@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "AmanitaSale",
+  "sourceName": "contracts/AmanitaSale.sol",
+  "abi": [],
+  "bytecode": "0x6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea26469706673582212205be1caff2bb4bcdb89a790f1c34664b2d5285f09bfc78c1120048198dd54d0f864736f6c63430008140033",
+  "deployedBytecode": "0x6080604052600080fdfea26469706673582212205be1caff2bb4bcdb89a790f1c34664b2d5285f09bfc78c1120048198dd54d0f864736f6c63430008140033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
