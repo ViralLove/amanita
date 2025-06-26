@@ -35,3 +35,4 @@ bot/.env.production
 /bot/services/__pycache__
 /bot/services/core/storage/__pycache__
 /bot/__pycache__
+bot/tests/__pycache__/test_blockchain.cpython-311-pytest-8.3.5.pyc
