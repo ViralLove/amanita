@@ -1,0 +1,26 @@
+{
+  "welcome": "Velkommen til AMANITA!",
+  "onboarding": {
+    "welcome": "👋 Hei! Du befinner deg i AMANITA-økosystemet, et samarbeidsfellesskap av New Earth Creators, Gaia-allierte. Det er her de som bidrar til å gjenopprette menneskelige og åndelige verdier samles. Vi setter stor pris på renheten i vårt fellesskap, så adgang er kun etter invitasjon.",
+    "continue": "Fortsettelse følger",
+    "choose_language": "Vennligst velg et språk:",
+    "language_russian": "🇷🇺 Russisk",
+    "language_english": "🇬🇧 engelsk",
+    "language_spanish": "🇪🇸 engelsk",
+    "language_estonian": "🇪🇪 Estland",
+    "about_invite": "Det er et lukket økosystem. For å delta trenger du en invitasjonskode, som du bare kan få fra et medlem. Hver deltaker kan bare gi ut 12 invitasjoner. Det er umulig å kjøpe en invitasjon, og du kan bare overføre den én gang - dette er et forsvar mot inntrengere og svindel.",
+    "next": "Videre",
+    "invite_prompt": "Vennligst skriv inn invitasjonskoden:",
+    "invite_from_link": "Vi har oppdaget en invitasjonskode i lenken din. Vennligst bekreft den:",
+    "invite_confirm": "Bekreft",
+    "no_invite": "Jeg har ikke koden.",
+    "no_invite_explanation": "Be om en invitasjon fra dem som allerede er en del av vårt fellesskap, og som du føler står deg nær i ånden. Dette er den eneste måten å bli en del av AMANITA på.",
+    "invite_checking": "Sjekker invitasjonskoden din....",
+    "onboarding_success": "🎉 Gratulerer! Du har blitt en del av AMANITA-økosystemet. Nå kan du gjøre det:\n- Invitere venner\n- Lære mer om bonuser\n- Gå til hovedmenyen",
+    "main_menu": "Hovedmeny",
+    "learn_bonuses": "Lær mer om bonuser",
+    "invite_friend": "Inviter en venn",
+    "help": "Hjelp",
+    "faq": "Ofte stilte spørsmål"
+  }
+}

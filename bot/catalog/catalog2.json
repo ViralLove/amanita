@@ -1,0 +1,353 @@
+[
+  {
+    "id": "amanita-muscaria-1",
+    "title": "Amanita muscaria — sliced caps and gills (1st grade)",
+    "description": "First grade sliced caps and gills of Amanita muscaria mushroom",
+    "categories": ["mushroom", "amanita_muscaria"],
+    "cover_image": "ar://QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+    "attributes": {
+      "species": "Amanita muscaria",
+      "form": "mixed slices"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "80 €"
+      }
+    ]
+  },
+  {
+    "id": "amanita-muscaria-2",
+    "title": "Amanita muscaria — whole closed caps",
+    "description": "Whole closed caps of Amanita muscaria mushroom",
+    "categories": ["mushroom", "amanita_muscaria"],
+    "cover_image": "ar://QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1",
+    "attributes": {
+      "species": "Amanita muscaria",
+      "form": "whole caps"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "90 €"
+      }
+    ]
+  },
+  {
+    "id": "amanita-muscaria-3",
+    "title": "Amanita muscaria — broken / collapsed caps",
+    "description": "Broken and collapsed caps of Amanita muscaria mushroom",
+    "categories": ["mushroom", "amanita_muscaria"],
+    "cover_image": "ar://QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B",
+    "attributes": {
+      "species": "Amanita muscaria",
+      "form": "broken caps"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "60 €"
+      }
+    ]
+  },
+  {
+    "id": "amanita-muscaria-4",
+    "title": "Amanita muscaria — premium quality caps (LUX)",
+    "description": "Premium quality (LUX) caps of Amanita muscaria mushroom",
+    "categories": ["mushroom", "amanita_muscaria"],
+    "cover_image": "ar://Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz",
+    "attributes": {
+      "species": "Amanita muscaria",
+      "form": "premium caps"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "90 €"
+      }
+    ]
+  },
+  {
+    "id": "amanita-pantherina-1",
+    "title": "Amanita pantherina — whole dried caps",
+    "description": "Whole dried caps of Amanita pantherina mushroom",
+    "categories": ["mushroom", "amanita_pantherina"],
+    "cover_image": "ar://QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn",
+    "attributes": {
+      "species": "Amanita pantherina",
+      "form": "whole dried"
+    },
+    "price_variants": [
+      {
+        "weight": "30 г",
+        "price": "60 €"
+      },
+      {
+        "weight": "50 г",
+        "price": "100 €"
+      },
+      {
+        "weight": "50 г",
+        "price": "90 €",
+        "form": "powder"
+      }
+    ]
+  },
+  {
+    "id": "amanita-muscaria-5",
+    "title": "Amanita muscaria — dried powder",
+    "description": "Dried powder form of Amanita muscaria mushroom",
+    "categories": ["mushroom", "amanita_muscaria"],
+    "cover_image": "ar://QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd",
+    "attributes": {
+      "species": "Amanita muscaria",
+      "form": "powder"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "60 €"
+      }
+    ]
+  },
+  {
+    "id": "amanita-muscaria-6",
+    "title": "Amanita muscaria — alcohol tincture",
+    "description": "Alcohol tincture of Amanita muscaria mushroom",
+    "categories": ["mushroom", "amanita_muscaria"],
+    "cover_image": "ar://QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa",
+    "attributes": {
+      "species": "Amanita muscaria",
+      "form": "tincture"
+    },
+    "price_variants": [
+      {
+        "volume": "50 мл",
+        "price": "15 €"
+      }
+    ]
+  },
+  {
+    "id": "blue-lotus-1",
+    "title": "Blue Lotus — alcohol tincture",
+    "description": "Alcohol tincture of Blue Lotus (Nymphaea caerulea)",
+    "categories": ["plant", "blue_lotus"],
+    "cover_image": "ar://QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
+    "attributes": {
+      "species": "Nymphaea caerulea (Blue Lotus)",
+      "form": "tincture"
+    },
+    "price_variants": [
+      {
+        "volume": "50 мл",
+        "price": "20 €"
+      }
+    ]
+  },
+  {
+    "id": "blue-lotus-2",
+    "title": "Blue Lotus — dried flowers",
+    "description": "Dried flowers of Blue Lotus (Nymphaea caerulea)",
+    "categories": ["plant", "blue_lotus"],
+    "cover_image": "ar://QmT5RC6Q6MRRF3YoDcXmKamKntXT6oSvxk3G2aLDkPc17T",
+    "attributes": {
+      "species": "Nymphaea caerulea (Blue Lotus)",
+      "form": "flower"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "30 €"
+      }
+    ]
+  },
+  {
+    "id": "chaga-1",
+    "title": "Chaga mushroom — dried chunks",
+    "description": "Dried chunks of Chaga mushroom (Inonotus obliquus)",
+    "categories": ["mushroom", "chaga"],
+    "cover_image": "ar://QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c",
+    "attributes": {
+      "species": "Inonotus obliquus (Chaga)",
+      "form": "chunks"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "10 €"
+      },
+      {
+        "weight": "200 г",
+        "price": "15 €"
+      }
+    ]
+  },
+  {
+    "id": "cordyceps-1",
+    "title": "Cordyceps militaris — powdered",
+    "description": "Powdered form of Cordyceps militaris mushroom",
+    "categories": ["mushroom", "cordyceps"],
+    "cover_image": "ar://QmW25vHA9WA78VENPus3A8Zrn45YeFMjVKWLJwfA5CEfSQ",
+    "attributes": {
+      "species": "Cordyceps militaris",
+      "form": "powder"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "40 €"
+      }
+    ]
+  },
+  {
+    "id": "cordyceps-2",
+    "title": "Cordyceps militaris — dried fruiting bodies",
+    "description": "Dried fruiting bodies of Cordyceps militaris mushroom",
+    "categories": ["mushroom", "cordyceps"],
+    "cover_image": "ar://QmfYLGvSUq2FEszpyLoyu28PLmeTMXk6zikT3c5W43kshP",
+    "attributes": {
+      "species": "Cordyceps militaris",
+      "form": "dried bodies"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "30 €"
+      }
+    ]
+  },
+  {
+    "id": "chanterelle-1",
+    "title": "Chanterelle mushrooms — dried",
+    "description": "Dried Chanterelle mushrooms (Cantharellus cibarius)",
+    "categories": ["mushroom", "chanterelle"],
+    "cover_image": "ar://QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa",
+    "attributes": {
+      "species": "Cantharellus cibarius (Chanterelle)",
+      "form": "dried"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "30 €",
+        "form": "dried"
+      },
+      {
+        "weight": "100 г",
+        "price": "40 €",
+        "form": "powder"
+      }
+    ]
+  },
+  {
+    "id": "aspen-bark-1",
+    "title": "Aspen bark — dried strips",
+    "description": "Dried strips of Aspen bark (Populus tremula)",
+    "categories": ["plant", "aspen"],
+    "cover_image": "ar://QmZGLPHZxDJP4VRbZbR8CRBY2widf5wMqMvu3rowhJGvCT",
+    "attributes": {
+      "species": "Populus tremula (Aspen)",
+      "form": "dried strips"
+    },
+    "price_variants": [
+      {
+        "weight": "200 г",
+        "price": "10 €"
+      }
+    ]
+  },
+  {
+    "id": "lions-mane-1",
+    "title": "Lion's Mane mushroom — powder",
+    "description": "Powdered form of Lion's Mane mushroom (Hericium erinaceus)",
+    "categories": ["mushroom", "lions_mane"],
+    "cover_image": "ar://QmTU5LpEp2qDBpCiWnZHEDuUK7BES3gm8wNWihn7ShqjAv",
+    "attributes": {
+      "species": "Hericium erinaceus (Lion's Mane)",
+      "form": "powder"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "40 €"
+      }
+    ]
+  },
+  {
+    "id": "lions-mane-2",
+    "title": "Lion's Mane mushroom — whole dried",
+    "description": "Whole dried Lion's Mane mushroom (Hericium erinaceus)",
+    "categories": ["mushroom", "lions_mane"],
+    "cover_image": "ar://QmXzbH3aeiyYyn5b4YSHe2kvNCQuUXtMngL91MeVjHH3vJ",
+    "attributes": {
+      "species": "Hericium erinaceus (Lion's Mane)",
+      "form": "whole dried"
+    },
+    "price_variants": [
+      {
+        "weight": "100 г",
+        "price": "30 €"
+      }
+    ]
+  },
+  {
+    "id": "passionflower-1",
+    "title": "Passionflower — dried aerial parts",
+    "description": "Dried aerial parts of Passionflower (Passiflora incarnata)",
+    "categories": ["plant", "passionflower"],
+    "cover_image": "ar://QmbtaSzChNvcjXEZZc3PpMXpcwVjpgQ5v1qfktbNGwuZZa",
+    "attributes": {
+      "species": "Passiflora incarnata (Passionflower)",
+      "form": "dried flowers"
+    },
+    "price_variants": []
+  },
+  {
+    "id": "nettle-tea-1",
+    "title": "Nettle Tea",
+    "description": "Tea made from Nettle (Urtica dioica)",
+    "categories": ["plant", "tea"],
+    "cover_image": "",
+    "attributes": {
+      "species": "Urtica dioica",
+      "form": "tea"
+    },
+    "price_variants": [
+      {
+        "price": "10 €"
+      }
+    ]
+  },
+  {
+    "id": "mint-tea-1",
+    "title": "Mint Tea",
+    "description": "Tea made from Peppermint (Mentha piperita)",
+    "categories": ["plant", "tea"],
+    "cover_image": "",
+    "attributes": {
+      "species": "Mentha piperita",
+      "form": "tea"
+    },
+    "price_variants": [
+      {
+        "price": "10 €"
+      }
+    ]
+  },
+  {
+    "id": "herbal-blend-1",
+    "title": "Herbal Tea Blend",
+    "description": "Special blend of herbal tea",
+    "categories": ["plant", "tea"],
+    "cover_image": "",
+    "attributes": {
+      "species": "Herbal blend",
+      "form": "tea"
+    },
+    "price_variants": [
+      {
+        "price": "10 €"
+      }
+    ]
+  }
+]

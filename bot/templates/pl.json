@@ -1,0 +1,26 @@
+{
+  "welcome": "Witamy w AMANITA!",
+  "onboarding": {
+    "welcome": "Jesteś w ekosystemie AMANITA, współpracującej społeczności Twórców Nowej Ziemi, Sojuszników Gai. To tutaj gromadzą się ci, którzy pomagają przywrócić ludzkie i duchowe wartości. Bardzo cenimy sobie czystość naszej społeczności, więc wstęp jest tylko na zaproszenie.",
+    "continue": "Ciąg dalszy nastąpi",
+    "choose_language": "Wybierz język:",
+    "language_russian": "🇷🇺 Rosyjski",
+    "language_english": "🇬🇧 Angielski",
+    "language_spanish": "🇪🇸 Angielski",
+    "language_estonian": "🇪🇪 Estonia",
+    "about_invite": "Jest to zamknięty ekosystem. Aby wziąć w nim udział, potrzebny jest kod zaproszenia, który można otrzymać tylko od jednego z uczestników. Każdy uczestnik może rozdać tylko 12 zaproszeń. Nie można kupić zaproszenia i można je przenieść tylko raz - jest to obrona przed intruzami i oszustwami.",
+    "next": "Dalej",
+    "invite_prompt": "Wprowadź kod zaproszenia:",
+    "invite_from_link": "Wykryliśmy kod zaproszenia w Twoim linku. Prosimy o jego potwierdzenie:",
+    "invite_confirm": "Potwierdzenie",
+    "no_invite": "Nie mam kodu.",
+    "no_invite_explanation": "Poproś o zaproszenie od tych, którzy są już częścią naszej społeczności i którzy są ci bliscy duchowo. To jedyny sposób, aby stać się częścią AMANITA.",
+    "invite_checking": "Sprawdzanie kodu zaproszenia.....",
+    "onboarding_success": "Gratulacje! Pomyślnie dołączyłeś do ekosystemu AMANITA. Możesz teraz\n- Zapraszać znajomych\n- Dowiedzieć się o bonusach\n- Przejść do menu głównego",
+    "main_menu": "Menu główne",
+    "learn_bonuses": "Dowiedz się więcej o bonusach",
+    "invite_friend": "Zaproś znajomego",
+    "help": "Pomoc",
+    "faq": "Często zadawane pytania"
+  }
+}

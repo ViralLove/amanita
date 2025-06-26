@@ -1,0 +1,23 @@
+{
+  "id": "lion's_mane_powder",
+  "title": "Lions Main — Powder",
+  "description_cid": "Qmen7LPjMtRpY2idijrTbhU81xMuQGxrhcfdduyDbApNa1",
+  "categories": [
+    "mushroom",
+    "mental health",
+    "focus",
+    "ADHD support",
+    "mental force"
+  ],
+  "cover_image": "QmTU5LpEp2qDBpCiWnZHEDuUK7BES3gm8wNWihn7ShqjAv",
+  "form": "dried powder",
+  "species": "Hericium erinaceus (Lion's Mane)",
+  "prices": [
+    {
+      "weight": "100",
+      "weight_unit": "g",
+      "price": "40",
+      "currency": "EUR"
+    }
+  ]
+}

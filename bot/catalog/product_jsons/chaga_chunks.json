@@ -1,0 +1,27 @@
+{
+  "id": "chaga_chunks",
+  "title": "Chaga",
+  "description_cid": "Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93",
+  "categories": [
+    "mushroom",
+    "immune system",
+    "vital force"
+  ],
+  "cover_image": "QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c",
+  "form": "chunks",
+  "species": "Inonotus obliquus (Chaga)",
+  "prices": [
+    {
+      "weight": "100",
+      "weight_unit": "g",
+      "price": "10",
+      "currency": "EUR"
+    },
+    {
+      "weight": "200",
+      "weight_unit": "g",
+      "price": "15",
+      "currency": "EUR"
+    }
+  ]
+}

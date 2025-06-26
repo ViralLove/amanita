@@ -1,0 +1,87 @@
+[
+    {
+      "id": "amanita-red-1",
+      "title": "Закрытые шляпки",
+      "description": "Цельные закрытые шляпки красного мухомора — это мощный природный союзник для тех, кто много работает умом и живёт в условиях постоянного стресса...",
+      "price": "90 €",
+      "categories": ["amanita_red"],
+      "cover_image": "ar://vaX0jdNhrFl0jepb00CasYzZKDleko6zelstfRYII0E",
+      "attributes": {
+        "weight": "100 г",
+        "note": ""
+      }
+    },
+    {
+      "id": "amanita-red-2",
+      "title": "Открытые шляпки LUX",
+      "description": "Эти открытые шляпки LUX-класса — выбор для тех, кто ценит глубину и чистоту грибного духа...",
+      "price": "90 €",
+      "categories": ["amanita_red"],
+      "cover_image": "ar://4dPBt_nl2077MPXLgml7MqcMw6jn8CIRiQpG0bSrTns",
+      "attributes": {
+        "weight": "100 г",
+        "note": ""
+      }
+    },
+    {
+      "id": "amanita-red-3",
+      "title": "Открытые шляпки 1 сорт",
+      "description": "Открытые шляпки первого сорта — прекрасный баланс между доступностью и силой...",
+      "price": "80 €",
+      "categories": ["amanita_red"],
+      "cover_image": "ar://bvzJBNUsp2AiayEtdeVZObQin2Embuly_IETHAk3KPY",
+      "attributes": {
+        "weight": "100 г",
+        "note": ""
+      }
+    },
+    {
+      "id": "amanita-red-4",
+      "title": "Поломанные шляпки",
+      "description": "Поломанные шляпки — экономичный вариант для микродозинга...",
+      "price": "60 €",
+      "categories": ["amanita_red"],
+      "cover_image": "ar://Q2oJRqCfrZzKL8rdI0ycarwtcjWRADDie01t7CRhsl8",
+      "attributes": {
+        "weight": "100 г",
+        "note": "ограниченное количество"
+      }
+    },
+    {
+      "id": "amanita-red-5",
+      "title": "Молотый порошок",
+      "description": "Порошок красного мухомора — готовая форма для удобного микродозинга...",
+      "price": "60 €",
+      "categories": ["amanita_red"],
+      "cover_image": "ar://0nyvefbHdiucHHjcEWiwl60wHWtCfC0HV7sshwL8PnY",
+      "attributes": {
+        "weight": "100 г",
+        "note": ""
+      }
+    },
+    {
+      "id": "amanita-red-6",
+      "title": "Капсулы (60 шт. по 0,4 г)",
+      "description": "Капсулы с сушёным мухомором — это современный и точный способ микродозинга...",
+      "price": "30 €",
+      "categories": ["amanita_red"],
+      "cover_image": "ar://vaX0jdNhrFl0jepb00CasYzZKDleko6zelstfRYII0E",
+      "attributes": {
+        "weight": "60 шт. по 0,4 г",
+        "note": ""
+      }
+    },
+    {
+      "id": "amanita-red-7",
+      "title": "Настойка (на сырых шляпках, спирт 95°)",
+      "description": "Настойка на сырых шляпках мухомора — традиционный способ экстрагирования активных веществ гриба...",
+      "price": "15 €",
+      "categories": ["amanita_red"],
+      "cover_image": "ar://PGT6S-0O6CrGVwV-c7DyuNRFCbBUqDkNOAQAe87hVW4",
+      "attributes": {
+        "weight": "50 мл",
+        "note": ""
+      }
+    }
+  ]
+  

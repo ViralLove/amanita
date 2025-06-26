@@ -1,0 +1,113 @@
+{
+    "valid_products": [
+        {
+            "id": "amanita1",
+            "title": "Amanita muscaria — sliced caps and gills (1st grade)",
+            "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+            "categories": [
+                "mushroom",
+                "mental health",
+                "focus",
+                "ADHD support",
+                "mental force"
+            ],
+            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "form": "mixed slices",
+            "species": "Amanita muscaria",
+            "prices": [
+                {
+                    "weight": "100",
+                    "weight_unit": "g",
+                    "price": "80",
+                    "currency": "EUR"
+                }
+            ]
+        },
+        {
+            "id": "blue_lotus_tincture",
+            "title": "Blue Lotus — Tinctura",
+            "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+            "categories": [
+                "plant",
+                "mental health",
+                "focus",
+                "ADHD support",
+                "mental force"
+            ],
+            "cover_image": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
+            "form": "tincture",
+            "species": "Nymphaea caerulea (Blue Lotus)",
+            "prices": [
+                {
+                    "volume": "50",
+                    "volume_unit": "ml",
+                    "price": "20",
+                    "currency": "EUR"
+                }
+            ]
+        }
+    ],
+    "invalid_products": [
+        {
+            "id": "invalid_empty_fields",
+            "title": "",
+            "description_cid": "",
+            "categories": [],
+            "cover_image": "",
+            "form": "",
+            "species": "",
+            "prices": []
+        },
+        {
+            "id": "invalid_price_format",
+            "title": "Test Product",
+            "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+            "categories": ["test"],
+            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "form": "test",
+            "species": "test",
+            "prices": [
+                {
+                    "weight": "-100",
+                    "weight_unit": "invalid",
+                    "price": "not_a_number",
+                    "currency": "INVALID"
+                }
+            ]
+        },
+        {
+            "id": "invalid_cid_format",
+            "title": "Test Product",
+            "description_cid": "invalid_cid",
+            "categories": ["test"],
+            "cover_image": "invalid_cid",
+            "form": "test",
+            "species": "test",
+            "prices": [
+                {
+                    "weight": "100",
+                    "weight_unit": "g",
+                    "price": "50",
+                    "currency": "EUR"
+                }
+            ]
+        },
+        {
+            "id": "invalid_currency",
+            "title": "Test Product",
+            "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+            "categories": ["test"],
+            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "form": "test",
+            "species": "test",
+            "prices": [
+                {
+                    "weight": "100",
+                    "weight_unit": "g",
+                    "price": "50",
+                    "currency": "INVALID"
+                }
+            ]
+        }
+    ]
+} 

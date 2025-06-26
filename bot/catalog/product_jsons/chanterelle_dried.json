@@ -1,0 +1,22 @@
+{
+  "id": "chanterelle_dried",
+  "title": "Foxes",
+  "description_cid": "QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE",
+  "categories": [
+    "mushroom",
+    "antiparasite",
+    "immune system",
+    "vital force"
+  ],
+  "cover_image": "QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa",
+  "form": "dried whole",
+  "species": "Cantharellus cibarius (Chanterelle)",
+  "prices": [
+    {
+      "weight": "100",
+      "weight_unit": "g",
+      "price": "30",
+      "currency": "EUR"
+    }
+  ]
+}

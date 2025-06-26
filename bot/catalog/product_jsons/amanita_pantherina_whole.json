@@ -1,0 +1,35 @@
+{
+  "id": "amanita_pantherina_whole",
+  "title": "Amanita — Pantera",
+  "description_cid": "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy",
+  "categories": [
+    "mushroom",
+    "mental health",
+    "focus",
+    "ADHD support",
+    "mental force"
+  ],
+  "cover_image": "QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn",
+  "form": "unknown",
+  "species": "Amanita pantherina",
+  "prices": [
+    {
+      "weight": "30",
+      "weight_unit": "g",
+      "price": "60",
+      "currency": "EUR"
+    },
+    {
+      "weight": "50",
+      "weight_unit": "g",
+      "price": "100",
+      "currency": "EUR"
+    },
+    {
+      "weight": "50",
+      "weight_unit": "g",
+      "price": "90",
+      "currency": "EUR"
+    }
+  ]
+}

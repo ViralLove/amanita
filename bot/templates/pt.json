@@ -1,0 +1,26 @@
+{
+  "welcome": "Bem-vindo ao AMANITA!",
+  "onboarding": {
+    "welcome": "Olá! Estás no ecossistema AMANITA, uma comunidade cooperativa de Criadores da Nova Terra, Aliados de Gaia. É aqui que se reúnem aqueles que ajudam a restaurar os valores humanos e espirituais. Valorizamos muito a pureza da nossa comunidade, por isso a entrada é apenas por convite.",
+    "continue": "Para continuar",
+    "choose_language": "Selecione uma língua:",
+    "language_russian": "🇷🇺 Russo",
+    "language_english": "🇬🇧 Inglês",
+    "language_spanish": "🇪🇸 Inglês",
+    "language_estonian": "🇪🇪 Estónia",
+    "about_invite": "Trata-se de um ecossistema fechado. Para participar, é necessário um código de convite, que só pode ser obtido junto de um membro. Cada participante só pode distribuir 12 convites. É impossível comprar um convite e só é possível transferi-lo uma vez - esta é uma defesa contra intrusos e burlas.",
+    "next": "Mais",
+    "invite_prompt": "Introduzir o código de convite:",
+    "invite_from_link": "Detectámos um código de convite na sua ligação. Por favor, confirme-o:",
+    "invite_confirm": "Reconhecer",
+    "no_invite": "Não tenho o código.",
+    "no_invite_explanation": "Peça um convite àqueles que já fazem parte da nossa comunidade e que sente que estão próximos de si em espírito. Esta é a única maneira de se tornar parte de AMANITA.",
+    "invite_checking": "Verificar o seu código de convite....",
+    "onboarding_success": "🎉 Parabéns! Aderiu com sucesso ao ecossistema AMANITA. Agora pode:\n- Convidar amigos\n- Conhecer os bónus\n- Ir para o menu principal",
+    "main_menu": "Menu principal",
+    "learn_bonuses": "Saiba mais sobre os bónus",
+    "invite_friend": "Convidar um amigo",
+    "help": "Ajuda",
+    "faq": "Perguntas mais frequentes"
+  }
+}

@@ -1,5 +1,12 @@
 {
   "name": "hardhat-project",
+  "scripts": {
+    "deploy:registry": "hardhat run scripts/deploy_full.js 0",
+    "deploy:all": "hardhat run scripts/deploy_full.js 1",
+    "deploy:contracts": "hardhat run scripts/deploy_full.js 2",
+    "deploy:invites": "hardhat run scripts/deploy_full.js 3",
+    "deploy:catalog": "hardhat run scripts/deploy_full.js 4"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "hardhat": "^2.24.0"

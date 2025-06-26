@@ -1,0 +1,23 @@
+{
+  "id": "amanita_lux",
+  "title": "Amanita — LUX",
+  "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+  "categories": [
+    "mushroom",
+    "mental health",
+    "focus",
+    "ADHD support",
+    "mental force"
+  ],
+  "cover_image": "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz",
+  "form": "premium caps",
+  "species": "Amanita muscaria",
+  "prices": [
+    {
+      "weight": "100",
+      "weight_unit": "g",
+      "price": "90",
+      "currency": "EUR"
+    }
+  ]
+}

@@ -1,0 +1,402 @@
+[
+  {
+    "id": "amanita1",
+    "title": "Amanita muscaria — sliced caps and gills (1st grade)",
+    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "categories": [
+      "mushroom",
+      "mental health",
+      "focus",
+      "ADHD support",
+      "mental force"
+    ],
+    "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+    "form": "mixed slices",
+    "species": "Amanita muscaria",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "80",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "amanita_closed_cups",
+    "title": "Amanita — Closed hat",
+    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "categories": [
+      "mushroom",
+      "mental health",
+      "focus",
+      "ADHD support",
+      "mental force"
+    ],
+    "cover_image": "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1",
+    "form": "whole caps",
+    "species": "Amanita muscaria",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "90",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "amanita_broken_closed_cups",
+    "title": "Amanita — Collapsed hats",
+    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "categories": [
+      "mushroom",
+      "mental health",
+      "focus",
+      "ADHD support",
+      "mental force"
+    ],
+    "cover_image": "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B",
+    "form": "broken caps",
+    "species": "Amanita muscaria",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "60",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "amanita_lux",
+    "title": "Amanita — LUX",
+    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "categories": [
+      "mushroom",
+      "mental health",
+      "focus",
+      "ADHD support",
+      "mental force"
+    ],
+    "cover_image": "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz",
+    "form": "premium caps",
+    "species": "Amanita muscaria",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "90",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "amanita_pantherina_whole",
+    "title": "Amanita — Pantera",
+    "description_cid": "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy",
+    "categories": [
+      "mushroom",
+      "mental health",
+      "focus",
+      "ADHD support",
+      "mental force"
+    ],
+    "cover_image": "QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn",
+    "form": "unknown",
+    "species": "Amanita pantherina",
+    "prices": [
+      {
+        "weight": "30",
+        "weight_unit": "g",
+        "price": "60",
+        "currency": "EUR"
+      },
+      {
+        "weight": "50",
+        "weight_unit": "g",
+        "price": "100",
+        "currency": "EUR"
+      },
+      {
+        "weight": "50",
+        "weight_unit": "g",
+        "price": "90",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "amanita_pantherina_powder",
+    "title": "Amanita — Powder",
+    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "categories": [
+      "mushroom",
+      "mental health",
+      "focus",
+      "ADHD support",
+      "mental force"
+    ],
+    "cover_image": "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd",
+    "form": "powder",
+    "species": "Amanita muscaria",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "60",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "amanita_tincture",
+    "title": "Amanita — Tinctura",
+    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "categories": [
+      "mushroom",
+      "mental health",
+      "focus",
+      "ADHD support",
+      "mental force"
+    ],
+    "cover_image": "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa",
+    "form": "tincture",
+    "species": "Amanita muscaria",
+    "prices": [
+      {
+        "volume": "50",
+        "volume_unit": "ml",
+        "price": "15",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "blue_lotus_tincture",
+    "title": "Blue Lotus — Tinctura",
+    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+    "categories": [
+      "plant",
+      "mental health",
+      "focus",
+      "ADHD support",
+      "mental force"
+    ],
+    "cover_image": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
+    "form": "tincture",
+    "species": "Nymphaea caerulea (Blue Lotus)",
+    "prices": [
+      {
+        "volume": "50",
+        "volume_unit": "ml",
+        "price": "20",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "blue_lotus_flowers",
+    "title": "Blue Lotus",
+    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+    "categories": [
+      "plant",
+      "mental health",
+      "focus",
+      "ADHD support",
+      "mental force"
+    ],
+    "cover_image": "QmT5RC6Q6MRRF3YoDcXmKamKntXT6oSvxk3G2aLDkPc17T",
+    "form": "flower",
+    "species": "Nymphaea caerulea (Blue Lotus)",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "30",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "chaga_chunks",
+    "title": "Chaga",
+    "description_cid": "Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93",
+    "categories": [
+      "mushroom",
+      "immune system",
+      "vital force"
+    ],
+    "cover_image": "QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c",
+    "form": "chunks",
+    "species": "Inonotus obliquus (Chaga)",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "10",
+        "currency": "EUR"
+      },
+      {
+        "weight": "200",
+        "weight_unit": "g",
+        "price": "15",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "cordyceps_militaris_powder",
+    "title": "cordyceps_militaris",
+    "description_cid": "QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy",
+    "categories": [
+      "mushroom",
+      "immune system",
+      "vital force"
+    ],
+    "cover_image": "",
+    "form": "powder",
+    "species": "Cordyceps militaris",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "40",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "cordyceps_militaris_dried_bodies",
+    "title": "cordyceps_militaris_powder",
+    "description_cid": "QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy",
+    "categories": [
+      "mushroom",
+      "immune system",
+      "vital force"
+    ],
+    "cover_image": "",
+    "form": "dried whole",
+    "species": "Cordyceps militaris",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "30",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "chanterelle_dried",
+    "title": "Foxes",
+    "description_cid": "QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE",
+    "categories": [
+      "mushroom",
+      "antiparasite",
+      "immune system",
+      "vital force"
+    ],
+    "cover_image": "QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa",
+    "form": "dried whole",
+    "species": "Cantharellus cibarius (Chanterelle)",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "30",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "chanterelle_powder",
+    "title": "Foxes",
+    "description_cid": "QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE",
+    "categories": [
+      "mushroom",
+      "antiparasite",
+      "immune system",
+      "vital force"
+    ],
+    "cover_image": "QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa",
+    "form": "dried powder",
+    "species": "Cantharellus cibarius (Chanterelle)",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "40",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "aspen_bark_dried_strips",
+    "title": "Kora Osiny",
+    "description_cid": "QmT1QMFRpSXHQPUv524EdthjxVUeZFgGM3c8FwVvrYbiXJ",
+    "categories": [
+      "plant",
+      "antiparasite",
+      "immune system",
+      "vital force"
+    ],
+    "cover_image": "QmZGLPHZxDJP4VRbZbR8CRBY2widf5wMqMvu3rowhJGvCT",
+    "form": "dried strips",
+    "species": "Populus tremula (Aspen)",
+    "prices": [
+      {
+        "weight": "200",
+        "weight_unit": "g",
+        "price": "10",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "lions_mane_powder",
+    "title": "Lions Main — Powder",
+    "description_cid": "QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1",
+    "categories": [
+      "mushroom",
+      "mental health",
+      "focus",
+      "ADHD support",
+      "mental force"
+    ],
+    "cover_image": "QmTU5LpEp2qDBpCiWnZHEDuUK7BES3gm8wNWihn7ShqjAv",
+    "form": "powder",
+    "species": "Hericium erinaceus (Lion's Mane)",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "40",
+        "currency": "EUR"
+      }
+    ]
+  },
+  {
+    "id": "Lion's Mane mushroom — whole dried",
+    "title": "Lions Main",
+    "description_cid": "QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1",
+    "categories": [
+      "mushroom",
+      "mental health",
+      "focus",
+      "ADHD support",
+      "mental force"
+    ],
+    "cover_image": "QmXzbH3aeiyYyn5b4YSHe2kvNCQuUXtMngL91MeVjHH3vJ",
+    "form": "whole dried",
+    "species": "Hericium erinaceus (Lion's Mane)",
+    "prices": [
+      {
+        "weight": "100",
+        "weight_unit": "g",
+        "price": "30",
+        "currency": "EUR"
+      }
+    ]
+  }
+]

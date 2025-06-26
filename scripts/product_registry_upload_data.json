@@ -1,0 +1,44 @@
+[
+  {
+    "id": "amanita-red-1",
+    "ipfsCID": "_x68-GTbjVxgPhBc01psD98g7yVFqEOUDo5n1GLfXbo",
+    "price": 90,
+    "active": true
+  },
+  {
+    "id": "amanita-red-2",
+    "ipfsCID": "7_C3eDOHm7VDiogwnqEOPwh8WbOP_aEeNloMSOv7lwo",
+    "price": 90,
+    "active": true
+  },
+  {
+    "id": "amanita-red-3",
+    "ipfsCID": "5sYdiRnFhFnk5e4l9dALQj_0cYf2hmSe1ws85b8MRxc",
+    "price": 80,
+    "active": true
+  },
+  {
+    "id": "amanita-red-4",
+    "ipfsCID": "DNYxb4WJAucKGjSNlkn8ZqAtWy6zzdfaJFEE8lTTcKM",
+    "price": 60,
+    "active": true
+  },
+  {
+    "id": "amanita-red-5",
+    "ipfsCID": "3f5aXbrEZHVEhuA_Ix543_2pUoJ4kW2QB1HDt4sgW6Q",
+    "price": 60,
+    "active": true
+  },
+  {
+    "id": "amanita-red-6",
+    "ipfsCID": "3L06HeTAZIUGjkrfJsShnTSEMx3c0xhK7OuAOmaO7i4",
+    "price": 30,
+    "active": true
+  },
+  {
+    "id": "amanita-red-7",
+    "ipfsCID": "vg8XjkBpgHz0AdqaoRArsgBdJPOvZQBvDjAUXZzBVvY",
+    "price": 15,
+    "active": true
+  }
+]

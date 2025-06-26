@@ -1,0 +1,23 @@
+{
+  "id": "amanita_closed_cups",
+  "title": "Amanita — Closed hat",
+  "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+  "categories": [
+    "mushroom",
+    "mental health",
+    "focus",
+    "ADHD support",
+    "mental force"
+  ],
+  "cover_image": "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1",
+  "form": "whole caps",
+  "species": "Amanita muscaria",
+  "prices": [
+    {
+      "weight": "100",
+      "weight_unit": "g",
+      "price": "90",
+      "currency": "EUR"
+    }
+  ]
+}

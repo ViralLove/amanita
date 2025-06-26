@@ -1,0 +1,26 @@
+{
+  "welcome": "Laipni lūdzam AMANITA!",
+  "onboarding": {
+    "welcome": "👋 Sveiki! Jūs atrodaties AMANITA ekosistēmā - Jaunās Zemes Radītāju, Gaijas sabiedroto, kooperatīvā kopienā. Šeit pulcējas tie, kas palīdz atjaunot cilvēciskās un garīgās vērtības. Mēs ļoti augstu vērtējam mūsu kopienas tīrību, tāpēc ieeja tajā ir tikai ar ielūgumiem.",
+    "continue": "Turpinājums",
+    "choose_language": "Lūdzu, izvēlieties valodu:",
+    "language_russian": "🇷🇺 Krievu valoda",
+    "language_english": "🇬🇧 Angļu valoda",
+    "language_spanish": "🇪🇸 Angļu valoda",
+    "language_estonian": "🇪🇪 Igaunija",
+    "about_invite": "Tā ir slēgta ekosistēma. Lai tajā iekļūtu, ir nepieciešams ielūguma kods, ko var saņemt tikai no kāda dalībnieka. Katrs dalībnieks var izsniegt tikai 12 ielūgumus. Ielūgumu nav iespējams nopirkt, un to var nodot tikai vienu reizi - tā ir aizsardzība pret iebrucējiem un krāpniecību.",
+    "next": "Tālāk",
+    "invite_prompt": "Lūdzu, ievadiet ielūguma kodu:",
+    "invite_from_link": "Jūsu saitē esam atklājuši ielūguma kodu. Lūdzu, apstipriniet to:",
+    "invite_confirm": "Atzīt",
+    "no_invite": "Man nav koda.",
+    "no_invite_explanation": "Lūdziet ielūgumu tiem, kuri jau ir mūsu kopienas locekļi un kuri, jūsuprāt, ir jums garā tuvi. Tas ir vienīgais veids, kā kļūt par AMANITA biedru.",
+    "invite_checking": "Uzaicinājuma koda pārbaude....",
+    "onboarding_success": "🎉 Apsveicam! Jūs esat veiksmīgi pievienojies AMANITA ekosistēmai. Tagad jūs varat:\n- uzaicināt draugus\n- Uzzināt par prēmijām\n- Iet uz galveno izvēlni",
+    "main_menu": "Galvenā izvēlne",
+    "learn_bonuses": "Uzziniet vairāk par prēmijām",
+    "invite_friend": "Uzaicināt draugu",
+    "help": "Palīdzība",
+    "faq": "Biežāk uzdotie jautājumi"
+  }
+}

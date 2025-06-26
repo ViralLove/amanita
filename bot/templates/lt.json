@@ -1,0 +1,26 @@
+{
+  "welcome": "Sveiki atvykę į AMANITA!",
+  "onboarding": {
+    "welcome": "👋 Sveiki! Esate AMANITA ekosistemoje, bendradarbiaujančioje Naujosios Žemės kūrėjų, Gajos sąjungininkų, bendruomenėje. Čia renkasi tie, kurie padeda atkurti žmogiškąsias ir dvasines vertybes. Mes labai branginame savo bendruomenės tyrumą, todėl patekti į ją galima tik su kvietimais.",
+    "continue": "Bus tęsiama",
+    "choose_language": "Pasirinkite kalbą:",
+    "language_russian": "🇷🇺 Rusų kalba",
+    "language_english": "🇬🇧 Anglų kalba",
+    "language_spanish": "🇪🇸 Anglų kalba",
+    "language_estonian": "🇪🇪 Estija",
+    "about_invite": "Tai uždara ekosistema. Norint į ją patekti, reikia gauti pakvietimo kodą, kurį galite gauti tik iš nario. Kiekvienas dalyvis gali išdalyti tik 12 pakvietimų. Kvietimo neįmanoma nusipirkti, o perduoti jį galima tik vieną kartą - taip apsisaugoma nuo įsibrovėlių ir sukčiavimo.",
+    "next": "Daugiau",
+    "invite_prompt": "Įveskite kvietimo kodą:",
+    "invite_from_link": "Jūsų nuorodoje aptikome kvietimo kodą. Prašome jį patvirtinti:",
+    "invite_confirm": "Pripažinti",
+    "no_invite": "Neturiu kodo.",
+    "no_invite_explanation": "Paprašykite pakviesti tuos, kurie jau priklauso mūsų bendruomenei ir kurie, jūsų manymu, yra jums artimi savo dvasia. Tai vienintelis būdas tapti AMANITA dalimi.",
+    "invite_checking": "Kvietimo kodo tikrinimas....",
+    "onboarding_success": "🎉 Sveikiname! Jūs sėkmingai prisijungėte prie AMANITA ekosistemos. Dabar galite:\n- pakviesti draugus\n- Sužinoti apie premijas\n- Eiti į pagrindinį meniu",
+    "main_menu": "Pagrindinis meniu",
+    "learn_bonuses": "Sužinokite apie premijas",
+    "invite_friend": "Pakvieskite draugą",
+    "help": "Pagalba",
+    "faq": "Dažnai užduodami klausimai"
+  }
+}

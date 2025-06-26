@@ -1,0 +1,46 @@
+{
+  "amanita_muscaria": {
+    "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "file_name": "biounit_amanita-muscaria_description.json"
+  },
+  "amanita_pantherina": {
+    "cid": "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy",
+    "file_name": "biounit_amanita-pantherina_description.json"
+  },
+  "blue-lotus": {
+    "cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+    "file_name": "biounit_blue-lotus_description.json"
+  },
+  "inonotus_obliquus": {
+    "cid": "Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93",
+    "file_name": "biounit_chaga_description.json"
+  },
+  "cordyceps_militaris": {
+    "cid": "QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy",
+    "file_name": "biounit_cordyceps_description.json"
+  },
+  "cantharellus_cibarius": {
+    "cid": "QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE",
+    "file_name": "biounit_chanterelle_description.json"
+  },
+  "populus_tremula": {
+    "cid": "QmT1QMFRpSXHQPUv524EdthjxVUeZFgGM3c8FwVvrYbiXJ",
+    "file_name": "biounit_aspen_description.json"
+  },
+  "lions-mane": {
+    "cid": "QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1",
+    "file_name": "biounit_lions-mane_description.json"
+  },
+  "passionflower": {
+    "cid": "QmYXGiCLB1sPtkoskNWA5dCo8d9uW6RVVS94uq2xf6awQ7",
+    "file_name": "biounit_passionflower_description.json"
+  },
+  "nettle": {
+    "cid": "Qmer3AYuJ5uFksPFpEzcqB52nN4w7vpGbw1hMQqJdXuJ1G",
+    "file_name": "biounit_nettle_description.json"
+  },
+  "mint": {
+    "cid": "QmR88CGcBUqvHFMavUeuodQEuCDHMP4zKKxdN3QMYz7Ayj",
+    "file_name": "biounit_mint_description.json"
+  }
+}

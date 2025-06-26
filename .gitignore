@@ -16,3 +16,22 @@ node_modules
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
 /.cursor
+.DS_Store
+.cache_key
+amanita.pub
+bot.zip
+/bot/__pycache__
+/bot/__pycache__
+bot/arweave_wallet.json
+bot/.env.production
+/bot/tests/__pycache__
+/bot/tests/__pycache__
+/metrics
+/venv
+/bot/services/product/__pycache__
+/bot/services/core/__pycache__
+/bot/services/__pycache__
+/bot/model/__pycache__
+/bot/services/__pycache__
+/bot/services/core/storage/__pycache__
+/bot/__pycache__

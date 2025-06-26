@@ -1,0 +1,26 @@
+{
+  "welcome": "Tervetuloa AMANITAan!",
+  "onboarding": {
+    "welcome": "👋 Hei! Olet AMANITA-ekosysteemissä, Gaian liittolaisten, Uuden Maan Luojien, yhteistyöyhteisössä. Tänne kokoontuvat ne, jotka auttavat palauttamaan inhimilliset ja henkiset arvot. Arvostamme hyvin paljon yhteisömme puhtautta, joten sisäänpääsy on vain kutsun perusteella.",
+    "continue": "Jatkuu myöhemmin",
+    "choose_language": "Valitse kieli:",
+    "language_russian": "🇷🇺 Venäjä",
+    "language_english": "🇬🇧 English",
+    "language_spanish": "🇪🇸 English",
+    "language_estonian": "🇪🇪 Viro",
+    "about_invite": "Se on suljettu ekosysteemi. Sisäänpääsyyn tarvitset kutsukoodin, jonka saat vain jäseneltäsi. Kukin osallistuja voi antaa vain 12 kutsua. Kutsua ei voi ostaa, ja sen voi siirtää vain kerran - näin suojaudutaan tunkeilijoilta ja huijauksilta.",
+    "next": "Lisätietoja",
+    "invite_prompt": "Syötä kutsukoodi:",
+    "invite_from_link": "Olemme havainneet kutsukoodin linkissäsi. Vahvista se:",
+    "invite_confirm": "Kuittaa",
+    "no_invite": "Minulla ei ole koodia.",
+    "no_invite_explanation": "Pyydä kutsua niiltä, jotka ovat jo osa yhteisöämme ja joiden tunnet olevan henkisesti lähelläsi. Tämä on ainoa tapa tulla osaksi AMANITAa.",
+    "invite_checking": "Kutsukoodisi tarkistaminen....",
+    "onboarding_success": "🎉 Onnittelut! Olet onnistuneesti liittynyt AMANITA-ekosysteemiin. Voit nyt:\n- Kutsua ystäviä\n- Tutustua bonuksiin\n- Siirtyä päävalikkoon",
+    "main_menu": "Päävalikko",
+    "learn_bonuses": "Lisätietoja bonuksista",
+    "invite_friend": "Kutsu ystävä",
+    "help": "Apua",
+    "faq": "Usein kysytyt kysymykset"
+  }
+}

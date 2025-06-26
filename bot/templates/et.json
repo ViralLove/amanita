@@ -1,0 +1,26 @@
+{
+  "welcome": "Tere tulemast AMANITAsse!",
+  "onboarding": {
+    "welcome": "👋 Tere! Te olete AMANITA ökosüsteemis, mis on Uue Maa loojate, Gaia liitlaste koostöökogukond. Siia kogunevad need, kes aitavad taastada inimlikke ja vaimseid väärtusi. Me hindame väga kõrgelt oma kogukonna puhtust, seega on sissepääs ainult kutsetega.",
+    "continue": "Jätkub",
+    "choose_language": "Palun valige keel:",
+    "language_russian": "🇷🇺 Vene keel",
+    "language_english": "🇬🇧 English",
+    "language_spanish": "🇪🇸 English",
+    "language_estonian": "🇪🇪 Eesti",
+    "about_invite": "See on suletud ökosüsteem. Sisenemiseks on vaja kutsekoodi, mille saad ainult liikmelt. Iga osaleja saab välja anda ainult 12 kutset. Kutset ei ole võimalik osta ja seda saab edasi anda ainult üks kord - see on kaitseks sissetungijate ja pettuste vastu.",
+    "next": "Edasine",
+    "invite_prompt": "Palun sisestage kutsekood:",
+    "invite_from_link": "Oleme tuvastanud teie lingis kutsekoodi. Palun kinnitage see:",
+    "invite_confirm": "Kinnita",
+    "no_invite": "Mul ei ole koodi.",
+    "no_invite_explanation": "Paluge kutset nendelt, kes juba meie kogukonna liikmed on ja kellest tunnete, et nad on teile hingeliselt lähedased. See on ainus viis AMANITA osaks saada.",
+    "invite_checking": "Kutsekoodi kontrollimine.....",
+    "onboarding_success": "🎉 Palju õnne! Olete edukalt liitunud AMANITA ökosüsteemiga. Nüüd saate:\n- Kutsuda sõpru\n- Tutvuda boonustega\n- Minna peamenüüsse",
+    "main_menu": "Peamenüü",
+    "learn_bonuses": "Tutvu boonustega",
+    "invite_friend": "Kutsu sõber",
+    "help": "Abi",
+    "faq": "Korduma kippuvad küsimused"
+  }
+}

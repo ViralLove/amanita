@@ -1,0 +1,18 @@
+biounit_id,product_id,product_name,image_file,categories,form,species,prices
+amanita_muscaria,amanita1,Amanita muscaria — sliced caps and gills (1st grade),Amanita — 1 level.jpeg,"mushroom,mental health,focus,ADHD support,mental force",mixed slices,Amanita muscaria,100|g|80|EUR
+amanita_muscaria,amanita_closed_cups,Amanita — Closed hat,Amanita — Closed hats.jpeg,"mushroom,mental health,focus,ADHD support,mental force",whole caps,Amanita muscaria,100|g|90|EUR
+amanita_muscaria,amanita_broken_closed_cups,Amanita — Collapsed hats,Amanita — Collapsed hats.jpeg,"mushroom,mental health,focus,ADHD support,mental force",broken caps,Amanita muscaria,100|g|60|EUR
+amanita_muscaria,amanita_lux,Amanita — LUX,Amanita — LUX.jpeg,"mushroom,mental health,focus,ADHD support,mental force",premium caps,Amanita muscaria,100|g|90|EUR
+amanita_pantherina,amanita_pantherina_whole,Amanita — Pantera,Amanita — Pantera.jpeg,"mushroom,mental health,focus,ADHD support,mental force",unknown,Amanita pantherina,30|g|60|EUR;50|g|100|EUR;50|g|90|EUR
+amanita_muscaria,amanita_pantherina_powder,Amanita — Powder,Amanita — Powder.jpeg,"mushroom,mental health,focus,ADHD support,mental force",powder,Amanita muscaria,100|g|60|EUR
+amanita_muscaria,amanita_tincture,Amanita — Tinctura,Amanita — Tinctura.jpeg,"mushroom,mental health,focus,ADHD support,mental force",tincture,Amanita muscaria,50|ml|15|EUR
+blue-lotus,blue_lotus_tincture,Blue Lotus — Tinctura,Blue Lotus — Tinctura.jpeg,"plant,mental health,focus,ADHD support,mental force",tincture,Nymphaea caerulea (Blue Lotus),50|ml|20|EUR
+blue-lotus,blue_lotus_flowers,Blue Lotus,Blue Lotus.jpeg,"plant,mental health,focus,ADHD support,mental force",flower,Nymphaea caerulea (Blue Lotus),100|g|30|EUR
+inonotus_obliquus,chaga_chunks,Chaga,Chaga.jpeg,"mushroom,immune system,vital force",chunks,Inonotus obliquus (Chaga),100|g|10|EUR;200|g|15|EUR
+cordyceps_militaris,cordyceps_militaris_powder,cordyceps_militaris,Cordyceps Militaris.jpeg,"mushroom,immune system,vital force",powder,Cordyceps militaris,100|g|40|EUR
+cordyceps_militaris,cordyceps_militaris_dried_bodies,cordyceps_militaris_powder,Cordyceps Militaris — Powder.jpeg,"mushroom,immune system,vital force",dried whole,Cordyceps militaris,100|g|30|EUR
+cantharellus_cibarius,chanterelle_dried,Foxes,Foxes.jpeg,"mushroom,antiparasite,immune system,vital force",dried whole,Cantharellus cibarius (Chanterelle),100|g|30|EUR
+cantharellus_cibarius,chanterelle_powder,Foxes,Foxes.jpeg,"mushroom,antiparasite,immune system,vital force",dried powder,Cantharellus cibarius (Chanterelle),100|g|40|EUR
+populus_tremula,aspen_bark_dried_strips,Kora Osiny,Kora Osiny.jpeg,"plant,antiparasite,immune system,vital force",dried strips,Populus tremula (Aspen),200|g|10|EUR
+lions-mane,lions_mane_powder,Lions Main — Powder,Lions Main — Powder.jpeg,"mushroom,mental health,focus,ADHD support,mental force",powder,Hericium erinaceus (Lion's Mane),100|g|40|EUR
+lions-mane,Lion's Mane mushroom — whole dried,Lions Main,Lions Main.jpeg,"mushroom,mental health,focus,ADHD support,mental force",whole dried,Hericium erinaceus (Lion's Mane),100|g|30|EUR

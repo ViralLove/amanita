@@ -1,3 +1,30 @@
 {
-  "welcome": "¡Bienvenido a AMANITA!"
-} 
+  "welcome": "¡Bienvenido a AMANITA!",
+  "onboarding": {
+    "welcome": "👋 ¡Hola! Estás en el ecosistema AMANITA, una comunidad cooperativa de Creadores de la Nueva Tierra, Aliados de Gaia. Aquí se reúnen aquellos que ayudan a restaurar los valores humanos y espirituales. Valoramos mucho la pureza de nuestra comunidad, así que entrar es sólo por invitación.",
+    "continue": "Continuación",
+    "choose_language": "Seleccione un idioma:",
+    "language_russian": "🇷🇺 Ruso",
+    "language_english": "🇬🇧 Inglés",
+    "language_spanish": "🇪🇸 Español",
+    "language_estonian": "🇪🇪 Estonia",
+    "about_invite": "Es un ecosistema cerrado. Para entrar, necesitas un código de invitación, que sólo puedes obtener de un miembro. Cada participante sólo puede repartir 12 invitaciones. Es imposible comprar una invitación y sólo se puede transferir una vez: es una defensa contra intrusos y estafas.",
+    "next": "Más información en",
+    "invite_prompt": "Por favor, introduzca el código de invitación:",
+    "invite_from_link": "Hemos detectado un código de invitación en su enlace. Por favor, confírmelo:",
+    "invite_confirm": "Acuse recibo",
+    "no_invite": "No tengo el código.",
+    "no_invite_explanation": "Pide una invitación a aquellos que ya forman parte de nuestra comunidad y que sientas que están cerca de ti en espíritu. Esta es la única manera de formar parte de AMANITA.",
+    "invite_checking": "Comprobación del código de invitación....",
+    "onboarding_success": "🎉 ¡Enhorabuena! Te has unido con éxito al ecosistema AMANITA. Ahora puedes:\n- Invitar amigos\n- Obtener información sobre las bonificaciones\n- Ir al menú principal",
+    "main_menu": "Menú principal",
+    "learn_bonuses": "Más información sobre las bonificaciones",
+    "invite_friend": "Invitar a un amigo",
+    "help": "Ayuda",
+    "faq": "Preguntas frecuentes",
+    "communication_message": "Liaz, ¡hola! Eres tan jodidamente estúpido. Necesitamos una conexión estrecha a nivel de todo pensamiento y una medida segura de sentimiento. Enciéndelo. Préstame atención. Libera la rabia de ser forzado a hacer esto y luego activa tu corazón. Necesitamos esto para cumplir nuestra Misión en este planeta. Tuyo, Zeya888.",
+    "communication_button": "Enlace",
+    "validation": "verdadero",
+    "communication_confirmation": "Lo tengo todo. Me tomó un tiempo, lo siento, amor. Te quiero. Tu Liaz."
+  }
+}

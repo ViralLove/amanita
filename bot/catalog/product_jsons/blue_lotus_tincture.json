@@ -1,0 +1,23 @@
+{
+  "id": "blue_lotus_tincture",
+  "title": "Blue Lotus — Tinctura",
+  "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+  "categories": [
+    "plant",
+    "mental health",
+    "focus",
+    "ADHD support",
+    "mental force"
+  ],
+  "cover_image": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
+  "form": "tincture",
+  "species": "Nymphaea caerulea (Blue Lotus)",
+  "prices": [
+    {
+      "volume": "50",
+      "volume_unit": "ml",
+      "price": "20",
+      "currency": "EUR"
+    }
+  ]
+}

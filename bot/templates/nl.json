@@ -1,0 +1,26 @@
+{
+  "welcome": "Welkom bij AMANITA!",
+  "onboarding": {
+    "welcome": "Je bent in het AMANITA ecosysteem, een coöperatieve gemeenschap van Nieuwe Aarde Scheppers, bondgenoten van Gaia. Dit is waar degenen die menselijke en spirituele waarden helpen herstellen, samenkomen. We hechten veel waarde aan de zuiverheid van onze gemeenschap, dus toegang is alleen op uitnodiging.",
+    "continue": "Wordt vervolgd",
+    "choose_language": "Selecteer een taal:",
+    "language_russian": "🇷🇺 Russisch",
+    "language_english": "🇬🇧 Engels",
+    "language_spanish": "🇪🇸 Engels",
+    "language_estonian": "🇪🇪 Estland",
+    "about_invite": "Het is een gesloten ecosysteem. Om mee te doen heb je een invitecode nodig, die je alleen van een lid kunt krijgen. Elke deelnemer kan slechts 12 uitnodigingen uitdelen. Het is onmogelijk om een invite te kopen en je kunt hem maar één keer overdragen - dit is een verdediging tegen indringers en oplichterij.",
+    "next": "Verder",
+    "invite_prompt": "Voer de uitnodigingscode in:",
+    "invite_from_link": "We hebben een uitnodigingscode gedetecteerd in je link. Bevestig deze alstublieft:",
+    "invite_confirm": "erkennen",
+    "no_invite": "Ik heb de code niet.",
+    "no_invite_explanation": "Vraag om een uitnodiging van degenen die al deel uitmaken van onze gemeenschap en van wie je het gevoel hebt dat ze dicht bij je staan in de geest. Dit is de enige manier om deel uit te maken van AMANITA.",
+    "invite_checking": "Je uitnodigingscode controleren....",
+    "onboarding_success": "Gefeliciteerd! Je bent succesvol lid geworden van het AMANITA ecosysteem. Je kunt nu:\n- Vrienden uitnodigen\n- Meer informatie over bonussen\n- Naar het hoofdmenu gaan",
+    "main_menu": "Hoofdmenu",
+    "learn_bonuses": "Meer informatie over bonussen",
+    "invite_friend": "Nodig een vriend uit",
+    "help": "Help",
+    "faq": "Veelgestelde vragen"
+  }
+}

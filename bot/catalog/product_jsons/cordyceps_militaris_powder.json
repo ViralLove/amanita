@@ -1,0 +1,21 @@
+{
+  "id": "cordyceps_militaris_powder",
+  "title": "cordyceps_militaris",
+  "description_cid": "QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy",
+  "categories": [
+    "mushroom",
+    "immune system",
+    "vital force"
+  ],
+  "cover_image": "",
+  "form": "powder",
+  "species": "Cordyceps militaris",
+  "prices": [
+    {
+      "weight": "100",
+      "weight_unit": "g",
+      "price": "40",
+      "currency": "EUR"
+    }
+  ]
+}

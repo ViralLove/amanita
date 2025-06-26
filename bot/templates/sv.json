@@ -1,0 +1,26 @@
+{
+  "welcome": "Välkommen till AMANITA!",
+  "onboarding": {
+    "welcome": "👋 Hej! Du befinner dig i AMANITA-ekosystemet, ett kooperativt samhälle av New Earth Creators, Gaias allierade. Det är här de som hjälper till att återställa mänskliga och andliga värden samlas. Vi värdesätter mycket renheten i vårt samhälle, så att komma in är endast genom inbjudan.",
+    "continue": "Fortsättning följer",
+    "choose_language": "Vänligen välj ett språk:",
+    "language_russian": "🇷🇺 Ryska",
+    "language_english": "🇬🇧 Engelska",
+    "language_spanish": "🇪🇸 Engelska",
+    "language_estonian": "🇪🇪 Estland",
+    "about_invite": "Det är ett slutet ekosystem. För att delta behöver du en inbjudningskod, som du bara kan få från en medlem. Varje deltagare kan bara ge ut 12 inbjudningar. Det är omöjligt att köpa en inbjudan och du kan bara överföra den en gång - detta är ett försvar mot inkräktare och bedrägerier.",
+    "next": "Ytterligare",
+    "invite_prompt": "Vänligen ange inbjudningskoden:",
+    "invite_from_link": "Vi har upptäckt en inbjudningskod i din länk. Vänligen bekräfta den:",
+    "invite_confirm": "Bekräfta",
+    "no_invite": "Jag har inte koden.",
+    "no_invite_explanation": "Be om en inbjudan från dem som redan är en del av vår gemenskap och som du känner står dig nära i anden. Detta är det enda sättet att bli en del av AMANITA.",
+    "invite_checking": "Kontrollera din inbjudningskod....",
+    "onboarding_success": "🎉 Grattis! Du har framgångsrikt gått med i AMANITA-ekosystemet. Du kan nu:\n- Bjuda in vänner\n- Lära dig mer om bonusar\n- Gå till huvudmenyn",
+    "main_menu": "Huvudmeny",
+    "learn_bonuses": "Läs mer om bonusar",
+    "invite_friend": "Bjud in en vän",
+    "help": "Hjälp",
+    "faq": "Vanliga frågor och svar"
+  }
+}

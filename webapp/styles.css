@@ -1,0 +1,424 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
+  
+  body {
+  font-family: 'Montserrat', sans-serif;
+  background: linear-gradient(to bottom, #0c1f0c, #1e4321);
+  color: #fff;
+  padding: 20px;
+    margin: 0;
+}
+
+.main-title {
+  font-size: 32px;
+  color: #fffbe7;
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+.subtitle {
+  font-size: 18px;
+  color: #c0e0c0;
+  text-align: center;
+  margin-top: -10px;
+  margin-bottom: 20px;
+  }
+.note {
+  font-style: italic;
+  font-size: 14px;
+  color: #ccc;
+  text-align: center;
+}
+
+.view {
+  display: none;
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+button, .button {
+  font-family: 'Montserrat', sans-serif;
+  background-color: #ff4444;
+  border: none;
+  color: white;
+  padding: 14px 24px;
+    font-size: 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(255, 100, 100, 0.3);
+    cursor: pointer;
+  margin-top: 16px;
+  transition: background 0.3s ease, transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  }
+  
+  button:hover {
+  background-color: #ff6666;
+  transform: scale(1.03);
+}
+
+.button-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+/* Стили для центрирования */
+.centered {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+/* Стили для иконок внутри кнопок */
+.icon {
+  margin-right: 8px;
+  font-size: 18px;
+}
+
+/* Контейнер для кнопок с центрированием */
+.button-container {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+/* Новые стили для блока с мухоморным паролем */
+.mushroom-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fffbea;
+  margin-bottom: 12px;
+}
+
+.warning-box {
+  background: linear-gradient(90deg, #ff6868, #ffb98f);
+  color: #2d0000;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 14px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.seed-container {
+  background: linear-gradient(145deg, #e7f4e4, #f9fff3);
+  padding: 20px;
+  border-radius: 12px;
+  margin-top: 8px;
+  margin-bottom: 24px;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  
+.seed-display {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  font-weight: 500;
+  color: #313c2a;
+  resize: none;
+  line-height: 1.6;
+  text-align: center;
+  min-height: 60px;
+}
+
+.seed-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.button-secondary {
+  background: #ffecdc;
+  color: #3d2f00;
+  border: 1px solid #ffbb88;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button-secondary:hover {
+  background: #fff4e5;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+input[type="text"], input[type="password"] {
+    width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.05);
+  color: white;
+  font-size: 16px;
+  margin-top: 10px;
+}
+
+h1, h2, h3 {
+  color: #fffbe7;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.note {
+    font-size: 14px;
+  color: #c0f0c0;
+    margin-top: 10px;
+  font-style: italic;
+}
+
+button.small {
+  padding: 8px 14px;
+  font-size: 14px;
+  border-radius: 8px;
+  }
+  
+.mono-input {
+    font-family: monospace;
+  font-size: 15px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fefdfc;
+  color: #333;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* Стили для уведомлений */
+.notifications-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  max-width: 300px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notification {
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(6px);
+  color: white;
+  padding: 14px 18px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transform: translateX(30px);
+  transition: all 0.3s ease;
+    font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.notification.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.notification.success {
+  border-left: 4px solid #4CAF50;
+}
+
+.notification.error {
+  border-left: 4px solid #F44336;
+}
+
+.notification.warning {
+  border-left: 4px solid #FF9800;
+}
+
+.notification.info {
+  border-left: 4px solid #2196F3;
+}
+
+.notification-content {
+  display: flex;
+  align-items: center;
+}
+
+.notification-icon {
+  margin-right: 12px;
+  font-size: 22px;
+}
+
+.notification-message {
+  flex: 1;
+  font-weight: 500;
+}
+
+/* Анимация затухания уведомления */
+@keyframes fadeOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(30px); }
+}
+
+.notification.fading {
+  animation: fadeOut 0.5s ease forwards;
+}
+
+/* Стили для экрана установки PIN */
+#setup-pin-screen {
+  text-align: center;
+}
+
+#setup-pin-screen p {
+  margin: 8px 0;
+}
+
+.pin-input {
+  width: 80%;
+    padding: 10px;
+  font-size: 1.1em;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  text-align: center;
+  margin: 12px 0;
+  box-sizing: border-box;
+}
+
+.pin-input:focus {
+  border-color: #ff5c5c;
+  outline: none;
+}
+
+#pin-error {
+  color: #ff5c5c;
+  font-size: 0.9em;
+}
+
+.pin-keyboard-container {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.pin-keyboard {
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
+  grid-gap: 12px;
+  justify-items: center;
+}
+
+.pin-keyboard button:active {
+  transform: scale(0.95);
+}
+
+.pin-keyboard button {
+  transition: transform 0.1s ease;
+}
+
+.pin-keyboard button img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.pin-display {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  }
+  
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #5a685a;
+  opacity: 0.4;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.pin-dot.filled {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 40%, #FFD700, #FFA500 85%);
+  border: 1px solid #DAA520;
+  box-shadow: 
+    inset 0 2px 3px rgba(255,255,255,0.4), 
+    inset 0 -2px 3px rgba(0,0,0,0.3),     
+    0 0 5px rgba(255, 215, 0, 0.5);
+}
+
+#pin-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  margin: 20px auto;
+}
+
+.pin-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  }
+  
+.mushroom-key {
+  width: 80px;
+  height: 80px;
+  background-color: transparent !important;
+  border: none;
+  outline: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  box-shadow: none !important;
+}
+
+.mushroom-key img {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: filter 0.2s ease-in-out;
+  }
+  
+.mushroom-key:hover img {
+  filter: 
+    drop-shadow(0 0 3px gold)
+    drop-shadow(0 0 8px gold)
+    drop-shadow(0 0 15px rgba(255, 215, 0, 0.6));
+}
+
+.mushroom-key:hover {
+  background-color: transparent !important;
+  transform: scale(1.05);
+}
+
+.mushroom-key:active {
+  transform: scale(0.9);
+}
+
+.mushroom-key:disabled img {
+  opacity: 0.5;
+  filter: none;
+}
+
+.mushroom-key[data-key="star"]:disabled img {
+  opacity: 1 !important;
+}
+
+.mushroom-key:disabled {
+  cursor: default;
+  transform: scale(1);
+  }
+  

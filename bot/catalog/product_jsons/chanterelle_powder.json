@@ -1,0 +1,22 @@
+{
+  "id": "chanterelle_powder",
+  "title": "Foxes",
+  "description_cid": "QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE",
+  "categories": [
+    "mushroom",
+    "antiparasite",
+    "immune system",
+    "vital force"
+  ],
+  "cover_image": "QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa",
+  "form": "dried powder",
+  "species": "Cantharellus cibarius (Chanterelle)",
+  "prices": [
+    {
+      "weight": "100",
+      "weight_unit": "g",
+      "price": "40",
+      "currency": "EUR"
+    }
+  ]
+}

@@ -1,3 +1,34 @@
 {
-  "welcome": "Welcome to AMANITA!"
-} 
+  "welcome": "Welcome to AMANITA!",
+  "onboarding": {
+    "welcome": "👋 Hello! You are in the AMANITA ecosystem",
+    "continue": "Continue",
+    "choose_language": "Please select a language:",
+    "language_russian": "🇷🇺 Russian",
+    "language_english": "🇬🇧 English",
+    "language_spanish": "🇪🇸 Spanish",
+    "language_estonian": "🇪🇪 Estonian",
+    "about_invite": "This is a closed ecosystem",
+    "next": "Next",
+    "invite_prompt": "Please enter the invite code:",
+    "invite_from_link": "We found an invite code in your link",
+    "invite_confirm": "Confirm",
+    "no_invite": "I don't have a code",
+    "no_invite_explanation": "Ask for an invite from those who are already part of our community",
+    "invite_checking": "Checking your invite code...",
+    "success": "🎉 Congratulations! You have successfully joined the AMANITA ecosystem.",
+    "main_menu": "Main menu",
+    "learn_bonuses": "Learn about bonuses",
+    "invite_friend": "Invite a friend",
+    "help": "Help",
+    "faq": "Frequently asked questions",
+    "code_expired": "❌ This invite code has expired.",
+    "back": "Back",
+    "blockchain_error": "❌ Error connecting to the blockchain. Please try again later or contact support.",
+    "code_not_found": "❌ No such invite code was found. Please check if you have entered it correctly.",
+    "code_already_used": "❌ This invite code has already been used. Each code can only be used once.",
+    "error": "❌ There was an error while verifying the invite code. Please try again later.",
+    "user_already_activated": "❌ You have already activated the invite code before.",
+    "invalid_format": "❌ Incorrect code format. The Invite code must consist of 12 characters (letters and numbers)."
+  }
+}

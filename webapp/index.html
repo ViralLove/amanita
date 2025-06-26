@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Amanita Web3 Wallet</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Встроенный скрипт для ранней проверки и логирования -->
+  <script>
+    console.log("🔍 Начало загрузки страницы");
+    
+    // Функция для логирования в консоль и на страницу
+    function logStatus(message, isError = false) {
+      console.log(message);
+      // После загрузки DOM добавим сообщение на страницу
+      document.addEventListener('DOMContentLoaded', function() {
+        const logElem = document.getElementById('init-log');
+        if (logElem) {
+          const line = document.createElement('div');
+          line.textContent = message;
+          if (isError) line.style.color = 'red';
+          logElem.appendChild(line);
+        }
+      });
+    }
+
+    // Проверка загрузки ethers
+    window.ethersLoaded = false;
+    
+    function checkEthers() {
+      if (typeof ethers !== 'undefined') {
+        window.ethersLoaded = true;
+        logStatus("✅ ethers.js успешно загружен");
+      } else {
+        logStatus("❌ ethers.js не загружен", true);
+      }
+    }
+
+    // Событие ошибки загрузки скрипта
+    window.addEventListener('error', function(e) {
+      if (e.target.tagName === 'SCRIPT') {
+        logStatus(`❌ Ошибка загрузки скрипта: ${e.target.src}`, true);
+      }
+    }, true);
+    
+    logStatus("🔍 Скрипт инициализации выполнен");
+
+    // Диагностика Telegram WebApp
+    window.tgWebAppData = {};
+    
+    console.log("WebApp запущен");
+    if (window.Telegram && window.Telegram.WebApp) {
+        // Сообщаем Telegram что приложение готово
+        window.Telegram.WebApp.ready();
+        
+        console.log("Запущен в Telegram WebApp");
+        console.log("Данные инициализации:", window.Telegram.WebApp.initData);
+        
+        // Сохраняем информацию о WebApp для отображения на странице
+        window.tgWebAppData = {
+            platform: window.Telegram.WebApp.platform || 'неизвестно',
+            version: window.Telegram.WebApp.version || 'неизвестно',
+            colorScheme: window.Telegram.WebApp.colorScheme || 'неизвестно',
+            initDataUnsafe: window.Telegram.WebApp.initDataUnsafe || {},
+            viewportHeight: window.Telegram.WebApp.viewportHeight,
+            viewportStableHeight: window.Telegram.WebApp.viewportStableHeight
+        };
+        
+        // Расширяем WebApp на полную высоту
+        window.Telegram.WebApp.expand();
+        
+        // Регистрируем обработчик события закрытия WebApp
+        window.Telegram.WebApp.onEvent('viewportChanged', function() {
+            logStatus(`📱 Изменение viewport: ${window.Telegram.WebApp.viewportHeight}px`);
+            updateTelegramInfo();
+        });
+    } else {
+        console.log("Запущен в обычном браузере");
+        window.tgWebAppData.isBrowser = true;
+    }
+    
+    // Функция для обновления информации о Telegram WebApp на странице
+    function updateTelegramInfo() {
+        document.addEventListener('DOMContentLoaded', function() {
+            const telegramInfoElem = document.getElementById('telegram-info');
+            if (!telegramInfoElem) return;
+            
+            if (window.Telegram && window.Telegram.WebApp) {
+                telegramInfoElem.innerHTML = `
+                    <div>✅ <strong>Telegram WebApp активен</strong></div>
+                    <div>Платформа: ${window.tgWebAppData.platform}</div>
+                    <div>Версия: ${window.tgWebAppData.version}</div>
+                    <div>Цветовая схема: ${window.tgWebAppData.colorScheme}</div>
+                    <div>Высота viewport: ${window.Telegram.WebApp.viewportHeight}px</div>
+                    <div>User ID: ${window.tgWebAppData.initDataUnsafe.user?.id || 'нет'}</div>
+                    <div>Метод запуска: из ${window.tgWebAppData.initDataUnsafe.start_param || 'основного меню'}</div>
+                `;
+            } else {
+                telegramInfoElem.innerHTML = `
+                    <div>⚠️ <strong>Запущено в обычном браузере</strong></div>
+                    <div>URL: ${window.location.href}</div>
+                    <div>User Agent: ${navigator.userAgent}</div>
+                `;
+            }
+        });
+    }
+    
+    // Вызываем функцию обновления информации
+    updateTelegramInfo();
+  </script>
+  
+  <!-- Альтернативные способы загрузки ethers -->
+  <script>
+    // Попробуем загрузить библиотеку динамически
+    logStatus("🔄 Пытаемся загрузить ethers.js динамически");
+    const script = document.createElement('script');
+    script.src = "https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js";
+    script.type = "text/javascript"; 
+    script.onload = function() {
+      logStatus("✅ ethers.js динамически загружен");
+      window.ethersLoaded = true;
+      checkEthers();
+    };
+    script.onerror = function() {
+      logStatus("❌ Ошибка динамической загрузки ethers.js, пробуем альтернативный источник", true);
+      // Пробуем загрузить с unpkg как альтернативный источник
+      const unpkgScript = document.createElement('script');
+      unpkgScript.src = "https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js";
+      unpkgScript.type = "text/javascript";
+      unpkgScript.onload = function() {
+        logStatus("✅ ethers.js успешно загружен с unpkg!");
+        window.ethersLoaded = true;
+        checkEthers();
+      };
+      unpkgScript.onerror = function() {
+        logStatus("❌ Не удалось загрузить ethers.js ни с одного источника", true);
+      };
+      document.head.appendChild(unpkgScript);
+    };
+    document.head.appendChild(script);
+  </script>
+  
+  <!-- Резервная загрузка через jsdelivr -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js" 
+          type="text/javascript"
+          onerror="logStatus('❌ Ошибка загрузки ethers.js через jsdelivr', true)"></script>
+  
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1 class="main-title" data-l10n="app_title">AMANITA</h1>
+    <p class="subtitle" data-l10n="app_subtitle">Кошелёк мицелия 🌱</p>
+  </header>  
+  <div id="app">
+    <p class="note" data-l10n="welcome_note">Добро пожаловать в рощу AMANITA. Здесь ты можешь создать или восстановить свой путь 🍄</p>
+
+    <!-- Статусное сообщение о загрузке библиотеки 
+    <div id="init-status">
+      <p>Статус загрузки библиотеки: <span id="ethers-status">Проверка...</span></p>
+      <div id="init-log" style="background:#f5f5f5; padding:10px; max-height:150px; overflow:auto; font-size:12px;"></div>
+    </div>-->
+
+    <!-- Диагностическая информация о Telegram WebApp 
+    <div id="telegram-diagnostic" style="margin: 15px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+      <h3>Диагностика Telegram WebApp</h3>
+      <div id="telegram-info">Загрузка информации...</div>
+      <div style="margin-top: 10px;">
+        <button onclick="toggleTelegramDebug()">Показать расширенную информацию</button>
+      </div>
+      <div id="telegram-debug" style="display:none; margin-top: 10px; background: #f0f0f0; padding: 10px; font-size: 12px;"></div>
+    </div>-->
+
+    <!-- Статусное сообщение, видимо только при наличии текста -->
+    <div id="status-message" class="view hidden"></div>
+
+    <!-- Режим выбора действия -->
+    <div id="start-screen" class="view hidden">
+      <p data-l10n="choose_action">Выберите действие для работы с вашим криптокошельком:</p>
+      <div class="button-container centered">
+        <button id="create-btn" class="shaman-button" data-l10n="btn_create_wallet"><span class="icon">🆕</span> Создать новый кошелёк</button>
+        <button id="restore-btn" class="shaman-button" data-l10n="btn_restore_wallet"><span class="icon">🔄</span> Восстановить по мухоморному паролю</button>
+      </div>
+    </div>
+
+    <!-- Режим загрузки во время операций -->
+    <div id="loading-screen" class="view hidden">
+      <p class="loading" id="loading-text" data-l10n="loading_create">Создаем кошелек, пожалуйста подождите...</p>
+    </div>
+
+    <!-- Режим сид фразы -->
+    <div id="seed-screen" class="view hidden">
+      <!-- Адрес кошелька (удаить после функциональной отладки)
+      <p><strong data-l10n="wallet_address_label">Ваш адрес кошелька:</strong></p>
+      <p id="wallet-address" class="mono"></p>-->
+
+      <h2 class="mushroom-title" data-l10n="seed_phrase_label">🍄 Ваш мухоморный пароль (12 слов):</h2>
+      <div class="warning-box" data-l10n="seed_warning">
+        ⚠️ Сохраните эту фразу в надежном месте! С её помощью вы сможете восстановить доступ к кошельку.
+      </div>
+
+      <div class="seed-container">
+        <textarea readonly id="wallet-mnemonic" class="seed-display mono sensitive"></textarea>
+        <div class="button-row centered seed-actions">
+          <button id="reveal-seed-btn" class="button-secondary" data-l10n="btn_reveal_seed"><span class="icon">👁️</span> Показать / скрыть мухоморный пароль</button>
+          <button id="copy-seed-btn" class="button-secondary" data-l10n="btn_copy_seed"><span class="icon">📋</span> Скопировать пароль</button>
+        </div>
+      </div>
+      
+      <!-- Новые кнопки управления существующим кошельком -->
+      <div class="wallet-actions centered" style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 15px;">
+        <button id="btn_confirm_wallet" class="shaman-button" data-l10n="btn_confirm_wallet"><span class="icon">✅</span> Я записал(а) мухоморный пароль</button>
+      </div>
+    </div>
+
+    <!-- Режим восстановления -->
+    <div id="restore-screen" class="view hidden">
+      <h2 class="section-title mushroom-title" data-l10n="restore_title">
+        🔄 Восстановление доступа к кошельку
+      </h2>
+
+      <p data-l10n="restore_enter_seed">
+        Введите мухоморный пароль (12 слов, разделенных пробелом):
+      </p>
+
+      <textarea
+        id="mnemonic-input"
+        rows="3"
+        class="mono-input"
+        placeholder="word1 word2 ... word12"
+        data-l10n-placeholder="restore_seed_placeholder"
+      ></textarea>
+
+      <p id="restore-error" class="error hidden"></p>
+
+      <div class="button-container centered" style="margin-top: 16px; gap: 12px;">
+        <button
+          id="restore-confirm-btn"
+          class="shaman-button"
+          data-l10n="btn_restore_wallet"
+        >
+          <span class="icon">✅</span> Восстановить кошелёк
+        </button>
+        <!--
+        <button
+          id="back-to-start-btn"
+          class="shaman-button secondary"
+          data-l10n="btn_back"
+        >
+          <span class="icon">⬅️</span> Назад
+        </button>-->
+      </div>
+    </div>
+
+    <!-- Экран установки PIN -->
+    <div id="setup-pin-screen" class="view hidden">
+      <h3 id="pin-entry-title" data-l10n="setup_pin_title">Установите PIN-код</h3>
+      <p id="pin-setup-description" data-l10n="setup_pin_description">Придумайте 5 цифр, которые защитят ваш мухоморный пароль.</p>
+
+      <div class="pin-display">
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+      </div>
+      
+      <!-- Клавиатура для PIN-кода -->
+      <div id="pin-keyboard">
+        <div class="pin-row">
+          <button class="mushroom-key" data-key="1"><img src="assets/amanita_key_1.png" alt="1"></button>
+          <button class="mushroom-key" data-key="2"><img src="assets/amanita_key_2.png" alt="2"></button>
+          <button class="mushroom-key" data-key="3"><img src="assets/amanita_key_3.png" alt="3"></button>
+        </div>
+        <div class="pin-row">
+          <button class="mushroom-key" data-key="4"><img src="assets/amanita_key_4.png" alt="4"></button>
+          <button class="mushroom-key" data-key="5"><img src="assets/amanita_key_5.png" alt="5"></button>
+          <button class="mushroom-key" data-key="6"><img src="assets/amanita_key_6.png" alt="6"></button>
+        </div>
+        <div class="pin-row">
+          <button class="mushroom-key" data-key="7"><img src="assets/amanita_key_7.png" alt="7"></button>
+          <button class="mushroom-key" data-key="8"><img src="assets/amanita_key_8.png" alt="8"></button>
+          <button class="mushroom-key" data-key="9"><img src="assets/amanita_key_9.png" alt="9"></button>
+        </div>
+        <div class="pin-row">
+          <button class="mushroom-key" data-key="star" disabled><img src="assets/star.png" alt="*"></button>
+          <button class="mushroom-key" data-key="0"><img src="assets/amanita_key_0.png" alt="0"></button>
+          <button class="mushroom-key" data-key="backspace"><img src="assets/amanita_key_back.png" alt="Удалить"></button>
+        </div>
+      </div>
+      
+      <!-- Кнопка подтверждения PIN удалена -->
+      <!-- <button id="setup-pin-submit-btn" class="shaman-button primary-button" data-l10n="setup_pin_submit_btn"><span class="icon">🔐</span> Подтвердить</button> -->
+
+    </div>
+
+    <!-- Экран успешного создания/восстановления кошелька -->
+    <div id="success-screen" class="view">
+      <h2 data-l10n="success_title">🎉 Всё готово!</h2>
+      <p data-l10n="success_description">Ты успешно создал(а)/восстановил(а) свой аккаунт к экосистеме Amanita 🍄</p>
+      <p data-l10n="success_description_2">Можешь перейти в каталог и исследовать возможности!</p>
+      <div class="button-container centered">
+        <button id="finish-btn" class="shaman-button" data-l10n="success_btn">
+          <span class="icon">✅</span> Перейти в каталог
+        </button>
+      </div>
+    </div>
+
+    <!-- Режим просмотра сид-фразы -->
+    <div id="unlock-screen" class="view hidden">
+      <p data-l10n="unlock_title">Введите PIN-код для просмотра вашего мухоморного пароля:</p>
+      <div class="pin-display">
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+      </div>
+      
+      <div id="pin-keyboard" class="pin-keyboard">
+        <button class="amanita-key" data-key="1"><img src="assets/amanita_key_1.png" alt="1" /></button>
+        <button class="amanita-key" data-key="2"><img src="assets/amanita_key_2.png" alt="2" /></button>
+        <button class="amanita-key" data-key="3"><img src="assets/amanita_key_3.png" alt="3" /></button>
+        <button class="amanita-key" data-key="4"><img src="assets/amanita_key_4.png" alt="4" /></button>
+        <button class="amanita-key" data-key="5"><img src="assets/amanita_key_5.png" alt="5" /></button>
+        <button class="amanita-key" data-key="6"><img src="assets/amanita_key_6.png" alt="6" /></button>
+        <button class="amanita-key" data-key="7"><img src="assets/amanita_key_7.png" alt="7" /></button>
+        <button class="amanita-key" data-key="8"><img src="assets/amanita_key_8.png" alt="8" /></button>
+        <button class="amanita-key" data-key="9"><img src="assets/amanita_key_9.png" alt="9" /></button>
+        <button class="mushroom-key" data-key="backspace"><img src="assets/amanita_key_backspace.png" alt="Удалить" /></button>
+        <button class="mushroom-key" data-key="0"><img src="assets/amanita_key_0.png" alt="0" /></button>
+        <button class="mushroom-key" data-key="confirm"><img src="assets/amanita_key_ok.png" alt="OK" /></button>
+      </div>
+      
+      <div class="button-container centered">
+        <button id="unlock-submit-btn" class="shaman-button" data-l10n="unlock_btn"><span class="icon">🔓</span> Показать мухоморный пароль</button>
+      </div>
+    </div>
+
+    <div id="view-screen" class="view hidden">
+      <p data-l10n="view_seed_title">Ваш мухоморный пароль (только на 20 секунд):</p>
+      <pre id="view-seed-text"></pre>
+    </div>
+
+    <!-- Режим подписи транзакции -->
+    <div id="sign-screen" class="view hidden">
+      <p data-l10n="sign_tx_title">Подписать использование скидки:</p>
+      <p><span data-l10n="sign_tx_order">🛒 Заказ:</span> <span id="tx-order-id"></span></p>
+      <p><span data-l10n="sign_tx_tokens">🎁 Токены AMANITA:</span> <span id="tx-token-amount"></span></p>
+      <input type="password" id="sign-pin-input" placeholder="Введите PIN-код для подписи" data-l10n="sign_pin_placeholder" />
+      <div class="button-container centered">
+        <button id="sign-submit-btn" class="shaman-button" data-l10n="btn_sign_submit"><span class="icon">✍️</span> Подписать</button>
+      </div>
+    </div>  
+  </div>
+
+  <script>
+    // Дополнительная проверка после загрузки DOM
+    document.addEventListener('DOMContentLoaded', function() {
+      logStatus("🔄 DOM полностью загружен");
+      
+      // Обновим статус на странице
+      setTimeout(function() {
+        const ethersStatus = document.getElementById('ethers-status');
+        if (ethersStatus) {
+          if (window.ethersLoaded) {
+            ethersStatus.textContent = "Загружена ✅";
+            ethersStatus.style.color = "green";
+          } else {
+            ethersStatus.textContent = "Не загружена ❌";
+            ethersStatus.style.color = "red";
+            
+            // Проверим еще раз с последней попыткой
+            checkEthers();
+            if (window.ethersLoaded) {
+              ethersStatus.textContent = "Загружена после повторной проверки ✅";
+              ethersStatus.style.color = "green";
+            } else {
+              logStatus("❌ ethers.js не удалось загрузить после нескольких попыток", true);
+            }
+          }
+        }
+      }, 1000);
+    });
+    
+    // Функция для отображения расширенной отладочной информации
+    function toggleTelegramDebug() {
+      const debugElem = document.getElementById('telegram-debug');
+      if (debugElem.style.display === 'none') {
+        debugElem.style.display = 'block';
+        
+        // Собираем расширенную отладочную информацию
+        let debugInfo = '';
+        
+        // Информация о вашем окружении
+        debugInfo += '<h4>Информация об окружении</h4>';
+        debugInfo += `<div>URL: ${window.location.href}</div>`;
+        debugInfo += `<div>User Agent: ${navigator.userAgent}</div>`;
+        debugInfo += `<div>Время загрузки: ${new Date().toLocaleString()}</div>`;
+        
+        // Проверка Telegram WebApp
+        if (window.Telegram && window.Telegram.WebApp) {
+          debugInfo += '<h4>Telegram WebApp</h4>';
+          
+          // Безопасные данные из initDataUnsafe
+          const safeData = { ...window.Telegram.WebApp.initDataUnsafe };
+          if (safeData.user) {
+            safeData.user = {
+              id: safeData.user.id,
+              is_bot: safeData.user.is_bot,
+              first_name: safeData.user.first_name,
+              last_name: safeData.user.last_name,
+              username: safeData.user.username,
+              language_code: safeData.user.language_code
+            };
+          }
+          
+          debugInfo += `<pre>${JSON.stringify(safeData, null, 2)}</pre>`;
+          
+          // Информация о функциях
+          debugInfo += '<h4>Доступные методы</h4>';
+          const methods = Object.getOwnPropertyNames(window.Telegram.WebApp)
+            .filter(prop => typeof window.Telegram.WebApp[prop] === 'function');
+          debugInfo += `<div>${methods.join(', ')}</div>`;
+        } else {
+          debugInfo += '<div>Telegram WebApp API не доступен</div>';
+        }
+        
+        debugElem.innerHTML = debugInfo;
+      } else {
+        debugElem.style.display = 'none';
+      }
+    }
+  </script>
+  
+  <!-- Контейнер для уведомлений -->
+  <div id="notifications-container" class="notifications-container"></div>
+
+  <!-- Кнопка управления логами -->
+  <div id="debug-control" style="position: fixed; top: 10px; right: 10px; z-index: 1001; pointer-events: auto;">
+    <button onclick="toggleDebugPanel()" style="background: rgba(0,0,0,0.6); border: 1px solid white; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; margin-right: 5px;">🔍 Logs</button>
+    <button onclick="copyLogs()" style="background: rgba(0,0,0,0.6); border: 1px solid white; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">📋 Copy</button>
+  </div>
+
+  <!-- Отладочная информация -->
+  <div id="debug-panel" style="position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); color: white; font-family: monospace; font-size: 12px; padding: 10px; max-height: 100px; overflow-y: auto; z-index: 1000; pointer-events: auto; transition: all 0.3s ease;">
+    <div id="init-log" style="white-space: pre-wrap;"></div>
+  </div>
+
+  <script>
+    function toggleDebugPanel() {
+      const panel = document.getElementById('debug-panel');
+      const currentHeight = panel.style.maxHeight;
+      const debugControl = document.getElementById('debug-control').getElementsByTagName('button')[0];
+      
+      if (currentHeight === '100px' || !currentHeight) {
+        panel.style.maxHeight = '0px';
+        panel.style.padding = '0px';
+        debugControl.style.background = 'rgba(0,0,0,0.3)';
+        debugControl.textContent = '🔍 Show Logs';
+      } else {
+        panel.style.maxHeight = '100px';
+        panel.style.padding = '10px';
+        debugControl.style.background = 'rgba(0,0,0,0.6)';
+        debugControl.textContent = '🔍 Hide Logs';
+      }
+    }
+
+    function copyLogs() {
+      const logContent = document.getElementById('init-log').innerText;
+      navigator.clipboard.writeText(logContent).then(() => {
+        // Показываем временное уведомление об успешном копировании
+        const copyBtn = document.getElementById('debug-control').getElementsByTagName('button')[1];
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = '✅ Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = originalText;
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy logs:', err);
+      });
+    }
+
+    // Функция для автоматической прокрутки логов вниз
+    function scrollLogsToBottom() {
+      const panel = document.getElementById('debug-panel');
+      panel.scrollTop = panel.scrollHeight;
+    }
+
+    // Модифицируем функцию logStatus для автоматической прокрутки
+    const originalLogStatus = window.logStatus;
+    window.logStatus = function(message, isError = false) {
+      originalLogStatus(message, isError);
+      // Добавляем небольшую задержку для уверенности, что контент обновился
+      setTimeout(scrollLogsToBottom, 10);
+    };
+
+    // Устанавливаем начальное состояние
+    document.addEventListener('DOMContentLoaded', function() {
+      const panel = document.getElementById('debug-panel');
+      panel.style.maxHeight = '100px'; // Показываем логи по умолчанию
+      const debugControl = document.getElementById('debug-control').getElementsByTagName('button')[0];
+      debugControl.textContent = '🔍 Hide Logs';
+      
+      // Начальная прокрутка вниз
+      scrollLogsToBottom();
+    });
+  </script>
+</body>
+</html>

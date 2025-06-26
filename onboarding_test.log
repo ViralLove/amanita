@@ -1,0 +1,539 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.4, pytest-8.3.5, pluggy-1.5.0
+rootdir: /Users/eslinko/Development/amanita
+plugins: cov-6.0.0, asyncio-0.25.3, anyio-3.7.1, mock-3.14.0, requests-mock-1.12.1
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None
+collected 5 items
+
+bot/tests/test_onboarding.py FFFFF                                       [100%]
+
+=================================== FAILURES ===================================
+_____________________________ test_onboarding_flow _____________________________
+
+blockchain_service = <bot.services.blockchain.BlockchainService object at 0x10854aed0>
+seller_account = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+generate_account = <eth_account.signers.local.LocalAccount object at 0x108838ad0>
+
+    def test_onboarding_flow(blockchain_service, seller_account, generate_account):
+        # Проверяем инициализацию продавца
+        # 1. Проверяем баланс ETH
+        seller_balance = blockchain_service.web3.eth.get_balance(seller_account)
+        min_required_balance = blockchain_service.web3.to_wei(0.1, 'ether')  # Минимум 0.1 ETH для газа
+        assert seller_balance >= min_required_balance, f"Недостаточно ETH у продавца. Требуется минимум 0.1 ETH, текущий баланс: {blockchain_service.web3.from_wei(seller_balance, 'ether')} ETH"
+    
+        # 2. Проверяем, что продавец не был ранее активирован
+        assert not blockchain_service.call_contract_function(
+            "InviteNFT",
+            "isUserActivated",
+            seller_account
+        ), "Продавец уже был активирован ранее"
+    
+        # 1. Продавец минтит 8 инвайтов
+        initial_invite_codes = [f"INVITE{i}" for i in range(8)]
+        tx_hash = blockchain_service.call_contract_function(
+            "InviteNFT",
+            "mintInvites",
+            initial_invite_codes,
+            0,  # бессрочные инвайты
+            sender=seller_account
+        )
+>       receipt = blockchain_service.web3.eth.wait_for_transaction_receipt(tx_hash)
+
+bot/tests/test_onboarding.py:48: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/eth/eth.py:476: in wait_for_transaction_receipt
+    tx_receipt = self._transaction_receipt(transaction_hash)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/module.py:100: in caller
+    (method_str, params), response_formatters = method.process_params(
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/method.py:237: in process_params
+    _apply_request_formatters(params, self.request_formatters(method)),
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/functional.py:47: in inner
+    return callback(fn(*args, **kwargs))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/method.py:64: in _apply_request_formatters
+    formatted_params = pipe(params, request_formatters)
+cytoolz/functoolz.pyx:680: in cytoolz.functoolz.pipe
+    ???
+cytoolz/functoolz.pyx:655: in cytoolz.functoolz.c_pipe
+    ???
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:570: in map_abi_data
+    return pipe(data, *pipeline)
+cytoolz/functoolz.pyx:680: in cytoolz.functoolz.pipe
+    ???
+cytoolz/functoolz.pyx:655: in cytoolz.functoolz.c_pipe
+    ???
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:605: in data_tree_map
+    return recursive_map(map_to_typed_data, data_tree)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/decorators.py:34: in wrapped
+    wrapped_val = to_wrap(*args)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:84: in recursive_map
+    items_mapped = map_collection(recurse, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:68: in map_collection
+    return datatype(map(func, collection))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:82: in recurse
+    return recursive_map(func, item)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/decorators.py:34: in wrapped
+    wrapped_val = to_wrap(*args)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:85: in recursive_map
+    return func(items_mapped)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:601: in map_to_typed_data
+    return ABITypedData(func(*elements))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:79: in wrapper
+    modified = to_wrap(type_str, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:134: in new_normalizer
+    return old_normalizer(abi_type, type_str, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:147: in abi_bytes_to_hex
+    bytes_data = hexstr_if_str(to_bytes, data)
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/encoding.py:182: in hexstr_if_str
+    return to_type(primitive, hexstr=hexstr)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/decorators.py:81: in wrapper
+    _assert_one_val(*args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (None,), kwargs = {'hexstr': None}
+
+    def _assert_one_val(*args: T, **kwargs: T) -> None:
+        if not _has_one_val(*args, **kwargs):
+>           raise TypeError(
+                "Exactly one of the passed values can be specified. "
+                f"Instead, values were: {repr(args)}, {repr(kwargs)}"
+            )
+E           TypeError: Exactly one of the passed values can be specified. Instead, values were: (None,), {'hexstr': None}
+
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/decorators.py:44: TypeError
+---------------------------- Captured stdout setup -----------------------------
+[Web3] Активный профиль: localhost, RPC: http://127.0.0.1:8545
+[Web3] Успешное подключение к localhost
+[Web3] Контракт InviteNFT подключён: 0x98eDDadCfde04dC22a0e62119617e74a6Bc77313
+[Web3] Контракт AmanitaSale подключён: 0x2B574555158337Cd46d47c2Ca57E4698A1f04e70
+[Web3] Контракт AmanitaToken подключён: 0x95bD8D42f30351685e96C62EDdc0d0613bf9a87A
+[Web3] Контракт OrderNFT подключён: 0xcA8b49076D1A8039599e24979abf819af784c27a
+[Web3] Контракт ReviewNFT подключён: 0xc039b3B46814D8388e5205D37Dd0D154D806F1f4
+----------------------------- Captured stdout call -----------------------------
+[Web3][ERROR] Ошибка вызова InviteNFT.isUserActivated: ("The function 'isUserActivated' was not found in this contract's abi.", ' Are you sure you provided the correct contract abi?')
+[Web3][ERROR] Ошибка вызова InviteNFT.mintInvites: ("The function 'mintInvites' was not found in this contract's abi.", ' Are you sure you provided the correct contract abi?')
+_______________________ test_initial_invites_validation ________________________
+
+blockchain_service = <bot.services.blockchain.BlockchainService object at 0x108d5efd0>
+seller_account = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+
+    def test_initial_invites_validation(blockchain_service, seller_account):
+        """Проверка валидности начальных инвайтов"""
+        # Создаем 8 инвайтов
+        initial_invite_codes = [f"INVITE{i}" for i in range(8)]
+        tx_hash = blockchain_service.call_contract_function(
+            "InviteNFT",
+            "mintInvites",
+            initial_invite_codes,
+            0,  # бессрочные инвайты
+            sender=seller_account
+        )
+>       receipt = blockchain_service.web3.eth.wait_for_transaction_receipt(tx_hash)
+
+bot/tests/test_onboarding.py:177: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/eth/eth.py:476: in wait_for_transaction_receipt
+    tx_receipt = self._transaction_receipt(transaction_hash)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/module.py:100: in caller
+    (method_str, params), response_formatters = method.process_params(
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/method.py:237: in process_params
+    _apply_request_formatters(params, self.request_formatters(method)),
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/functional.py:47: in inner
+    return callback(fn(*args, **kwargs))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/method.py:64: in _apply_request_formatters
+    formatted_params = pipe(params, request_formatters)
+cytoolz/functoolz.pyx:680: in cytoolz.functoolz.pipe
+    ???
+cytoolz/functoolz.pyx:655: in cytoolz.functoolz.c_pipe
+    ???
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:570: in map_abi_data
+    return pipe(data, *pipeline)
+cytoolz/functoolz.pyx:680: in cytoolz.functoolz.pipe
+    ???
+cytoolz/functoolz.pyx:655: in cytoolz.functoolz.c_pipe
+    ???
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:605: in data_tree_map
+    return recursive_map(map_to_typed_data, data_tree)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/decorators.py:34: in wrapped
+    wrapped_val = to_wrap(*args)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:84: in recursive_map
+    items_mapped = map_collection(recurse, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:68: in map_collection
+    return datatype(map(func, collection))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:82: in recurse
+    return recursive_map(func, item)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/decorators.py:34: in wrapped
+    wrapped_val = to_wrap(*args)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:85: in recursive_map
+    return func(items_mapped)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:601: in map_to_typed_data
+    return ABITypedData(func(*elements))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:79: in wrapper
+    modified = to_wrap(type_str, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:134: in new_normalizer
+    return old_normalizer(abi_type, type_str, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:147: in abi_bytes_to_hex
+    bytes_data = hexstr_if_str(to_bytes, data)
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/encoding.py:182: in hexstr_if_str
+    return to_type(primitive, hexstr=hexstr)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/decorators.py:81: in wrapper
+    _assert_one_val(*args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (None,), kwargs = {'hexstr': None}
+
+    def _assert_one_val(*args: T, **kwargs: T) -> None:
+        if not _has_one_val(*args, **kwargs):
+>           raise TypeError(
+                "Exactly one of the passed values can be specified. "
+                f"Instead, values were: {repr(args)}, {repr(kwargs)}"
+            )
+E           TypeError: Exactly one of the passed values can be specified. Instead, values were: (None,), {'hexstr': None}
+
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/decorators.py:44: TypeError
+---------------------------- Captured stdout setup -----------------------------
+[Web3] Активный профиль: localhost, RPC: http://127.0.0.1:8545
+[Web3] Успешное подключение к localhost
+[Web3] Контракт InviteNFT подключён: 0x98eDDadCfde04dC22a0e62119617e74a6Bc77313
+[Web3] Контракт AmanitaSale подключён: 0x2B574555158337Cd46d47c2Ca57E4698A1f04e70
+[Web3] Контракт AmanitaToken подключён: 0x95bD8D42f30351685e96C62EDdc0d0613bf9a87A
+[Web3] Контракт OrderNFT подключён: 0xcA8b49076D1A8039599e24979abf819af784c27a
+[Web3] Контракт ReviewNFT подключён: 0xc039b3B46814D8388e5205D37Dd0D154D806F1f4
+----------------------------- Captured stdout call -----------------------------
+[Web3][ERROR] Ошибка вызова InviteNFT.mintInvites: ("The function 'mintInvites' was not found in this contract's abi.", ' Are you sure you provided the correct contract abi?')
+____________________ test_first_user_onboarding_validation _____________________
+
+blockchain_service = <bot.services.blockchain.BlockchainService object at 0x108d97450>
+seller_account = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+generate_account = <eth_account.signers.local.LocalAccount object at 0x108dcd810>
+
+    def test_first_user_onboarding_validation(blockchain_service, seller_account, generate_account):
+        """Проверка валидности онбординга первого пользователя"""
+        # Создаем инвайты
+        initial_invite_codes = [f"INVITE{i}" for i in range(8)]
+        tx_hash = blockchain_service.call_contract_function(
+            "InviteNFT",
+            "mintInvites",
+            initial_invite_codes,
+            0,
+            sender=seller_account
+        )
+>       receipt = blockchain_service.web3.eth.wait_for_transaction_receipt(tx_hash)
+
+bot/tests/test_onboarding.py:215: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/eth/eth.py:476: in wait_for_transaction_receipt
+    tx_receipt = self._transaction_receipt(transaction_hash)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/module.py:100: in caller
+    (method_str, params), response_formatters = method.process_params(
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/method.py:237: in process_params
+    _apply_request_formatters(params, self.request_formatters(method)),
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/functional.py:47: in inner
+    return callback(fn(*args, **kwargs))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/method.py:64: in _apply_request_formatters
+    formatted_params = pipe(params, request_formatters)
+cytoolz/functoolz.pyx:680: in cytoolz.functoolz.pipe
+    ???
+cytoolz/functoolz.pyx:655: in cytoolz.functoolz.c_pipe
+    ???
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:570: in map_abi_data
+    return pipe(data, *pipeline)
+cytoolz/functoolz.pyx:680: in cytoolz.functoolz.pipe
+    ???
+cytoolz/functoolz.pyx:655: in cytoolz.functoolz.c_pipe
+    ???
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:605: in data_tree_map
+    return recursive_map(map_to_typed_data, data_tree)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/decorators.py:34: in wrapped
+    wrapped_val = to_wrap(*args)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:84: in recursive_map
+    items_mapped = map_collection(recurse, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:68: in map_collection
+    return datatype(map(func, collection))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:82: in recurse
+    return recursive_map(func, item)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/decorators.py:34: in wrapped
+    wrapped_val = to_wrap(*args)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:85: in recursive_map
+    return func(items_mapped)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:601: in map_to_typed_data
+    return ABITypedData(func(*elements))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:79: in wrapper
+    modified = to_wrap(type_str, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:134: in new_normalizer
+    return old_normalizer(abi_type, type_str, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:147: in abi_bytes_to_hex
+    bytes_data = hexstr_if_str(to_bytes, data)
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/encoding.py:182: in hexstr_if_str
+    return to_type(primitive, hexstr=hexstr)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/decorators.py:81: in wrapper
+    _assert_one_val(*args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (None,), kwargs = {'hexstr': None}
+
+    def _assert_one_val(*args: T, **kwargs: T) -> None:
+        if not _has_one_val(*args, **kwargs):
+>           raise TypeError(
+                "Exactly one of the passed values can be specified. "
+                f"Instead, values were: {repr(args)}, {repr(kwargs)}"
+            )
+E           TypeError: Exactly one of the passed values can be specified. Instead, values were: (None,), {'hexstr': None}
+
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/decorators.py:44: TypeError
+---------------------------- Captured stdout setup -----------------------------
+[Web3] Активный профиль: localhost, RPC: http://127.0.0.1:8545
+[Web3] Успешное подключение к localhost
+[Web3] Контракт InviteNFT подключён: 0x98eDDadCfde04dC22a0e62119617e74a6Bc77313
+[Web3] Контракт AmanitaSale подключён: 0x2B574555158337Cd46d47c2Ca57E4698A1f04e70
+[Web3] Контракт AmanitaToken подключён: 0x95bD8D42f30351685e96C62EDdc0d0613bf9a87A
+[Web3] Контракт OrderNFT подключён: 0xcA8b49076D1A8039599e24979abf819af784c27a
+[Web3] Контракт ReviewNFT подключён: 0xc039b3B46814D8388e5205D37Dd0D154D806F1f4
+----------------------------- Captured stdout call -----------------------------
+[Web3][ERROR] Ошибка вызова InviteNFT.mintInvites: ("The function 'mintInvites' was not found in this contract's abi.", ' Are you sure you provided the correct contract abi?')
+____________________ test_second_user_onboarding_validation ____________________
+
+blockchain_service = <bot.services.blockchain.BlockchainService object at 0x108e4a650>
+seller_account = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+generate_account = <eth_account.signers.local.LocalAccount object at 0x108c38650>
+
+    def test_second_user_onboarding_validation(blockchain_service, seller_account, generate_account):
+        """Проверка валидности онбординга второго пользователя"""
+        # Создаем начальные инвайты и первого пользователя
+        initial_invite_codes = [f"INVITE{i}" for i in range(8)]
+        tx_hash = blockchain_service.call_contract_function(
+            "InviteNFT",
+            "mintInvites",
+            initial_invite_codes,
+            0,
+            sender=seller_account
+        )
+>       receipt = blockchain_service.web3.eth.wait_for_transaction_receipt(tx_hash)
+
+bot/tests/test_onboarding.py:287: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/eth/eth.py:476: in wait_for_transaction_receipt
+    tx_receipt = self._transaction_receipt(transaction_hash)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/module.py:100: in caller
+    (method_str, params), response_formatters = method.process_params(
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/method.py:237: in process_params
+    _apply_request_formatters(params, self.request_formatters(method)),
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/functional.py:47: in inner
+    return callback(fn(*args, **kwargs))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/method.py:64: in _apply_request_formatters
+    formatted_params = pipe(params, request_formatters)
+cytoolz/functoolz.pyx:680: in cytoolz.functoolz.pipe
+    ???
+cytoolz/functoolz.pyx:655: in cytoolz.functoolz.c_pipe
+    ???
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:570: in map_abi_data
+    return pipe(data, *pipeline)
+cytoolz/functoolz.pyx:680: in cytoolz.functoolz.pipe
+    ???
+cytoolz/functoolz.pyx:655: in cytoolz.functoolz.c_pipe
+    ???
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:605: in data_tree_map
+    return recursive_map(map_to_typed_data, data_tree)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/decorators.py:34: in wrapped
+    wrapped_val = to_wrap(*args)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:84: in recursive_map
+    items_mapped = map_collection(recurse, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:68: in map_collection
+    return datatype(map(func, collection))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:82: in recurse
+    return recursive_map(func, item)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/decorators.py:34: in wrapped
+    wrapped_val = to_wrap(*args)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:85: in recursive_map
+    return func(items_mapped)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:601: in map_to_typed_data
+    return ABITypedData(func(*elements))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:79: in wrapper
+    modified = to_wrap(type_str, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:134: in new_normalizer
+    return old_normalizer(abi_type, type_str, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:147: in abi_bytes_to_hex
+    bytes_data = hexstr_if_str(to_bytes, data)
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/encoding.py:182: in hexstr_if_str
+    return to_type(primitive, hexstr=hexstr)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/decorators.py:81: in wrapper
+    _assert_one_val(*args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (None,), kwargs = {'hexstr': None}
+
+    def _assert_one_val(*args: T, **kwargs: T) -> None:
+        if not _has_one_val(*args, **kwargs):
+>           raise TypeError(
+                "Exactly one of the passed values can be specified. "
+                f"Instead, values were: {repr(args)}, {repr(kwargs)}"
+            )
+E           TypeError: Exactly one of the passed values can be specified. Instead, values were: (None,), {'hexstr': None}
+
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/decorators.py:44: TypeError
+---------------------------- Captured stdout setup -----------------------------
+[Web3] Активный профиль: localhost, RPC: http://127.0.0.1:8545
+[Web3] Успешное подключение к localhost
+[Web3] Контракт InviteNFT подключён: 0x98eDDadCfde04dC22a0e62119617e74a6Bc77313
+[Web3] Контракт AmanitaSale подключён: 0x2B574555158337Cd46d47c2Ca57E4698A1f04e70
+[Web3] Контракт AmanitaToken подключён: 0x95bD8D42f30351685e96C62EDdc0d0613bf9a87A
+[Web3] Контракт OrderNFT подключён: 0xcA8b49076D1A8039599e24979abf819af784c27a
+[Web3] Контракт ReviewNFT подключён: 0xc039b3B46814D8388e5205D37Dd0D154D806F1f4
+----------------------------- Captured stdout call -----------------------------
+[Web3][ERROR] Ошибка вызова InviteNFT.mintInvites: ("The function 'mintInvites' was not found in this contract's abi.", ' Are you sure you provided the correct contract abi?')
+_______________________ test_contract_events_validation ________________________
+
+blockchain_service = <bot.services.blockchain.BlockchainService object at 0x108d8e550>
+seller_account = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+generate_account = <eth_account.signers.local.LocalAccount object at 0x10895aed0>
+
+    def test_contract_events_validation(blockchain_service, seller_account, generate_account):
+        """Проверка событий контракта"""
+        # Создаем начальные инвайты
+        initial_invite_codes = [f"INVITE{i}" for i in range(8)]
+        tx_hash = blockchain_service.call_contract_function(
+            "InviteNFT",
+            "mintInvites",
+            initial_invite_codes,
+            0,
+            sender=seller_account
+        )
+>       receipt = blockchain_service.web3.eth.wait_for_transaction_receipt(tx_hash)
+
+bot/tests/test_onboarding.py:375: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/eth/eth.py:476: in wait_for_transaction_receipt
+    tx_receipt = self._transaction_receipt(transaction_hash)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/module.py:100: in caller
+    (method_str, params), response_formatters = method.process_params(
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/method.py:237: in process_params
+    _apply_request_formatters(params, self.request_formatters(method)),
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/functional.py:47: in inner
+    return callback(fn(*args, **kwargs))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/method.py:64: in _apply_request_formatters
+    formatted_params = pipe(params, request_formatters)
+cytoolz/functoolz.pyx:680: in cytoolz.functoolz.pipe
+    ???
+cytoolz/functoolz.pyx:655: in cytoolz.functoolz.c_pipe
+    ???
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:570: in map_abi_data
+    return pipe(data, *pipeline)
+cytoolz/functoolz.pyx:680: in cytoolz.functoolz.pipe
+    ???
+cytoolz/functoolz.pyx:655: in cytoolz.functoolz.c_pipe
+    ???
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:605: in data_tree_map
+    return recursive_map(map_to_typed_data, data_tree)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/decorators.py:34: in wrapped
+    wrapped_val = to_wrap(*args)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:84: in recursive_map
+    items_mapped = map_collection(recurse, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:68: in map_collection
+    return datatype(map(func, collection))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:82: in recurse
+    return recursive_map(func, item)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/decorators.py:34: in wrapped
+    wrapped_val = to_wrap(*args)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/formatters.py:85: in recursive_map
+    return func(items_mapped)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/abi.py:601: in map_to_typed_data
+    return ABITypedData(func(*elements))
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:79: in wrapper
+    modified = to_wrap(type_str, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:134: in new_normalizer
+    return old_normalizer(abi_type, type_str, data)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/normalizers.py:147: in abi_bytes_to_hex
+    bytes_data = hexstr_if_str(to_bytes, data)
+cytoolz/functoolz.pyx:267: in cytoolz.functoolz.curry.__call__
+    ???
+cytoolz/functoolz.pyx:263: in cytoolz.functoolz.curry.__call__
+    ???
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/web3/_utils/encoding.py:182: in hexstr_if_str
+    return to_type(primitive, hexstr=hexstr)
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/decorators.py:81: in wrapper
+    _assert_one_val(*args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (None,), kwargs = {'hexstr': None}
+
+    def _assert_one_val(*args: T, **kwargs: T) -> None:
+        if not _has_one_val(*args, **kwargs):
+>           raise TypeError(
+                "Exactly one of the passed values can be specified. "
+                f"Instead, values were: {repr(args)}, {repr(kwargs)}"
+            )
+E           TypeError: Exactly one of the passed values can be specified. Instead, values were: (None,), {'hexstr': None}
+
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/eth_utils/decorators.py:44: TypeError
+---------------------------- Captured stdout setup -----------------------------
+[Web3] Активный профиль: localhost, RPC: http://127.0.0.1:8545
+[Web3] Успешное подключение к localhost
+[Web3] Контракт InviteNFT подключён: 0x98eDDadCfde04dC22a0e62119617e74a6Bc77313
+[Web3] Контракт AmanitaSale подключён: 0x2B574555158337Cd46d47c2Ca57E4698A1f04e70
+[Web3] Контракт AmanitaToken подключён: 0x95bD8D42f30351685e96C62EDdc0d0613bf9a87A
+[Web3] Контракт OrderNFT подключён: 0xcA8b49076D1A8039599e24979abf819af784c27a
+[Web3] Контракт ReviewNFT подключён: 0xc039b3B46814D8388e5205D37Dd0D154D806F1f4
+----------------------------- Captured stdout call -----------------------------
+[Web3][ERROR] Ошибка вызова InviteNFT.mintInvites: ("The function 'mintInvites' was not found in this contract's abi.", ' Are you sure you provided the correct contract abi?')
+=========================== short test summary info ============================
+FAILED bot/tests/test_onboarding.py::test_onboarding_flow - TypeError: Exactl...
+FAILED bot/tests/test_onboarding.py::test_initial_invites_validation - TypeEr...
+FAILED bot/tests/test_onboarding.py::test_first_user_onboarding_validation - ...
+FAILED bot/tests/test_onboarding.py::test_second_user_onboarding_validation
+FAILED bot/tests/test_onboarding.py::test_contract_events_validation - TypeEr...
+============================== 5 failed in 1.30s ===============================
