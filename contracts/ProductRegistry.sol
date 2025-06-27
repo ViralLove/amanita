@@ -76,9 +76,6 @@ contract ProductRegistry {
     /// @notice Событие: обновлена версия каталога продавца
     event CatalogUpdated(address indexed seller, uint256 newVersion);
 
-    event DebugEvent(string functionName, uint256 counter, address indexed sender, string ipfsCID, uint256 price);
-    event DebugEventSimple(string functionName, string message);
-
     // --------------------------------
     // ------- Модификаторы ----------
     // --------------------------------
@@ -127,15 +124,11 @@ contract ProductRegistry {
     * - Минимальные storage-записи (только 3 массива и 1 mapping).
     */
     function createProduct(string calldata ipfsCID) external {
-        emit DebugEventSimple("createProduct", "start");
-
         require(bytes(ipfsCID).length > 0, "ProductRegistry: empty CID");
-        emit DebugEventSimple("createProduct", "CID check passed");
 
         // Генерируем новый productId
         _productIdCounter += 1;
         uint256 newProductId = _productIdCounter;
-        emit DebugEventSimple("createProduct", "ID generated");
 
         // Создаём продукт в памяти
         Product memory newProduct = Product({
@@ -144,26 +137,21 @@ contract ProductRegistry {
             ipfsCID: ipfsCID,
             active: true
         });
-        emit DebugEventSimple("createProduct", "product struct created");
 
         // Сохраняем в storage
         products[newProductId] = newProduct;
-        emit DebugEventSimple("createProduct", "product saved to storage");
 
         // Добавляем productId в список активных товаров
         activeProductIds.push(newProductId);
-        emit DebugEventSimple("createProduct", "added to active products");
 
         // Добавляем productId в индекс продавца
         productsBySeller[msg.sender].push(newProductId);
-        emit DebugEventSimple("createProduct", "added to seller products");
 
         // Эмитим событие для фронтенда
         emit ProductCreated(msg.sender, newProductId, ipfsCID, 1);
 
         catalogVersion[msg.sender] += 1;
         emit CatalogUpdated(msg.sender, catalogVersion[msg.sender]);
-        emit DebugEventSimple("createProduct", "finished successfully");
     }
 
 

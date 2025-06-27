@@ -5,7 +5,7 @@
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from bot.services.localization import Localization
+from bot.services.common.localization import Localization
 from bot.model.user_settings import UserSettings
 from bot.config import WALLET_APP_URL
 import logging
@@ -138,16 +138,16 @@ async def process_menu_callback(callback_query: types.CallbackQuery):
     action = callback_query.data.split(":")[1]
     lang_code = user_settings.get_language(user_id)
     loc = Localization(lang_code)
-    
+
     logging.info(f"[MENU] process_menu_callback: user_id={user_id}, action={action}, lang_code={lang_code}")
-    
-    # Обработка различных действий меню
+    logging.info(f"hahaha")
     if action == "catalog":
-        await callback_query.message.edit_text(
-            text=loc.t("menu.catalog"),
-            reply_markup=get_main_menu_keyboard(user_id)
-        )
-    elif action == "cart":
+        # Не обрабатываем здесь, чтобы сработал обработчик из catalog.py
+        logging.info(f"Catalog callback detected")
+        return
+
+    # Остальные действия меню
+    if action == "cart":
         await callback_query.message.edit_text(
             text=loc.t("menu.cart") + " (в разработке)",
             reply_markup=get_main_menu_keyboard(user_id)

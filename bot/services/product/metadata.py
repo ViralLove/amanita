@@ -45,7 +45,8 @@ class ProductMetadataService:
             
             # Извлекаем базовые поля
             title = metadata.get('title', '')
-            product_id = metadata.get('id', '')
+            product_id = metadata.get('id', '')  # Блокчейн ID будет установлен позже
+            alias = metadata.get('id', '')  # Бизнес-идентификатор из метаданных
 
             cover_image_cid = metadata.get('cover_image', '')
             cover_image_url = self.cache_service.get_image_url_by_cid(cover_image_cid)
@@ -58,6 +59,12 @@ class ProductMetadataService:
             
             # Обрабатываем формы
             forms = metadata.get('forms', [])
+            # Если есть поле 'form' (единственное число), добавляем его в список форм
+            if 'form' in metadata and metadata['form']:
+                if not forms:  # Если forms пустой, создаем список с одним элементом
+                    forms = [metadata['form']]
+                elif metadata['form'] not in forms:  # Если формы нет в списке, добавляем
+                    forms.append(metadata['form'])
             
             # Получаем вид
             species = metadata.get('species', '')
@@ -81,7 +88,8 @@ class ProductMetadataService:
             
             # Создаем объект продукта
             product = Product(
-                id=product_id,
+                id=product_id,  # Временно используем ID из метаданных, будет заменен на блокчейн ID
+                alias=alias,    # Бизнес-идентификатор из метаданных
                 status=1,
                 cid=cover_image_cid,
                 title=title,

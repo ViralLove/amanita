@@ -21,7 +21,7 @@ if not TELEGRAM_BOT_TOKEN:
 raw_wallet_url = os.getenv("WALLET_APP_URL")
 logging.info(f"[CONFIG] Исходное значение WALLET_APP_URL из .env: {raw_wallet_url}")
 
-WALLET_APP_URL = os.getenv("WALLET_APP_URL", "https://localhost:8080/")
+WALLET_APP_URL = os.getenv("WALLET_APP_URL", "https://localhost:3000/")
 logging.info(f"[CONFIG] Финальное значение WALLET_APP_URL: {WALLET_APP_URL}")
 
 # Читаем напрямую из файла для проверки

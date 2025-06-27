@@ -14,7 +14,9 @@ def get_text(key: str, lang: str = 'en') -> str:
         str: Найденный текст или ключ, если текст не найден
     """
     try:
-        file_path = os.path.join(os.path.dirname(__file__), f'{lang}.json')
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+        file_path = os.path.join(project_root, "bot", "templates", f"{lang}.json")
+        print(f"[LOCALIZATION] file_path={file_path}")
         with open(file_path, 'r', encoding='utf-8') as f:
             translations = json.load(f)
             
@@ -25,10 +27,12 @@ def get_text(key: str, lang: str = 'en') -> str:
             for v in d.values():
                 if isinstance(v, dict):
                     result = find_nested(v, k)
-                    if result:
+                    if result and result != k:
                         return result
             return k
-            
-        return find_nested(translations, key)
-    except (FileNotFoundError, json.JSONDecodeError):
+        result = find_nested(translations, key)
+        print(f"[LOCALIZATION] lang={lang}, key={key}, result={result}")
+        return result
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"[LOCALIZATION][ERROR] lang={lang}, key={key}, error={e}")
         return key 

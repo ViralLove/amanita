@@ -506,7 +506,8 @@ class Product:
     Модель продукта, представляющая товар в каталоге.
     
     Attributes:
-        id (Union[int, str]): Уникальный идентификатор продукта
+        id (Union[int, str]): Уникальный идентификатор продукта (блокчейн ID)
+        alias (str): Бизнес-идентификатор продукта из метаданных
         status (int): Статус продукта (0 - неактивен, 1 - активен)
         cid (str): Content Identifier - ссылка на контент в IPFS/Arweave
         title (str): Название продукта
@@ -522,6 +523,7 @@ class Product:
     def __init__(
         self,
         id: Union[int, str],
+        alias: str,
         status: int,
         cid: str,
         title: str,
@@ -537,7 +539,8 @@ class Product:
         Инициализирует объект Product.
         
         Args:
-            id: Уникальный идентификатор продукта
+            id: Уникальный идентификатор продукта (блокчейн ID)
+            alias: Бизнес-идентификатор продукта из метаданных
             status: Статус продукта (0 - неактивен, 1 - активен)
             cid: Content Identifier
             title: Название продукта
@@ -557,6 +560,11 @@ class Product:
             self.id = id
         else:
             raise ValueError("ID должен быть числом или строкой")
+
+        # Валидация alias
+        if not alias:
+            raise ValueError("Alias не может быть пустым")
+        self.alias = alias
 
         # Валидация status
         if status not in [0, 1]:
@@ -735,6 +743,7 @@ class Product:
 
         return cls(
             id=data['id'],
+            alias=data.get('alias', ''),
             status=data.get('status', 1),
             cid=data.get('cid', ''),
             title=data['title'],
@@ -756,6 +765,7 @@ class Product:
         """
         return {
             'id': self.id,
+            'alias': self.alias,
             'status': self.status,
             'cid': self.cid,
             'title': self.title,

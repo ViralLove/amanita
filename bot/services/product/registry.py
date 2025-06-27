@@ -604,33 +604,28 @@ class ProductRegistryService:
             self.logger.error(f"[ProductRegistry] Ошибка обновления статуса продукта {product_id}: {e}")
             return False
     
-    async def set_product_active(self, product_id: int, is_active: bool) -> bool:
+    async def deactivate_product(self, product_id: int) -> bool:
         """
-        Устанавливает активность продукта.
-        
+        Деактивирует продукт через контракт (делает его невидимым в каталоге).
         Args:
             product_id: ID продукта
-            is_active: True - продукт активен, False - не активен
-            
         Returns:
             bool: True если успешно, False если ошибка
         """
         try:
-            tx_hash = await self.blockchain.set_product_active(
+            tx_hash = await self.blockchain.transact_contract_function(
+                "ProductRegistry",
+                "deactivateProduct",
                 self.blockchain.seller_key,
-                product_id,
-                is_active
+                product_id
             )
-            
             if not tx_hash:
-                self.logger.error(f"[ProductRegistry] Ошибка установки активности продукта {product_id}")
+                self.logger.error(f"[ProductRegistry] Ошибка деактивации продукта {product_id}")
                 return False
-                
-            self.logger.info(f"[ProductRegistry] Активность продукта {product_id} установлена: {is_active}")
+            self.logger.info(f"[ProductRegistry] Продукт {product_id} деактивирован")
             return True
-            
         except Exception as e:
-            self.logger.error(f"[ProductRegistry] Ошибка установки активности продукта {product_id}: {e}")
+            self.logger.error(f"[ProductRegistry] Ошибка деактивации продукта {product_id}: {e}")
             return False
 
     def _deserialize_product(self, product_data: tuple) -> Optional[Product]:
@@ -646,36 +641,22 @@ class ProductRegistryService:
                 self.logger.error(f"Некорректная структура product_data: {product_data}")
                 return None
 
-            product_id = product_data[0]
+            product_id = product_data[0]  # Блокчейн ID
             ipfs_cid = product_data[2]
-            active = product_data[3]
+            is_active = bool(product_data[3])
 
-            self.logger.info(f"🔍 Получаем метаданные продукта: {product_id}, {ipfs_cid}, {active}")
+            self.logger.info(f"🔍 Получаем метаданные продукта: {product_id}, {ipfs_cid}, {is_active}")
             metadata = self.storage_service.download_json(ipfs_cid)
-            self.logger.info(f"📥 Получены метаданные для продукта {product_id}: {type(metadata)}, {metadata}")
-            
             if not metadata:
-                self.logger.error(f"Не удалось загрузить метаданные для продукта {product_id}")
+                self.logger.warning(f"Не удалось получить метаданные для продукта {product_id}")
                 return None
-            
-            # Проверяем, что metadata является словарем
-            if not isinstance(metadata, dict):
-                self.logger.error(f"Метаданные должны быть словарем, получено: {type(metadata)} для продукта {product_id}")
-                return None
-            
-            # Обрабатываем метаданные через metadata_service
+
             product = self.metadata_service.process_product_metadata(metadata)
-            if not product:
-                self.logger.error(f"Не удалось десериализовать продукт {product_id}")
-                return None
-
-            # Устанавливаем дополнительные поля из блокчейна
-            product.status = 1 if active else 0
-            product.id = product_id
-            product.cid = ipfs_cid
-
+            if product:
+                product.id = product_id
+                product.cid = ipfs_cid
+                product.is_active = is_active
             return product
-
         except Exception as e:
             self.logger.error(f"Ошибка десериализации продукта: {e}")
             return None

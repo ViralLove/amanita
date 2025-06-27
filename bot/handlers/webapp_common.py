@@ -1,13 +1,15 @@
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, InlineQueryResultArticle, InputTextMessageContent
-from bot.services.localization import Localization
+from aiogram.filters.command import Command
+from bot.services.common.localization import Localization
 from bot.fsm.onboarding_states import OnboardingStates
 from bot.model.user_settings import UserSettings
-from bot.services.blockchain import BlockchainService
-from bot.services.account import AccountService
+from bot.services.core.blockchain import BlockchainService
+from bot.services.core.account import AccountService
 import logging
 import json
+import os
 
 router = Router()
 logger = logging.getLogger(__name__)

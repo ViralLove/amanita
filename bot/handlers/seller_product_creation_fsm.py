@@ -2,11 +2,11 @@ from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from bot.fsm.product_creation_states import ProductCreationStates
-from bot.services.localization import Localization
+from bot.services.common.localization import Localization
 from bot.model.user_settings import UserSettings
-from bot.services.product_registry import ProductRegistryService
-from bot.services.blockchain import BlockchainService
-from bot.services.ar_weave import ArWeaveUploader
+from bot.services.product.registry import ProductRegistryService
+from bot.services.core.blockchain import BlockchainService
+from bot.services.core.storage.ar_weave import ArWeaveUploader
 import logging
 import os
 
@@ -210,7 +210,7 @@ async def collect_attributes(message: types.Message, state: FSMContext):
         for pair in pairs:
             if ":" not in pair:
                 await message.answer(loc.t("e-catalog.product_creation.invalid_attributes"))
-        return
+                return
 
             key, value = pair.split(":", 1)
             attributes[key.strip()] = value.strip()

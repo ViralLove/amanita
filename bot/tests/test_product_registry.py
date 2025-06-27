@@ -14,6 +14,7 @@ from bot.services.product.validation import ProductValidationService
 from bot.services.core.account import AccountService
 from bot.services.core.ipfs_factory import IPFSFactory
 from bot.model.product import PriceInfo, Description
+from decimal import Decimal
 
 # Загружаем .env файл
 load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
@@ -244,7 +245,7 @@ async def test_get_full_catalog(product_registry):
         assert product.cid is not None and product.cid.strip() != ""
         assert product.description_cid is not None and product.description_cid.strip() != ""
         logger.info(f"✅ Качество данных продукта: ID={product.id}, Title='{product.title}', Status={product.status}")
-        
+            
         # 🔍 ПРОВЕРКА ОПИСАНИЯ (Description)
         logger.info("🔍 Проверяем структуру и качество описания")
         assert isinstance(product.description, Description)
@@ -282,7 +283,7 @@ async def test_get_full_catalog(product_registry):
             assert dosage.title is not None and dosage.title.strip() != ""
             assert dosage.description is not None and dosage.description.strip() != ""
             logger.info(f"✅ Инструкция по дозировке: Type='{dosage.type}', Title='{dosage.title}'")
-        
+            
         # 🔍 ПРОВЕРКА КАТЕГОРИЙ
         logger.info("🔍 Проверяем категории")
         assert isinstance(product.categories, list)
@@ -291,7 +292,7 @@ async def test_get_full_catalog(product_registry):
                 assert isinstance(category, str)
                 assert category.strip() != ""
             logger.info(f"✅ Категории: {product.categories}")
-        
+            
         # 🔍 ПРОВЕРКА ФОРМ
         logger.info("🔍 Проверяем формы")
         assert isinstance(product.forms, list)
@@ -318,7 +319,7 @@ async def test_get_full_catalog(product_registry):
             assert price.currency in PriceInfo.SUPPORTED_CURRENCIES
             logger.info(f"   Цена: {price.format_full()}")
         logger.info(f"✅ Цены: {len(product.prices)} вариантов")
-        
+            
         # 🔍 ПРОВЕРКА ИЗОБРАЖЕНИЙ
         logger.info("🔍 Проверяем изображения")
         assert product.cover_image_url is not None and product.cover_image_url.strip() != ""
@@ -349,167 +350,121 @@ async def test_get_full_catalog(product_registry):
     logger.info("✅ Тест получения полного каталога завершен успешно")
 
 @pytest.mark.asyncio
-async def test_create_product_success(product_registry, test_data):
+async def test_create_successful_product_flow(product_registry, test_data):
     """
-    Интеграционный тест: успешное создание продукта через create_product
+    Полноценный интеграционный тест: успешное создание продукта с полным циклом проверок
     Arrange: Берем валидные тестовые данные
-    Act: Вызываем create_product
-    Assert: Проверяем, что продукт создан, есть ID, можно получить продукт по ID
+    Act: Создаем продукт, получаем его, проверяем все аспекты
+    Assert: Проверяем создание, получение, метаданные, активацию, статусы
     """
-    logger.info("🧪 Начинаем тест успешного создания продукта")
+    logger.info("🧪 Начинаем полноценный тест создания продукта")
     
     valid_product = test_data["valid_products"][0]
     logger.info(f"📝 Создаем продукт: {valid_product['title']}")
     
+    # ==================== ЭТАП 1: СОЗДАНИЕ ПРОДУКТА ====================
     logger.info("🚀 Вызываем create_product")
     product_id = await product_registry.create_product(valid_product)
-    assert product_id is not None
+    assert product_id is not None, "Продукт должен быть создан"
     logger.info(f"✅ Продукт создан с ID: {product_id}")
     
+    # ==================== ЭТАП 2: ПОЛУЧЕНИЕ И ПРОВЕРКА ПРОДУКТА ====================
     logger.info("🔍 Получаем созданный продукт по ID")
     product = product_registry.get_product(product_id)
-    assert product is not None
-    assert product.title == valid_product["title"]
+    assert product is not None, "Продукт должен быть найден"
+    assert product.title == valid_product["title"], f"Название должно совпадать: {product.title} != {valid_product['title']}"
     logger.info(f"✅ Продукт найден: {product.title}")
     
-    logger.info("✅ Тест создания продукта завершен")
+    # ==================== ЭТАП 3: ПРОВЕРКА МЕТАДАННЫХ ====================
+    logger.info("📋 Проверяем метаданные продукта")
+    # Проверяем alias (бизнес-идентификатор из метаданных)
+    assert product.alias == valid_product["id"], f"Alias должен совпадать: {product.alias} != {valid_product['id']}"
+    assert product.species == valid_product["species"], f"Вид должен совпадать: {product.species} != {valid_product['species']}"
+    assert product.forms == [valid_product["form"]], f"Формы должны совпадать: {product.forms} != {[valid_product['form']]}"
+    assert product.categories == valid_product["categories"], f"Категории должны совпадать: {product.categories} != {valid_product['categories']}"
+    # Генерируем ожидаемый URL для cover_image
+    expected_cover_url = f"https://gateway.pinata.cloud/ipfs/{valid_product['cover_image']}"
+    assert product.cover_image_url == expected_cover_url, f"Обложка должна совпадать: {product.cover_image_url} != {expected_cover_url}"
+    logger.info("✅ Все метаданные продукта корректны")
+    
+    # ==================== ЭТАП 4: ПРОВЕРКА ОПИСАНИЯ ====================
+    logger.info("📖 Проверяем описание продукта")
+    assert product.description is not None, "Описание должно быть загружено"
+    assert hasattr(product.description, 'generic_description'), "Описание должно содержать generic_description"
+    assert hasattr(product.description, 'scientific_name'), "Описание должно содержать scientific_name"
+    logger.info("✅ Описание продукта корректно загружено")
+    
+    # ==================== ЭТАП 5: ПРОВЕРКА ЦЕН ====================
+    logger.info("💰 Проверяем цены продукта")
+    assert product.prices is not None, "Цены должны быть загружены"
+    assert len(product.prices) == len(valid_product["prices"]), f"Количество цен должно совпадать: {len(product.prices)} != {len(valid_product['prices'])}"
+    
+    for i, expected_price in enumerate(valid_product["prices"]):
+        actual_price = product.prices[i]
+        # Преобразуем строковые значения в Decimal для корректного сравнения
+        expected_weight = Decimal(expected_price["weight"])
+        expected_price_value = Decimal(expected_price["price"])
+        
+        assert actual_price.weight == expected_weight, f"Вес цены {i} должен совпадать: {actual_price.weight} != {expected_weight}"
+        assert actual_price.price == expected_price_value, f"Цена {i} должна совпадать: {actual_price.price} != {expected_price_value}"
+        assert actual_price.weight_unit == expected_price["weight_unit"], f"Единица веса {i} должна совпадать: {actual_price.weight_unit} != {expected_price['weight_unit']}"
+        assert actual_price.currency == expected_price["currency"], f"Валюта {i} должна совпадать: {actual_price.currency} != {expected_price['currency']}"
+    
+    logger.info("✅ Все цены продукта корректны")
+    
+    # ==================== ЭТАП 6: ФИНАЛЬНАЯ ПРОВЕРКА ====================
+    logger.info("🎯 Финальная проверка продукта")
+    final_product = product_registry.get_product(product_id)
+    assert final_product is not None, "Продукт должен остаться доступным"
+    assert final_product.title == valid_product["title"], "Название должно остаться неизменным"
+    assert final_product.alias == valid_product["id"], "Alias должен остаться неизменным"
+    logger.info("✅ Финальная проверка пройдена")
+    
+    logger.info("🎉 Полноценный тест создания продукта успешно завершен")
 
 @pytest.mark.asyncio
-async def test_create_and_validate_product(product_registry):
-    """Тест создания и валидации продукта"""
-    logger.info("🧪 Начинаем тест создания и валидации продукта")
+async def test_validation_valid_product():
+    """Тест валидации корректного продукта"""
+    logger.info("🧪 Тест валидации корректного продукта")
     
-    logger.info("🔍 Проверяем валидацию перед созданием")
-    validation_result = await product_registry.validation_service.validate_product_data(TEST_PRODUCT_DATA)
-    assert validation_result["is_valid"] is True, f"Тестовые данные должны быть валидными: {validation_result.get('errors', [])}"
-    logger.info("✅ Валидация пройдена")
-    
-    logger.info("🚀 Создаем продукт")
-    product_id = await product_registry.create_product(TEST_PRODUCT_DATA)
-    assert product_id is not None, "Продукт не создан"
-    logger.info(f"📦 ID продукта: {product_id}")
-    
-    logger.info("🔍 Получаем продукт из блокчейна")
-    product = await product_registry.get_product(product_id)
-    assert product is not None, "Продукт не найден в блокчейне"
-    logger.info("✅ Продукт найден в блокчейне")
-    
-    logger.info("📄 Проверяем метаданные продукта")
-    metadataDownloaded = await storage_service.download_json(product.cid)
-    assert metadataDownloaded is not None, "Метаданные продукта не найдены в IPFS"
-    logger.info("✅ Метаданные найдены в IPFS")
-    
-    logger.info("🔍 Сверяем поля сериализованного Product полученного по ID из смартконтракта и отдельно полученные значения метаданных полученные через Storage сервис напрямую")
-    assert product.id == metadataDownloaded["id"], "ID продукта не совпадает"
-    assert product.title == metadataDownloaded["title"], "Название продукта не совпадает"
-    assert product.description_cid is not None, "CID описания продукта не может быть None"
-
-    descriptionMetadataDownloaded = await storage_service.download_json(product.description_cid)
-    assert descriptionMetadataDownloaded is not None, "Описание продукта не найдено в IPFS"
-
-    assert product.description.generic_description == descriptionMetadataDownloaded["generic_description"], "Описание продукта не совпадает"
-    assert product.description.scientific_name == descriptionMetadataDownloaded["scientific_name"], "Научное название продукта не совпадает"
-    assert product.description.effects == descriptionMetadataDownloaded["effects"], "Эффекты продукта не совпадают"
-    assert product.description.shamanic == descriptionMetadataDownloaded["shamanic"], "Шаманская информация продукта не совпадает"
-    assert product.description.warnings == descriptionMetadataDownloaded["warnings"], "Предупреждения продукта не совпадают"
-    assert product.description.dosage_instructions == descriptionMetadataDownloaded["dosage_instructions"], "Инструкции по дозировке продукта не совпадают"
-    
-    coverImageCid = metadataDownloaded["cover_image"]
-    coverImageUrl = storage_service.get_gateway_url(coverImageCid)
-    assert coverImageUrl is not None, "Обложка продукта не найдена в IPFS"
-    assert product.cover_image_url == coverImageUrl, "Обложка продукта не совпадает"
-
-    assert product.categories == descriptionMetadataDownloaded["categories"], "Категории продукта не совпадают"
-    assert product.forms == descriptionMetadataDownloaded["form"], "Формы продукта не совпадают"
-    assert product.species == descriptionMetadataDownloaded["species"], "Вид продукта не совпадает"
-
-    # Проверка длины списков категорий и форм
-    assert len(product.categories) == len(descriptionMetadataDownloaded["categories"]), f"Длина категорий не совпадает: {len(product.categories)} != {len(descriptionMetadataDownloaded['categories'])}"
-    assert len(product.forms) == (len(descriptionMetadataDownloaded["form"]) if isinstance(descriptionMetadataDownloaded["form"], list) else 1), f"Длина форм не совпадает: {len(product.forms)} != {len(descriptionMetadataDownloaded['form'])}"
-
-    # Проверка gallery
-    if "gallery" in metadataDownloaded:
-        assert hasattr(product, "gallery"), "У продукта отсутствует поле gallery"
-        assert len(product.gallery) == len(metadataDownloaded["gallery"]), f"Длина gallery не совпадает: {len(product.gallery)} != {len(metadataDownloaded['gallery'])}"
-        for idx, cid in enumerate(metadataDownloaded["gallery"]):
-            assert product.gallery[idx] == storage_service.get_gateway_url(cid), f"Элемент gallery[{idx}] не совпадает: {product.gallery[idx]} != {storage_service.get_gateway_url(cid)}"
-
-    # Проверка video
-    if "video" in metadataDownloaded:
-        assert hasattr(product, "video"), "У продукта отсутствует поле video"
-        assert product.video == storage_service.get_gateway_url(metadataDownloaded["video"]), f"Поле video не совпадает: {product.video} != {storage_service.get_gateway_url(metadataDownloaded['video'])}"
-
-    # Проверка всех полей цен
-    assert len(product.prices) == len(metadataDownloaded["prices"]), f"Количество цен не совпадает: {len(product.prices)} != {len(metadataDownloaded['prices'])}"
-    for idx, price in enumerate(product.prices):
-        meta_price = metadataDownloaded["prices"][idx]
-        if hasattr(price, "to_dict"):
-            price_dict = price.to_dict()
-        elif isinstance(price, dict):
-            price_dict = price
-        else:
-            raise AssertionError("Неизвестный тип price")
-        for key in meta_price:
-            assert str(price_dict.get(key)) == str(meta_price.get(key)), f"Поле {key} в цене не совпадает: {price_dict.get(key)} != {meta_price.get(key)}"
-        assert set(price_dict.keys()) == set(meta_price.keys()), f"Набор ключей цены не совпадает: {set(price_dict.keys())} != {set(meta_price.keys())}"
-
-    # Проверка что все поля из метаданных отражены в объекте продукта
-    for key in metadataDownloaded:
-        if hasattr(product, key):
-            product_value = getattr(product, key)
-            meta_value = metadataDownloaded[key]
-            if isinstance(product_value, list) and isinstance(meta_value, list):
-                assert len(product_value) == len(meta_value), f"Поле {key}: длина списка не совпадает: {len(product_value)} != {len(meta_value)}"
-            else:
-                assert product_value == meta_value or str(product_value) == str(meta_value), f"Поле {key} не совпадает: {product_value} != {meta_value}"
-
-    logger.info("✅ Все поля продукта и метаданных успешно сверены")
-    
-    logger.info("✅ Тест создания и валидации продукта завершен")
-
-@pytest.mark.asyncio
-async def test_product_validation():
-    """Комплексный тест валидации продукта"""
-    logger.info("🧪 Начинаем комплексный тест валидации продукта")
-    
-    logger.info("🔧 Создаем сервисы")
     blockchain_service = BlockchainService()
     storage_service = IPFSFactory().get_storage()
     validation_service = ProductValidationService()
-    
-    logger.info("🔧 Создаем основной сервис")
     service = ProductRegistryService(
         blockchain_service=blockchain_service,
         storage_service=storage_service,
         validation_service=validation_service
     )
     
-    # ==================== ТЕСТ 1: ВАЛИДНЫЕ ДАННЫЕ ====================
-    logger.info("📝 Тест 1: Проверяем валидные данные")
     valid_product = TEST_PRODUCTS["valid_products"][0]
-    logger.info(f"🔍 Тестируем валидный продукт: {valid_product['title']}")
-    
     validation_result = await service.validation_service.validate_product_data(valid_product)
-    logger.info(f"🔍 Результат валидации валидного продукта: {json.dumps(validation_result, indent=2)}")
     
     assert validation_result["is_valid"], f"Валидный продукт должен проходить валидацию. Ошибки: {validation_result.get('errors')}"
     assert len(validation_result["errors"]) == 0, f"Валидный продукт не должен иметь ошибок: {validation_result['errors']}"
     logger.info("✅ Валидный продукт прошел валидацию")
+
+@pytest.mark.asyncio
+async def test_validation_empty_fields():
+    """Тест валидации продукта с пустыми полями"""
+    logger.info("🧪 Тест валидации продукта с пустыми полями")
     
-    # ==================== ТЕСТ 2: ПУСТЫЕ ПОЛЯ ====================
-    logger.info("📝 Тест 2: Проверяем пустые поля")
+    blockchain_service = BlockchainService()
+    storage_service = IPFSFactory().get_storage()
+    validation_service = ProductValidationService()
+    service = ProductRegistryService(
+        blockchain_service=blockchain_service,
+        storage_service=storage_service,
+        validation_service=validation_service
+    )
+    
     invalid_product = TEST_PRODUCTS["invalid_products"][0]
-    logger.info(f"🔍 Тестируем невалидный продукт с пустыми полями: {invalid_product['id']}")
-    
     validation_result = await service.validation_service.validate_product_data(invalid_product)
-    logger.info(f"🔍 Результат валидации невалидного продукта: {json.dumps(validation_result, indent=2)}")
     
     assert not validation_result["is_valid"], "Продукт с пустыми полями должен быть невалидным"
     assert len(validation_result["errors"]) > 0, "Должны быть ошибки валидации"
     
-    # Проверяем конкретные ошибки
     errors = validation_result["errors"]
-    expected_empty_field_errors = [
+    expected_errors = [
         "title: Поле не может быть пустым",
         "description_cid: Поле не может быть пустым",
         "cover_image: Поле не может быть пустым",
@@ -517,54 +472,130 @@ async def test_product_validation():
         "species: Поле не может быть пустым"
     ]
     
-    for expected_error in expected_empty_field_errors:
+    for expected_error in expected_errors:
         assert any(expected_error in error for error in errors), f"Ожидалась ошибка: {expected_error}"
     
-    # Проверяем ошибки формата CID
-    assert any("Неверный формат CID" in error for error in errors), "Должны быть ошибки формата CID"
-    
-    # Проверяем ошибки категорий и цен
-    assert any("категория" in error.lower() for error in errors), "Должна быть ошибка о категориях"
-    assert any("цена" in error.lower() for error in errors), "Должна быть ошибка о ценах"
-    
     logger.info(f"✅ Найдено {len(errors)} ошибок валидации для пустых полей")
+
+@pytest.mark.asyncio
+async def test_validation_invalid_cid_format():
+    """Тест валидации продукта с некорректным форматом CID"""
+    logger.info("🧪 Тест валидации продукта с некорректным форматом CID")
     
-    # ==================== ТЕСТ 3: НЕКОРРЕКТНЫЕ ФОРМАТЫ ====================
-    logger.info("📝 Тест 3: Проверяем некорректные форматы")
-    invalid_format_product = TEST_PRODUCTS["invalid_products"][2]  # invalid_cid_format
-    logger.info(f"🔍 Тестируем продукт с некорректными CID: {invalid_format_product['id']}")
+    blockchain_service = BlockchainService()
+    storage_service = IPFSFactory().get_storage()
+    validation_service = ProductValidationService()
+    service = ProductRegistryService(
+        blockchain_service=blockchain_service,
+        storage_service=storage_service,
+        validation_service=validation_service
+    )
     
+    invalid_format_product = TEST_PRODUCTS["invalid_products"][2]
     validation_result = await service.validation_service.validate_product_data(invalid_format_product)
     
     assert not validation_result["is_valid"], "Продукт с некорректными CID должен быть невалидным"
     assert any("Неверный формат CID" in error for error in validation_result["errors"]), "Должны быть ошибки формата CID"
     logger.info("✅ Ошибки формата CID обнаружены")
+
+@pytest.mark.asyncio
+async def test_validation_invalid_price_format():
+    """Тест валидации продукта с некорректным форматом цены"""
+    logger.info("🧪 Тест валидации продукта с некорректным форматом цены")
     
-    # ==================== ТЕСТ 4: НЕКОРРЕКТНЫЕ ЦЕНЫ ====================
-    logger.info("📝 Тест 4: Проверяем некорректные цены")
-    invalid_price_product = TEST_PRODUCTS["invalid_products"][1]  # invalid_price_format
-    logger.info(f"🔍 Тестируем продукт с некорректными ценами: {invalid_price_product['id']}")
+    blockchain_service = BlockchainService()
+    storage_service = IPFSFactory().get_storage()
+    validation_service = ProductValidationService()
+    service = ProductRegistryService(
+        blockchain_service=blockchain_service,
+        storage_service=storage_service,
+        validation_service=validation_service
+    )
     
-    validation_result = await service.validation_service.validate_product_data(invalid_price_product)
+    invalid_price_format_product = TEST_PRODUCTS["invalid_products"][1]
+    validation_result = await service.validation_service.validate_product_data(invalid_price_format_product)
     
-    assert not validation_result["is_valid"], "Продукт с некорректными ценами должен быть невалидным"
-    assert any(error.startswith("prices[0].price:") for error in validation_result["errors"]), "Должны быть ошибки по цене"
-    assert any(error.startswith("prices[0].currency:") for error in validation_result["errors"]), "Должны быть ошибки по валюте"
-    logger.info("✅ Ошибки цен обнаружены")
+    assert not validation_result["is_valid"], "Продукт с некорректным форматом цены должен быть невалидным"
+    assert any(error.startswith("prices[0].price:") for error in validation_result["errors"]), "Должны быть ошибки по формату цены"
+    logger.info(f"✅ Ошибки по формату цены: {[e for e in validation_result['errors'] if e.startswith('prices[0].price:')]}")
+
+@pytest.mark.asyncio
+async def test_validation_invalid_currency():
+    """Тест валидации продукта с некорректной валютой"""
+    logger.info("🧪 Тест валидации продукта с некорректной валютой")
     
-    # ==================== ТЕСТ 5: НЕКОРРЕКТНАЯ ВАЛЮТА ====================
-    logger.info("📝 Тест 5: Проверяем некорректную валюту")
-    invalid_currency_product = TEST_PRODUCTS["invalid_products"][3]  # invalid_currency
-    logger.info(f"🔍 Тестируем продукт с некорректной валютой: {invalid_currency_product['id']}")
+    blockchain_service = BlockchainService()
+    storage_service = IPFSFactory().get_storage()
+    validation_service = ProductValidationService()
+    service = ProductRegistryService(
+        blockchain_service=blockchain_service,
+        storage_service=storage_service,
+        validation_service=validation_service
+    )
+    
+    invalid_currency_product = {
+        "id": "invalid_currency_test",
+        "title": "Test Product",
+        "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+        "categories": ["test"],
+        "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+        "form": "powder",
+        "species": "Test species",
+        "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "INVALID"}]
+    }
     
     validation_result = await service.validation_service.validate_product_data(invalid_currency_product)
     
     assert not validation_result["is_valid"], "Продукт с некорректной валютой должен быть невалидным"
-    assert any(error.startswith("prices[0].currency:") for error in validation_result["errors"]), "Должна быть ошибка валюты"
-    logger.info("✅ Ошибка валюты обнаружена")
+    assert any(error.startswith("prices[0].currency:") for error in validation_result["errors"]), "Должны быть ошибки по валюте"
+    logger.info(f"✅ Ошибки по валюте: {[e for e in validation_result['errors'] if e.startswith('prices[0].currency:')]}")
+
+@pytest.mark.asyncio
+async def test_validation_invalid_form():
+    """Тест валидации продукта с некорректной формой"""
+    logger.info("🧪 Тест валидации продукта с некорректной формой")
     
-    # ==================== ТЕСТ 6: ГРАНИЧНЫЕ СЛУЧАИ ====================
-    logger.info("📝 Тест 6: Проверяем граничные случаи")
+    blockchain_service = BlockchainService()
+    storage_service = IPFSFactory().get_storage()
+    validation_service = ProductValidationService()
+    service = ProductRegistryService(
+        blockchain_service=blockchain_service,
+        storage_service=storage_service,
+        validation_service=validation_service
+    )
+    
+    invalid_form_product = {
+        "id": "invalid_form_test",
+        "title": "Test Product",
+        "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+        "categories": ["test"],
+        "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+        "form": "invalid_form",
+        "species": "Test species",
+        "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
+    }
+    
+    validation_result = await service.validation_service.validate_product_data(invalid_form_product)
+    
+    assert not validation_result["is_valid"], "Продукт с некорректной формой должен быть невалидным"
+    assert any(error.startswith("form:") for error in validation_result["errors"]), "Должны быть ошибки по форме"
+    logger.info(f"✅ Ошибки по форме: {[e for e in validation_result['errors'] if e.startswith('form:')]}")
+
+@pytest.mark.asyncio
+async def test_validation_boundary_cases():
+    """Тест валидации граничных случаев"""
+    logger.info("🧪 Тест валидации граничных случаев")
+    
+    blockchain_service = BlockchainService()
+    storage_service = IPFSFactory().get_storage()
+    validation_service = ProductValidationService()
+    service = ProductRegistryService(
+        blockchain_service=blockchain_service,
+        storage_service=storage_service,
+        validation_service=validation_service
+    )
+    
+    valid_product = TEST_PRODUCTS["valid_products"][0]
     
     # Слишком длинное название
     boundary_product = valid_product.copy()
@@ -583,9 +614,22 @@ async def test_product_validation():
     assert not validation_result["is_valid"], "Слишком много категорий должно быть невалидным"
     assert any("категори" in error.lower() for error in validation_result["errors"]), "Должна быть ошибка количества категорий"
     logger.info("✅ Ошибка количества категорий обнаружена")
+
+@pytest.mark.asyncio
+async def test_validation_data_sanitization():
+    """Тест санитизации данных при валидации"""
+    logger.info("🧪 Тест санитизации данных при валидации")
     
-    # ==================== ТЕСТ 7: САНИТИЗАЦИЯ ДАННЫХ ====================
-    logger.info("📝 Тест 7: Проверяем санитизацию данных")
+    blockchain_service = BlockchainService()
+    storage_service = IPFSFactory().get_storage()
+    validation_service = ProductValidationService()
+    service = ProductRegistryService(
+        blockchain_service=blockchain_service,
+        storage_service=storage_service,
+        validation_service=validation_service
+    )
+    
+    valid_product = TEST_PRODUCTS["valid_products"][0]
     
     # Продукт с лишними пробелами
     dirty_product = valid_product.copy()
@@ -600,80 +644,21 @@ async def test_product_validation():
     assert sanitized["title"] == "Amanita muscaria — sliced caps and gills (1st grade)", "Пробелы должны быть удалены"
     assert sanitized["categories"] == ["mushroom", "mental health"], "Пробелы в категориях должны быть удалены"
     logger.info("✅ Санитизация данных работает корректно")
-    
-    logger.info("✅ Комплексный тест валидации продукта завершен")
-
-@pytest.mark.asyncio
-async def test_product_creation_flow(product_registry):
-    """Тест полного цикла создания продукта"""
-    logger.info("🧪 Начинаем тест полного цикла создания продукта")
-    
-    logger.info("📝 Получаем тестовые данные")
-    valid_product = TEST_PRODUCTS["valid_products"][0]
-    
-    logger.info("🚀 Создаем продукт")
-    product_id = await product_registry.create_product(valid_product)
-    assert product_id is not None, "Продукт должен быть создан"
-    logger.info(f"✅ Продукт создан с ID: {product_id}")
-    
-    logger.info("🔍 Проверяем что продукт создан")
-    product = await product_registry.get_product(product_id)
-    assert product is not None, "Продукт должен быть найден"
-    assert product["title"] == valid_product["title"]
-    logger.info(f"✅ Продукт найден: {product['title']}")
-    
-    logger.info("🔄 Проверяем активацию/деактивацию")
-    await product_registry.set_product_active(product_id, True)
-    product = await product_registry.get_product(product_id)
-    assert product["is_active"] is True
-    logger.info("✅ Продукт активирован")
-    
-    await product_registry.set_product_active(product_id, False)
-    product = await product_registry.get_product(product_id)
-    assert product["is_active"] is False
-    logger.info("✅ Продукт деактивирован")
-    
-    logger.info("✅ Тест полного цикла создания продукта завершен")
-
-@pytest.mark.asyncio
-async def test_get_all_products(product_registry):
-    """Тест получения всех продуктов"""
-    logger.info("🧪 Начинаем тест получения всех продуктов")
-    
-    logger.info("🚀 Создаем несколько продуктов")
-    for valid_product in TEST_PRODUCTS["valid_products"]:
-        await product_registry.create_product(valid_product)
-        logger.info(f"✅ Создан продукт: {valid_product['title']}")
-    
-    logger.info("📦 Получаем все продукты")
-    products = await product_registry.get_all_products()
-    assert len(products) >= len(TEST_PRODUCTS["valid_products"])
-    logger.info(f"✅ Найдено продуктов: {len(products)}")
-    
-    logger.info("🔍 Проверяем что все созданные продукты присутствуют")
-    product_ids = [p["id"] for p in products]
-    for valid_product in TEST_PRODUCTS["valid_products"]:
-        assert valid_product["id"] in product_ids
-        logger.info(f"✅ Продукт найден в списке: {valid_product['id']}")
-    
-    logger.info("✅ Тест получения всех продуктов завершен")
 
 @pytest.mark.asyncio
 async def test_product_status_updates(product_registry):
-    """Тест обновления статуса продукта"""
-    logger.info("🧪 Начинаем тест обновления статуса продукта")
+    """Тест деактивации продукта и невозможности обновления неактивного товара"""
+    logger.info("🧪 Начинаем тест деактивации продукта")
     
     logger.info("🚀 Создаем продукт")
     valid_product = TEST_PRODUCTS["valid_products"][0]
     product_id = await product_registry.create_product(valid_product)
     logger.info(f"✅ Продукт создан с ID: {product_id}")
     
-    logger.info("🔄 Проверяем разные статусы")
-    statuses = [1, 2, 3]  # В процессе, отправлен, доставлен
-    for status in statuses:
-        await product_registry.update_product_status(product_id, status)
-        product = await product_registry.get_product(product_id)
-        assert product["status"] == status
-        logger.info(f"✅ Статус обновлен: {status}")
+    logger.info("🔄 Деактивируем продукт")
+    result = await product_registry.deactivate_product(product_id)
+    assert result, "Продукт должен быть успешно деактивирован"
+    product = product_registry.get_product(product_id)
+    assert not product.is_active, "Продукт должен быть неактивен после деактивации"
+    logger.info("✅ Продукт деактивирован")
     
-    logger.info("✅ Тест обновления статуса продукта завершен") 

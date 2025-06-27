@@ -17,7 +17,9 @@ class Localization:
         self._verify_critical_keys()
 
     def load_labels(self, lang):
-        path = os.path.join(os.path.dirname(__file__), '..', 'templates', f'{lang}.json')
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+        path = os.path.join(project_root, "bot", "templates", f"{lang}.json")
+        print(f"[LOCALIZATION] file_path={path}")
         logger.debug(f"[LOCALIZATION] Загрузка языкового файла: {path}")
         logger.debug(f"[LOCALIZATION] Файл существует: {os.path.exists(path)}")
         
