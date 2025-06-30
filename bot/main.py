@@ -14,7 +14,7 @@ from bot.handlers.menu import router as menu_router
 from bot.handlers.seller_product_creation_fsm import router as product_creation_router
 from bot.handlers.seller_menu import router as seller_router
 from bot.handlers.catalog import router as catalog_router
-from bot.services.product.registry import ProductRegistryService
+from bot.services.product.registry_singleton import product_registry_service
 
 print("=== IMPORTS DONE ===")
 
@@ -98,7 +98,6 @@ async def main():
 
         # === Фоновая загрузка каталога ===
         logger.info("Запуск фоновой загрузки каталога продуктов...")
-        product_registry_service = ProductRegistryService()
         async def preload_catalog():
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, product_registry_service.get_all_products)

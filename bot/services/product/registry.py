@@ -58,6 +58,8 @@ class ProductRegistryService:
         """
         # Инициализируем logger
         self.logger = logging.getLogger(__name__)
+
+        self.logger.info(f"[ProductRegistry] __init__ id(self)={id(self)}")
         
         # Используем синглтон BlockchainService если не передан
         self.blockchain = blockchain_service or BlockchainService()
@@ -371,17 +373,31 @@ class ProductRegistryService:
     
     def get_all_products(self) -> List[Product]:
         """Получает все продукты с кэшированием"""
+
+        self.logger.info(f"[ProductRegistry] get_all_products id(self)={id(self)}")
+
         try:
             # Проверяем версию каталога
             catalog_version = self.blockchain.get_catalog_version()
+            self.logger.info(f"[ProductRegistry] Текущая версия каталога: {catalog_version}")
             
             # Проверяем кэш
+            self.logger.info(f"[ProductRegistry] Проверяем кэш каталога...")
             cached_catalog = self.cache_service.get_cached_item("catalog", "catalog")
-            if cached_catalog and cached_catalog.get("version") == catalog_version:
-                self.logger.info("Returning cached catalog")
-                return cached_catalog.get("products", [])
+            
+            if cached_catalog:
+                self.logger.info(f"[ProductRegistry] Найден кэш каталога: version={cached_catalog.get('version')}, products_count={len(cached_catalog.get('products', []))}")
+                
+                if cached_catalog.get("version") == catalog_version:
+                    self.logger.info(f"[ProductRegistry] ✅ Возвращаем кэшированный каталог (версия {catalog_version})")
+                    return cached_catalog.get("products", [])
+                else:
+                    self.logger.info(f"[ProductRegistry] ❌ Кэш устарел: cached_version={cached_catalog.get('version')}, current_version={catalog_version}")
+            else:
+                self.logger.info(f"[ProductRegistry] Кэш каталога пуст")
             
             # Получаем продукты из блокчейна
+            self.logger.info(f"[ProductRegistry] Загружаем продукты из блокчейна...")
             products_data = self.blockchain.get_all_products()
             if not products_data:
                 self.logger.warning("No products found in blockchain")
@@ -402,10 +418,12 @@ class ProductRegistryService:
                     continue
             
             # Обновляем кэш
+            self.logger.info(f"[ProductRegistry] Сохраняем каталог в кэш: version={catalog_version}, products_count={len(products)}")
             self.cache_service.set_cached_item("catalog", {
                 "version": catalog_version,
                 "products": products
             }, "catalog")
+            self.logger.info(f"[ProductRegistry] ✅ Каталог успешно сохранен в кэш")
             
             return products
             

@@ -4,9 +4,10 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeybo
 from bot.fsm.product_creation_states import ProductCreationStates
 from bot.services.common.localization import Localization
 from bot.model.user_settings import UserSettings
-from bot.services.product.registry import ProductRegistryService
 from bot.services.core.blockchain import BlockchainService
 from bot.services.core.storage.ar_weave import ArWeaveUploader
+from bot.services.product.registry_singleton import product_registry_service
+from bot.handlers.menu import get_main_menu_keyboard
 import logging
 import os
 
@@ -17,7 +18,6 @@ user_settings = UserSettings()
 # Инициализируем зависимости
 blockchain_service = BlockchainService()
 arweave_uploader = ArWeaveUploader()
-product_registry_service = ProductRegistryService(blockchain_service, arweave_uploader)
 
 @router.message(F.text == "/create_product")
 async def start_product_creation(message: types.Message, state: FSMContext):

@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery, FSInputFile, InputMediaPhoto
 from bot.services.common.localization import Localization
 from bot.model.user_settings import UserSettings
-from bot.services.product.registry import ProductRegistryService
+from bot.services.product.registry_singleton import product_registry_service
 from bot.services.core.blockchain import BlockchainService
 from bot.services.core.ipfs_factory import IPFSFactory
 from bot.services.product.validation import ProductValidationService
@@ -37,14 +37,8 @@ try:
     account_service = AccountService(blockchain_service)
     logger.info("[CATALOG] AccountService инициализирован")
 
-    logger.info("[CATALOG] Инициализация ProductRegistryService...")
-    product_registry_service = ProductRegistryService(
-        blockchain_service=blockchain_service,
-        storage_service=storage_service,
-        validation_service=validation_service,
-        account_service=account_service
-    )
-    logger.info("[CATALOG] ProductRegistryService инициализирован")
+    # Используем глобальный экземпляр product_registry_service
+    logger.info("[CATALOG] Используется глобальный экземпляр product_registry_service")
     logger.info("[CATALOG] Все сервисы успешно инициализированы!")
 except Exception as e:
     logger.error(f"[CATALOG] Ошибка при инициализации сервисов: {e}")

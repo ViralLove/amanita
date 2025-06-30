@@ -101,14 +101,14 @@ class ProductMetadataService:
                 species=species,
                 prices=prices
             )
-
+            
             self.logger.info(f"Product: {product}")
             return product
             
         except Exception as e:
             self.logger.error(f"Error processing product metadata: {e}")
             return None
-
+    
     def process_description_metadata(self, description_data: Any) -> Optional[Description]:
         """Обрабатывает метаданные описания и создает объект Description"""
         try:
@@ -117,7 +117,7 @@ class ProductMetadataService:
             # Если это уже объект Description, возвращаем его
             if isinstance(description_data, Description):
                 self.logger.info(f"[process_description_metadata] Данные уже являются объектом Description")
-                return description_data
+            return description_data
             
             # Если это словарь, создаем Description из него
             if isinstance(description_data, dict):
@@ -154,7 +154,7 @@ class ProductMetadataService:
             
         except Exception as e:
             self.logger.error(f"[process_description_metadata] Неожиданная ошибка: {e}")
-            return None
+        return None 
 
     def process_metadata(self, metadata: Dict[str, Any]) -> Optional[Product]:
         """Обрабатывает метаданные и создает объект Product (устаревший метод, используйте process_product_metadata)"""

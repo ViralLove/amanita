@@ -13,7 +13,7 @@ class ProductCacheService:
     
     # Время жизни кэша для разных типов данных
     CACHE_TTL = {
-        'catalog': timedelta(minutes=5),
+        'catalog': timedelta(hours=24),
         'description': timedelta(hours=24),
         'image': timedelta(hours=12)
     }
@@ -26,14 +26,34 @@ class ProductCacheService:
         return cls._instance
     
     def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        self.logger.info(f"[ProductCacheService] __init__ id(self)={id(self)}")
+        
+        # Всегда инициализируем кэши (даже для singleton)
+        if not hasattr(self, 'catalog_cache'):
+            self.logger.info(f"[ProductCacheService] Инициализируем catalog_cache")
+            self.catalog_cache: Dict = {}  # {"version": int, "products": List[Product], "timestamp": datetime}
+        else:
+            self.logger.info(f"[ProductCacheService] catalog_cache уже существует")
+            
+        if not hasattr(self, 'description_cache'):
+            self.logger.info(f"[ProductCacheService] Инициализируем description_cache")
+            self.description_cache: Dict[str, Tuple[Description, datetime]] = {}  # {cid: (description, timestamp)}
+        else:
+            self.logger.info(f"[ProductCacheService] description_cache уже существует")
+            
+        if not hasattr(self, 'image_cache'):
+            self.logger.info(f"[ProductCacheService] Инициализируем image_cache")
+            self.image_cache: Dict[str, Tuple[str, datetime]] = {}  # {cid: (url, timestamp)}
+        else:
+            self.logger.info(f"[ProductCacheService] image_cache уже существует")
+        
         if not hasattr(self, '_initialized'):
             # Инициализация только при первом создании
-            self.catalog_cache: Dict = {}  # {"version": int, "products": List[Product], "timestamp": datetime}
-            self.description_cache: Dict[str, Tuple[Description, datetime]] = {}  # {cid: (description, timestamp)}
-            self.image_cache: Dict[str, Tuple[str, datetime]] = {}  # {cid: (url, timestamp)}
-            self.logger = logging.getLogger(__name__)
+            self.logger.info(f"ProductCacheService initialization started...")
             self._storage_service = None  # Lazy loading
             self._initialized = True
+            self.logger.info(f"ProductCacheService initialization completed")
     
     @property
     def storage_service(self):
@@ -57,39 +77,71 @@ class ProductCacheService:
         Returns:
             Optional[Any]: Закэшированное значение или None
         """
-        cache = self._get_cache_by_type(cache_type)
-        if not cache:
-            return None
-            
-        cached = cache.get(key)
-        if not cached:
-            return None
-            
-        value, timestamp = cached
+        self.logger.info(f"[ProductCacheService] get_cached_item id(self)={id(self)}")
+        self.logger.info(f"[ProductCacheService] get_cached_item: key='{key}', cache_type='{cache_type}'")
         
-        if self._is_cache_valid(timestamp, cache_type):
-            return value
+        cache = self._get_cache_by_type(cache_type)
+        if cache is None:
+            self.logger.info(f"[ProductCacheService] Кэш типа '{cache_type}' не найден")
+            return None
             
-        return None
+        # Проверяем, есть ли ключ в кэше
+        if key in cache:
+            cached_data = cache[key]
+            self.logger.info(f"[ProductCacheService] Найден элемент в кэше: key='{key}', type='{cache_type}'")
+            
+            # Проверяем структуру кэшированных данных (value, timestamp)
+            if isinstance(cached_data, tuple) and len(cached_data) == 2:
+                value, timestamp = cached_data
+                
+                if self._is_cache_valid(timestamp, cache_type):
+                    self.logger.info(f"[ProductCacheService] ✅ Кэш валиден для key='{key}', cache_type='{cache_type}'")
+                    return value
+                else:
+                    self.logger.info(f"[ProductCacheService] ❌ Кэш устарел для key='{key}', cache_type='{cache_type}'")
+                    return None
+            else:
+                # Если данные не в формате (value, timestamp), возвращаем как есть
+                self.logger.info(f"[ProductCacheService] Данные в кэше не в ожидаемом формате: {type(cached_data)}")
+                return cached_data
+        else:
+            self.logger.info(f"[ProductCacheService] Элемент не найден в кэше: key='{key}', type='{cache_type}'")
+            return None
     
-    def set_cached_item(self, key: str, value: Any, cache_type: str):
+    def set_cached_item(self, key: str, value: Any, cache_type: str) -> bool:
         """
         Сохраняет элемент в кэш.
         
         Args:
             key: Ключ для сохранения в кэше
-            value: Значение для сохранения
+            value: Значение для кэширования
             cache_type: Тип кэша ('catalog', 'description', 'image')
+            
+        Returns:
+            bool: True если успешно сохранено, False в противном случае
         """
+        self.logger.info(f"[ProductCacheService] set_cached_item: key='{key}', cache_type='{cache_type}'")
+        
         cache = self._get_cache_by_type(cache_type)
-        if not cache:
-            return
+        if cache is None:
+            self.logger.error(f"[ProductCacheService] Не удалось найти кэш типа '{cache_type}'")
+            return False
             
         # Для description проверяем тип и конвертируем если нужно
         if cache_type == 'description' and isinstance(value, dict):
             value = Description.from_dict(value)
             
+        # Сохраняем в кэш с временной меткой
         cache[key] = (value, datetime.utcnow())
+        self.logger.info(f"[ProductCacheService] ✅ Элемент сохранен в кэш: key='{key}', cache_type='{cache_type}'")
+        
+        # Дополнительная информация для каталога
+        if cache_type == 'catalog' and isinstance(value, dict):
+            version = value.get('version', 'unknown')
+            products_count = len(value.get('products', []))
+            self.logger.info(f"[ProductCacheService] 📦 Каталог в кэше: version={version}, products_count={products_count}")
+            
+        return True
     
     def get_description_by_cid(self, description_cid: str) -> Optional[Description]:
         """
@@ -233,13 +285,23 @@ class ProductCacheService:
         Returns:
             Optional[Dict]: Словарь с кэшем или None
         """
+        self.logger.info(f"[ProductCacheService] _get_cache_by_type: cache_type='{cache_type}'")
+        self.logger.info(f"[ProductCacheService] _get_cache_by_type: hasattr(self, 'catalog_cache')={hasattr(self, 'catalog_cache')}")
+        self.logger.info(f"[ProductCacheService] _get_cache_by_type: hasattr(self, 'description_cache')={hasattr(self, 'description_cache')}")
+        self.logger.info(f"[ProductCacheService] _get_cache_by_type: hasattr(self, 'image_cache')={hasattr(self, 'image_cache')}")
+        
         if cache_type == 'catalog':
-            return self.catalog_cache
+            self.logger.info(f"[ProductCacheService] _get_cache_by_type: catalog_cache={self.catalog_cache}")
+            return self.catalog_cache  # Возвращаем всегда, даже если пустой
         elif cache_type == 'description':
-            return self.description_cache
+            self.logger.info(f"[ProductCacheService] _get_cache_by_type: description_cache={self.description_cache}")
+            return self.description_cache  # Возвращаем всегда, даже если пустой
         elif cache_type == 'image':
-            return self.image_cache
-        return None
+            self.logger.info(f"[ProductCacheService] _get_cache_by_type: image_cache={self.image_cache}")
+            return self.image_cache  # Возвращаем всегда, даже если пустой
+        else:
+            self.logger.error(f"[ProductCacheService] Неизвестный тип кэша: {cache_type}")
+            return None
     
     def _is_cache_valid(self, timestamp: datetime, cache_type: str) -> bool:
         """
@@ -253,10 +315,18 @@ class ProductCacheService:
             bool: True если кэш актуален, False если устарел
         """
         if not timestamp:
+            self.logger.info(f"[ProductCacheService] _is_cache_valid: timestamp is None")
             return False
             
         ttl = self.CACHE_TTL.get(cache_type)
         if not ttl:
+            self.logger.info(f"[ProductCacheService] _is_cache_valid: TTL not found for cache_type='{cache_type}'")
             return False
             
-        return datetime.utcnow() - timestamp < ttl 
+        now = datetime.utcnow()
+        age = now - timestamp
+        is_valid = age < ttl
+        
+        self.logger.info(f"[ProductCacheService] _is_cache_valid: cache_type='{cache_type}', timestamp={timestamp}, now={now}, age={age}, ttl={ttl}, is_valid={is_valid}")
+        
+        return is_valid 
