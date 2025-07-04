@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts/utils/Nonces.sol";
 
 /**
  * @title AmanitaGovToken
@@ -35,30 +36,6 @@ contract AmanitaGovToken is ERC20Votes, ERC20Permit, AccessControl {
         _mint(to, amount);
     }
 
-    /// @inheritdoc ERC20Votes
-    function _afterTokenTransfer(address from, address to, uint256 amount)
-        internal
-        override(ERC20, ERC20Votes)
-    {
-        super._afterTokenTransfer(from, to, amount);
-    }
-
-    /// @inheritdoc ERC20Votes
-    function _mint(address to, uint256 amount)
-        internal
-        override(ERC20, ERC20Votes)
-    {
-        super._mint(to, amount);
-    }
-
-    /// @inheritdoc ERC20Votes
-    function _burn(address account, uint256 amount)
-        internal
-        override(ERC20, ERC20Votes)
-    {
-        super._burn(account, amount);
-    }
-
     /**
      * @notice Проверка поддержки интерфейса (ERC165)
      * @param interfaceId ID интерфейса
@@ -70,5 +47,22 @@ contract AmanitaGovToken is ERC20Votes, ERC20Permit, AccessControl {
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
+    }
+
+    // Обязательный override для множественного наследования
+    function _update(address from, address to, uint256 value)
+        internal
+        override(ERC20, ERC20Votes)
+    {
+        super._update(from, to, value);
+    }
+
+    function nonces(address owner)
+        public
+        view
+        override(ERC20Permit, Nonces)
+        returns (uint256)
+    {
+        return super.nonces(owner);
     }
 }

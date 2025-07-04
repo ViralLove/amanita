@@ -2,3 +2,4 @@ aiogram>=3.0.0
 web3
 python-dotenv 
 arweave-python-client
+supabase==2.11.0

@@ -151,7 +151,7 @@ contract LoveDoPostNFT is ERC721URIStorage, AccessControl {
         
         uint256 monthKey = block.timestamp / 30 days;
         require(monthlyLikesUsed[msg.sender][monthKey] < MAX_SUPERLIKES_PER_MONTH, "Monthly superlikes exhausted");
-        
+
         // --- [0] Проверяем nonce
         require(superlikeNonces[msg.sender] == expectedNonce, "Invalid nonce");
         superlikeNonces[msg.sender]++;
@@ -221,9 +221,16 @@ contract LoveDoPostNFT is ERC721URIStorage, AccessControl {
     }
 
     function postExists(uint256 tokenId) public view returns (bool) {
-        return _exists(tokenId);
+        // Если есть владелец, то пост существует
+        return ownerOf(tokenId) != address(0);
+    }
+
+    // Обязательный override для поддержки интерфейсов (множественное наследование)
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721URIStorage, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }
+
 
 /// @notice Интерфейс для InviteNFT или InviteGraph контракта
 interface IInviteGraph {
