@@ -1,0 +1,401 @@
+/**
+ * Amanita Admin CSS
+ * 
+ * @package Amanita
+ */
+
+/* Основные стили */
+.amanita-connection-status {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f9f9f9;
+    border-left: 4px solid #0073aa;
+    border-radius: 3px;
+}
+
+.amanita-connection-status h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #23282d;
+}
+
+#amanita-status-indicator {
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.status-loading {
+    color: #666;
+    font-style: italic;
+}
+
+.status-success {
+    color: #46b450;
+    font-weight: bold;
+}
+
+.status-error {
+    color: #dc3232;
+    font-weight: bold;
+}
+
+/* Информационный блок */
+.amanita-settings-info {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f9f9f9;
+    border-left: 4px solid #0073aa;
+    border-radius: 3px;
+}
+
+.amanita-settings-info h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #23282d;
+}
+
+.amanita-settings-info h4 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    color: #23282d;
+}
+
+.amanita-settings-info ul, 
+.amanita-settings-info ol {
+    margin-left: 20px;
+    margin-bottom: 15px;
+}
+
+.amanita-settings-info li {
+    margin-bottom: 5px;
+}
+
+/* Статистика */
+.amanita-stats {
+    margin-top: 30px;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+.amanita-stats h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #23282d;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 5px;
+    border: 1px solid #e5e5e5;
+}
+
+.stat-number {
+    display: block;
+    font-size: 24px;
+    font-weight: bold;
+    color: #0073aa;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    display: block;
+    color: #666;
+    font-size: 14px;
+}
+
+/* Метабокс стили */
+.amanita-metabox {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.amanita-metabox h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #23282d;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+.amanita-status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.amanita-status-item {
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 3px;
+    border-left: 3px solid #0073aa;
+}
+
+.amanita-status-item.error {
+    border-left-color: #dc3232;
+    background: #fef7f7;
+}
+
+.amanita-status-item.success {
+    border-left-color: #46b450;
+    background: #f7fef7;
+}
+
+.amanita-status-item.warning {
+    border-left-color: #ffb900;
+    background: #fefcf7;
+}
+
+.amanita-status-label {
+    font-weight: bold;
+    color: #23282d;
+    margin-bottom: 5px;
+}
+
+.amanita-status-value {
+    color: #666;
+    font-size: 13px;
+    word-break: break-all;
+}
+
+/* Кнопки */
+.amanita-button {
+    display: inline-block;
+    padding: 8px 16px;
+    margin: 5px 5px 5px 0;
+    background: #0073aa;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 3px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.4;
+    transition: background-color 0.2s ease;
+}
+
+.amanita-button:hover {
+    background: #005a87;
+    color: #fff;
+    text-decoration: none;
+}
+
+.amanita-button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.amanita-button.secondary {
+    background: #f7f7f7;
+    color: #555;
+    border: 1px solid #ccc;
+}
+
+.amanita-button.secondary:hover {
+    background: #eee;
+    color: #555;
+}
+
+.amanita-button.success {
+    background: #46b450;
+}
+
+.amanita-button.success:hover {
+    background: #389a41;
+}
+
+.amanita-button.error {
+    background: #dc3232;
+}
+
+.amanita-button.error:hover {
+    background: #c92626;
+}
+
+/* Логи */
+.amanita-logs {
+    max-height: 200px;
+    overflow-y: auto;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.amanita-log-entry {
+    margin-bottom: 8px;
+    padding: 5px;
+    border-radius: 2px;
+}
+
+.amanita-log-entry.info {
+    background: #e7f3ff;
+    border-left: 3px solid #0073aa;
+}
+
+.amanita-log-entry.warning {
+    background: #fff8e7;
+    border-left: 3px solid #ffb900;
+}
+
+.amanita-log-entry.error {
+    background: #ffe7e7;
+    border-left: 3px solid #dc3232;
+}
+
+.amanita-log-entry.debug {
+    background: #f7f7f7;
+    border-left: 3px solid #666;
+}
+
+.amanita-log-timestamp {
+    color: #666;
+    font-size: 11px;
+}
+
+.amanita-log-level {
+    font-weight: bold;
+    margin-right: 5px;
+}
+
+.amanita-log-message {
+    color: #333;
+}
+
+/* Формы */
+.amanita-form-group {
+    margin-bottom: 15px;
+}
+
+.amanita-form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #23282d;
+}
+
+.amanita-form-group input[type="text"],
+.amanita-form-group input[type="url"],
+.amanita-form-group input[type="password"],
+.amanita-form-group input[type="number"],
+.amanita-form-group select,
+.amanita-form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+.amanita-form-group input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.amanita-form-group .description {
+    margin-top: 5px;
+    color: #666;
+    font-size: 13px;
+    font-style: italic;
+}
+
+/* Уведомления */
+.amanita-notice {
+    margin: 15px 0;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .amanita-status-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .amanita-button {
+        display: block;
+        width: 100%;
+        margin: 5px 0;
+        text-align: center;
+    }
+}
+
+/* Анимации */
+.amanita-fade-in {
+    animation: amanitaFadeIn 0.3s ease-in;
+}
+
+@keyframes amanitaFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.amanita-loading {
+    position: relative;
+    color: transparent !important;
+}
+
+.amanita-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0073aa;
+    border-radius: 50%;
+    animation: amanitaSpin 1s linear infinite;
+}
+
+@keyframes amanitaSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Темная тема поддержка */
+@media (prefers-color-scheme: dark) {
+    .amanita-settings-info,
+    .amanita-connection-status,
+    .stat-item,
+    .amanita-metabox {
+        background: #2c3338;
+        border-color: #3c434a;
+        color: #f0f0f1;
+    }
+    
+    .amanita-status-item {
+        background: #3c434a;
+        color: #f0f0f1;
+    }
+    
+    .amanita-logs {
+        background: #2c3338;
+        color: #f0f0f1;
+    }
+} 

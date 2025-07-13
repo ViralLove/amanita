@@ -1,0 +1,45 @@
+<?php
+/*
+Plugin Name: Amanita Connector
+Text Domain: amanita
+Version: 0.1.0
+Requires at least: 5.0
+Tested up to: 6.5
+WC requires at least: 3.0
+WC tested up to: 7.0
+*/
+
+// Автозагрузка через Composer
+if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
+
+// Проверка наличия WooCommerce
+add_action( 'plugins_loaded', function() {
+    if ( ! class_exists( 'WooCommerce' ) ) {
+        add_action( 'admin_notices', function() {
+            echo '<div class="error"><p>' . esc_html__( 'Amanita Connector требует установленный и активированный WooCommerce.', 'amanita' ) . '</p></div>';
+        });
+        return;
+    }
+    
+    // Основная инициализация плагина
+    // Классы загружаются через Composer autoload
+    
+    // Инициализация классов
+    new \Amanita\Admin\MetaBoxes();
+    new \Amanita\Admin\SettingsPage();
+    
+    // Подключение обработчика формы синхронизации
+    add_action('admin_post_amanita_sync_product', array(new \Amanita\SyncProduct(), 'handle_sync_request'));
+});
+
+// Хуки активации/деактивации/удаления
+register_activation_hook( __FILE__,  [ 'Amanita\Uninstaller', 'on_activation' ] );
+register_deactivation_hook( __FILE__, [ 'Amanita\Uninstaller', 'on_deactivation' ] );
+register_uninstall_hook(   __FILE__,  [ 'Amanita\Uninstaller', 'cleanup' ] );
+
+// Локализация
+add_action( 'init', function() {
+    load_plugin_textdomain( 'amanita', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+});

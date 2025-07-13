@@ -1,0 +1,517 @@
+# Copyright (C) 2024 Amanita Team
+# This file is distributed under the GPL v3 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Amanita Connector 0.1.0\n"
+"Report-Msgid-Bugs-To: https://github.com/amanita/connector\n"
+"POT-Creation-Date: 2024-12-19 12:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: 2024-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+
+#: amanita.php:123
+msgid "Amanita Connector requires installed and activated WooCommerce."
+msgstr ""
+
+#: amanita.php:129
+msgid "Amanita Connector requires PHP version 7.4 or higher."
+msgstr ""
+
+#: amanita.php:158
+msgid "Testing connection..."
+msgstr ""
+
+#: amanita.php:159
+msgid "Connection successful!"
+msgstr ""
+
+#: amanita.php:160
+msgid "Connection failed!"
+msgstr ""
+
+#: amanita.php:161
+msgid "Synchronizing..."
+msgstr ""
+
+#: amanita.php:162
+msgid "Synchronization successful!"
+msgstr ""
+
+#: amanita.php:163
+msgid "Synchronization failed!"
+msgstr ""
+
+#: admin/SettingsPage.php:35
+msgid "Amanita Settings"
+msgstr ""
+
+#: admin/SettingsPage.php:36
+msgid "Amanita"
+msgstr ""
+
+#: admin/SettingsPage.php:60
+msgid "Integration Settings"
+msgstr ""
+
+#: admin/SettingsPage.php:67
+msgid "Blockchain Settings"
+msgstr ""
+
+#: admin/SettingsPage.php:74
+msgid "IPFS Settings"
+msgstr ""
+
+#: admin/SettingsPage.php:81
+msgid "Synchronization Settings"
+msgstr ""
+
+#: admin/SettingsPage.php:88
+msgid "Logging & Debug"
+msgstr ""
+
+#: admin/SettingsPage.php:95
+msgid "Security Settings"
+msgstr ""
+
+#: admin/SettingsPage.php:105
+msgid "Python Service URL"
+msgstr ""
+
+#: admin/SettingsPage.php:113
+msgid "API Key"
+msgstr ""
+
+#: admin/SettingsPage.php:121
+msgid "Seller Wallet Address"
+msgstr ""
+
+#: admin/SettingsPage.php:129
+msgid "Blockchain Network"
+msgstr ""
+
+#: admin/SettingsPage.php:137
+msgid "IPFS Provider"
+msgstr ""
+
+#: admin/SettingsPage.php:145
+msgid "IPFS API Key"
+msgstr ""
+
+#: admin/SettingsPage.php:153
+msgid "Auto Sync"
+msgstr ""
+
+#: admin/SettingsPage.php:161
+msgid "Sync Products"
+msgstr ""
+
+#: admin/SettingsPage.php:169
+msgid "Sync Orders"
+msgstr ""
+
+#: admin/SettingsPage.php:177
+msgid "Debug Mode"
+msgstr ""
+
+#: admin/SettingsPage.php:185
+msgid "Enable Logging"
+msgstr ""
+
+#: admin/SettingsPage.php:193
+msgid "Log Retention (days)"
+msgstr ""
+
+#: admin/SettingsPage.php:201
+msgid "Rate Limiting"
+msgstr ""
+
+#: admin/SettingsPage.php:209
+msgid "Max Requests per Hour"
+msgstr ""
+
+#: admin/SettingsPage.php:220
+msgid "Connection Status"
+msgstr ""
+
+#: admin/SettingsPage.php:222
+msgid "Checking connection..."
+msgstr ""
+
+#: admin/SettingsPage.php:224
+msgid "Test Connection"
+msgstr ""
+
+#: admin/SettingsPage.php:230
+msgid "Save Settings"
+msgstr ""
+
+#: admin/SettingsPage.php:235
+msgid "About Amanita Integration"
+msgstr ""
+
+#: admin/SettingsPage.php:237
+msgid "This plugin synchronizes WooCommerce products and orders with the Amanita Python microservice for blockchain integration and decentralized commerce features."
+msgstr ""
+
+#: admin/SettingsPage.php:241
+msgid "How it works:"
+msgstr ""
+
+#: admin/SettingsPage.php:243
+msgid "Configure the integration settings above"
+msgstr ""
+
+#: admin/SettingsPage.php:244
+msgid "Test the connection to ensure everything is working"
+msgstr ""
+
+#: admin/SettingsPage.php:245
+msgid "Products and orders will be automatically synchronized"
+msgstr ""
+
+#: admin/SettingsPage.php:246
+msgid "Monitor the sync status in product and order pages"
+msgstr ""
+
+#: admin/SettingsPage.php:249
+msgid "Synchronized Data:"
+msgstr ""
+
+#: admin/SettingsPage.php:251
+msgid "Product basic info (name, description, price)"
+msgstr ""
+
+#: admin/SettingsPage.php:252
+msgid "Categories and tags"
+msgstr ""
+
+#: admin/SettingsPage.php:253
+msgid "Product images"
+msgstr ""
+
+#: admin/SettingsPage.php:254
+msgid "Attributes and variations"
+msgstr ""
+
+#: admin/SettingsPage.php:255
+msgid "Stock information"
+msgstr ""
+
+#: admin/SettingsPage.php:256
+msgid "Order details and status"
+msgstr ""
+
+#: admin/SettingsPage.php:257
+msgid "Customer information"
+msgstr ""
+
+#: admin/SettingsPage.php:262
+msgid "Statistics"
+msgstr ""
+
+#: admin/SettingsPage.php:267
+msgid "Synced Products"
+msgstr ""
+
+#: admin/SettingsPage.php:271
+msgid "Synced Orders"
+msgstr ""
+
+#: admin/SettingsPage.php:275
+msgid "Sync Errors"
+msgstr ""
+
+#: admin/SettingsPage.php:285
+msgid "Configure the connection to the Amanita Python microservice."
+msgstr ""
+
+#: admin/SettingsPage.php:289
+msgid "Configure blockchain network and seller wallet settings."
+msgstr ""
+
+#: admin/SettingsPage.php:293
+msgid "Configure IPFS provider for decentralized storage."
+msgstr ""
+
+#: admin/SettingsPage.php:297
+msgid "Configure automatic synchronization settings."
+msgstr ""
+
+#: admin/SettingsPage.php:301
+msgid "Configure logging and debugging options."
+msgstr ""
+
+#: admin/SettingsPage.php:305
+msgid "Configure security and rate limiting settings."
+msgstr ""
+
+#: admin/SettingsPage.php:315
+msgid "The URL of your Amanita Python microservice"
+msgstr ""
+
+#: admin/SettingsPage.php:325
+msgid "Your API key"
+msgstr ""
+
+#: admin/SettingsPage.php:327
+msgid "Optional API key for authentication with the Python service"
+msgstr ""
+
+#: admin/SettingsPage.php:337
+msgid "Your Ethereum wallet address for receiving payments"
+msgstr ""
+
+#: admin/SettingsPage.php:349
+msgid "Localhost (Development)"
+msgstr ""
+
+#: admin/SettingsPage.php:350
+msgid "Testnet"
+msgstr ""
+
+#: admin/SettingsPage.php:351
+msgid "Mainnet"
+msgstr ""
+
+#: admin/SettingsPage.php:354
+msgid "Select the blockchain network to use"
+msgstr ""
+
+#: admin/SettingsPage.php:364
+msgid "IPFS provider URL for decentralized storage"
+msgstr ""
+
+#: admin/SettingsPage.php:374
+msgid "IPFS API key"
+msgstr ""
+
+#: admin/SettingsPage.php:376
+msgid "Optional API key for IPFS provider"
+msgstr ""
+
+#: admin/SettingsPage.php:386
+msgid "Enable automatic synchronization"
+msgstr ""
+
+#: admin/SettingsPage.php:388
+msgid "Automatically sync products and orders when they are created or updated"
+msgstr ""
+
+#: admin/SettingsPage.php:398
+msgid "Sync products"
+msgstr ""
+
+#: admin/SettingsPage.php:400
+msgid "Synchronize WooCommerce products with blockchain"
+msgstr ""
+
+#: admin/SettingsPage.php:410
+msgid "Sync orders"
+msgstr ""
+
+#: admin/SettingsPage.php:412
+msgid "Synchronize WooCommerce orders with blockchain"
+msgstr ""
+
+#: admin/SettingsPage.php:422
+msgid "Enable debug mode"
+msgstr ""
+
+#: admin/SettingsPage.php:424
+msgid "Log detailed debug information to WordPress error log"
+msgstr ""
+
+#: admin/SettingsPage.php:434
+msgid "Enable detailed logging"
+msgstr ""
+
+#: admin/SettingsPage.php:436
+msgid "Log all sync operations with detailed information"
+msgstr ""
+
+#: admin/SettingsPage.php:446
+msgid "Number of days to keep log entries"
+msgstr ""
+
+#: admin/SettingsPage.php:456
+msgid "Enable rate limiting"
+msgstr ""
+
+#: admin/SettingsPage.php:458
+msgid "Limit the number of API requests to prevent abuse"
+msgstr ""
+
+#: admin/SettingsPage.php:468
+msgid "Maximum number of requests per hour"
+msgstr ""
+
+#: admin/SettingsPage.php:478
+msgid "Please enter a valid URL."
+msgstr ""
+
+#: admin/SettingsPage.php:485
+msgid "Please enter a valid Ethereum wallet address."
+msgstr ""
+
+#: admin/MetaBoxes.php:30
+msgid "Amanita Blockchain Sync"
+msgstr ""
+
+#: admin/MetaBoxes.php:40
+msgid "Product not found."
+msgstr ""
+
+#: admin/MetaBoxes.php:55
+msgid "Sync Status"
+msgstr ""
+
+#: admin/MetaBoxes.php:58
+msgid "Status"
+msgstr ""
+
+#: admin/MetaBoxes.php:62
+msgid "Synced"
+msgstr ""
+
+#: admin/MetaBoxes.php:65
+msgid "Error"
+msgstr ""
+
+#: admin/MetaBoxes.php:68
+msgid "Pending"
+msgstr ""
+
+#: admin/MetaBoxes.php:71
+msgid "Not Synced"
+msgstr ""
+
+#: admin/MetaBoxes.php:78
+msgid "Last Sync"
+msgstr ""
+
+#: admin/MetaBoxes.php:87
+msgid "Error"
+msgstr ""
+
+#: admin/MetaBoxes.php:95
+msgid "Blockchain Info"
+msgstr ""
+
+#: admin/MetaBoxes.php:99
+msgid "Blockchain ID"
+msgstr ""
+
+#: admin/MetaBoxes.php:107
+msgid "IPFS CID"
+msgstr ""
+
+#: admin/MetaBoxes.php:110
+msgid "View on IPFS"
+msgstr ""
+
+#: admin/MetaBoxes.php:118
+msgid "Transaction Hash"
+msgstr ""
+
+#: admin/MetaBoxes.php:121
+msgid "View on Etherscan"
+msgstr ""
+
+#: admin/MetaBoxes.php:129
+msgid "Active Status"
+msgstr ""
+
+#: admin/MetaBoxes.php:131
+msgid "Active"
+msgstr ""
+
+#: admin/MetaBoxes.php:131
+msgid "Inactive"
+msgstr ""
+
+#: admin/MetaBoxes.php:140
+msgid "Actions"
+msgstr ""
+
+#: admin/MetaBoxes.php:147
+msgid "Sync to Blockchain"
+msgstr ""
+
+#: admin/MetaBoxes.php:152
+msgid "Refresh Status"
+msgstr ""
+
+#: admin/MetaBoxes.php:158
+msgid "View on Blockchain"
+msgstr ""
+
+#: admin/MetaBoxes.php:168
+msgid "Recent Activity"
+msgstr ""
+
+#: admin/MetaBoxes.php:180
+msgid "View all logs"
+msgstr ""
+
+#: admin/MetaBoxes.php:187
+msgid "Product Info"
+msgstr ""
+
+#: admin/MetaBoxes.php:192
+msgid "SKU"
+msgstr ""
+
+#: admin/MetaBoxes.php:193
+msgid "N/A"
+msgstr ""
+
+#: admin/MetaBoxes.php:197
+msgid "Price"
+msgstr ""
+
+#: admin/MetaBoxes.php:201
+msgid "Stock"
+msgstr ""
+
+#: admin/MetaBoxes.php:203
+msgid "In Stock"
+msgstr ""
+
+#: admin/MetaBoxes.php:205
+msgid "Out of Stock"
+msgstr ""
+
+#: admin/MetaBoxes.php:209
+msgid "Type"
+msgstr ""
+
+#: admin/MetaBoxes.php:230
+msgid "Product synchronized successfully with Amanita blockchain!"
+msgstr ""
+
+#: admin/MetaBoxes.php:233
+msgid "Failed to synchronize product with Amanita blockchain."
+msgstr ""
+
+#: admin/MetaBoxes.php:236
+msgid "Product synchronization is in progress..."
+msgstr ""
+
+#: includes/SyncProduct.php:315
+msgid "Product synchronized successfully"
+msgstr ""
+
+#: includes/SyncProduct.php:337
+msgid "Failed to prepare product data"
+msgstr ""
+
+#: includes/SyncProduct.php:345
+msgid "Unknown error occurred"
+msgstr ""
+
+#: includes/SyncProduct.php:365
+msgid "Rate limit exceeded. Please try again later."
+msgstr ""
