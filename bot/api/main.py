@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
 import sys
 import os
@@ -9,6 +10,21 @@ from datetime import datetime
 from typing import Optional
 from logging.handlers import RotatingFileHandler
 from api.config import APIConfig
+from api.middleware.auth import HMACMiddleware
+from fastapi.exceptions import RequestValidationError, HTTPException
+from pydantic import ValidationError
+from api import error_handlers
+from api.models.health import HealthCheckResponse, HealthStatus, ServiceInfo, DetailedHealthCheckResponse, SystemUptime, ComponentInfo, ComponentStatus
+from api.models.common import get_current_timestamp, generate_request_id, Timestamp, RequestId
+from api.utils.health_utils import calculate_uptime, get_system_metrics, check_component_latency
+from api.utils.health_utils import (
+    check_api_component, check_service_factory_component, check_blockchain_component,
+    check_database_component, check_external_apis_component
+)
+from services.service_factory import ServiceFactory
+
+# Глобальное время запуска приложения
+APP_START_TIME = datetime.now()
 
 # Настройка логирования для API
 def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None):
@@ -134,69 +150,199 @@ def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Opti
         allowed_hosts=APIConfig.TRUSTED_HOSTS
     )
     
+    # Настройка HMAC аутентификации
+    api_key_service = None
+    if service_factory:
+        try:
+            api_key_service = service_factory.create_api_key_service()
+            logger.info("ApiKeyService интегрирован в HMAC middleware")
+        except Exception as e:
+            logger.warning(f"Не удалось инициализировать ApiKeyService: {e}")
+    
+    app.add_middleware(HMACMiddleware, api_key_service=api_key_service)
+    
     # Сохранение service_factory в состоянии приложения
     if service_factory:
         app.state.service_factory = service_factory
         logger.info("ServiceFactory интегрирован в приложение")
     
+    # Глобальные обработчики ошибок
+    app.add_exception_handler(RequestValidationError, error_handlers.validation_exception_handler)
+    app.add_exception_handler(ValidationError, error_handlers.pydantic_validation_error_handler)
+    app.add_exception_handler(HTTPException, error_handlers.http_exception_handler)
+    app.add_exception_handler(StarletteHTTPException, error_handlers.not_found_exception_handler)
+    app.add_exception_handler(Exception, error_handlers.unhandled_exception_handler)
+
+    def create_public_response(message: str, additional_data: dict = None) -> dict:
+        """Создает единообразный ответ для публичных эндпоинтов"""
+        response = {
+            "success": True,
+            "service": "amanita_api",
+            "version": "1.0.0",
+            "environment": APIConfig.ENVIRONMENT,
+            "timestamp": get_current_timestamp(),
+            "request_id": generate_request_id(),
+            "message": message
+        }
+        
+        if additional_data:
+            response.update(additional_data)
+        
+        return response
+
     # Базовые эндпоинты
     @app.get("/")
     async def root():
         """Корневой эндпоинт"""
         logger.info("Запрос к корневому эндпоинту", extra={"endpoint": "/"})
-        return {
-            "message": "AMANITA API",
-            "version": "1.0.0",
-            "status": "running"
-        }
+        return create_public_response(
+            message="AMANITA API",
+            additional_data={"status": "running"}
+        )
     
     @app.get("/health")
     async def health_check():
         """Health check эндпоинт"""
         logger.debug("Health check запрос", extra={"endpoint": "/health"})
-        return {
-            "status": "healthy",
-            "service": "amanita_api"
-        }
+        
+        # Вычисляем uptime
+        uptime = calculate_uptime(APP_START_TIME)
+        
+        return HealthCheckResponse(
+            success=True,
+            status=HealthStatus(
+                status="healthy",
+                message="Service is running normally"
+            ),
+            service=ServiceInfo(
+                name="amanita_api",
+                version="1.0.0",
+                environment=APIConfig.ENVIRONMENT
+            ),
+            timestamp=Timestamp(get_current_timestamp()),
+            request_id=RequestId(generate_request_id()),
+            uptime=uptime
+        )
     
     @app.get("/health/detailed")
     async def detailed_health_check():
         """Детальный health check"""
         logger.info("Детальный health check запрос", extra={"endpoint": "/health/detailed"})
         
-        health_status = {
-            "status": "healthy",
-            "service": "amanita_api",
-            "components": {
-                "api": "ok",
-                "service_factory": "ok" if service_factory else "not_initialized"
-            }
-        }
+        # Вычисляем uptime
+        uptime = calculate_uptime(APP_START_TIME)
         
-        # Проверка ServiceFactory если доступен
+        # Получаем системные метрики
+        system_metrics = get_system_metrics()
+        
+        # Проверяем компоненты системы
+        components = []
+        
+        # API компонент
+        api_component = await check_component_latency(check_api_component, "api")
+        components.append(api_component)
+        
+        # ServiceFactory компонент
         if service_factory:
-            try:
-                # Базовая проверка blockchain service
-                blockchain_service = service_factory.blockchain
-                health_status["components"]["blockchain"] = "ok"
-                logger.debug("Blockchain service проверен успешно")
-            except Exception as e:
-                health_status["components"]["blockchain"] = f"error: {str(e)}"
-                health_status["status"] = "degraded"
-                logger.error("Ошибка при проверке blockchain service", extra={"error": str(e)})
+            sf_component = await check_component_latency(
+                lambda: check_service_factory_component(service_factory), 
+                "service_factory"
+            )
+            components.append(sf_component)
+        else:
+            components.append(ComponentInfo(
+                name="service_factory",
+                status=ComponentStatus.NOT_INITIALIZED,
+                last_check=datetime.now(),
+                error_count=0,
+                details={"message": "ServiceFactory не инициализирован"}
+            ))
         
-        return health_status
+        # Blockchain компонент
+        if service_factory and hasattr(service_factory, 'blockchain'):
+            blockchain_component = await check_component_latency(
+                lambda: check_blockchain_component(service_factory),
+                "blockchain"
+            )
+            components.append(blockchain_component)
+        else:
+            components.append(ComponentInfo(
+                name="blockchain",
+                status=ComponentStatus.UNAVAILABLE,
+                last_check=datetime.now(),
+                error_count=0,
+                details={"message": "Blockchain service недоступен"}
+            ))
+        
+        # Database компонент
+        db_component = await check_component_latency(check_database_component, "database")
+        components.append(db_component)
+        
+        # External APIs компонент
+        external_apis_component = await check_component_latency(check_external_apis_component, "external_apis")
+        components.append(external_apis_component)
+        
+        # Определяем общий статус на основе компонентов
+        error_components = [c for c in components if c.status == ComponentStatus.ERROR]
+        degraded_components = [c for c in components if c.status == ComponentStatus.DEGRADED]
+        
+        if error_components:
+            status = "unhealthy"
+            message = f"Критические ошибки в компонентах: {', '.join([c.name for c in error_components])}"
+        elif degraded_components:
+            status = "degraded"
+            message = f"Проблемы в компонентах: {', '.join([c.name for c in degraded_components])}"
+        else:
+            status = "healthy"
+            message = "Все компоненты работают нормально"
+        
+        return DetailedHealthCheckResponse(
+            success=True,
+            status=HealthStatus(
+                status=status,
+                message=message
+            ),
+            service=ServiceInfo(
+                name="amanita_api",
+                version="1.0.0",
+                environment=APIConfig.ENVIRONMENT
+            ),
+            timestamp=Timestamp(get_current_timestamp()),
+            request_id=RequestId(generate_request_id()),
+            uptime=uptime,
+            components=components,
+            system_metrics=system_metrics
+        )
     
     @app.get("/hello")
     async def hello_world():
         """Простой hello world endpoint для тестирования"""
         logger.info("Hello world запрос", extra={"endpoint": "/hello"})
+        return create_public_response(
+            message="Hello World!",
+            additional_data={"status": "running"}
+        )
+    
+    @app.post("/auth-test")
+    async def auth_test(request: Request):
+        """Тестовый эндпоинт для проверки HMAC аутентификации"""
+        logger.info("Auth test запрос", extra={
+            "endpoint": "/auth-test",
+            "client_address": getattr(request.state, 'client_address', 'unknown')
+        })
+        
+        client_address = getattr(request.state, 'client_address', 'unknown')
+        
         return {
-            "message": "Hello World!",
-            "service": "amanita_api",
-            "status": "running",
-            "timestamp": datetime.now().isoformat()
+            "success": True,
+            "client_address": client_address,
+            "authenticated_at": datetime.now().isoformat(),
+            "message": "Authentication successful"
         }
+    
+    # Подключаем роутеры
+    from api.routes import api_keys
+    app.include_router(api_keys.router)
     
     logger.info("FastAPI приложение создано с базовой конфигурацией", extra={
         "docs_url": "/docs",

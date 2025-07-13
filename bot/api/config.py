@@ -12,6 +12,9 @@ class APIConfig:
     API_DESCRIPTION = "API для интеграции e-commerce платформ с блокчейн экосистемой AMANITA"
     API_VERSION = "1.0.0"
     
+    # Окружение
+    ENVIRONMENT = os.environ.get("AMANITA_API_ENVIRONMENT", "development")
+    
     # Настройки сервера
     HOST = os.environ.get("AMANITA_API_HOST", "0.0.0.0")
     PORT = int(os.environ.get("AMANITA_API_PORT", "8000"))
@@ -28,6 +31,11 @@ class APIConfig:
     
     # Настройки безопасности
     TRUSTED_HOSTS = os.environ.get("AMANITA_API_TRUSTED_HOSTS", "*").split(",")
+    
+    # Настройки HMAC аутентификации
+    HMAC_SECRET_KEY = os.environ.get("AMANITA_API_HMAC_SECRET_KEY", "default-secret-key-change-in-production")
+    HMAC_TIMESTAMP_WINDOW = int(os.environ.get("AMANITA_API_HMAC_TIMESTAMP_WINDOW", "300"))  # 5 минут
+    HMAC_NONCE_CACHE_TTL = int(os.environ.get("AMANITA_API_HMAC_NONCE_CACHE_TTL", "600"))  # 10 минут
     
     # Настройки документации
     DOCS_URL = os.environ.get("AMANITA_API_DOCS_URL", "/docs")
@@ -64,4 +72,13 @@ class APIConfig:
             "docs_url": cls.DOCS_URL,
             "redoc_url": cls.REDOC_URL,
             "openapi_url": cls.OPENAPI_URL
+        }
+    
+    @classmethod
+    def get_hmac_config(cls) -> dict:
+        """Получить конфигурацию HMAC аутентификации"""
+        return {
+            "secret_key": cls.HMAC_SECRET_KEY,
+            "timestamp_window": cls.HMAC_TIMESTAMP_WINDOW,
+            "nonce_cache_ttl": cls.HMAC_NONCE_CACHE_TTL
         } 

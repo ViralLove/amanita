@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 import logging
 import json
 import traceback
-from bot.model.product import Description, DosageInstruction
-from bot.services.core.ipfs_factory import IPFSFactory
+from model.product import Description, DosageInstruction
+from services.core.ipfs_factory import IPFSFactory
 
 logger = logging.getLogger(__name__)
 

@@ -8,8 +8,7 @@ from eth_account import Account
 import logging
 from typing import Optional, Any, List, Dict, Union
 import asyncio
-from bot import config
-from bot.config import (
+from config import (
     SELLER_PRIVATE_KEY,
     ACTIVE_PROFILE,
     RPC_URL,

@@ -1,8 +1,8 @@
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 import logging
-from bot.model.product import Product, PriceInfo, Description
-from bot.services.product.cache import ProductCacheService
+from model.product import Product, PriceInfo, Description
+from services.product.cache import ProductCacheService
 
 logger = logging.getLogger(__name__)
 

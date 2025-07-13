@@ -1,8 +1,8 @@
 import logging
 from dotenv import load_dotenv
 import os
-from bot.services.core.storage.pinata import SecurePinataUploader
-from bot.services.core.storage.ar_weave import ArWeaveUploader
+from services.core.storage.pinata import SecurePinataUploader
+from services.core.storage.ar_weave import ArWeaveUploader
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any
 import logging
 import aiohttp
 import re
-from bot.services.core.ipfs_factory import IPFSFactory
+from services.core.ipfs_factory import IPFSFactory
 
 logger = logging.getLogger(__name__)
 

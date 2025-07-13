@@ -54,6 +54,10 @@ if not SELLER_PRIVATE_KEY:
 if not SELLER_PRIVATE_KEY.startswith("0x"):
     SELLER_PRIVATE_KEY = f"0x{SELLER_PRIVATE_KEY}"
 
+# API ключи для аутентификации (MVP)
+AMANITA_API_KEY = os.getenv("AMANITA_API_KEY", "ak_seller_amanita_mvp_2024")
+AMANITA_API_SECRET = os.getenv("AMANITA_API_SECRET", "sk_seller_secret_amanita_mvp_2024_secure_key")
+
 # Адрес реестра контрактов
 AMANITA_REGISTRY_CONTRACT_ADDRESS = os.getenv("AMANITA_REGISTRY_CONTRACT_ADDRESS")
 if not AMANITA_REGISTRY_CONTRACT_ADDRESS:

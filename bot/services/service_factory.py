@@ -1,8 +1,9 @@
-from bot.services.core.blockchain import BlockchainService
-from bot.services.core.account import AccountService
-from bot.services.product.registry import ProductRegistryService
-from bot.services.product.storage import ProductStorageService
-from bot.services.product.validation import ProductValidationService
+from services.core.blockchain import BlockchainService
+from services.core.account import AccountService
+from services.core.api_key import ApiKeyService
+from services.product.registry import ProductRegistryService
+from services.product.storage import ProductStorageService
+from services.product.validation import ProductValidationService
 
 class ServiceFactory:
     def __init__(self):
@@ -11,6 +12,9 @@ class ServiceFactory:
 
     def create_account_service(self):
         return AccountService(self.blockchain)
+    
+    def create_api_key_service(self):
+        return ApiKeyService(self.blockchain)
     
     def create_product_registry_service(self):
         # Создаем зависимости для ProductRegistryService
