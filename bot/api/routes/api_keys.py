@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import List, Optional
 import logging
 
-from services.core.api_key import ApiKeyService
-from services.service_factory import ServiceFactory
-from api.models.auth import (
+from bot.services.core.api_key import ApiKeyService
+from bot.services.service_factory import ServiceFactory
+from bot.api.models.auth import (
     ApiKeyCreateRequest,
     ApiKeyCreateResponse,
     ApiKeyValidateRequest,
@@ -15,7 +15,7 @@ from api.models.auth import (
     ApiKeyRevokeRequest,
     ApiKeyRevokeResponse
 )
-from api.models.common import get_current_timestamp, generate_request_id, ApiKey, RequestId, Timestamp
+from bot.api.models.common import get_current_timestamp, generate_request_id, ApiKey, RequestId, Timestamp
 
 logger = logging.getLogger(__name__)
 
