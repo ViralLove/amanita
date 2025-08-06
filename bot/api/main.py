@@ -9,107 +9,32 @@ import json
 from datetime import datetime
 from typing import Optional
 from logging.handlers import RotatingFileHandler
-from api.config import APIConfig
-from api.middleware.auth import HMACMiddleware
+from bot.api.config import APIConfig
+from bot.api.middleware.auth import HMACMiddleware
 from fastapi.exceptions import RequestValidationError, HTTPException
 from pydantic import ValidationError
-from api import error_handlers
-from api.models.health import HealthCheckResponse, HealthStatus, ServiceInfo, DetailedHealthCheckResponse, SystemUptime, ComponentInfo, ComponentStatus
-from api.models.common import get_current_timestamp, generate_request_id, Timestamp, RequestId
-from api.utils.health_utils import calculate_uptime, get_system_metrics, check_component_latency
-from api.utils.health_utils import (
+from bot.api import error_handlers
+from bot.api.models.health import HealthCheckResponse, HealthStatus, ServiceInfo, DetailedHealthCheckResponse, SystemUptime, ComponentInfo, ComponentStatus
+from bot.api.models.common import get_current_timestamp, generate_request_id, Timestamp, RequestId
+from bot.api.utils.health_utils import calculate_uptime, get_system_metrics, check_component_latency
+from bot.api.utils.health_utils import (
     check_api_component, check_service_factory_component, check_blockchain_component,
     check_database_component, check_external_apis_component
 )
-from services.service_factory import ServiceFactory
+from bot.services.service_factory import ServiceFactory
+from bot.utils.sentry_init import init_sentry
+from bot.utils.logging_setup import setup_logging
+
+init_sentry()
+logger = setup_logging(
+    log_level=APIConfig.LOG_LEVEL,
+    log_file=APIConfig.LOG_FILE,
+    max_size=APIConfig.LOG_MAX_SIZE,
+    backup_count=APIConfig.LOG_BACKUP_COUNT
+)
 
 # Глобальное время запуска приложения
 APP_START_TIME = datetime.now()
-
-# Настройка логирования для API
-def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None):
-    """
-    Настройка логирования для API слоя
-    
-    Args:
-        log_level: Уровень логирования (DEBUG, INFO, WARNING, ERROR)
-        log_file: Путь к файлу для записи логов (если None - только консоль)
-    """
-    logger = logging.getLogger("amanita_api")
-    logger.setLevel(getattr(logging, log_level.upper()))
-    
-    # Очищаем существующие обработчики
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-    
-    # Создаем обработчик для вывода в консоль
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(getattr(logging, log_level.upper()))
-    
-    # Форматтер для консоли (человекочитаемый)
-    console_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    console_handler.setFormatter(console_formatter)
-    logger.addHandler(console_handler)
-    
-    # Если указан файл, добавляем файловый обработчик
-    if log_file:
-        # Создаем директорию для логов если не существует
-        log_dir = os.path.dirname(log_file)
-        if log_dir and not os.path.exists(log_dir):
-            os.makedirs(log_dir, exist_ok=True)
-        
-        # Получаем конфигурацию логирования
-        log_config = APIConfig.get_logging_config()
-        
-        # Ротация логов: настраиваемый размер и количество файлов
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=log_config["max_size"],
-            backupCount=log_config["backup_count"],
-            encoding='utf-8'
-        )
-        file_handler.setLevel(getattr(logging, log_level.upper()))
-        
-        # JSON форматтер для файлов (structured logging)
-        class JSONFormatter(logging.Formatter):
-            def format(self, record):
-                log_entry = {
-                    "timestamp": datetime.fromtimestamp(record.created).isoformat(),
-                    "level": record.levelname,
-                    "logger": record.name,
-                    "message": record.getMessage(),
-                    "module": record.module,
-                    "function": record.funcName,
-                    "line": record.lineno
-                }
-                
-                # Добавляем exception info если есть
-                if record.exc_info:
-                    log_entry["exception"] = self.formatException(record.exc_info)
-                
-                # Добавляем extra поля если есть
-                for key, value in record.__dict__.items():
-                    if key not in ['name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 
-                                 'filename', 'module', 'lineno', 'funcName', 'created', 
-                                 'msecs', 'relativeCreated', 'thread', 'threadName', 
-                                 'processName', 'process', 'getMessage', 'exc_info', 
-                                 'exc_text', 'stack_info']:
-                        log_entry[key] = value
-                
-                return json.dumps(log_entry, ensure_ascii=False)
-        
-        file_handler.setFormatter(JSONFormatter())
-        logger.addHandler(file_handler)
-    
-    # Настраиваем логирование для внешних библиотек
-    logging.getLogger("uvicorn").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("fastapi").setLevel(logging.WARNING)
-    
-    return logger
 
 def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Optional[str] = None) -> FastAPI:
     """
@@ -123,8 +48,7 @@ def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Opti
     Returns:
         FastAPI: Настроенное приложение
     """
-    # Настройка логирования
-    logger = setup_logging(log_level, log_file)
+    # logger уже инициализирован глобально
     logger.info("Инициализация AMANITA API приложения", extra={
         "log_level": log_level,
         "log_file": log_file,
@@ -341,8 +265,11 @@ def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Opti
         }
     
     # Подключаем роутеры
-    from api.routes import api_keys
+    from bot.api.routes import api_keys, products, media, description
     app.include_router(api_keys.router)
+    app.include_router(products.router)
+    app.include_router(media.router)
+    app.include_router(description.router)
     
     logger.info("FastAPI приложение создано с базовой конфигурацией", extra={
         "docs_url": "/docs",

@@ -12,7 +12,7 @@ sleep 3
 
 # Деплой контрактов
 echo "📜 Деплой контрактов..."
-npx hardhat run scripts/deploy.js --network localhost &
+npx hardhat run scripts/deploy_full.js --network localhost &
 DEPLOY_PID=$!
 
 # Ждем деплоя

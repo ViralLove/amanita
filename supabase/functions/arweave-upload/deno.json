@@ -1,0 +1,13 @@
+{
+  "imports": {
+    "arweave": "npm:arweave@^1.15.7"
+  },
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env --allow-read index.ts",
+    "test": "deno test --allow-env --allow-read --no-check index.test.ts"
+  },
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window"]
+  }
+} 

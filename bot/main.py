@@ -1,4 +1,4 @@
-print("=== STARTING BOT INITIALIZATION ===")
+print("=== STARTING AMANITA BOT + API INITIALIZATION ===")
 
 import asyncio
 import os
@@ -8,6 +8,7 @@ from aiogram.enums import ParseMode
 from aiogram.client.bot import DefaultBotProperties
 import logging
 import sys
+import uvicorn
 from bot.handlers.onboarding_fsm import router as onboarding_router
 from bot.handlers.webapp_common import router as webapp_router
 from bot.handlers.menu import router as menu_router
@@ -15,32 +16,22 @@ from bot.handlers.seller_product_creation_fsm import router as product_creation_
 from bot.handlers.seller_menu import router as seller_router
 from bot.handlers.catalog import router as catalog_router
 from bot.services.product.registry_singleton import product_registry_service
+from bot.services.service_factory import ServiceFactory
+from bot.api.main import create_api_app
+from bot.api.config import APIConfig
+import sentry_sdk
+from bot.utils.sentry_init import init_sentry
+from bot.utils.logging_setup import setup_logging
+
+init_sentry()
+logger = setup_logging(
+    log_level=APIConfig.LOG_LEVEL,
+    log_file=APIConfig.LOG_FILE,
+    max_size=APIConfig.LOG_MAX_SIZE,
+    backup_count=APIConfig.LOG_BACKUP_COUNT
+)
 
 print("=== IMPORTS DONE ===")
-
-# Настройка логирования - принудительный вывод в консоль
-# Настраиваем корневой логгер для всех модулей
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-
-# Очищаем все обработчики, чтобы избежать дублирования
-for handler in root_logger.handlers[:]:
-    root_logger.removeHandler(handler)
-
-# Создаем обработчик для вывода в консоль
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-
-# Устанавливаем формат
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s', 
-                             datefmt='%Y-%m-%d %H:%M:%S')
-console_handler.setFormatter(formatter)
-
-# Добавляем обработчик к корневому логгеру
-root_logger.addHandler(console_handler)
-
-# Создаем логгер для текущего модуля
-logger = logging.getLogger(__name__)
 
 print("=== LOGGING INITIALIZED ===")
 
@@ -61,12 +52,17 @@ if not API_TOKEN:
     logger.error("Не найден TELEGRAM_BOT_TOKEN в .env файле")
     exit(1)
 
-logger.info("=== Инициализация AMANITA Telegram Bot ===")
+logger.info("=== Инициализация AMANITA Telegram Bot + API Server ===")
 print("Логи работают! Если вы видите это сообщение, то увидите и логи ниже.")
 
 async def main():
     print("=== ВХОД В ФУНКЦИЮ MAIN() ===")
     try:
+        # Инициализация ServiceFactory (общий для бота и API)
+        logger.info("Инициализация ServiceFactory...")
+        service_factory = ServiceFactory()
+        logger.info("ServiceFactory успешно инициализирован")
+        
         # Инициализация бота - простая инициализация, которая работает в тесте
         logger.info("Создание экземпляра бота...")
         bot = Bot(
@@ -106,13 +102,39 @@ async def main():
         logger.info("Фоновая задача по загрузке каталога запущена")
         # === Конец фоновой загрузки ===
 
-        # Запуск поллинга
-        logger.info("Запуск поллинга...")
-        print("=== ЗАПУСК ПОЛЛИНГА ===")
-        logger.info("=== Бот запущен и готов к работе ===")
+        # Создание FastAPI приложения с ServiceFactory
+        logger.info("Создание FastAPI приложения...")
         
-        # Запускаем поллинг с настройками, которые работают в тесте
-        await dp.start_polling(bot)
+        # Настройка логирования для API из конфигурации
+        api_app = create_api_app(
+            service_factory=service_factory,
+            log_level=APIConfig.LOG_LEVEL,
+            log_file=APIConfig.LOG_FILE
+        )
+        logger.info(f"FastAPI приложение создано с логированием: {APIConfig.LOG_LEVEL} -> {APIConfig.LOG_FILE}")
+        
+        # Настройка uvicorn сервера для API
+        logger.info("Настройка uvicorn сервера...")
+        config = uvicorn.Config(
+            api_app,
+            host="0.0.0.0",
+            port=8000,
+            log_level="info",
+            access_log=False  # Отключаем access log, так как у нас есть свое логирование
+        )
+        server = uvicorn.Server(config)
+        logger.info("Uvicorn сервер настроен")
+        
+        # Запуск бота и API сервера параллельно
+        logger.info("Запуск бота и API сервера параллельно...")
+        print("=== ЗАПУСК БОТА И API СЕРВЕРА ===")
+        logger.info("=== AMANITA Bot + API Server запущены и готовы к работе ===")
+        
+        # Параллельный запуск через asyncio.gather
+        await asyncio.gather(
+            dp.start_polling(bot),
+            server.serve()
+        )
         
     except Exception as e:
         logger.error(f"Ошибка в функции main(): {e}")
@@ -122,14 +144,15 @@ async def main():
         if 'bot' in locals():
             logger.info("=== Бот остановлен ===")
             await bot.session.close()
+        logger.info("=== AMANITA Bot + API Server остановлены ===")
 
 if __name__ == "__main__":
-    print("=== STARTING MAIN ===")
+    print("=== STARTING AMANITA BOT + API MAIN ===")
     try:
-        # Используем простой способ запуска, который работает в тесте
+        # Запуск бота и API сервера
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Бот остановлен пользователем (Ctrl+C)")
+        logger.info("AMANITA Bot + API Server остановлены пользователем (Ctrl+C)")
     except Exception as e:
         logger.error(f"Критическая ошибка: {e}")
         import traceback

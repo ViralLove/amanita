@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any, List, Union
 import logging
 import re
-from services.product.validation_utils import (
+from bot.services.product.validation_utils import (
     validate_product_data,
     sanitize_product_data,
     ValidationError

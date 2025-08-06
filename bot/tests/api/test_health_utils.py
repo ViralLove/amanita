@@ -5,12 +5,12 @@ import pytest
 import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
-from api.utils.health_utils import (
+from bot.api.utils.health_utils import (
     format_uptime, calculate_uptime, get_system_metrics,
     check_component_latency, check_api_component,
     check_service_factory_component, check_blockchain_component
 )
-from api.models.health import ComponentStatus
+from bot.api.models.health import ComponentStatus
 
 
 class TestFormatUptime:
@@ -54,7 +54,7 @@ class TestCalculateUptime:
 class TestGetSystemMetrics:
     """Тесты для получения системных метрик"""
     
-    @patch('api.utils.health_utils.psutil')
+    @patch('bot.api.utils.health_utils.psutil')
     def test_get_system_metrics_success(self, mock_psutil):
         """Тест успешного получения системных метрик"""
         # Мокаем psutil
@@ -83,7 +83,7 @@ class TestGetSystemMetrics:
         assert metrics["disk"]["free_gb"] == 50.0
         assert metrics["disk"]["used_percent"] == 50.0
     
-    @patch('api.utils.health_utils.psutil')
+    @patch('bot.api.utils.health_utils.psutil')
     def test_get_system_metrics_error(self, mock_psutil):
         """Тест обработки ошибки при получении метрик"""
         mock_psutil.cpu_percent.side_effect = Exception("Test error")

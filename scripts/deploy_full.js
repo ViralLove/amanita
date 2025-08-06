@@ -113,7 +113,7 @@ async function deployContract(contractName, constructorArgs = [], options = {}) 
  */
 async function main(action) {
 
-  action=3;
+  action=1;
   // Проверка корректности action
   if (action === undefined || action === null) {
     throw new Error("Не указан параметр action. Используйте: node deploy_full.js <action> (0-4)");

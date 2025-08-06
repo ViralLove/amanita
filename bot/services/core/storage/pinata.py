@@ -384,7 +384,8 @@ class SecurePinataUploader:
                 response = self._make_request(
                     'GET',
                     f"{self.api_url}/data/pinList",
-                    headers=self.json_headers
+                    headers=self.json_headers,
+                    timeout=10  # Добавляем таймаут 10 секунд
                 )
                 pins = response.json().get('rows', [])
                 self.cache.update_from_pins(pins)
@@ -392,6 +393,7 @@ class SecurePinataUploader:
             except Exception as e:
                 logger.error(f"Ошибка при обновлении кэша: {e}")
                 self.metrics.track_error("cache_update_error")
+                # Не падаем, просто логируем ошибку
     
     def find_file_by_name(self, file_name: str) -> Optional[Tuple[str, Dict]]:
         """

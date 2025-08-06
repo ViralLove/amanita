@@ -21,7 +21,7 @@ class AccountService:
         Args:
             blockchain_service: Экземпляр BlockchainService для работы с блокчейном
         """
-        self.blockchain = blockchain_service
+        self.blockchain_service = blockchain_service
         logger.info("[AccountService] Сервис инициализирован")
 
     def get_seller_account(self) -> Account:
@@ -64,7 +64,7 @@ class AccountService:
             bool: True если адрес является продавцом, False иначе
         """
         logger.info(f"[AccountService] Проверка прав продавца для адреса: {wallet_address}")
-        result = self.blockchain._call_contract_read_function("InviteNFT", "isSeller", False, wallet_address)
+        result = self.blockchain_service._call_contract_read_function("InviteNFT", "isSeller", False, wallet_address)
         logger.info(f"[AccountService] Результат проверки продавца: {result}")
         return result
     
@@ -81,7 +81,7 @@ class AccountService:
         logger.info(f"[AccountService][CHECK] Проверяем наличие Invite NFT у адреса: {wallet_address}")
         
         # Проверяем количество инвайтов у пользователя
-        invite_count = self.blockchain._call_contract_read_function("InviteNFT", "userInviteCount", 0, wallet_address)
+        invite_count = self.blockchain_service._call_contract_read_function("InviteNFT", "userInviteCount", 0, wallet_address)
         logger.info(f"[AccountService] Количество инвайтов у {wallet_address}: {invite_count}")
         
         if invite_count > 0:
@@ -102,7 +102,7 @@ class AccountService:
             bool: True если пользователь активирован, False иначе
         """
         logger.info(f"[AccountService] Проверка активации пользователя: {user_address}")
-        result = self.blockchain._call_contract_read_function("InviteNFT", "isUserActivated", False, user_address)
+        result = self.blockchain_service._call_contract_read_function("InviteNFT", "isUserActivated", False, user_address)
         logger.info(f"[AccountService] Пользователь {user_address} активирован: {result}")
         return result
     
@@ -114,7 +114,7 @@ class AccountService:
             List[str]: Список адресов активированных пользователей
         """
         logger.info("[AccountService] Получение списка активированных пользователей")
-        users = self.blockchain._call_contract_read_function("InviteNFT", "getAllActivatedUsers", [])
+        users = self.blockchain_service._call_contract_read_function("InviteNFT", "getAllActivatedUsers", [])
         logger.info(f"[AccountService] Найдено активированных пользователей: {len(users)}")
         return users
     
@@ -130,7 +130,7 @@ class AccountService:
             Tuple[List[str], List[str]]: Кортеж (валидные_коды, невалидные_коды)
         """
         logger.info(f"[AccountService] Пакетная валидация {len(invite_codes)} кодов для {user_address}")
-        result = self.blockchain._call_contract_read_function("InviteNFT", "batchValidateInviteCodes", ([], []), invite_codes, user_address)
+        result = self.blockchain_service._call_contract_read_function("InviteNFT", "batchValidateInviteCodes", ([], []), invite_codes, user_address)
         success_array, reasons_array = result
         
         # Преобразуем результат в нужный формат
@@ -176,10 +176,10 @@ class AccountService:
             raise ValueError("SELLER_PRIVATE_KEY не установлен в .env")
         
         # Получаем контракт и функцию для оценки газа
-        contract = self.blockchain.get_contract("InviteNFT")
+        contract = self.blockchain_service.get_contract("InviteNFT")
         contract_function = getattr(contract.functions, "activateAndMintInvites")
         
-        estimate_gas = await self.blockchain.estimate_gas_with_multiplier(
+        estimate_gas = await self.blockchain_service.estimate_gas_with_multiplier(
             contract_function,
             invite_code,
             wallet_address,
@@ -193,7 +193,7 @@ class AccountService:
         gas_limit = max(estimate_gas, 10000000)  # 10M газа
         logger.info(f"[AccountService] Используемый лимит газа: {gas_limit}")
             
-        tx_hash = await self.blockchain.transact_contract_function(
+        tx_hash = await self.blockchain_service.transact_contract_function(
             "InviteNFT",
             "activateAndMintInvites",
             seller_private_key,
@@ -210,7 +210,7 @@ class AccountService:
             raise Exception("Транзакция не была отправлена или завершилась с ошибкой")
         
         # Ждем подтверждения транзакции
-        receipt = self.blockchain.web3.eth.wait_for_transaction_receipt(tx_hash)
+        receipt = self.blockchain_service.web3.eth.wait_for_transaction_receipt(tx_hash)
         logger.info(f"[AccountService] Транзакция выполнена: gasUsed={receipt['gasUsed']}, status={receipt['status']}")
         
         # Проверяем статус транзакции

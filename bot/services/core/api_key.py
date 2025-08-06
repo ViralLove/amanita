@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 
 from .blockchain import BlockchainService
-from config import AMANITA_API_KEY, AMANITA_API_SECRET
+from bot.config import AMANITA_API_KEY, AMANITA_API_SECRET
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class ApiKeyService:
     """
     
     def __init__(self, blockchain_service: BlockchainService):
-        self.blockchain = blockchain_service
+        self.blockchain_service = blockchain_service
         self._init_encryption()
         self._cache: Dict[str, Dict] = {}
         self._cache_ttl = 300  # 5 минут
@@ -165,11 +165,11 @@ class ApiKeyService:
     async def _register_api_key_in_blockchain(self, seller_address: str, api_key: str, description: str):
         """Регистрирует API ключ в блокчейне (заглушка для MVP)"""
         # TODO: В production здесь будет вызов смарт-контракта
-        # contract = self.blockchain.get_contract("AmanitaRegistry")
-        # await self.blockchain.transact_contract_function(
+        # contract = self.blockchain_service.get_contract("AmanitaRegistry")
+        # await self.blockchain_service.transact_contract_function(
         #     "AmanitaRegistry", 
         #     "registerApiKey", 
-        #     self.blockchain.seller_key,
+        #     self.blockchain_service.seller_key,
         #     seller_address, 
         #     api_key, 
         #     description
@@ -265,7 +265,7 @@ class ApiKeyService:
         if api_key == AMANITA_API_KEY:
             try:
                 # Получаем адрес селлера из приватного ключа
-                seller_account = self.blockchain.seller_account
+                seller_account = self.blockchain_service.seller_account
                 return {
                     "seller_address": seller_account.address,
                     "active": True,
@@ -276,7 +276,7 @@ class ApiKeyService:
                 return None
         
         # TODO: В production здесь будет вызов смарт-контракта
-        # contract = self.blockchain.get_contract("AmanitaRegistry")
+        # contract = self.blockchain_service.get_contract("AmanitaRegistry")
         # try:
         #     seller_address = contract.functions.getSellerByApiKey(api_key).call()
         #     if seller_address != "0x0000000000000000000000000000000000000000":
@@ -368,11 +368,11 @@ class ApiKeyService:
     async def _revoke_api_key_in_blockchain(self, api_key: str, seller_address: str):
         """Отзывает API ключ в блокчейне (заглушка для MVP)"""
         # TODO: В production здесь будет вызов смарт-контракта
-        # contract = self.blockchain.get_contract("AmanitaRegistry")
-        # await self.blockchain.transact_contract_function(
+        # contract = self.blockchain_service.get_contract("AmanitaRegistry")
+        # await self.blockchain_service.transact_contract_function(
         #     "AmanitaRegistry", 
         #     "revokeApiKey", 
-        #     self.blockchain.seller_key,
+        #     self.blockchain_service.seller_key,
         #     seller_address, 
         #     api_key
         # )
@@ -411,7 +411,7 @@ class ApiKeyService:
         """
         try:
             # Проверяем адрес селлера из .env (MVP)
-            seller_account = self.blockchain.seller_account
+            seller_account = self.blockchain_service.seller_account
             if seller_address.lower() == seller_account.address.lower():
                 return [{
                     "api_key": AMANITA_API_KEY,

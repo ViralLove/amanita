@@ -2,29 +2,31 @@ from typing import Optional, Dict, Any
 import logging
 import aiohttp
 import re
-from services.core.ipfs_factory import IPFSFactory
+from bot.services.core.ipfs_factory import IPFSFactory
 
 logger = logging.getLogger(__name__)
 
 class ProductStorageService:
     """Сервис для работы с хранилищами (IPFS)"""
     
-    _instance = None
-    
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-    
     # Регулярное выражение для валидации IPFS CID
     IPFS_CID_PATTERN = re.compile(r'^(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[A-Za-z2-7]{55})$')
     
-    def __init__(self):
-        if not hasattr(self, '_initialized'):
-            # Инициализация только при первом создании
+    def __init__(self, storage_provider=None):
+        """
+        Инициализирует ProductStorageService.
+        
+        Args:
+            storage_provider: Провайдер хранилища (IPFS/Arweave). 
+                            Если None, создается через IPFSFactory.
+        """
+        # Для обратной совместимости: если storage_provider не передан, используем фабрику
+        if storage_provider is None:
             self.ipfs = IPFSFactory().get_storage()
-            self.logger = logging.getLogger(__name__)
-            self._initialized = True
+        else:
+            self.ipfs = storage_provider
+            
+        self.logger = logging.getLogger(__name__)
     
     def validate_ipfs_cid(self, cid: str) -> bool:
         """Проверяет валидность IPFS CID"""

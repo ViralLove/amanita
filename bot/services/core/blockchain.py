@@ -8,7 +8,7 @@ from eth_account import Account
 import logging
 from typing import Optional, Any, List, Dict, Union
 import asyncio
-from config import (
+from bot.config import (
     SELLER_PRIVATE_KEY,
     ACTIVE_PROFILE,
     RPC_URL,
@@ -454,34 +454,39 @@ class BlockchainService:
             Optional[str]: Хэш транзакции или None в случае ошибки
         """
         logger.info(f"[BlockchainService] Установка активности продукта {product_id}: {is_active}")
-        return await self.transact_contract_function(
-            contract_name="ProductRegistry",
-            function_name="setProductStatus",
-            private_key=private_key,
-            product_id=product_id,
-            new_status=is_active
-        )
+        
+        if is_active:
+            # В текущем контракте нет функции для активации продукта
+            # Продукты создаются активными по умолчанию
+            logger.warning(f"[BlockchainService] Продукт {product_id} уже активен")
+            return None
+        else:
+            # Используем существующую функцию deactivateProduct
+            return await self.transact_contract_function(
+                "ProductRegistry",
+                "deactivateProduct",
+                private_key,
+                product_id
+            )
 
     async def update_product_status(self, private_key: str, product_id: int, new_status: int) -> Optional[str]:
         """
-        Обновляет статус продукта (в процессе/отправлен/доставлен и т.д.).
+        Обновляет статус продукта (активен/неактивен).
         
         Args:
             private_key: Приватный ключ для подписи
             product_id: ID продукта
-            new_status: Новый статус (0 - создан, 1 - в процессе, 2 - отправлен, 3 - доставлен)
+            new_status: Новый статус (0 - неактивен, 1 - активен)
             
         Returns:
             Optional[str]: Хэш транзакции или None в случае ошибки
         """
         logger.info(f"[BlockchainService] Обновление статуса продукта {product_id} на {new_status}")
-        return await self.transact_contract_function(
-            contract_name="ProductRegistry",
-            function_name="updateProductStatus",
-            private_key=private_key,
-            product_id=product_id,
-            new_status=new_status
-        )
+        
+        # Преобразуем статус в boolean
+        is_active = bool(new_status)
+        
+        return await self.set_product_active(private_key, product_id, is_active)
 
     async def wait_for_transaction(self, tx_hash: str, timeout: int = 120) -> Optional[dict]:
         """

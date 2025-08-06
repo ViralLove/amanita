@@ -58,6 +58,17 @@ if not SELLER_PRIVATE_KEY.startswith("0x"):
 AMANITA_API_KEY = os.getenv("AMANITA_API_KEY", "ak_seller_amanita_mvp_2024")
 AMANITA_API_SECRET = os.getenv("AMANITA_API_SECRET", "sk_seller_secret_amanita_mvp_2024_secure_key")
 
+# Supabase конфигурация для Edge Functions
+SUPABASE_URL = os.getenv("SUPABASE_URL", "http://localhost:54321")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+if not SUPABASE_ANON_KEY:
+    logging.warning("SUPABASE_ANON_KEY не установлен в .env - Edge Functions могут не работать")
+
+# ArWeave конфигурация
+ARWEAVE_PRIVATE_KEY = os.getenv("ARWEAVE_PRIVATE_KEY")
+if not ARWEAVE_PRIVATE_KEY:
+    logging.warning("ARWEAVE_PRIVATE_KEY не установлен в .env - ArWeave операции могут не работать")
+
 # Адрес реестра контрактов
 AMANITA_REGISTRY_CONTRACT_ADDRESS = os.getenv("AMANITA_REGISTRY_CONTRACT_ADDRESS")
 if not AMANITA_REGISTRY_CONTRACT_ADDRESS:

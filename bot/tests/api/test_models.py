@@ -2,12 +2,12 @@
 Тесты для Pydantic моделей API
 """
 import pytest
-from api.models.common import (
+from bot.api.models.common import (
     EthereumAddress, ApiKey, Timestamp, RequestId, Signature, Nonce
 )
-from api.models.health import HealthCheckResponse, HealthStatus, ServiceInfo
-from api.models.errors import ErrorResponse, ErrorDetail
-from api.models.auth import AuthRequest, AuthResponse
+from bot.api.models.health import HealthCheckResponse, HealthStatus, ServiceInfo
+from bot.api.models.errors import ErrorResponse, ErrorDetail
+from bot.api.models.auth import AuthRequest, AuthResponse
 from test_data import (
     VALID_ETHEREUM_ADDRESSES, INVALID_ETHEREUM_ADDRESSES,
     VALID_API_KEYS, INVALID_API_KEYS
@@ -113,7 +113,7 @@ class TestHealthModels:
     
     def test_health_check_response_model(self):
         """Тест модели HealthCheckResponse"""
-        from api.models.common import Timestamp, RequestId
+        from bot.api.models.common import Timestamp, RequestId
         
         response = HealthCheckResponse(
             success=True,
@@ -145,7 +145,7 @@ class TestErrorModels:
     
     def test_error_response_model(self):
         """Тест модели ErrorResponse"""
-        from api.models.common import Timestamp, RequestId
+        from bot.api.models.common import Timestamp, RequestId
         
         response = ErrorResponse(
             success=False,
@@ -168,7 +168,7 @@ class TestAuthModels:
     
     def test_auth_request_model(self):
         """Тест модели AuthRequest"""
-        from api.models.common import Timestamp, RequestId, Signature, Nonce
+        from bot.api.models.common import Timestamp, RequestId, Signature, Nonce
         
         request = AuthRequest(
             api_key=ApiKey("a" * 64),
@@ -185,7 +185,7 @@ class TestAuthModels:
     
     def test_auth_response_model(self):
         """Тест модели AuthResponse"""
-        from api.models.common import Timestamp, RequestId
+        from bot.api.models.common import Timestamp, RequestId
         
         response = AuthResponse(
             success=True,

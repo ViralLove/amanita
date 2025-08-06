@@ -1,0 +1,69 @@
+{
+  "version": "5",
+  "redirects": {
+    "https://esm.sh/@types/bn.js@~4.11.6/index.d.ts": "https://esm.sh/@types/bn.js@4.11.6/index.d.ts",
+    "https://esm.sh/@types/minimalistic-assert@~1.0.3/index.d.ts": "https://esm.sh/@types/minimalistic-assert@1.0.3/index.d.ts",
+    "https://esm.sh/@types/safer-buffer@~2.1.3/index.d.ts": "https://esm.sh/@types/safer-buffer@2.1.3/index.d.ts",
+    "https://esm.sh/arconnect@^0.4.2?target=denonext": "https://esm.sh/arconnect@0.4.2?target=denonext",
+    "https://esm.sh/arweave@latest": "https://esm.sh/arweave@1.15.7",
+    "https://esm.sh/asn1.js@^5.4.1?target=denonext": "https://esm.sh/asn1.js@5.4.1?target=denonext",
+    "https://esm.sh/base64-js@^1.5.1?target=denonext": "https://esm.sh/base64-js@1.5.1?target=denonext",
+    "https://esm.sh/bignumber.js@^9.0.2?target=denonext": "https://esm.sh/bignumber.js@9.3.1?target=denonext",
+    "https://esm.sh/bn.js@^4.0.0?target=denonext": "https://esm.sh/bn.js@4.12.2?target=denonext",
+    "https://esm.sh/minimalistic-assert@^1.0.0?target=denonext": "https://esm.sh/minimalistic-assert@1.0.1?target=denonext",
+    "https://esm.sh/safer-buffer@^2.1.0?target=denonext": "https://esm.sh/safer-buffer@2.1.2?target=denonext",
+    "https://esm.sh/src/modules.d.ts": "https://esm.sh/src@1.1.2/modules.d.ts"
+  },
+  "remote": {
+    "https://deno.land/std@0.168.0/async/abortable.ts": "80b2ac399f142cc528f95a037a7d0e653296352d95c681e284533765961de409",
+    "https://deno.land/std@0.168.0/async/deadline.ts": "2c2deb53c7c28ca1dda7a3ad81e70508b1ebc25db52559de6b8636c9278fd41f",
+    "https://deno.land/std@0.168.0/async/debounce.ts": "60301ffb37e730cd2d6f9dadfd0ecb2a38857681bd7aaf6b0a106b06e5210a98",
+    "https://deno.land/std@0.168.0/async/deferred.ts": "77d3f84255c3627f1cc88699d8472b664d7635990d5358c4351623e098e917d6",
+    "https://deno.land/std@0.168.0/async/delay.ts": "5a9bfba8de38840308a7a33786a0155a7f6c1f7a859558ddcec5fe06e16daf57",
+    "https://deno.land/std@0.168.0/async/mod.ts": "7809ad4bb223e40f5fdc043e5c7ca04e0e25eed35c32c3c32e28697c553fa6d9",
+    "https://deno.land/std@0.168.0/async/mux_async_iterator.ts": "770a0ff26c59f8bbbda6b703a2235f04e379f73238e8d66a087edc68c2a2c35f",
+    "https://deno.land/std@0.168.0/async/pool.ts": "6854d8cd675a74c73391c82005cbbe4cc58183bddcd1fbbd7c2bcda42b61cf69",
+    "https://deno.land/std@0.168.0/async/retry.ts": "e8e5173623915bbc0ddc537698fa418cf875456c347eda1ed453528645b42e67",
+    "https://deno.land/std@0.168.0/async/tee.ts": "3a47cc4e9a940904fd4341f0224907e199121c80b831faa5ec2b054c6d2eff5e",
+    "https://deno.land/std@0.168.0/fmt/colors.ts": "03ad95e543d2808bc43c17a3dd29d25b43d0f16287fe562a0be89bf632454a12",
+    "https://deno.land/std@0.168.0/http/server.ts": "e99c1bee8a3f6571ee4cdeb2966efad465b8f6fe62bec1bdb59c1f007cc4d155",
+    "https://deno.land/std@0.168.0/testing/_diff.ts": "a23e7fc2b4d8daa3e158fa06856bedf5334ce2a2831e8bf9e509717f455adb2c",
+    "https://deno.land/std@0.168.0/testing/_format.ts": "cd11136e1797791045e639e9f0f4640d5b4166148796cad37e6ef75f7d7f3832",
+    "https://deno.land/std@0.168.0/testing/asserts.ts": "51353e79437361d4b02d8e32f3fc83b22231bc8f8d4c841d86fd32b0b0afe940",
+    "https://esm.sh/arconnect@0.4.2/denonext/arconnect.mjs": "3fba1dc51a38b837ccb309ee576288b8d3879fce75f667e256c0c4bb8d4e7839",
+    "https://esm.sh/arconnect@0.4.2?target=denonext": "d63e3b7e5811dd6e3e94b1d0aab8be8db22c8b1beea2a0a5eee62ff1d95841a9",
+    "https://esm.sh/arweave@1.12.0": "e17479f09e954cea79b8138dfd3239b301f263898130c35de1ef5444462f756b",
+    "https://esm.sh/arweave@1.12.0/denonext/arweave.mjs": "107ec67c009f43dd42539d9b078283ab5dc86a8c7f77ab0284a7eebc39f9a1be",
+    "https://esm.sh/arweave@1.13.0": "d468c9c4c8cbedc8b097c837a1db5e7726c45ff4baafecb3b25f4193466f0e54",
+    "https://esm.sh/arweave@1.13.0/denonext/arweave.mjs": "85e701270ea9040bb4416a8fa4f4891f8349480d9d258c7841a8d76b8bcae839",
+    "https://esm.sh/arweave@1.14.0": "6396c23221b57e5455e19ab06a13d7037c0cca1918cd03504c1df5d2323bb919",
+    "https://esm.sh/arweave@1.14.0/denonext/arweave.mjs": "93812c5770f78a00d2c5f3dc430c6aadbe5b33f6f0f87a08165abc25e6ea0391",
+    "https://esm.sh/arweave@1.15.5": "69e4707b6cb9eb598938819a1d4f85b87ddbd8b656f57a6fbb6f36192bb7b4d8",
+    "https://esm.sh/arweave@1.15.5/denonext/arweave.mjs": "38110638d6d403b77ad50e7584284227ac5363a5444b1ebf99503cdb90d641cb",
+    "https://esm.sh/arweave@1.15.7": "407e3b77520450d1894b6386d3751effd103cc2c83caa5132d37e25a411f61ff",
+    "https://esm.sh/arweave@1.15.7/denonext/arweave.mjs": "b116e32b446929d1608af951a631df0a9cf4aea307e2da80f5f201f377756b44",
+    "https://esm.sh/asn1.js@5.4.1/denonext/asn1.mjs": "6b068713e7378406b25f431f6646ba10a0b03c5d72ecd68158f67bfe0867ffeb",
+    "https://esm.sh/asn1.js@5.4.1?target=denonext": "8787df97afb1d0fcdee1fd4b1b9eb764a55f8327a51700b06c7059686399be46",
+    "https://esm.sh/base64-js@1.5.1/denonext/base64-js.mjs": "5dbae8a1d8f5789da21736786f9921727523b5ccc64cbcf9f831331c381957dc",
+    "https://esm.sh/base64-js@1.5.1?target=denonext": "7c2f775b41bd5df47fedaa143e6619625c9d81f34302d6aa030e20d9a7240633",
+    "https://esm.sh/bignumber.js@9.3.1/denonext/bignumber.mjs": "70103d1c5de8eb9ab29d2829b8938411391fc824cdbbf48c6c1ef1e76cf6c0f2",
+    "https://esm.sh/bignumber.js@9.3.1?target=denonext": "fc7807922ee0e64066dd9417dc9c0410495dc3d5486e98dadc0984cec4787c1f",
+    "https://esm.sh/bn.js@4.12.2/denonext/bn.mjs": "20c89dda5b538d93e06ad1ca1a54617a4f19893aede56e16c0d0cb3a4e23b3c5",
+    "https://esm.sh/bn.js@4.12.2?target=denonext": "acf676bc314a99e4bf92101e36bf269b6c28012a74431dfe10b12f196e1debe5",
+    "https://esm.sh/minimalistic-assert@1.0.1/denonext/minimalistic-assert.mjs": "07377d761438c22ed239e538e2b641cce8e0733793f0a98f34594782a6e85829",
+    "https://esm.sh/minimalistic-assert@1.0.1?target=denonext": "4e19506c5a46f3c68b4d7b431e1de059c6c57b663cabf226cdb7ef0906b7aebe",
+    "https://esm.sh/safer-buffer@2.1.2/denonext/safer-buffer.mjs": "63b601ca3ed03a32349ca04538ac898f2c520dbc6b554246d11c482c31e8a6b8",
+    "https://esm.sh/safer-buffer@2.1.2?target=denonext": "381ed15e73b07affd71d58c070213d027e4b8951c381f44e5f80589d3ea9957b"
+  },
+  "workspace": {
+    "dependencies": [
+      "npm:arweave@^1.15.7"
+    ],
+    "packageJson": {
+      "dependencies": [
+        "npm:@types/node@20",
+        "npm:arweave@^1.14.0"
+      ]
+    }
+  }
+}

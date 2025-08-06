@@ -4,8 +4,8 @@
 import pytest
 from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
-from api.main import create_api_app
-from api.models.health import ComponentStatus
+from bot.api.main import create_api_app
+from bot.api.models.health import ComponentStatus
 
 
 class TestHealthEndpoints:

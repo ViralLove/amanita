@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 import logging
 
-from api.models.errors import (
+from bot.api.models.errors import (
     ValidationErrorResponse,
     AuthenticationErrorResponse,
     AuthorizationErrorResponse,
@@ -16,7 +16,7 @@ from api.models.errors import (
     RateLimitErrorResponse,
     ErrorDetail
 )
-from api.models.common import get_current_timestamp, generate_request_id, Timestamp
+from bot.api.models.common import get_current_timestamp, generate_request_id, Timestamp
 
 logger = logging.getLogger("amanita.api.errors")
 
