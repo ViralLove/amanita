@@ -63,9 +63,10 @@ Each seller is a **seller node** with their own e-commerce solution deployed thr
 ## 📚 Documentation
 - [AI-Navigator.md](AI-Navigator.md) — working diary and decision history
 - [Manifest & Mission](docs/manifest.md)
-- [Architecture & Components](docs/architecture/overview.md)
-- [API & Integrations](docs/api/overview.md)
-- [Smart Contracts](docs/contracts/overview.md)
+- [Architecture & Components](docs/architecture-overview.md)
+- [Network Economy](docs/Network-Economy.md) — tokenomics and social mining mechanics
+- [API & Integrations](docs/webapi-overview.md)
+- [Smart Contracts](docs/contracts-overview.md)
 - [User Guides](docs/user-guide/getting-started.md)
 
 ## 💬 Contacts & Support
