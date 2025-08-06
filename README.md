@@ -67,12 +67,11 @@ Each seller is a **seller node** with their own e-commerce solution deployed thr
 - [Network Economy](docs/Network-Economy.md) — tokenomics and social mining mechanics
 - [API & Integrations](docs/webapi-overview.md)
 - [Smart Contracts](docs/contracts-overview.md)
-- [User Guides](docs/user-guide/getting-started.md)
 
 ## 💬 Contacts & Support
-- Telegram: [@amanita_support](https://t.me/amanita_support)
-- Email: info@amanita.network
-- Issues: [GitHub Issues](https://github.com/your-org/amanita/issues)
+- Telegram: [@zeya888](https://t.me/zeya888)
+- Email: zeya.metsapuu@gmail.com
+- Issues: [GitHub Issues](https://github.com/ViralLove/amanita/issues)
 
 ---
 Amanita — fair trade, trust, and cooperation in every Invite NFT.
