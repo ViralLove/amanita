@@ -145,10 +145,8 @@ class BlockchainService:
     def _load_registry_contract(self) -> Any:
         """Загружает контракт реестра"""
         try:
-            # Загружаем ABI
-            abi_path = os.path.join(ABI_BASE_DIR, "AmanitaRegistry.sol", "AmanitaRegistry.json")
-            with open(abi_path) as f:
-                abi = json.load(f)["abi"]
+            # Загружаем ABI (единый путь загрузки)
+            abi = load_abi("AmanitaRegistry")
                 
             # Создаем контракт
             contract = self.web3.eth.contract(
@@ -169,7 +167,7 @@ class BlockchainService:
             contracts = {}
             
             # Получаем список всех контрактов из реестра
-            contract_names = ["InviteNFT", "ProductRegistry"]  # Пока хардкодим, потом можно получать из реестра
+            contract_names = ["InviteNFT", "ProductRegistry"]  # TODO: получать динамически из реестра
             
             for name in contract_names:
                 try:
@@ -177,10 +175,8 @@ class BlockchainService:
                     address = self.registry.functions.getAddress(name).call()
                     logger.info(f"[Web3] Получен адрес контракта {name}: {address}")
                     
-                    # Загружаем ABI
-                    abi_path = os.path.join(ABI_BASE_DIR, f"{name}.sol", f"{name}.json")
-                    with open(abi_path) as f:
-                        abi = json.load(f)["abi"]
+                    # Загружаем ABI (единый путь загрузки)
+                    abi = load_abi(name)
                         
                     # Создаем контракт
                     contract = self.web3.eth.contract(
@@ -406,6 +402,23 @@ class BlockchainService:
         except Exception as e:
             logger.error(f"Error getting products: {e}")
             return []
+
+    def get_products_by_current_seller_full(self) -> List[tuple]:
+        """
+        Возвращает все товары текущего продавца со структурами Product (id, seller, ipfsCID, active).
+        Использует ProductRegistry.getProductsBySellerFull(), требующий isSeller(msg.sender).
+        """
+        try:
+            products = self._call_contract_read_function(
+                "ProductRegistry",
+                "getProductsBySellerFull",
+                []
+            )
+            logger.info(f"Retrieved {len(products)} seller products (full) from blockchain")
+            return products or []
+        except Exception as e:
+            logger.error(f"Error getProductsBySellerFull: {e}")
+            return []
     
     def get_product(self, product_id: int) -> Optional[dict]:
         """Получает продукт по ID"""
@@ -441,6 +454,39 @@ class BlockchainService:
             logger.error(f"Error creating product: {e}")
             return None
 
+    def product_exists_in_blockchain(self, product_id: int) -> bool:
+        """
+        Проверяет, существует ли продукт с указанным blockchain ID в смарт-контракте.
+        
+        Args:
+            product_id: Blockchain ID продукта для проверки
+            
+        Returns:
+            bool: True если продукт существует в блокчейне, False если нет
+        """
+        try:
+            logger.debug(f"🔗 Проверка существования продукта в блокчейне: ID {product_id}")
+            
+            # Используем getProduct для проверки существования
+            # Если продукт не существует, контракт вернет ошибку "product does not exist"
+            product = self._call_contract_read_function(
+                "ProductRegistry",
+                "getProduct",
+                None,
+                product_id
+            )
+            
+            # Если продукт получен, проверяем что ID не 0 (дополнительная защита)
+            exists = product is not None and product[0] != 0
+            logger.debug(f"🔗 Продукт с blockchain ID {product_id} {'существует' if exists else 'не существует'} в блокчейне")
+            
+            return exists
+            
+        except Exception as e:
+            # Если контракт вернул "product does not exist" или другую ошибку
+            logger.debug(f"🔗 Продукт с blockchain ID {product_id} не существует в блокчейне: {e}")
+            return False
+
     async def set_product_active(self, private_key: str, product_id: int, is_active: bool) -> Optional[str]:
         """
         Устанавливает активность продукта (доступен/не доступен для покупки).
@@ -456,10 +502,13 @@ class BlockchainService:
         logger.info(f"[BlockchainService] Установка активности продукта {product_id}: {is_active}")
         
         if is_active:
-            # В текущем контракте нет функции для активации продукта
-            # Продукты создаются активными по умолчанию
-            logger.warning(f"[BlockchainService] Продукт {product_id} уже активен")
-            return None
+            # Используем новую функцию activateProduct
+            return await self.transact_contract_function(
+                "ProductRegistry",
+                "activateProduct",
+                private_key,
+                product_id
+            )
         else:
             # Используем существующую функцию deactivateProduct
             return await self.transact_contract_function(
@@ -538,40 +587,9 @@ class BlockchainService:
             Optional[list]: ABI контракта или None в случае ошибки
         """
         try:
-            # Проверяем пути для поиска ABI
-            hardhat_path = os.path.join(config.ABI_BASE_DIR, f"{contract_name}.sol/{contract_name}.json")
-            flat_path = os.path.join(config.ABI_BASE_DIR, f"{contract_name}.json")
-            
-            logger.info(f"[ABI] Проверка путей для {contract_name}:")
-            logger.info(f"  - Hardhat: {hardhat_path} {'✅' if os.path.exists(hardhat_path) else '❌'}")
-            logger.info(f"  - Flat:    {flat_path} {'✅' if os.path.exists(flat_path) else '❌'}")
-            
-            # Выбираем существующий путь
-            if os.path.exists(hardhat_path):
-                abi_path = hardhat_path
-            elif os.path.exists(flat_path):
-                abi_path = flat_path
-            else:
-                logger.error(f"[ABI] ABI файл не найден для {contract_name}")
-                return None
-            
-            # Загружаем ABI из файла
-            with open(abi_path, 'r') as f:
-                data = json.load(f)
-                
-            # Логируем структуру файла
-            logger.info(f"[ABI] Загружаем ABI из: {abi_path}")
-            logger.info(f"[ABI] Ключи: {list(data.keys())}")
-            
-            # Получаем ABI из структуры файла
-            if 'abi' in data:
-                abi = data['abi']
-                logger.info(f"[ABI] Кол-во функций: {len(abi)}")
-                logger.info(f"[ABI] Пример функции: {abi[0]}")
-                return abi
-            else:
-                logger.error(f"[ABI] Структура ABI файла некорректна для {contract_name}")
-                return None
+            # Единый способ получения ABI
+            abi = load_abi(contract_name)
+            return abi
                 
         except Exception as e:
             logger.error(f"[ABI] Ошибка загрузки ABI для {contract_name}: {e}")
@@ -622,7 +640,12 @@ class BlockchainService:
             if not contract:
                 logger.error("[Web3] Контракт ProductRegistry не найден")
                 return None
-            logs = contract.events.ProductCreated().process_receipt(receipt)
+            # Безопасная обработка события с защитой от MismatchedABI
+            try:
+                logs = contract.events.ProductCreated().process_receipt(receipt)
+            except Exception as e:
+                logger.error(f"[Web3] Ошибка обработки события ProductCreated: {e}")
+                return None
             for log in logs:
                 product_id = log.args.get("productId")
                 if product_id is not None:

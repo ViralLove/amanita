@@ -28,18 +28,13 @@ class ValidationError(Exception):
         super().__init__(f"{field}: {error}")
 
 def validate_required_fields(data: Dict, required_fields: List[str]) -> None:
-    """Проверка наличия обязательных полей"""
+    """Проверяет наличие обязательных полей"""
     for field in required_fields:
-        if field not in data or not data[field]:
+        if field not in data:
             raise ValidationError(field, "Поле обязательно для заполнения")
 
-def validate_string_length(value: str, max_length: int, field: str) -> None:
-    """Проверка длины строки"""
-    if len(value) > max_length:
-        raise ValidationError(field, f"Превышена максимальная длина {max_length} символов")
-
 def validate_cid(cid: str, field: str) -> None:
-    """Проверка формата CID"""
+    """Валидация IPFS CID"""
     if not re.match(CID_PATTERN, cid):
         raise ValidationError(field, "Неверный формат CID")
 
@@ -81,8 +76,14 @@ def validate_price(price_data: Dict) -> None:
     logger.info("✅ Валидация цены успешна")
 
     # Проверка единиц измерения
-    has_weight = "weight" in price_data and "weight_unit" in price_data
-    has_volume = "volume" in price_data and "volume_unit" in price_data
+    has_weight = ("weight" in price_data and price_data["weight"] is not None and 
+                  "weight_unit" in price_data and price_data["weight_unit"] is not None)
+    has_volume = ("volume" in price_data and price_data["volume"] is not None and 
+                  "volume_unit" in price_data and price_data["volume_unit"] is not None)
+    
+    # Отладочная информация
+    logger.info(f"🔍 Отладка валидации: weight={price_data.get('weight')}, weight_unit={price_data.get('weight_unit')}, volume={price_data.get('volume')}, volume_unit={price_data.get('volume_unit')}")
+    logger.info(f"🔍 has_weight={has_weight}, has_volume={has_volume}")
     
     if has_weight and has_volume:
         raise ValidationError("measurement", "Должен быть указан вес или объем, но не оба")
@@ -109,27 +110,165 @@ def validate_price(price_data: Dict) -> None:
 
 def validate_categories(categories: List[str]) -> None:
     """Валидация категорий"""
+    if not isinstance(categories, list):
+        raise ValidationError("categories", "Категории должны быть списком")
+    
     if not categories:
         raise ValidationError("categories", "Должна быть указана хотя бы одна категория")
-    if len(categories) > MAX_CATEGORIES:
-        raise ValidationError("categories", f"Превышено максимальное количество категорий ({MAX_CATEGORIES})")
-    if not all(isinstance(cat, str) and cat.strip() for cat in categories):
-        raise ValidationError("categories", "Все категории должны быть непустыми строками")
+    
+    for category in categories:
+        if not isinstance(category, str):
+            raise ValidationError("categories", "Каждая категория должна быть строкой")
+        if not category.strip():
+            raise ValidationError("categories", "Категория не может быть пустой")
+        if len(category) < 2 or len(category) > 50:
+            raise ValidationError("categories", "Длина категории должна быть от 2 до 50 символов")
 
-def validate_form(form: str) -> None:
-    """Валидация формы продукта"""
-    if form not in VALID_FORMS:
-        raise ValidationError("form", f"Форма должна быть одной из: {', '.join(VALID_FORMS)}")
+def validate_forms(forms: List[str]) -> None:
+    """Валидация списка форм продукта"""
+    if not isinstance(forms, list):
+        raise ValidationError("forms", "Формы должны быть списком")
+    if not forms:
+        raise ValidationError("forms", "Должна быть указана хотя бы одна форма")
+    for form in forms:
+        if not isinstance(form, str):
+            raise ValidationError("forms", "Каждая форма должна быть строкой")
+        if not form.strip():
+            raise ValidationError("forms", "Форма не может быть пустой")
+        if form not in VALID_FORMS:
+            raise ValidationError("forms", f"Форма '{form}' должна быть одной из: {', '.join(VALID_FORMS)}")
 
-def validate_product_data(data: Dict) -> Dict[str, Union[bool, List[str]]]:
+def validate_organic_component(component: Dict) -> None:
+    """Валидация одного органического компонента"""
+    if not isinstance(component, dict):
+        raise ValidationError("organic_component", "Компонент должен быть словарем")
+    
+    # Проверка обязательных полей
+    required_fields = ["biounit_id", "description_cid", "proportion"]
+    for field in required_fields:
+        if field not in component:
+            raise ValidationError(f"organic_component.{field}", f"Поле {field} обязательно для заполнения")
+        if not component[field] or not str(component[field]).strip():
+            raise ValidationError(f"organic_component.{field}", f"Поле {field} не может быть пустым")
+    
+    # Валидация CID
+    try:
+        validate_cid(component["description_cid"], f"organic_component.description_cid")
+    except ValidationError as e:
+        raise ValidationError(f"organic_component.{e.field}", e.error)
+    
+    # Валидация пропорции
+    proportion = str(component["proportion"])
+    proportion_pattern = r'^(\d+(?:\.\d+)?)(%|g|ml|kg|l|oz|lb|fl_oz)$'
+    
+    if not re.match(proportion_pattern, proportion):
+        raise ValidationError("organic_component.proportion", 
+                           f"Некорректный формат пропорции: {proportion}. "
+                           f"Поддерживаемые форматы: 50%, 100g, 30ml, 25%")
+
+def validate_organic_components(components: List[Dict]) -> None:
+    """Валидация списка органических компонентов"""
+    if not isinstance(components, list):
+        raise ValidationError("organic_components", "Компоненты должны быть списком")
+    
+    if not components:
+        raise ValidationError("organic_components", "Должен быть указан хотя бы один компонент")
+    
+    # Валидация каждого компонента
+    for i, component in enumerate(components):
+        try:
+            validate_organic_component(component)
+        except ValidationError as e:
+            # Добавляем индекс компонента к ошибке
+            raise ValidationError(f"organic_components[{i}].{e.field}", e.error)
+    
+    # Проверка уникальности biounit_id
+    biounit_ids = [comp["biounit_id"] for comp in components]
+    if len(biounit_ids) != len(set(biounit_ids)):
+        raise ValidationError("organic_components", "biounit_id должен быть уникальным для каждого компонента")
+    
+    # Валидация пропорций
+    validate_component_proportions(components)
+
+async def validate_organic_components_with_ipfs(components: List[Dict], storage_service) -> None:
+    """Валидация списка органических компонентов с проверкой существования в IPFS"""
+    # Сначала базовая валидация
+    validate_organic_components(components)
+    
+    # Проверка существования всех description_cid в IPFS
+    for i, component in enumerate(components):
+        description_cid = component["description_cid"]
+        try:
+            description_data = await storage_service.download_json_async(description_cid)
+            if description_data is None:
+                raise ValidationError(f"organic_components[{i}].description_cid", 
+                                   f"Описание с CID {description_cid} не найдено в IPFS")
+        except Exception as e:
+            raise ValidationError(f"organic_components[{i}].description_cid", 
+                               f"Ошибка при проверке существования описания {description_cid}: {str(e)}")
+
+def validate_component_proportions(components: List[Dict]) -> None:
+    """Валидация корректности пропорций компонентов"""
+    if not components:
+        return
+    
+    # Определяем тип пропорций
+    first_proportion = str(components[0]["proportion"])
+    proportion_type = None
+    
+    if first_proportion.endswith('%'):
+        proportion_type = 'percentage'
+    elif any(first_proportion.endswith(unit) for unit in ['g', 'kg', 'oz', 'lb']):
+        proportion_type = 'weight'
+    elif any(first_proportion.endswith(unit) for unit in ['ml', 'l', 'fl_oz']):
+        proportion_type = 'volume'
+    else:
+        raise ValidationError("organic_components", "Неподдерживаемый тип пропорции")
+    
+    # Проверяем, что все компоненты имеют одинаковый тип
+    for i, component in enumerate(components):
+        proportion = str(component["proportion"])
+        if proportion_type == 'percentage' and not proportion.endswith('%'):
+            raise ValidationError(f"organic_components[{i}].proportion", 
+                               "Все компоненты должны иметь одинаковый тип пропорции")
+        elif proportion_type == 'weight' and not any(proportion.endswith(unit) for unit in ['g', 'kg', 'oz', 'lb']):
+            raise ValidationError(f"organic_components[{i}].proportion", 
+                               "Все компоненты должны иметь одинаковый тип пропорции")
+        elif proportion_type == 'volume' and not any(proportion.endswith(unit) for unit in ['ml', 'l', 'fl_oz']):
+            raise ValidationError(f"organic_components[{i}].proportion", 
+                               "Все компоненты должны иметь одинаковый тип пропорции")
+    
+    # Для процентных пропорций проверяем, что сумма = 100%
+    if proportion_type == 'percentage':
+        total_percentage = 0
+        for component in components:
+            proportion_value = float(str(component["proportion"]).rstrip('%'))
+            total_percentage += proportion_value
+        
+        if abs(total_percentage - 100.0) > 0.01:  # Допуск 0.01%
+            raise ValidationError("organic_components", 
+                               f"Сумма процентных пропорций должна быть 100%, текущая сумма: {total_percentage}%")
+    
+    # Для весовых/объемных пропорций проверяем, что все > 0
+    elif proportion_type in ['weight', 'volume']:
+        for i, component in enumerate(components):
+            proportion_value = float(str(component["proportion"])[:-2] if str(component["proportion"])[-2:].isalpha() else str(component["proportion"])[:-1])
+            if proportion_value <= 0:
+                raise ValidationError(f"organic_components[{i}].proportion", 
+                                   "Пропорция должна быть положительной")
+
+async def validate_product_data(data: Dict, storage_service=None) -> Dict[str, Union[bool, List[str]]]:
     """
     Комплексная валидация данных продукта.
+    Если передан storage_service, дополнительно проверяет существование description_cid в IPFS.
     Возвращает словарь с результатом валидации и списком ошибок.
     """
     errors = []
     try:
-        # Проверка обязательных полей
-        required_fields = ["id", "title", "description_cid", "categories", "cover_image", "form", "species", "prices"]
+        # Проверка обязательных полей - новый формат с компонентами
+        required_fields = ["id", "title", "organic_components", "categories", "cover_image", "forms", "species", "prices"]
+        
+        # Проверяем обязательные поля
         for field in required_fields:
             if field not in data:
                 errors.append(f"{field}: Поле обязательно для заполнения")
@@ -141,18 +280,40 @@ def validate_product_data(data: Dict) -> Dict[str, Union[bool, List[str]]]:
                 "errors": errors
             }
 
+        # Проверка типов данных
+        if not isinstance(data["title"], str):
+            errors.append("title: Должно быть строкой")
+        if not isinstance(data["cover_image"], str):
+            errors.append("cover_image: Должно быть строкой")
+        if not isinstance(data["forms"], list):
+            errors.append("forms: Должно быть списком")
+        if not isinstance(data["species"], str):
+            errors.append("species: Должно быть строкой")
+        if not isinstance(data["categories"], list):
+            errors.append("categories: Должно быть списком")
+        
+        # Проверка типа organic_components
+        if not isinstance(data["organic_components"], list):
+            errors.append("organic_components: Должно быть списком")
+
         # Проверка пустых значений (кроме списков и цен)
         for field in required_fields:
-            if field not in ["categories", "prices"] and not data[field]:
-                errors.append(f"{field}: Поле не может быть пустым")
+            if field not in ["categories", "prices", "forms", "organic_components"]:
+                # Для строковых полей проверяем на пустоту и None
+                if field in ["id", "title", "cover_image", "species"]:
+                    if data[field] is None or (isinstance(data[field], str) and not data[field].strip()):
+                        errors.append(f"{field}: Поле не может быть пустым")
+                # Для остальных полей используем стандартную проверку
+                elif not data[field]:
+                    errors.append(f"{field}: Поле не может быть пустым")
 
         # Валидация строковых полей
         if len(data["title"]) > MAX_TITLE_LENGTH:
             errors.append(f"title: Превышена максимальная длина {MAX_TITLE_LENGTH} символов")
         
-        # Валидация CID
+        # Валидация компонентов (включает валидацию CID)
         try:
-            validate_cid(data["description_cid"], "description_cid")
+            validate_organic_components(data["organic_components"])
         except ValidationError as e:
             errors.append(f"{e.field}: {e.error}")
             
@@ -167,9 +328,9 @@ def validate_product_data(data: Dict) -> Dict[str, Union[bool, List[str]]]:
         except ValidationError as e:
             errors.append(f"{e.field}: {e.error}")
         
-        # Валидация формы
+        # Валидация форм
         try:
-            validate_form(data["form"])
+            validate_forms(data["forms"])
         except ValidationError as e:
             errors.append(f"{e.field}: {e.error}")
         
@@ -182,6 +343,13 @@ def validate_product_data(data: Dict) -> Dict[str, Union[bool, List[str]]]:
                     validate_price(price)
                 except ValidationError as e:
                     errors.append(f"prices[{i}].{e.field}: {e.error}")
+        
+        # Дополнительная IPFS валидация компонентов, если передан storage_service
+        if storage_service and "organic_components" in data:
+            try:
+                await validate_organic_components_with_ipfs(data["organic_components"], storage_service)
+            except ValidationError as e:
+                errors.append(f"{e.field}: {e.error}")
 
     except Exception as e:
         errors.append(f"Неожиданная ошибка: {str(e)}")
@@ -199,9 +367,13 @@ def sanitize_product_data(data: Dict) -> Dict:
     sanitized = data.copy()
     
     # Очистка строковых полей
-    for field in ["id", "title", "form", "species"]:
+    for field in ["id", "title", "species"]:
         if field in sanitized:
             sanitized[field] = str(sanitized[field]).strip()
+    
+    # Очистка форм
+    if "forms" in sanitized:
+        sanitized["forms"] = [form.strip() for form in sanitized["forms"] if form.strip()]
     
     # Очистка категорий
     if "categories" in sanitized:

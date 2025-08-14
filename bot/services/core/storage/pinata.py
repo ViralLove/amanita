@@ -19,6 +19,13 @@ import hashlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import tempfile
 
+# Импорт типизированных исключений
+from .exceptions import (
+    StorageError, StorageAuthError, StoragePermissionError, StorageRateLimitError,
+    StorageNotFoundError, StorageValidationError, StorageTimeoutError, StorageNetworkError,
+    StorageConfigError, StorageProviderError, create_storage_error_from_http_response, create_storage_error_from_exception
+)
+
 logger = logging.getLogger(__name__)
 
 def retry_with_backoff(retries=3, backoff_in_seconds=1):
@@ -261,11 +268,11 @@ class SecurePinataCache:
 class SecurePinataUploader:
     """Улучшенная версия PinataUploader с дополнительными мерами безопасности"""
     
-    # Константы для настройки запросов
-    MAX_RETRIES = 5  # Увеличиваем количество попыток
-    INITIAL_BACKOFF = 2  # Увеличиваем начальную задержку
-    REQUEST_TIMEOUT = 30
-    REQUEST_DELAY = 2.0  # Увеличиваем задержку между запросами
+    # Константы для настройки запросов - УВЕЛИЧЕНЫ для решения rate limiting
+    MAX_RETRIES = 10  # Увеличиваем количество попыток для стабильности
+    INITIAL_BACKOFF = 5  # Увеличиваем начальную задержку для Pinata API
+    REQUEST_TIMEOUT = 60  # Увеличиваем таймаут для медленных соединений
+    REQUEST_DELAY = 10.0  # Увеличиваем задержку между запросами до 10 секунд (Pinata recommendation)
     MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
     
     # Разрешенные MIME типы
@@ -282,8 +289,12 @@ class SecurePinataUploader:
         load_dotenv()
         self.api_key = os.getenv("PINATA_API_KEY")
         self.secret_api_key = os.getenv("PINATA_API_SECRET")
-        if not self.api_key or not self.secret_api_key:
-            raise ValueError("Pinata API credentials are missing in .env")
+        
+        # Проверка конфигурации с типизированными исключениями
+        if not self.api_key:
+            raise StorageConfigError("Pinata API key is missing", missing_key="PINATA_API_KEY")
+        if not self.secret_api_key:
+            raise StorageConfigError("Pinata API secret is missing", missing_key="PINATA_API_SECRET")
         
         # Заголовки для API запросов
         self.base_headers = {
@@ -300,25 +311,35 @@ class SecurePinataUploader:
         self._last_request_time = 0
         self.cache = SecurePinataCache(cache_file)
         self.metrics = PinataMetrics()
+        
+        # Circuit breaker для предотвращения каскадных сбоев
+        self._consecutive_errors = 0
+        self._circuit_breaker_threshold = 5  # Максимум 5 ошибок подряд
+        self._circuit_breaker_timeout = 300  # 5 минут блокировки
+        self._circuit_breaker_last_failure = 0
+        self._circuit_breaker_open = False
     
     def validate_file(self, file_path: str):
         """Проверяет файл на соответствие ограничениям"""
         # Проверка существования файла
         if not os.path.exists(file_path):
-            raise ValueError(f"Файл не существует: {file_path}")
+            raise StorageValidationError(f"Файл не существует: {file_path}", field="file_path")
             
         # Проверка размера
         size = os.path.getsize(file_path)
         if size > self.MAX_FILE_SIZE:
-            raise ValueError(f"Файл слишком большой: {size} байт (максимум {self.MAX_FILE_SIZE} байт)")
+            raise StorageValidationError(
+                f"Файл слишком большой: {size} байт (максимум {self.MAX_FILE_SIZE} байт)", 
+                field="file_size"
+            )
         
         # Проверка MIME типа
         mime_type, _ = mimetypes.guess_type(file_path)
         if not mime_type:
-            raise ValueError(f"Невозможно определить тип файла: {file_path}")
+            raise StorageValidationError(f"Невозможно определить тип файла: {file_path}", field="mime_type")
         
         if mime_type not in self.ALLOWED_MIME_TYPES:
-            raise ValueError(f"Неподдерживаемый тип файла: {mime_type}")
+            raise StorageValidationError(f"Неподдерживаемый тип файла: {mime_type}", field="mime_type")
     
     def calculate_file_hash(self, file_path: str) -> str:
         """Вычисляет SHA-256 хеш файла"""
@@ -329,19 +350,56 @@ class SecurePinataUploader:
         return sha256_hash.hexdigest()
     
     def _wait_for_rate_limit(self):
-        """Простой rate limiting с фиксированной задержкой"""
-        current_time = time.time()
-        time_since_last = current_time - self._last_request_time
-        if time_since_last < self.REQUEST_DELAY:
-            sleep_time = self.REQUEST_DELAY - time_since_last
-            logger.debug(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
-            time.sleep(sleep_time)
+        """Улучшенный rate limiting с jitter для предотвращения thundering herd"""
+        # Базовая задержка согласно Pinata API рекомендациям
+        base_delay = self.REQUEST_DELAY
+        
+        # Добавляем jitter (случайность) для предотвращения одновременных запросов
+        jitter = random.uniform(0.5, 2.0)  # Случайность 0.5-2 секунды
+        total_delay = base_delay + jitter
+        
+        logger.info(f"[Pinata] Rate limiting: ожидание {total_delay:.2f}s (базовая: {base_delay}s + jitter: {jitter:.2f}s)")
+        time.sleep(total_delay)
+        
+        # Обновляем время последнего запроса
         self._last_request_time = time.time()
+    
+    def _check_circuit_breaker(self):
+        """Проверяет состояние circuit breaker"""
+        if self._circuit_breaker_open:
+            current_time = time.time()
+            if current_time - self._circuit_breaker_last_failure > self._circuit_breaker_timeout:
+                logger.info("[Pinata] Circuit breaker: переход в полуоткрытое состояние")
+                self._circuit_breaker_open = False
+                self._consecutive_errors = 0
+            else:
+                raise StorageRateLimitError(
+                    f"Circuit breaker открыт. Повторите через {self._circuit_breaker_timeout - (current_time - self._circuit_breaker_last_failure):.0f} секунд",
+                    retry_after=self._circuit_breaker_timeout
+                )
+    
+    def _record_success(self):
+        """Записывает успешную операцию"""
+        self._consecutive_errors = 0
+        self._circuit_breaker_open = False
+    
+    def _record_error(self):
+        """Записывает ошибку и проверяет circuit breaker"""
+        self._consecutive_errors += 1
+        self._circuit_breaker_last_failure = time.time()
+        
+        if self._consecutive_errors >= self._circuit_breaker_threshold:
+            self._circuit_breaker_open = True
+            logger.error(f"[Pinata] Circuit breaker открыт после {self._consecutive_errors} ошибок подряд")
     
     @retry_with_backoff(retries=MAX_RETRIES, backoff_in_seconds=INITIAL_BACKOFF)
     def _make_request(self, method: str, url: str, **kwargs) -> requests.Response:
         """Выполняет HTTP запрос с учетом ограничений и авторизации"""
         start_time = time.time()
+        
+        # Проверяем circuit breaker перед выполнением запроса
+        self._check_circuit_breaker()
+        
         try:
             self._wait_for_rate_limit()
             
@@ -359,18 +417,44 @@ class SecurePinataUploader:
                 **kwargs
             )
             
-            if response.status_code == 401:
-                logger.error("Ошибка авторизации в Pinata API")
-                self.metrics.track_error("auth_error")
-                raise requests.exceptions.HTTPError("Unauthorized", response=response)
+            # Проверяем статус код и создаем соответствующие исключения
+            if response.status_code != 200:
+                # Записываем ошибку для circuit breaker
+                self._record_error()
+                
+                provider = "pinata" if url.startswith(self.api_url) else "gateway"
+                error = create_storage_error_from_http_response(
+                    response.status_code, 
+                    f"HTTP {response.status_code} error", 
+                    provider
+                )
+                logger.error(f"HTTP error {response.status_code}: {error}")
+                self.metrics.track_error(f"http_{response.status_code}")
+                raise error
             
-            response.raise_for_status()
+            # Записываем успешную операцию для circuit breaker
+            self._record_success()
+            
             return response
             
-        except Exception as e:
-            error_type = type(e).__name__
-            self.metrics.track_error(error_type)
+        except requests.exceptions.Timeout:
+            error = StorageTimeoutError("Request timeout", provider="pinata", timeout=timeout)
+            logger.error(f"Request timeout: {error}")
+            self.metrics.track_error("timeout")
+            raise error
+        except requests.exceptions.ConnectionError as e:
+            error = StorageNetworkError("Connection error", provider="pinata", original_error=e)
+            logger.error(f"Connection error: {error}")
+            self.metrics.track_error("connection_error")
+            raise error
+        except StorageError:
+            # Перебрасываем уже созданные StorageError исключения
             raise
+        except Exception as e:
+            error = create_storage_error_from_exception(e, provider="pinata")
+            logger.error(f"Unexpected error: {error}")
+            self.metrics.track_error("unexpected_error")
+            raise error
         finally:
             duration = time.time() - start_time
             if method == 'POST':  # Только для загрузок
@@ -414,6 +498,10 @@ class SecurePinataUploader:
         try:
             logger.info("Начинаем загрузку текстовых данных в IPFS")
             
+            # Валидация входных данных
+            if not data:
+                raise StorageValidationError("Data cannot be empty", field="data")
+            
             # Подготовка данных
             if isinstance(data, str):
                 try:
@@ -451,12 +539,16 @@ class SecurePinataUploader:
             else:
                 logger.error(f"Не удалось получить CID из ответа: {result}")
                 self.metrics.track_error("missing_cid")
-                return None
+                raise StorageProviderError("No CID in response", provider="pinata")
                 
+        except StorageError:
+            # Перебрасываем уже созданные StorageError исключения
+            raise
         except Exception as e:
-            logger.error(f"Ошибка при загрузке в IPFS: {e}\n{traceback.format_exc()}")
+            error = create_storage_error_from_exception(e, provider="pinata")
+            logger.error(f"Ошибка при загрузке в IPFS: {error}")
             self.metrics.track_error("upload_error")
-            return None
+            raise error
     
     def upload_file(self, file_path_or_data: Union[str, dict], file_name: Optional[str] = None) -> str:
         """Загружает файл или данные в IPFS"""
@@ -499,20 +591,28 @@ class SecurePinataUploader:
                     else:
                         logger.error(f"Не удалось получить CID из ответа: {result}")
                         self.metrics.track_error("missing_cid")
-                        return None
+                        raise StorageProviderError("No CID in response", provider="pinata")
             else:
                 # Если переданы данные вместо пути к файлу
                 logger.info("Обнаружены данные вместо пути к файлу, используем upload_text")
                 return self.upload_text(file_path_or_data, file_name)
                     
+        except StorageError:
+            # Перебрасываем уже созданные StorageError исключения
+            raise
         except Exception as e:
-            logger.error(f"Ошибка при загрузке в IPFS: {e}\n{traceback.format_exc()}")
+            error = create_storage_error_from_exception(e, provider="pinata")
+            logger.error(f"Ошибка при загрузке в IPFS: {error}")
             self.metrics.track_error("upload_error")
-            return None
+            raise error
     
     def download_json(self, cid: str) -> Optional[Dict]:
         """Загружает JSON данные из IPFS"""
         try:
+            # Валидация CID
+            if not cid:
+                raise StorageValidationError("CID cannot be empty", field="cid")
+            
             if cid.startswith("ipfs://"):
                 cid = cid.replace("ipfs://", "")
                 
@@ -528,21 +628,25 @@ class SecurePinataUploader:
                     result = response.json()
                     logger.info(f"Successfully downloaded JSON from {url}, result type: {type(result)}")
                     return result
-                except requests.exceptions.HTTPError as e:
-                    if e.response.status_code == 429:  # Too Many Requests
-                        if attempt == self.MAX_RETRIES - 1:
-                            raise
-                        sleep = (self.INITIAL_BACKOFF * 2 ** attempt +
-                               random.uniform(0, 1))
-                        logger.warning(f"Rate limit hit, waiting {sleep:.2f} seconds...")
-                        time.sleep(sleep)
-                        continue
+                except StorageRateLimitError:
+                    if attempt == self.MAX_RETRIES - 1:
+                        raise
+                    sleep = (self.INITIAL_BACKOFF * 2 ** attempt + random.uniform(0, 1))
+                    logger.warning(f"Rate limit hit, waiting {sleep:.2f} seconds...")
+                    time.sleep(sleep)
+                    continue
+                except StorageError:
+                    # Перебрасываем другие StorageError исключения
                     raise
                 
+        except StorageError:
+            # Перебрасываем уже созданные StorageError исключения
+            raise
         except Exception as e:
-            logger.error(f"Ошибка при скачивании JSON для CID {cid}: {e}\n{traceback.format_exc()}")
+            error = create_storage_error_from_exception(e, provider="pinata")
+            logger.error(f"Ошибка при скачивании JSON для CID {cid}: {error}")
             self.metrics.track_error("download_error")
-            return None
+            raise error
     
     def get_gateway_url(self, cid: str) -> str:
         """Возвращает URL для доступа к файлу через gateway"""
@@ -587,10 +691,11 @@ class SecurePinataUploader:
         
         return results
 
-    async def upload_json(self, data: dict) -> Optional[str]:
+    async def upload_json(self, data: dict) -> str:
         """
         Асинхронная загрузка JSON данных в IPFS
         """
+        temp_file_path = None
         try:
             # Создаем временный файл
             with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as temp_file:
@@ -619,13 +724,22 @@ class SecurePinataUploader:
             # Обновляем кэш
             if cid:
                 self.cache.update_file(file_hash, cid, {'name': file_hash})
+                return cid
+            else:
+                raise StorageProviderError("Failed to upload JSON file", provider="pinata")
             
-            return cid
-            
+        except StorageError:
+            # Перебрасываем уже созданные StorageError исключения
+            raise
         except Exception as e:
-            logger.error(f"Error uploading JSON to IPFS: {str(e)}")
-            return None
+            error = create_storage_error_from_exception(e, provider="pinata")
+            logger.error(f"Ошибка при асинхронной загрузке JSON в IPFS: {error}")
+            self.metrics.track_error("async_upload_error")
+            raise error
         finally:
             # Удаляем временный файл
-            if 'temp_file_path' in locals():
-                os.unlink(temp_file_path)
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                except Exception as e:
+                    logger.warning(f"Не удалось удалить временный файл {temp_file_path}: {e}")

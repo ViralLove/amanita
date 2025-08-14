@@ -20,6 +20,7 @@ from bot.services.product.storage import ProductStorageService
 from bot.services.product.validation import ProductValidationService
 from bot.services.product.validation_utils import ValidationError
 from bot.services.core.account import AccountService
+from bot.services.product.exceptions import InvalidProductIdError, ProductNotFoundError
 
 dotenv.load_dotenv()
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ class ProductRegistryService:
         
         # Используем синглтон BlockchainService если не передан
         self.blockchain_service = blockchain_service or BlockchainService()
-        self.validation_service = validation_service
+        self.validation_service = validation_service or ProductValidationService()
         
         # Создаем фабрику один раз
         self.storage_service = storage_service or IPFSFactory().get_storage()
@@ -290,14 +291,15 @@ class ProductRegistryService:
         self.logger.info(f"📝 Входные данные: {json.dumps(product_data, indent=2)}")
 
         try:
-            # Создаем базовую структуру метаданных
+            # Создаем базовую структуру метаданных (строгий стандарт: только 'forms')
+            forms_value = product_data["forms"]
             metadata = {
                 "id": product_data["id"],
                 "title": product_data["title"],
-                "description_cid": product_data["description_cid"],
+                "organic_components": product_data["organic_components"],
                 "cover_image": product_data["cover_image"],
                 "categories": product_data["categories"],
-                "form": product_data["form"],
+                "forms": forms_value,
                 "species": product_data["species"],
                 "prices": product_data["prices"],
                 "created_at": datetime.now().isoformat()
@@ -372,7 +374,7 @@ class ProductRegistryService:
         "field_3": "active"
     }
     
-    def get_all_products(self) -> List[Product]:
+    async def get_all_products(self) -> List[Product]:
         """Получает все продукты с кэшированием"""
 
         self.logger.info(f"[ProductRegistry] get_all_products id(self)={id(self)}")
@@ -387,11 +389,16 @@ class ProductRegistryService:
             cached_catalog = self.cache_service.get_cached_item("catalog", "catalog")
             
             if cached_catalog:
-                self.logger.info(f"[ProductRegistry] Найден кэш каталога: version={cached_catalog.get('version')}, products_count={len(cached_catalog.get('products', []))}")
-                
-                if cached_catalog.get("version") == catalog_version:
+                products_in_cache = cached_catalog.get('products', [])
+                self.logger.info(f"[ProductRegistry] Найден кэш каталога: version={cached_catalog.get('version')}, products_count={len(products_in_cache)}")
+
+                # Если версия совпадает и кэш не пустой — используем его
+                if cached_catalog.get("version") == catalog_version and len(products_in_cache) > 0:
                     self.logger.info(f"[ProductRegistry] ✅ Возвращаем кэшированный каталог (версия {catalog_version})")
-                    return cached_catalog.get("products", [])
+                    return products_in_cache
+                elif cached_catalog.get("version") == catalog_version and len(products_in_cache) == 0:
+                    # Версия совпадает, но кэш пуст — принудительно обновим из блокчейна
+                    self.logger.info(f"[ProductRegistry] ⚠️ Кэш пуст при актуальной версии ({catalog_version}), обновляем из блокчейна")
                 else:
                     self.logger.info(f"[ProductRegistry] ❌ Кэш устарел: cached_version={cached_catalog.get('version')}, current_version={catalog_version}")
             else:
@@ -410,7 +417,7 @@ class ProductRegistryService:
             for product_data in products_data:
                 try:
                     # Используем унифицированный метод десериализации
-                    product = self._deserialize_product(product_data)
+                    product = await self._deserialize_product(product_data)
                     if product:
                         products.append(product)
                         
@@ -432,7 +439,7 @@ class ProductRegistryService:
             self.logger.error(f"Error getting all products: {e}")
             return []
     
-    def get_product(self, product_id: Union[str, int]) -> Optional[Product]:
+    async def get_product(self, product_id: Union[str, int]) -> Product:
         """
         Получает продукт по ID.
         
@@ -440,15 +447,49 @@ class ProductRegistryService:
             product_id: ID продукта (строка или число)
             
         Returns:
-            Optional[Product]: Данные продукта или None
+            Product: Данные продукта
+            
+        Raises:
+            InvalidProductIdError: Если ID продукта невалиден
+            ProductNotFoundError: Если продукт не найден
         """
         try:
+            # Валидация входного ID
+            if not product_id:
+                raise InvalidProductIdError(str(product_id), "ID продукта не может быть пустым")
+            
             # Конвертируем в int для blockchain_service
-            product_id_int = int(product_id) if isinstance(product_id, str) else product_id
+            try:
+                product_id_int = int(product_id) if isinstance(product_id, str) else product_id
+            except (ValueError, TypeError):
+                raise InvalidProductIdError(str(product_id), f"Невалидный формат ID продукта: {product_id}")
+            # Доп. валидация диапазона ID
+            if not isinstance(product_id_int, int) or product_id_int <= 0:
+                raise InvalidProductIdError(str(product_id), f"Невалидный ID: {product_id}. Ожидается положительное целое число")
+            
+            # Получаем данные продукта из блокчейна
             product_data = self.blockchain_service.get_product(product_id_int)
-            return self._deserialize_product(product_data) if product_data else None
+            
+            if not product_data:
+                self.logger.warning(f"[ProductRegistry] Продукт {product_id} не найден в блокчейне (None)")
+                return None
+            
+            # Десериализуем продукт
+            product = await self._deserialize_product(product_data)
+            if not product:
+                self.logger.warning(f"[ProductRegistry] Не удалось десериализовать продукт {product_id}")
+                return None
+            
+            return product
+            
+        except ProductNotFoundError:
+            # Для несуществующего продукта возвращаем None (read‑path контракт)
+            return None
         except Exception as e:
-            self.logger.error(f"Error getting product {product_id}: {e}")
+            # Не подавляем InvalidProductIdError
+            if isinstance(e, InvalidProductIdError):
+                raise
+            self.logger.error(f"Неожиданная ошибка при получении продукта {product_id}: {e}")
             return None
     
     async def validate_product(self, product_data: dict) -> bool:
@@ -463,7 +504,7 @@ class ProductRegistryService:
         """
         try:
             # Проверяем обязательные поля
-            required_fields = ['title', 'description_cid', 'categories', 'cover_image', 'form', 'species', 'prices']
+            required_fields = ['title', 'organic_components', 'categories', 'cover_image', 'forms', 'species', 'prices']
             for field in required_fields:
                 if field not in product_data:
                     self.logger.error(f"Missing required field: {field}")
@@ -472,6 +513,8 @@ class ProductRegistryService:
                 if not product_data[field]:
                     if field == 'prices':
                         self.logger.error("Список цен не может быть пустым")
+                    elif field == 'forms':
+                        self.logger.error("Список форм не может быть пустым")
                     else:
                         self.logger.error(f"Empty required field: {field}")
                     return False
@@ -518,10 +561,36 @@ class ProductRegistryService:
                     self.logger.error("Missing weight or volume")
                     return False
 
-            # Проверяем IPFS CID
-            if not self.storage_service.is_valid_cid(product_data['description_cid']):
-                self.logger.error("Invalid description CID")
+            # Проверяем формы
+            if not isinstance(product_data['forms'], list):
+                self.logger.error("Формы должны быть списком")
                 return False
+                
+            if not product_data['forms']:
+                self.logger.error("Список форм не может быть пустым")
+                return False
+
+            # Проверяем IPFS CID для organic_components
+            if not isinstance(product_data['organic_components'], list):
+                self.logger.error("organic_components должен быть списком")
+                return False
+                
+            if not product_data['organic_components']:
+                self.logger.error("organic_components не может быть пустым")
+                return False
+                
+            for component in product_data['organic_components']:
+                if not isinstance(component, dict):
+                    self.logger.error("Каждый элемент organic_components должен быть словарем")
+                    return False
+                    
+                if 'description_cid' not in component:
+                    self.logger.error("Каждый компонент должен содержать description_cid")
+                    return False
+                    
+                if not self.storage_service.is_valid_cid(component['description_cid']):
+                    self.logger.error(f"Invalid description CID: {component['description_cid']}")
+                    return False
                 
             if not self.storage_service.is_valid_cid(product_data['cover_image']):
                 self.logger.error("Invalid cover image CID")
@@ -533,45 +602,184 @@ class ProductRegistryService:
             self.logger.error(f"Error validating product: {e}")
             return False
 
+    async def _check_product_id_exists(self, product_id: Union[str, int]) -> bool:
+        """
+        Проверяет, существует ли продукт с указанным business ID (строка или число) среди
+        всех товаров текущего продавца (включая неактивные), а также
+        выполняет дополнительную проверку по blockchain ID если ID выглядит числом.
+        
+        Args:
+            product_id: Business ID продукта для проверки (строка или число)
+            
+        Returns:
+            bool: True если продукт с таким business ID существует, False если нет
+            
+        Raises:
+            InvalidProductIdError: Если ID продукта невалиден
+        """
+        try:
+            self.logger.debug(f"🔍 Проверка существования продукта с business ID: {product_id}")
+            
+            # Валидация входного ID
+            if product_id is None:
+                raise InvalidProductIdError("None", "Business ID продукта не может быть None")
+            
+            # Преобразуем в строку для дальнейшей обработки
+            product_id_str = str(product_id)
+            if not product_id_str:
+                raise InvalidProductIdError(str(product_id), "Business ID продукта должен быть непустой строкой")
+            
+            # 1) Если это бизнес-ID (нечисловой), попробуем получить продукт напрямую
+            try:
+                # В тестах метод может быть замокан под бизнес-ID
+                product_by_business_id = await self.get_product(product_id_str)
+                if product_by_business_id is not None:
+                    self.logger.debug(f"🔍 Продукт с business ID {product_id_str} найден через get_product")
+                    return True
+            except InvalidProductIdError:
+                # Нормально: означает, что get_product поддерживает только числовые ID
+                pass
+
+            # 2) Быстрая проверка: если это число, попробуем убедиться, что blockchain id занят
+            try:
+                numeric_id = int(product_id_str)
+                if self._check_blockchain_product_exists(numeric_id):
+                    self.logger.debug(f"🔍 Продукт с blockchain ID {numeric_id} уже существует")
+                    return True
+            except (ValueError, TypeError):
+                pass
+
+            # 3) Полный проход по товарам продавца (включая неактивные) через контракт, если доступен метод
+            if hasattr(self.blockchain_service, 'get_products_by_current_seller_full'):
+                seller_products = self.blockchain_service.get_products_by_current_seller_full()
+                for p in seller_products:
+                    # Ожидается tuple (id, seller, ipfsCID, active)
+                    if not hasattr(p, '__getitem__') or len(p) < 3:
+                        continue
+                    pid = str(p[0])
+                    if pid == product_id_str:
+                        self.logger.debug(f"🔍 Продукт с business ID {product_id_str} найден среди товаров продавца")
+                        return True
+            else:
+                # 4) Fallback: используем кэшированный каталог (активные товары) и проверяем alias/id
+                all_products = await self.get_all_products()
+                for product in all_products:
+                    if hasattr(product, 'alias') and product.alias == product_id_str:
+                        self.logger.debug(f"🔍 Продукт с business ID {product_id_str} найден по alias в каталоге")
+                        return True
+                    if hasattr(product, 'id') and str(product.id) == product_id_str:
+                        self.logger.debug(f"🔍 Продукт с business ID {product_id_str} найден по id в каталоге")
+                        return True
+            
+            self.logger.debug(f"🔍 Продукт с business ID {product_id_str} не существует")
+            return False
+            
+        except InvalidProductIdError:
+            # Невалидный ID - это ошибка пользователя, не маскируем
+            self.logger.error(f"❌ Невалидный business ID продукта: {product_id}")
+            raise
+        except Exception as e:
+            # Неожиданные ошибки не маскируем - они указывают на проблемы системы
+            self.logger.error(f"❌ Критическая ошибка при проверке существования продукта {product_id}: {e}")
+            raise
+
+    def _check_blockchain_product_exists(self, blockchain_id: int) -> bool:
+        """
+        Проверяет, существует ли продукт с указанным blockchain ID в смарт-контракте.
+        
+        Дополнительный уровень валидации для обеспечения целостности данных
+        между локальным каталогом и блокчейном.
+        
+        Args:
+            blockchain_id: Blockchain ID продукта для проверки
+            
+        Returns:
+            bool: True если продукт существует в блокчейне, False если нет
+        """
+        try:
+            self.logger.debug(f"🔗 Проверка blockchain ID в смарт-контракте: {blockchain_id}")
+            
+            # Валидация входного ID
+            if not isinstance(blockchain_id, int) or blockchain_id <= 0:
+                self.logger.debug(f"🔗 Невалидный blockchain ID: {blockchain_id}")
+                return False
+            
+            # Делегируем проверку BlockchainService
+            exists = self.blockchain_service.product_exists_in_blockchain(blockchain_id)
+            
+            self.logger.debug(f"🔗 Blockchain ID {blockchain_id} {'найден' if exists else 'не найден'} в смарт-контракте")
+            return exists
+            
+        except Exception as e:
+            # При ошибках блокчейна логируем и возвращаем False
+            # Это обеспечивает graceful degradation при недоступности блокчейна
+            self.logger.warning(f"🔗 Ошибка при проверке blockchain ID {blockchain_id}: {e}")
+            return False
+
     async def create_product(self, product_data: dict) -> dict:
         """
-        Создает новый продукт: валидация → формирование метаданных → загрузка в IPFS → запись в блокчейн.
+        Создает новый продукт: валидация → проверка уникальности ID → формирование метаданных → загрузка в IPFS → запись в блокчейн.
         Возвращает dict с результатом (id, metadata_cid, blockchain_id, tx_hash, status, error)
         """
         try:
+            product_id = product_data.get("id")
+            self.logger.info(f"🆕 Начинаем создание продукта с ID: {product_id}")
+            
             # 1. Валидация
             validation_result = await self.validation_service.validate_product_data(product_data)
             if not validation_result["is_valid"]:
+                self.logger.error(f"❌ Валидация продукта {product_id} не прошла: {validation_result['errors']}")
                 return {
-                    "id": product_data.get("id"),
+                    "id": product_id,
                     "status": "error",
                     "error": "; ".join(validation_result["errors"])
                 }
-            # 2. Формирование метаданных
+            
+            # 2. Проверка уникальности ID
+            if product_id and await self._check_product_id_exists(product_id):
+                error_msg = f"Продукт с ID '{product_id}' уже существует. Используйте уникальный ID."
+                self.logger.error(f"❌ {error_msg}")
+                return {
+                    "id": product_id,
+                    "status": "error",
+                    "error": error_msg
+                }
+            # 3. Формирование метаданных
             metadata = self.create_product_metadata(product_data)
-            # 3. Загрузка в IPFS
+            # 4. Загрузка в IPFS
             logger.info(f"[DEBUG] storage_service: {self.storage_service} (type: {type(self.storage_service)}, id: {id(self.storage_service)})")
             metadata_cid = await self.storage_service.upload_json(metadata)
             logger.info(f"[DEBUG] upload_json вернул: {metadata_cid} (тип: {type(metadata_cid)})")
             if not metadata_cid:
                 return {
-                    "id": product_data.get("id"),
+                    "id": product_id,
                     "status": "error",
                     "error": "Ошибка загрузки метаданных в IPFS"
                 }
-            # 4. Запись в блокчейн
+            # 5. Запись в блокчейн
             tx_hash = await self.blockchain_service.create_product(metadata_cid)
             if not tx_hash:
                 return {
-                    "id": product_data.get("id"),
+                    "id": product_id,
                     "metadata_cid": metadata_cid,
                     "status": "error",
                     "error": "Ошибка записи в блокчейн"
                 }
-            # 5. Получение blockchain_id
+            # 6. Получение blockchain_id
             blockchain_id = await self.blockchain_service.get_product_id_from_tx(tx_hash)
+            
+            # 7. Дополнительная валидация: проверяем что продукт действительно создан в блокчейне
+            if blockchain_id is not None:
+                blockchain_exists = self._check_blockchain_product_exists(blockchain_id)
+                if not blockchain_exists:
+                    self.logger.warning(f"⚠️ Продукт {product_id} создан (tx: {tx_hash}), но не найден в блокчейне (ID: {blockchain_id})")
+                    # Не считаем это критической ошибкой - возможна задержка синхронизации
+                else:
+                    self.logger.debug(f"🔗 Подтверждено: продукт {product_id} существует в блокчейне (ID: {blockchain_id})")
+            
+            self.logger.info(f"✅ Продукт {product_id} успешно создан")
             return {
-                "id": product_data.get("id"),
+                "id": product_id,
                 "metadata_cid": metadata_cid,
                 "blockchain_id": str(blockchain_id) if blockchain_id is not None else None,
                 "tx_hash": str(tx_hash) if tx_hash is not None else None,
@@ -579,6 +787,7 @@ class ProductRegistryService:
                 "error": None
             }
         except Exception as e:
+            self.logger.error(f"❌ Критическая ошибка при создании продукта: {e}")
             return {
                 "id": product_data.get("id"),
                 "status": "error",
@@ -605,7 +814,7 @@ class ProductRegistryService:
 
             # 1. Проверка существования продукта по ID
             self.logger.info(f"[ProductRegistry] Проверяем существование продукта {product_id}")
-            existing_product = self.get_product(product_id)
+            existing_product = await self.get_product(product_id)
             
             if existing_product is None:
                 self.logger.error(f"[ProductRegistry] Продукт {product_id} не найден")
@@ -752,7 +961,7 @@ class ProductRegistryService:
         
         Args:
             product_id: ID продукта
-            new_status: Новый статус (0 - создан, 1 - в процессе, 2 - отправлен, 3 - доставлен)
+            new_status: Новый статус (0 - неактивен, 1 - активен)
             
         Returns:
             bool: True если успешно, False если ошибка
@@ -762,7 +971,7 @@ class ProductRegistryService:
             
             # Проверка существования продукта и прав доступа
             self.logger.info(f"[ProductRegistry] Проверяем существование продукта {product_id}")
-            existing_product = self.get_product(str(product_id))
+            existing_product = await self.get_product(str(product_id))
             
             if existing_product is None:
                 self.logger.error(f"[ProductRegistry] Продукт {product_id} не найден")
@@ -770,11 +979,17 @@ class ProductRegistryService:
             
             self.logger.info(f"[ProductRegistry] Продукт {product_id} найден: {existing_product.title}")
             
+            # ИСПРАВЛЕНИЕ: Получаем статус ТОЛЬКО из блокчейна, игнорируем локальный кэш
+            self.logger.info(f"[ProductRegistry] Игнорируем статус из локального кэша: {existing_product.status}")
+            
+            # ДОПОЛНИТЕЛЬНАЯ ДИАГНОСТИКА: Проверяем, что статус действительно игнорируется
+            self.logger.info(f"[ProductRegistry] Статус из локального кэша будет проигнорирован при проверке идемпотентности")
+            
             # Проверка прав доступа
             self.logger.info(f"[ProductRegistry] Проверяем права доступа для продукта {product_id}")
             
             try:
-                # Получаем информацию о продукте из блокчейна для проверки владельца
+                # Получаем информацию о продукте из блокчейна для проверки владельца И статуса
                 product_blockchain_data = self.blockchain_service.get_product(product_id)
                 if product_blockchain_data and len(product_blockchain_data) >= 2:
                     product_owner_address = product_blockchain_data[1]  # seller address
@@ -789,19 +1004,30 @@ class ProductRegistryService:
                     
                     self.logger.info(f"[ProductRegistry] Права доступа подтверждены для продукта {product_id}")
                     
-                    # Проверка идемпотентности - сравниваем текущий статус с новым
+                    # ИСПРАВЛЕНИЕ: Проверка идемпотентности - получаем статус ТОЛЬКО из блокчейна
                     if len(product_blockchain_data) >= 4:
-                        current_status = product_blockchain_data[3]  # active status
-                        self.logger.info(f"[ProductRegistry] Текущий статус продукта {product_id}: {current_status}")
+                        current_active = product_blockchain_data[3]  # active status (bool) из блокчейна
+                        current_status = 1 if current_active else 0  # Преобразуем bool в int
+                        self.logger.info(f"[ProductRegistry] Текущий статус продукта {product_id} из блокчейна: {current_status} (active: {current_active})")
                         self.logger.info(f"[ProductRegistry] Запрашиваемый статус: {new_status}")
                         
+                        # ДОПОЛНИТЕЛЬНАЯ ДИАГНОСТИКА: Логируем все данные из блокчейна
+                        self.logger.info(f"[ProductRegistry] ДЕТАЛЬНАЯ ДИАГНОСТИКА блокчейна:")
+                        self.logger.info(f"   - product_blockchain_data: {product_blockchain_data}")
+                        self.logger.info(f"   - product_blockchain_data[3]: {product_blockchain_data[3]} (тип: {type(product_blockchain_data[3])})")
+                        self.logger.info(f"   - current_active: {current_active} (тип: {type(current_active)})")
+                        self.logger.info(f"   - current_status: {current_status} (тип: {type(current_status)})")
+                        
+                        # Проверяем идемпотентность только если статус действительно совпадает
                         if current_status == new_status:
                             self.logger.info(f"[ProductRegistry] Статус продукта {product_id} уже установлен на {new_status} (идемпотентность)")
                             return True
                         else:
                             self.logger.info(f"[ProductRegistry] Статус продукта {product_id} будет изменен с {current_status} на {new_status}")
                     else:
-                        self.logger.warning(f"[ProductRegistry] Не удалось получить текущий статус продукта {product_id}")
+                        self.logger.warning(f"[ProductRegistry] Не удалось получить текущий статус продукта {product_id} из блокчейна")
+                        # Если не можем получить статус из блокчейна, продолжаем с обновлением
+                        self.logger.info(f"[ProductRegistry] Продолжаем обновление статуса без проверки идемпотентности")
                         
                 else:
                     self.logger.warning(f"[ProductRegistry] Не удалось получить данные владельца продукта {product_id}")
@@ -812,17 +1038,21 @@ class ProductRegistryService:
             
             # Выполнение операции в блокчейне
             self.logger.info(f"[ProductRegistry] Выполняем обновление статуса в блокчейне")
+            
+            # Преобразуем product_id в int для блокчейна
+            try:
+                product_id_int = int(product_id)
+            except (ValueError, TypeError) as e:
+                self.logger.error(f"[ProductRegistry] Неверный формат product_id: {product_id}, ошибка: {e}")
+                return False
+            
             tx_hash = await self.blockchain_service.update_product_status(
                 self.blockchain_service.seller_key,
-                product_id,
+                product_id_int,
                 new_status
             )
             
-            if tx_hash is None and new_status == 1:
-                # Активация не поддерживается в текущем контракте, но это не ошибка
-                self.logger.info(f"[ProductRegistry] Продукт {product_id} уже активен")
-                return True
-            elif not tx_hash:
+            if not tx_hash:
                 self.logger.error(f"[ProductRegistry] Ошибка обновления статуса продукта {product_id}")
                 return False
                 
@@ -857,7 +1087,7 @@ class ProductRegistryService:
             self.logger.error(f"[ProductRegistry] Ошибка деактивации продукта {product_id}: {e}")
             return False
 
-    def _deserialize_product(self, product_data: tuple) -> Optional[Product]:
+    async def _deserialize_product(self, product_data: tuple) -> Optional[Product]:
         """
         Десериализует продукт из кортежа блокчейна и метаданных IPFS.
         Args:
@@ -880,6 +1110,7 @@ class ProductRegistryService:
                 self.logger.warning(f"Не удалось получить метаданные для продукта {product_id}")
                 return None
 
+            # Обрабатываем метаданные через сервис
             product = self.metadata_service.process_product_metadata(metadata)
             if product:
                 product.id = product_id

@@ -130,25 +130,24 @@ contract ProductRegistry {
         _productIdCounter += 1;
         uint256 newProductId = _productIdCounter;
 
-        // Создаём продукт в памяти
+        // Создаём продукт в памяти (неактивный по умолчанию)
         Product memory newProduct = Product({
             id: newProductId,
             seller: msg.sender,
             ipfsCID: ipfsCID,
-            active: true
+            active: false
         });
 
         // Сохраняем в storage
         products[newProductId] = newProduct;
 
-        // Добавляем productId в список активных товаров
-        activeProductIds.push(newProductId);
+        // НЕ добавляем в список активных товаров (продукт создается неактивным)
 
         // Добавляем productId в индекс продавца
         productsBySeller[msg.sender].push(newProductId);
 
-        // Эмитим событие для фронтенда
-        emit ProductCreated(msg.sender, newProductId, ipfsCID, 1);
+        // Эмитим событие для фронтенда (статус 0 - неактивный)
+        emit ProductCreated(msg.sender, newProductId, ipfsCID, 0);
 
         catalogVersion[msg.sender] += 1;
         emit CatalogUpdated(msg.sender, catalogVersion[msg.sender]);
@@ -232,6 +231,40 @@ contract ProductRegistry {
         emit CatalogUpdated(msg.sender, catalogVersion[msg.sender]);
     }
 
+    /**
+    * @notice Активировать товар (сделать его видимым в каталоге).
+    * @dev
+    * - Продавец может активировать только свой товар.
+    * - Товар должен быть неактивным.
+    * - Статус `active = true`.
+    * - Добавляет productId в список активных товаров.
+    * - Эмиттирует событие ProductUpdated.
+    *
+    * Acceptance criteria:
+    * - Проверка продавца (onlyOwnSellerProduct)
+    * - Проверка, что товар неактивен
+    * - Обновлён статус в storage
+    * - Добавлен в массив активных
+    * - Эмиттировано событие
+    *
+    * Газ-эффективность:
+    * - O(1) операции без циклов
+    * - Минимальные storage-операции
+    */
+    function activateProduct(uint256 productId) external onlyOwnSellerProduct(productId) {
+        Product storage product = products[productId];
+        require(!product.active, "ProductRegistry: already active");
+
+        product.active = true;
+
+        // Добавляем productId в список активных товаров
+        activeProductIds.push(productId);
+
+        emit ProductUpdated(msg.sender, productId, product.ipfsCID, 0, 1);
+
+        catalogVersion[msg.sender] += 1;  // обновляем только для этого продавца
+        emit CatalogUpdated(msg.sender, catalogVersion[msg.sender]);
+    }
 
     // --------------------------------
     // ------- View функции ----------

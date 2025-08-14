@@ -2,6 +2,7 @@ from typing import Optional, List, Dict, Union
 from datetime import datetime
 from decimal import Decimal
 from dataclasses import dataclass
+from .organic_component import OrganicComponent
 
 @dataclass
 class DosageInstruction:
@@ -511,8 +512,7 @@ class Product:
         status (int): Статус продукта (0 - неактивен, 1 - активен)
         cid (str): Content Identifier - ссылка на контент в IPFS/Arweave
         title (str): Название продукта
-        description (Description): Структурированное описание продукта
-        description_cid (str): CID для расширенного описания
+        organic_components (List[OrganicComponent]): Список компонентов продукта
         cover_image_url (str): Ссылка на основное изображение
         categories (List[str]): Список категорий
         forms (List[str]): Список форм продукта
@@ -527,8 +527,7 @@ class Product:
         status: int,
         cid: str,
         title: str,
-        description: Description,
-        description_cid: str,
+        organic_components: List[OrganicComponent],
         cover_image_url: str,
         categories: List[str],
         forms: List[str],
@@ -544,8 +543,7 @@ class Product:
             status: Статус продукта (0 - неактивен, 1 - активен)
             cid: Content Identifier
             title: Название продукта
-            description: Структурированное описание продукта
-            description_cid: CID для расширенного описания
+            organic_components: Список компонентов продукта
             cover_image_url: Ссылка на основное изображение
             categories: Список категорий
             forms: Список форм продукта
@@ -581,15 +579,18 @@ class Product:
             raise ValueError("Title не может быть пустым")
         self.title = title
 
-        # Валидация description
-        if not isinstance(description, Description):
-            raise ValueError("Description должен быть объектом Description")
-        self.description = description
-
-        # Валидация description_cid
-        if not description_cid:
-            raise ValueError("Description CID не может быть пустым")
-        self.description_cid = description_cid
+        # Валидация organic_components
+        if not isinstance(organic_components, list):
+            raise ValueError("Organic components должен быть списком")
+        if not organic_components:
+            raise ValueError("Organic components не может быть пустым")
+        
+        # Валидация каждого компонента
+        for component in organic_components:
+            if not isinstance(component, OrganicComponent):
+                raise ValueError("Каждый элемент organic_components должен быть объектом OrganicComponent")
+        
+        self.organic_components = organic_components
 
         # Валидация cover_image_url
         if not cover_image_url:
@@ -627,10 +628,7 @@ class Product:
         Returns:
             List[PriceInfo]: Список объектов с информацией о ценах
         """
-        if self._price_infos is None:
-            prices_data = self.metadata.get('prices', [])
-            self._price_infos = [PriceInfo.from_dict(p) for p in prices_data]
-        return self._price_infos
+        return self.prices
 
     @property
     def price(self) -> float:
@@ -712,6 +710,91 @@ class Product:
                     return price_info
         return None
 
+    def get_component_by_biounit_id(self, biounit_id: str) -> Optional[OrganicComponent]:
+        """
+        Получает компонент по biounit_id.
+        
+        Args:
+            biounit_id: Идентификатор биологической единицы
+            
+        Returns:
+            Optional[OrganicComponent]: Компонент или None, если не найден
+        """
+        for component in self.organic_components:
+            if component.biounit_id == biounit_id:
+                return component
+        return None
+
+    def get_components_by_proportion_type(self, proportion_type: str) -> List[OrganicComponent]:
+        """
+        Получает компоненты по типу пропорции.
+        
+        Args:
+            proportion_type: Тип пропорции ('percentage', 'weight', 'volume')
+            
+        Returns:
+            List[OrganicComponent]: Список компонентов с указанным типом пропорции
+        """
+        if proportion_type == 'percentage':
+            return [comp for comp in self.organic_components if comp.is_percentage()]
+        elif proportion_type == 'weight':
+            return [comp for comp in self.organic_components if comp.is_weight_based()]
+        elif proportion_type == 'volume':
+            return [comp for comp in self.organic_components if comp.is_volume_based()]
+        else:
+            return []
+
+    def validate_proportions(self) -> bool:
+        """
+        Валидирует корректность пропорций компонентов.
+        
+        Returns:
+            bool: True если пропорции корректны, False если нет
+        """
+        # Проверяем, что все компоненты имеют одинаковый тип пропорции
+        proportion_types = set()
+        for component in self.organic_components:
+            if component.is_percentage():
+                proportion_types.add('percentage')
+            elif component.is_weight_based():
+                proportion_types.add('weight')
+            elif component.is_volume_based():
+                proportion_types.add('volume')
+        
+        # Если смешанные типы пропорций, валидация не проходит
+        if len(proportion_types) > 1:
+            return False
+        
+        # Для процентных пропорций проверяем, что сумма = 100%
+        if 'percentage' in proportion_types:
+            total_percentage = sum(comp.get_proportion_value() for comp in self.organic_components)
+            return abs(total_percentage - 100.0) < 0.01  # Допуск 0.01%
+        
+        # Для весовых/объемных пропорций проверяем, что все > 0
+        return all(comp.get_proportion_value() > 0 for comp in self.organic_components)
+
+    def get_total_proportion(self) -> str:
+        """
+        Получает общую пропорцию продукта.
+        
+        Returns:
+            str: Общая пропорция (например, "100%", "500g", "1L")
+        """
+        if not self.organic_components:
+            return "0"
+        
+        first_component = self.organic_components[0]
+        if first_component.is_percentage():
+            return "100%"
+        elif first_component.is_weight_based():
+            total_weight = sum(comp.get_proportion_value() for comp in self.organic_components)
+            return f"{total_weight}{first_component.get_proportion_unit()}"
+        elif first_component.is_volume_based():
+            total_volume = sum(comp.get_proportion_value() for comp in self.organic_components)
+            return f"{total_volume}{first_component.get_proportion_unit()}"
+        else:
+            return "0"
+
     @classmethod
     def from_json(cls, data: Dict) -> 'Product':
         """
@@ -730,28 +813,49 @@ class Product:
             raise ValueError("Входные данные должны быть словарем")
 
         # Обязательные поля
-        required_fields = ['id', 'title', 'description', 'description_cid', 'cover_image_url', 'species']
+        required_fields = ['id', 'title', 'cover_image_url', 'species']
         for field in required_fields:
             if field not in data:
                 raise ValueError(f"Отсутствует обязательное поле '{field}'")
 
-        # Создаем объект Description
-        description = Description.from_dict(data['description'])
+        # Обратная совместимость: поддержка старого формата с description
+        if 'organic_components' in data:
+            # Новый формат с компонентами
+            organic_components_data = data['organic_components']
+            if not isinstance(organic_components_data, list):
+                raise ValueError("organic_components должен быть списком")
+            
+            organic_components = [OrganicComponent.from_dict(comp) for comp in organic_components_data]
+        elif 'description' in data and 'description_cid' in data:
+            # Старый формат: создаем один компонент из description
+            organic_components = [OrganicComponent(
+                biounit_id=data.get('species', 'unknown'),
+                description_cid=data['description_cid'],
+                proportion='100%'
+            )]
+        else:
+            raise ValueError("Должны быть указаны либо organic_components, либо description + description_cid")
 
         # Создаем объекты PriceInfo
         prices = [PriceInfo.from_dict(p) for p in data.get('prices', [])]
 
+        # Обратная совместимость: поддержка поля 'form' (единственное число)
+        if 'forms' in data:
+            forms_value = data.get('forms', [])
+        else:
+            single_form = data.get('form')
+            forms_value = [single_form] if single_form else []
+
         return cls(
             id=data['id'],
-            alias=data.get('alias', ''),
-            status=data.get('status', 1),
-            cid=data.get('cid', ''),
+            alias=data.get('alias', str(data['id'])),  # Используем id как alias по умолчанию
+            status=data.get('status', 0),  # Продукт создается неактивным по умолчанию
+            cid=data.get('cid', str(data['id'])),  # Используем id как CID по умолчанию
             title=data['title'],
-            description=description,
-            description_cid=data['description_cid'],
+            organic_components=organic_components,
             cover_image_url=data['cover_image_url'],
             categories=data.get('categories', []),
-            forms=data.get('forms', []),
+            forms=forms_value,
             species=data['species'],
             prices=prices
         )
@@ -769,8 +873,7 @@ class Product:
             'status': self.status,
             'cid': self.cid,
             'title': self.title,
-            'description': self.description.to_dict(),
-            'description_cid': self.description_cid,
+            'organic_components': [comp.to_dict() for comp in self.organic_components],
             'cover_image_url': self.cover_image_url,
             'categories': self.categories,
             'forms': self.forms,

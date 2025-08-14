@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any, List, Union
 import logging
 import re
-from bot.services.product.validation_utils import (
+from services.product.validation_utils import (
     validate_product_data,
     sanitize_product_data,
     ValidationError
@@ -15,15 +15,14 @@ class ProductValidationService:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
     
-    async def validate_product_data(self, data: Dict, storage_service=None) -> Dict[str, Union[bool, List[str]]]:
+    async def validate_product_data(self, data: Dict) -> Dict[str, Union[bool, List[str]]]:
         """
         Асинхронная валидация данных продукта.
-        Если передан storage_service, дополнительно проверяет существование description_cid в IPFS.
         Включает базовую валидацию и бизнес-правила.
         """
-        # Сначала базовая валидация (с IPFS если передан storage_service)
+        # Сначала базовая валидация
         self.logger.info(f"🔍 [ProductValidationService] Начинаем валидацию данных: {data}")
-        validation_result = await validate_product_data(data, storage_service)
+        validation_result = validate_product_data(data)
         self.logger.info(f"🔍 [ProductValidationService] Результат валидации: {validation_result}")
         if not validation_result["is_valid"]:
             return validation_result
@@ -46,7 +45,37 @@ class ProductValidationService:
             "sanitized_data": sanitized_data
         }
     
-    async def validate_batch_products(self, products: List[Dict], storage_service=None) -> Dict[str, Union[bool, Dict]]:
+    async def validate_product_data_with_ipfs(self, data: Dict, storage_service) -> Dict[str, Union[bool, List[str]]]:
+        """
+        Асинхронная валидация данных продукта с проверкой существования в IPFS.
+        Включает базовую валидацию, проверку IPFS и бизнес-правила.
+        """
+        # Сначала базовая валидация с проверкой IPFS
+        self.logger.info(f"🔍 [ProductValidationService] Начинаем валидацию данных с IPFS: {data}")
+        validation_result = await validate_product_data_with_ipfs(data, storage_service)
+        self.logger.info(f"🔍 [ProductValidationService] Результат валидации с IPFS: {validation_result}")
+        if not validation_result["is_valid"]:
+            return validation_result
+            
+        try:
+            # Санитизация только валидных данных
+            sanitized_data = sanitize_product_data(data)
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "errors": [f"Ошибка санитизации данных: {str(e)}"]
+            }
+            
+        # Дополнительные бизнес-правила можно добавить здесь
+        # Например, проверка уникальности ID, специфичные правила для категорий и т.д.
+        
+        return {
+            "is_valid": True,
+            "errors": [],
+            "sanitized_data": sanitized_data
+        }
+    
+    async def validate_batch_products(self, products: List[Dict]) -> Dict[str, Union[bool, Dict]]:
         """
         Пакетная валидация нескольких продуктов.
         """
@@ -55,7 +84,7 @@ class ProductValidationService:
         
         for product in products:
             product_id = product.get("id", "unknown")
-            validation_result = await self.validate_product_data(product, storage_service)
+            validation_result = await self.validate_product_data(product)
             results[product_id] = validation_result
             if not validation_result["is_valid"]:
                 is_valid = False
@@ -65,13 +94,13 @@ class ProductValidationService:
             "results": results
         }
     
-    async def validate_product_update(self, old_data: Dict, new_data: Dict, storage_service=None) -> Dict[str, Union[bool, List[str]]]:
+    async def validate_product_update(self, old_data: Dict, new_data: Dict) -> Dict[str, Union[bool, List[str]]]:
         """
         Валидация обновления продукта.
         Проверяет корректность изменений.
         """
         # Проверяем новые данные
-        validation_result = await self.validate_product_data(new_data, storage_service)
+        validation_result = await self.validate_product_data(new_data)
         if not validation_result["is_valid"]:
             return validation_result
             
