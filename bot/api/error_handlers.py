@@ -35,6 +35,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         ))
     
     response = ValidationErrorResponse(
+        success=False,
         message="Ошибка валидации данных",
         details=details,
         timestamp=Timestamp(get_current_timestamp()),
@@ -58,6 +59,7 @@ async def pydantic_validation_error_handler(request: Request, exc: ValidationErr
         ))
     
     response = ValidationErrorResponse(
+        success=False,
         message="Ошибка валидации данных",
         details=details,
         timestamp=Timestamp(get_current_timestamp()),
@@ -65,6 +67,33 @@ async def pydantic_validation_error_handler(request: Request, exc: ValidationErr
     )
     
     return JSONResponse(status_code=400, content=response.model_dump())
+
+# 422: Кастомные исключения валидации продуктов
+async def product_validation_exception_handler(request: Request, exc: Exception):
+    """Обработчик для кастомных исключений валидации продуктов"""
+    from bot.api.exceptions.validation import ProductValidationError
+    
+    if isinstance(exc, ProductValidationError):
+        logger.warning(f"422 Product validation error: {exc.message} | field={exc.field} | path={request.url.path}")
+        
+        details = [ErrorDetail(
+            field=exc.field,
+            message=exc.message,
+            value=exc.value
+        )]
+        
+        response = ValidationErrorResponse(
+            success=False,
+            message="Ошибка валидации продукта",
+            details=details,
+            timestamp=Timestamp(get_current_timestamp()),
+            path=str(request.url.path)
+        )
+        
+        return JSONResponse(status_code=422, content=response.model_dump())
+    
+    # Если это не наше исключение, передаем дальше
+    raise exc
 
 # HTTPException (универсальный)
 async def http_exception_handler(request: Request, exc: HTTPException):

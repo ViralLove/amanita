@@ -95,6 +95,7 @@ def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Opti
     app.add_exception_handler(ValidationError, error_handlers.pydantic_validation_error_handler)
     app.add_exception_handler(HTTPException, error_handlers.http_exception_handler)
     app.add_exception_handler(StarletteHTTPException, error_handlers.not_found_exception_handler)
+    app.add_exception_handler(Exception, error_handlers.product_validation_exception_handler)
     app.add_exception_handler(Exception, error_handlers.unhandled_exception_handler)
 
     def create_public_response(message: str, additional_data: dict = None) -> dict:
