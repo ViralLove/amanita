@@ -1,10 +1,14 @@
 """
-Кастомные исключения для валидации продуктов
+Кастомные исключения для валидации продуктов и унифицированная ошибка API-уровня.
 """
+
+from typing import Any, Dict, Optional
+from bot.validation import ValidationError as CoreValidationError
+
 
 class ProductValidationError(Exception):
     """Базовое исключение для ошибок валидации продуктов"""
-    def __init__(self, message: str, field: str = None, value: any = None):
+    def __init__(self, message: str, field: str = None, value: Any = None):
         self.message = message
         self.field = field
         self.value = value
@@ -64,4 +68,38 @@ class InvalidPriceFormatError(ProductValidationError):
             f"Неверный формат для поля '{field}': {value}",
             field=field,
             value=value
+        )
+
+
+class UnifiedValidationError(ProductValidationError):
+    """
+    Унифицированная ошибка валидации для API-уровня.
+    Совмещает внутренний результат валидации и человекочитаемое сообщение.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        field: Optional[str] = None,
+        value: Any = None,
+        error_code: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        super().__init__(message=message, field=field, value=value)
+        self.error_code = error_code
+        self.details = details or {}
+
+    @classmethod
+    def from_core_error(
+        cls,
+        core_error: CoreValidationError,
+        default_message: str = "Ошибка валидации данных"
+    ) -> "UnifiedValidationError":
+        """Создает UnifiedValidationError из ядрового ValidationError."""
+        return cls(
+            message=str(core_error) or default_message,
+            field=getattr(core_error, "field_name", None),
+            value=getattr(core_error, "field_value", None),
+            error_code=getattr(core_error, "error_code", None),
+            details=getattr(core_error, "to_dict", lambda: {})(),
         )

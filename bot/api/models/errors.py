@@ -14,6 +14,8 @@ class ErrorDetail(BaseModel):
     field: Optional[str] = Field(None, description="Поле, в котором произошла ошибка")
     message: str = Field(..., description="Сообщение об ошибке")
     value: Optional[Any] = Field(None, description="Значение, которое вызвало ошибку")
+    error_code: Optional[str] = Field(None, description="Код ошибки для программной обработки")
+    suggestions: Optional[List[str]] = Field(None, description="Предложения по исправлению ошибки")
     
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -35,6 +37,13 @@ class ValidationErrorResponse(ErrorResponse):
     """Ответ с ошибкой валидации"""
     error: str = Field("validation_error", description="Тип ошибки")
     message: str = Field("Ошибка валидации данных", description="Сообщение об ошибке")
+
+
+class UnifiedValidationErrorResponse(ErrorResponse):
+    """Ответ с унифицированной ошибкой валидации"""
+    error: str = Field("unified_validation_error", description="Тип ошибки")
+    message: str = Field("Ошибка валидации данных", description="Сообщение об ошибке")
+    validation_source: Optional[str] = Field(None, description="Источник валидации (api, service, core)")
 
 
 class AuthenticationErrorResponse(ErrorResponse):

@@ -10,7 +10,8 @@ from bot.api.models.product import (
     ProductUploadIn, ProductUploadRequest, ProductResponse, ProductsUploadResponse,
     ProductUpdateIn, ProductStatusUpdate
 )
-from bot.api.exceptions.validation import ProductValidationError
+from bot.api.exceptions.validation import ProductValidationError, UnifiedValidationError
+from bot.api.converters import ConverterFactory
 import logging
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,9 @@ async def upload_products(
     """
     logger.info(f"[API] Получен запрос /products/upload: {request}")
     logger.info(f"[API] request.products: {request.products}")
+    
+    # Получаем конвертер для продуктов
+    product_converter = ConverterFactory.get_product_converter()
     results = []
     
     for product in request.products:
@@ -35,8 +39,22 @@ async def upload_products(
             # Получаем business_id из модели
             business_id = product.get_business_id()
             
-            # Подготавливаем данные для сервиса
-            product_dict = product.model_dump()
+            # Используем конвертер вместо model_dump()
+            try:
+                product_dict = product_converter.api_to_dict(product)
+            except (ValueError, UnifiedValidationError) as e:
+                logger.error(f"Ошибка конвертации продукта {product.id}: {e}")
+                error_message = str(e)
+                if isinstance(e, UnifiedValidationError):
+                    error_message = f"Ошибка валидации: {e.message}"
+                    if e.error_code:
+                        error_message += f" (код: {e.error_code})"
+                results.append(ProductResponse(
+                    id=str(product.id),
+                    status="error",
+                    error=error_message
+                ))
+                continue
             
             # Добавляем business_id если его нет
             if 'business_id' not in product_dict or not product_dict['business_id']:
@@ -56,12 +74,17 @@ async def upload_products(
                 status=result.get("status", "error"),
                 error=result.get("error")
             ))
-        except ProductValidationError as e:
+        except (ProductValidationError, UnifiedValidationError) as e:
             logger.error(f"Ошибка валидации продукта {product.id}: {e}")
+            error_message = str(e)
+            if isinstance(e, UnifiedValidationError):
+                error_message = f"Ошибка валидации: {e.message}"
+                if e.error_code:
+                    error_message += f" (код: {e.error_code})"
             results.append(ProductResponse(
                 id=str(product.id),
                 status="error",
-                error=str(e)
+                error=error_message
             ))
         except Exception as e:
             logger.error(f"Ошибка при обработке продукта {product.id}: {e}")
@@ -94,9 +117,27 @@ async def update_product(
                 detail="Некорректный ID продукта"
             )
         
+        # Получаем конвертер для продуктов
+        product_converter = ConverterFactory.get_product_converter()
+        
+        # Используем конвертер вместо model_dump()
+        try:
+            product_dict = product_converter.api_to_dict(request)
+        except (ValueError, UnifiedValidationError) as e:
+            logger.error(f"Ошибка конвертации продукта {product_id}: {e}")
+            error_message = str(e)
+            if isinstance(e, UnifiedValidationError):
+                error_message = f"Ошибка валидации: {e.message}"
+                if e.error_code:
+                    error_message += f" (код: {e.error_code})"
+            raise HTTPException(
+                status_code=422,
+                detail=error_message
+            )
+        
         # Вызываем сервис для обновления продукта
         logger.info(f"[API] Вызываем registry_service.update_product для продукта {product_id}")
-        result = await registry_service.update_product(product_id, request.model_dump())
+        result = await registry_service.update_product(product_id, product_dict)
         logger.info(f"[API] Результат update_product: {result}")
         
         # Проверяем результат операции

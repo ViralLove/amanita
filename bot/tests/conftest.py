@@ -6,6 +6,9 @@ import logging
 import os
 from unittest.mock import Mock, AsyncMock
 from bot.services.core import blockchain
+from bot.model.product import Product
+from bot.model.organic_component import OrganicComponent
+from bot.model.product import PriceInfo
 
 # Явная регистрация pytest-asyncio плагина
 pytest_plugins = ["pytest_asyncio"]
@@ -38,7 +41,7 @@ def setup_test_logging():
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_blockchain_service(monkeypatch):
     """Мок для BlockchainService (только для unit-тестов продуктов)"""
     
@@ -54,6 +57,17 @@ def mock_blockchain_service(monkeypatch):
             self.product_cids = {}
             # Ссылка на storage service для синхронизации
             self.storage_service = None
+            
+            # 🔧 ИЗОЛЯЦИЯ: Сбрасываем состояние при каждом создании фикстуры
+            self._reset_state()
+        
+        def _reset_state(self):
+            """Сброс состояния для изоляции тестов"""
+            self.create_product_called = False
+            self._next_blockchain_id = 1
+            self.product_statuses.clear()
+            self.product_cids.clear()
+            logger.info("🔧 [MockBlockchainService] Состояние сброшено для изоляции тестов")
         
         def _generate_next_blockchain_id(self):
             """Генерирует следующий уникальный blockchain ID"""
@@ -221,7 +235,7 @@ def mock_blockchain_service(monkeypatch):
     return MockBlockchainService()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_validation_service():
     """Универсальный мок для ProductValidationService"""
     class MockProductValidationService:
@@ -269,7 +283,7 @@ def mock_validation_service():
     return MockProductValidationService()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_account_service():
     """Универсальный мок для AccountService"""
     class MockAccountService:
@@ -293,7 +307,7 @@ def mock_account_service():
     return MockAccountService()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_ipfs_storage_failing():
     """Мок IPFS storage с симуляцией ошибок"""
     class MockIPFSStorageFailing:
@@ -351,7 +365,7 @@ def mock_ipfs_storage_failing():
     return MockIPFSStorageFailing()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_validation_service_failing():
     """Мок ProductValidationService с симуляцией ошибок"""
     class MockProductValidationServiceFailing:
@@ -368,7 +382,7 @@ def mock_validation_service_failing():
     return MockProductValidationServiceFailing()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_integration_registry_service(mock_blockchain_service, mock_ipfs_service, mock_validation_service, mock_account_service):
     """Мок ProductRegistryService для интеграционных тестов с синхронизированными моками"""
     from bot.dependencies import get_product_registry_service
@@ -387,7 +401,7 @@ def mock_integration_registry_service(mock_blockchain_service, mock_ipfs_service
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_integration_registry_service_real_blockchain(mock_ipfs_service, mock_validation_service, mock_account_service):
     """Мок для интеграционных тестов с реальным блокчейном, но моканным IPFS"""
     from bot.dependencies import get_product_registry_service
@@ -401,7 +415,7 @@ def mock_integration_registry_service_real_blockchain(mock_ipfs_service, mock_va
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_ipfs_service(monkeypatch):
     """Мок для ProductStorageService (IPFS/Pinata) для unit-тестов API продуктов"""
     class MockIPFSService:
@@ -459,7 +473,7 @@ def mock_ipfs_service(monkeypatch):
     return MockIPFSService()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_blockchain_service_with_error(monkeypatch):
     """Мок для BlockchainService с симуляцией ошибки создания продукта"""
     class MockBlockchainServiceWithError:
@@ -497,7 +511,7 @@ def mock_blockchain_service_with_error(monkeypatch):
     return MockBlockchainServiceWithError()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_blockchain_service_with_id_error(monkeypatch):
     """Мок для BlockchainService с симуляцией ошибки получения blockchain_id"""
     class MockBlockchainServiceWithIdError:
@@ -537,7 +551,7 @@ def mock_blockchain_service_with_id_error(monkeypatch):
     return MockBlockchainServiceWithIdError()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_blockchain_service_with_tracking(monkeypatch):
     """Мок для BlockchainService с отслеживанием вызовов для тестирования идемпотентности"""
     class MockBlockchainServiceWithTracking:
@@ -576,50 +590,54 @@ def mock_blockchain_service_with_tracking(monkeypatch):
 
 # === API СПЕЦИФИЧНЫЕ ФИКСТУРЫ ===
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 async def api_client() -> AsyncGenerator[httpx.AsyncClient, None]:
     """Фикстура для HTTP клиента"""
+    print("🔧 [API Client] Создание HTTP клиента для теста")
+    
     async with httpx.AsyncClient(base_url=API_URL) as client:
         yield client
+    
+    print("🧹 [API Client] HTTP клиент закрыт и очищен")
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def test_api_key() -> str:
     """Фикстура для тестового API ключа"""
     return AMANITA_API_KEY
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def test_secret_key() -> str:
     """Фикстура для тестового секретного ключа"""
     return AMANITA_API_SECRET
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def valid_ethereum_address() -> str:
     """Фикстура для валидного Ethereum адреса"""
     return "0x742d35cc6634c0532925a3b8d4c9db96c4b4d8b6"
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def invalid_ethereum_address() -> str:
     """Фикстура для невалидного Ethereum адреса"""
     return "invalid-address"
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def valid_api_key() -> str:
     """Фикстура для валидного API ключа"""
     return "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678"
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def invalid_api_key() -> str:
     """Фикстура для невалидного API ключа"""
     return "invalid-key"
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def test_request_data() -> dict:
     """Фикстура для тестовых данных запроса"""
     return {
@@ -628,9 +646,11 @@ def test_request_data() -> dict:
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_service_factory():
     """Фикстура для мока ServiceFactory"""
+    print("🔧 [Service Factory] Создание Mock ServiceFactory")
+    
     class MockServiceFactory:
         def create_api_key_service(self):
             return MockApiKeyService()
@@ -638,7 +658,10 @@ def mock_service_factory():
         def create_blockchain_service(self):
             return MockBlockchainService()
     
-    return MockServiceFactory()
+    factory = MockServiceFactory()
+    yield factory
+    
+    print("🧹 [Service Factory] Mock ServiceFactory очищен")
 
 
 class MockApiKeyService:
@@ -672,37 +695,103 @@ class MockBlockchainService:
 
 # === УПРАВЛЕНИЕ СОСТОЯНИЕМ МОКОВ ===
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 def reset_mock_states():
     """Автоматический сброс состояния моков перед каждым тестом"""
+    print("🔧 [Reset] Сброс состояния моков для изоляции тестов")
+    
     yield
-    # Сброс состояния всех моков
-    # Очистка списков загруженных файлов
-    # Сброс счетчиков вызовов
+    
+    print("🧹 [Reset] Очистка состояния моков после теста")
+    # Очистка происходит автоматически при создании новой фикстуры
+    # благодаря scope="function" и методам _reset_state
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 def clear_mock_storage_between_tests():
     """Автоматическая очистка MockIPFSStorage между тестами"""
-    yield
-    # Получаем все активные фикстуры mock_ipfs_storage и очищаем их
-    import pytest
-    from _pytest.fixtures import FixtureRequest
+    print("🔧 [Clear] Очистка MockIPFSStorage для изоляции тестов")
     
+    yield
+    
+    print("🧹 [Clear] Очистка MockIPFSStorage после теста")
     # Очистка происходит автоматически при создании новой фикстуры
-    # Но можно добавить дополнительную логику если потребуется
+    # благодаря scope="function" и методам _reset_state
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True, scope="function")
+def comprehensive_cleanup():
+    """
+    Комплексная фикстура для очистки всех данных после каждого теста.
+    Автоматически запускается для каждого теста.
+    """
+    print("🔧 [Comprehensive] Комплексная очистка для изоляции тестов")
+    
+    yield
+    
+    print("🧹 [Comprehensive] Комплексная очистка завершена")
+    # Дополнительная логика очистки может быть добавлена здесь
+    # например, очистка временных файлов, сброс глобальных переменных и т.д.
+
+
+@pytest.fixture(scope="function")
+def temp_files_cleanup():
+    """
+    Фикстура для очистки временных файлов, созданных во время тестов.
+    """
+    import tempfile
+    import os
+    
+    # Список временных файлов для очистки
+    temp_files = []
+    
+    print("🔧 [Temp Files] Подготовка к очистке временных файлов")
+    
+    yield temp_files
+    
+    # Очистка временных файлов
+    for temp_file in temp_files:
+        try:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+                print(f"🧹 [Temp Files] Удален временный файл: {temp_file}")
+        except Exception as e:
+            print(f"⚠️ [Temp Files] Ошибка удаления файла {temp_file}: {e}")
+    
+    print("🧹 [Temp Files] Очистка временных файлов завершена")
+
+
+@pytest.fixture(scope="function")
+def cache_cleanup():
+    """
+    Фикстура для очистки кэша между тестами.
+    """
+    print("🔧 [Cache] Подготовка к очистке кэша")
+    
+    # Здесь можно добавить логику очистки различных типов кэша
+    # например, очистка Redis, Memcached, локального кэша и т.д.
+    
+    yield
+    
+    print("🧹 [Cache] Кэш очищен")
+
+
+@pytest.fixture(scope="function")
 def mock_config():
     """Конфигурация моков через переменные окружения"""
-    return {
+    print("🔧 [Mock Config] Загрузка конфигурации моков")
+    
+    config = {
         "ipfs_mock_enabled": os.getenv("MOCK_IPFS", "true").lower() == "true",
         "blockchain_mock_enabled": os.getenv("MOCK_BLOCKCHAIN", "true").lower() == "true",
         "validation_mock_enabled": os.getenv("MOCK_VALIDATION", "true").lower() == "true"
     }
+    
+    yield config
+    
+    print("🧹 [Mock Config] Конфигурация моков очищена")
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_ipfs_storage():
     """Универсальный мок для IPFS/Arweave storage с консистентным хранением данных"""
     class MockIPFSStorage:
@@ -719,6 +808,9 @@ def mock_ipfs_storage():
             self.uploaded_jsons = []
             self.downloaded_json = {}
             self.gateway_url_prefix = "https://mocked.ipfs/"
+            
+            # 🔧 ИЗОЛЯЦИЯ: Сбрасываем состояние при каждом создании фикстуры
+            self._reset_state()
         
         def _generate_unique_cid(self, data):
             """Генерирует уникальный CID для данных"""
@@ -742,6 +834,15 @@ def mock_ipfs_storage():
             cid_suffix = ''.join(random.choices(valid_chars, k=44))
             
             return f"Qm{cid_suffix}"
+        
+        def _reset_state(self):
+            """Сброс состояния для изоляции тестов"""
+            self._storage.clear()
+            self._counter = 0
+            self.uploaded_files.clear()
+            self.uploaded_jsons.clear()
+            self.downloaded_json.clear()
+            logger.info("🔧 [MockIPFSStorage] Состояние сброшено для изоляции тестов")
         
         # Синхронный метод для unit-тестов
         def download_json(self, cid):
@@ -799,7 +900,7 @@ def mock_ipfs_storage():
     
     return MockIPFSStorage()
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def mock_registry_service(mock_blockchain_service, mock_ipfs_storage, mock_validation_service, mock_account_service):
     """Полностью замоканный ProductRegistryService для unit-тестов"""
     from bot.services.product.registry import ProductRegistryService
@@ -826,49 +927,738 @@ def mock_registry_service(mock_blockchain_service, mock_ipfs_storage, mock_valid
     
     # Мокаем metadata_service чтобы избежать реальных обращений к IPFS
     mock_metadata_service = Mock()
-    mock_metadata_service.process_metadata.return_value = {
-        "id": "amanita1",
-        "title": "Amanita muscaria — sliced caps and gills (1st grade)",
-        "organic_components": [
-            {
-                "biounit_id": "amanita_muscaria",
-                "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                "proportion": "100%"
-            }
-        ],
-        "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
-        "categories": ["mushroom", "mental health", "focus", "ADHD support", "mental force"],
-        "forms": ["mixed slices"],
-        "species": "Amanita muscaria",
-        "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
-    }
-    # Мокаем асинхронный метод process_product_metadata
-    # Создаем OrganicComponent объекты для тестов
-    from bot.model.organic_component import OrganicComponent
-    test_component = OrganicComponent(
-        biounit_id="amanita_muscaria",
-        description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-        proportion="100%"
-    )
-    
-    mock_metadata_service.process_product_metadata = AsyncMock(return_value=Product(
-        id=1,
-        alias="amanita1",
-        status=1,
-        cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-        title="Amanita muscaria — sliced caps and gills (1st grade)",
-        organic_components=[test_component],
-        cover_image_url="https://mocked.ipfs/test.jpg",
-        categories=["mushroom", "mental health", "focus", "ADHD support", "mental force"],
-        forms=["mixed slices"],
-        species="Amanita muscaria",
-        prices=[PriceInfo(weight="100", weight_unit="g", price="80", currency="EUR")]
-    ))
+    mock_metadata_service.process_metadata.return_value = None
     service.metadata_service = mock_metadata_service
     
     return service
 
-@pytest.fixture
+
+@pytest.fixture(scope="function")
+def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mock_validation_service, mock_account_service):
+    """Полноценный Mock ProductRegistryService с полным интерфейсом"""
+    from unittest.mock import Mock, AsyncMock
+    from datetime import datetime, timedelta
+    from typing import Dict, List, Optional, Union, Any
+    from bot.model.product import Product, Description, PriceInfo
+    import logging
+    
+    class MockProductRegistryService:
+        """
+        Полноценный Mock для ProductRegistryService.
+        Реализует все публичные методы с детерминированным поведением.
+        """
+        
+        def __init__(self, blockchain_service=None, storage_service=None, validation_service=None, account_service=None):
+            """Инициализация Mock ProductRegistryService"""
+            self.logger = logging.getLogger(__name__)
+            
+            # Зависимости
+            self.blockchain_service = blockchain_service or Mock()
+            self.storage_service = storage_service or Mock()
+            self.validation_service = validation_service or Mock()
+            self.account_service = account_service or Mock()
+            
+            # Внутренние сервисы
+            self.cache_service = Mock()
+            self.metadata_service = Mock()
+            
+            # Внутреннее состояние для тестирования
+            self._products = {}  # product_id -> Product
+            self._product_counter = 1
+            self._catalog_version = 1
+            self._cache_data = {}
+            self._metadata_cids = {}  # product_id -> metadata_cid
+            self._blockchain_ids = {}  # product_id -> blockchain_id
+            
+            # 🔧 ИЗОЛЯЦИЯ: Сбрасываем состояние при каждом создании фикстуры
+            self._reset_state()
+            
+            # Инициализация начальных данных для тестирования
+            self._initialize_test_data()
+            
+            # Настройка поведения по умолчанию
+            self._setup_default_behavior()
+            
+            logger.info("🔧 MockProductRegistryService инициализирован")
+        
+        def _reset_state(self):
+            """Сброс состояния для изоляции тестов"""
+            self._products.clear()
+            self._product_counter = 1
+            self._catalog_version = 1
+            self._cache_data.clear()
+            self._metadata_cids.clear()
+            self._blockchain_ids.clear()
+            logger.info("🔧 [MockProductRegistryService] Состояние сброшено для изоляции тестов")
+        
+        def _setup_default_behavior(self):
+            """Настройка поведения по умолчанию"""
+            # Настройка cache_service
+            self.cache_service.get_cached_item.return_value = None
+            self.cache_service.set_cached_item.return_value = True
+            self.cache_service.invalidate_cache.return_value = None
+            self.cache_service.get_description_by_cid.return_value = None
+            self.cache_service.get_image_url_by_cid.return_value = "https://mocked.ipfs/test.jpg"
+            
+            # Настройка metadata_service
+            self.metadata_service.process_product_metadata.return_value = None
+            self.metadata_service.create_product_metadata.return_value = {}
+            
+            # Настройка validation_service
+            self.validation_service.validate_product_data = AsyncMock(return_value={
+                "is_valid": True,
+                "errors": []
+            })
+            
+            # Настройка storage_service - только если это Mock объект
+            if hasattr(self.storage_service, 'return_value'):
+                # Если storage_service - это Mock объект, настраиваем его
+                self.storage_service.download_json.return_value = {
+                    "id": "test_product",
+                    "title": "Test Product",
+                    "description_cid": "QmDescriptionCID",
+                    "cover_image": "QmImageCID",
+                    "categories": ["mushroom"],
+                    "forms": ["powder"],
+                    "species": "Amanita muscaria",
+                    "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
+                }
+                self.storage_service.upload_json = AsyncMock(return_value="QmMockCID")
+                self.storage_service.is_valid_cid.return_value = True
+            # Если storage_service уже имеет реализованные методы (например, MockIPFSStorage),
+            # то не нужно их переопределять
+            
+            # Настройка blockchain_service - только если это Mock объект
+            if hasattr(self.blockchain_service, 'return_value'):
+                # Если blockchain_service - это Mock объект, настраиваем его
+                self.blockchain_service.get_catalog_version.return_value = 1
+                self.blockchain_service.get_all_products.return_value = []
+                self.blockchain_service.get_products_by_current_seller_full.return_value = []
+                self.blockchain_service.product_exists_in_blockchain.return_value = False
+                self.blockchain_service.create_product = AsyncMock(return_value="0x123")
+                self.blockchain_service.update_product_status = AsyncMock(return_value="0x456")
+                self.blockchain_service.deactivate_product = AsyncMock(return_value="0x789")
+                self.blockchain_service.get_product_id_from_tx = AsyncMock(return_value="0x42")
+            # Если blockchain_service уже имеет реализованные методы (например, MockBlockchainService),
+            # то не нужно их переопределять
+        
+        def _initialize_test_data(self):
+            """Инициализация начальных тестовых данных"""
+            # Создаем продукт с ID=1 для тестирования
+            test_product = {
+                "id": "1",
+                "title": "Test Product 1",
+                "description": {"en": "Test description for product 1"},
+                "description_cid": "QmTestDescriptionCID1",
+                "cover_image": "QmTestCoverCID1",
+                "gallery": ["QmTestGalleryCID1"],
+                "categories": ["mushroom", "test"],
+                "forms": ["powder"],
+                "species": "Amanita muscaria",
+                "organic_components": ["Amanita muscaria"],
+                "prices": [{"weight": "100", "weight_unit": "g", "price": "50", "currency": "EUR"}],
+                "attributes": {"sku": "TEST1", "stock": 10}
+            }
+            
+            # Добавляем в внутреннее состояние
+            self._products["1"] = test_product
+            self._metadata_cids["1"] = "QmTestMetadataCID1"
+            self._blockchain_ids["1"] = 1
+            
+            # Обновляем счетчик
+            self._product_counter = 2
+            
+            logger.info("🔧 [Mock] Инициализированы тестовые данные: продукт с ID=1")
+        
+        # === ОСНОВНЫЕ МЕТОДЫ УПРАВЛЕНИЯ ПРОДУКТАМИ ===
+        
+        async def create_product(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
+            """Создает новый продукт"""
+            try:
+                product_id = product_data.get("id")
+                logger.info(f"🔧 [Mock] Создание продукта: {product_id}")
+                
+                # Валидация
+                validation_result = await self.validation_service.validate_product_data(product_data)
+                if not validation_result["is_valid"]:
+                    return {
+                        "id": product_id,
+                        "status": "error",
+                        "error": "; ".join(validation_result["errors"])
+                    }
+                
+                # Проверка уникальности ID
+                if product_id and await self._check_product_id_exists(product_id):
+                    return {
+                        "id": product_id,
+                        "status": "error",
+                        "error": f"Продукт с ID '{product_id}' уже существует"
+                    }
+                
+                # Создание метаданных
+                metadata = self.create_product_metadata(product_data)
+                
+                # Загрузка в IPFS
+                metadata_cid = await self.storage_service.upload_json(metadata)
+                if not metadata_cid:
+                    return {
+                        "id": product_id,
+                        "status": "error",
+                        "error": "Ошибка загрузки метаданных в IPFS"
+                    }
+                
+                # Запись в блокчейн
+                tx_hash = await self.blockchain_service.create_product(metadata_cid)
+                if not tx_hash:
+                    return {
+                        "id": product_id,
+                        "metadata_cid": metadata_cid,
+                        "status": "error",
+                        "error": "Ошибка записи в блокчейн"
+                    }
+                
+                # Получение blockchain_id
+                blockchain_id = await self.blockchain_service.get_product_id_from_tx(tx_hash)
+                
+                # Сохранение в внутреннем состоянии
+                self._products[product_id] = product_data
+                self._metadata_cids[product_id] = metadata_cid
+                self._blockchain_ids[product_id] = blockchain_id
+                self._product_counter += 1
+                
+                logger.info(f"🔧 [Mock] Продукт {product_id} создан успешно")
+                return {
+                    "id": product_id,
+                    "metadata_cid": metadata_cid,
+                    "blockchain_id": str(blockchain_id) if blockchain_id else None,
+                    "tx_hash": str(tx_hash) if tx_hash else None,
+                    "status": "success",
+                    "error": None
+                }
+                
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка создания продукта: {e}")
+                return {
+                    "id": product_data.get("id"),
+                    "status": "error",
+                    "error": str(e)
+                }
+        
+        async def get_product(self, product_id: Union[str, int]) -> Optional[Product]:
+            """Получает продукт по ID"""
+            try:
+                if not product_id:
+                    return None
+                
+                product_id_str = str(product_id)
+                logger.info(f"🔧 [Mock] Получение продукта: {product_id_str}")
+                
+                # Проверяем внутреннее состояние
+                if product_id_str in self._products:
+                    product_data = self._products[product_id_str]
+                    metadata_cid = self._metadata_cids.get(product_id_str)
+                    blockchain_id = self._blockchain_ids.get(product_id_str)
+                    
+                    # Создаем объект Product
+                    
+                    # Создаем OrganicComponent для тестирования
+                    organic_component = OrganicComponent(
+                        biounit_id="test_biounit_1",
+                        description_cid="QmTestDescriptionCID1",
+                        proportion="100%"
+                    )
+                    
+                    # Создаем тестовую цену
+                    test_price = PriceInfo(
+                        price=50.0,
+                        weight=100,
+                        weight_unit="g",
+                        currency="EUR"
+                    )
+                    
+                    product = Product(
+                        id=blockchain_id or int(product_id_str),
+                        alias=product_id_str,
+                        status=1,  # Активный по умолчанию
+                        cid=metadata_cid or "QmMockCID",
+                        title=product_data.get("title", ""),
+                        organic_components=[organic_component],
+                        cover_image_url="https://mocked.ipfs/test.jpg",
+                        categories=product_data.get("categories", []),
+                        forms=product_data.get("forms", []),
+                        species=product_data.get("species", ""),
+                        prices=[test_price]
+                    )
+                    
+                    logger.info(f"🔧 [Mock] Продукт {product_id_str} найден")
+                    return product
+                
+                # Если не найден в внутреннем состоянии, пробуем блокчейн
+                product_data = self.blockchain_service.get_product(product_id)
+                if product_data:
+                    return await self._deserialize_product(product_data)
+                
+                logger.info(f"🔧 [Mock] Продукт {product_id_str} не найден")
+                return None
+                
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка получения продукта {product_id}: {e}")
+                return None
+        
+        async def get_all_products(self) -> List[Product]:
+            """Получает все продукты"""
+            try:
+                logger.info("🔧 [Mock] Получение всех продуктов")
+                
+                # Проверяем кэш
+                cached_catalog = self.cache_service.get_cached_item("catalog", "catalog")
+                if cached_catalog and cached_catalog.get("products"):
+                    logger.info("🔧 [Mock] Возвращаем кэшированный каталог")
+                    return cached_catalog["products"]
+                
+                # Получаем из блокчейна
+                products_data = self.blockchain_service.get_all_products()
+                products = []
+                
+                for product_data in products_data:
+                    product = await self._deserialize_product(product_data)
+                    if product:
+                        products.append(product)
+                
+                # Обновляем кэш
+                self.cache_service.set_cached_item("catalog", {
+                    "version": self._catalog_version,
+                    "products": products
+                }, "catalog")
+                
+                logger.info(f"🔧 [Mock] Получено {len(products)} продуктов")
+                return products
+                
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка получения всех продуктов: {e}")
+                return []
+        
+        async def update_product(self, product_id: str, product_data: Dict[str, Any]) -> Dict[str, Any]:
+            """Обновляет продукт"""
+            try:
+                logger.info(f"🔧 [Mock] Обновление продукта: {product_id}")
+                
+                # Проверка существования
+                existing_product = await self.get_product(product_id)
+                if not existing_product:
+                    return {
+                        "id": product_id,
+                        "status": "error",
+                        "error": f"Продукт с ID {product_id} не найден"
+                    }
+                
+                # Валидация
+                is_valid = await self.validate_product(product_data)
+                if not is_valid:
+                    return {
+                        "id": product_id,
+                        "status": "error",
+                        "error": f"Данные продукта {product_id} не прошли валидацию"
+                    }
+                
+                # Обновление метаданных
+                new_metadata = self.create_product_metadata(product_data)
+                new_metadata["updated_at"] = datetime.now().isoformat()
+                
+                # Загрузка в IPFS
+                new_metadata_cid = await self.storage_service.upload_json(new_metadata)
+                if not new_metadata_cid:
+                    return {
+                        "id": product_id,
+                        "status": "error",
+                        "error": f"Не удалось загрузить метаданные в IPFS для продукта {product_id}"
+                    }
+                
+                # Обновление внутреннего состояния
+                self._products[product_id] = product_data
+                self._metadata_cids[product_id] = new_metadata_cid
+                
+                logger.info(f"🔧 [Mock] Продукт {product_id} обновлен успешно")
+                return {
+                    "id": product_id,
+                    "metadata_cid": new_metadata_cid,
+                    "blockchain_id": None,  # Не обновляем в блокчейне в Mock
+                    "tx_hash": None,
+                    "status": "success",
+                    "error": None
+                }
+                
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка обновления продукта {product_id}: {e}")
+                return {
+                    "id": product_id,
+                    "status": "error",
+                    "error": str(e)
+                }
+        
+        async def update_product_status(self, product_id: int, new_status: int) -> bool:
+            """Обновляет статус продукта"""
+            try:
+                logger.info(f"🔧 [Mock] Обновление статуса продукта {product_id} на {new_status}")
+                
+                # Проверка существования
+                existing_product = await self.get_product(str(product_id))
+                if not existing_product:
+                    self.logger.error(f"🔧 [Mock] Продукт {product_id} не найден")
+                    return False
+                
+                # Выполнение операции в блокчейне
+                tx_hash = await self.blockchain_service.update_product_status(
+                    "mock_private_key",
+                    product_id,
+                    new_status
+                )
+                
+                if not tx_hash:
+                    self.logger.error(f"🔧 [Mock] Ошибка обновления статуса продукта {product_id}")
+                    return False
+                
+                logger.info(f"🔧 [Mock] Статус продукта {product_id} обновлен: {new_status}")
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка обновления статуса продукта {product_id}: {e}")
+                return False
+        
+        async def deactivate_product(self, product_id: int) -> bool:
+            """Деактивирует продукт"""
+            try:
+                logger.info(f"🔧 [Mock] Деактивация продукта {product_id}")
+                
+                tx_hash = await self.blockchain_service.deactivate_product(product_id)
+                if not tx_hash:
+                    self.logger.error(f"🔧 [Mock] Ошибка деактивации продукта {product_id}")
+                    return False
+                
+                logger.info(f"🔧 [Mock] Продукт {product_id} деактивирован")
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка деактивации продукта {product_id}: {e}")
+                return False
+        
+        # === МЕТОДЫ ВАЛИДАЦИИ И ПРОВЕРКИ ===
+        
+        async def validate_product(self, product_data: Dict[str, Any]) -> bool:
+            """Валидирует данные продукта"""
+            try:
+                logger.info(f"🔧 [Mock] Валидация продукта")
+                
+                # Проверяем обязательные поля
+                required_fields = ['title', 'organic_components', 'categories', 'cover_image', 'forms', 'species', 'prices']
+                for field in required_fields:
+                    if field not in product_data:
+                        self.logger.error(f"Missing required field: {field}")
+                        return False
+                    
+                    if not product_data[field]:
+                        self.logger.error(f"Empty required field: {field}")
+                        return False
+                
+                # Проверяем цены
+                if not isinstance(product_data['prices'], list) or not product_data['prices']:
+                    self.logger.error("Цены должны быть непустым списком")
+                    return False
+                
+                # Проверяем формы
+                if not isinstance(product_data['forms'], list) or not product_data['forms']:
+                    self.logger.error("Формы должны быть непустым списком")
+                    return False
+                
+                # Проверяем IPFS CID
+                if not self.storage_service.is_valid_cid(product_data['cover_image']):
+                    self.logger.error("Invalid cover image CID")
+                    return False
+                
+                logger.info("🔧 [Mock] Валидация продукта прошла успешно")
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка валидации продукта: {e}")
+                return False
+        
+        async def _check_product_id_exists(self, product_id: Union[str, int]) -> bool:
+            """Проверяет существование продукта по ID"""
+            try:
+                product_id_str = str(product_id)
+                logger.info(f"🔧 [Mock] Проверка существования продукта: {product_id_str}")
+                
+                # Проверяем внутреннее состояние
+                if product_id_str in self._products:
+                    logger.info(f"🔧 [Mock] Продукт {product_id_str} найден во внутреннем состоянии")
+                    return True
+                
+                # Проверяем через get_product
+                product = await self.get_product(product_id_str)
+                if product:
+                    logger.info(f"🔧 [Mock] Продукт {product_id_str} найден через get_product")
+                    return True
+                
+                # Проверяем блокчейн ID если это число
+                try:
+                    numeric_id = int(product_id_str)
+                    if self._check_blockchain_product_exists(numeric_id):
+                        logger.info(f"🔧 [Mock] Продукт с blockchain ID {numeric_id} найден")
+                        return True
+                except (ValueError, TypeError):
+                    pass
+                
+                logger.info(f"🔧 [Mock] Продукт {product_id_str} не найден")
+                return False
+                
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка проверки существования продукта {product_id}: {e}")
+                return False
+        
+        def _check_blockchain_product_exists(self, blockchain_id: int) -> bool:
+            """Проверяет существование продукта в блокчейне"""
+            try:
+                logger.info(f"🔧 [Mock] Проверка blockchain ID: {blockchain_id}")
+                
+                exists = self.blockchain_service.product_exists_in_blockchain(blockchain_id)
+                logger.info(f"🔧 [Mock] Blockchain ID {blockchain_id} {'найден' if exists else 'не найден'}")
+                return exists
+                
+            except Exception as e:
+                self.logger.warning(f"🔧 [Mock] Ошибка при проверке blockchain ID {blockchain_id}: {e}")
+                return False
+        
+        # === МЕТОДЫ КЭШИРОВАНИЯ ===
+        
+        def _is_cache_valid(self, timestamp: datetime, cache_type: str) -> bool:
+            """Проверяет актуальность кэша"""
+            if not timestamp:
+                return False
+            
+            cache_ttl = {
+                'catalog': timedelta(minutes=5),
+                'description': timedelta(hours=24),
+                'image': timedelta(hours=12)
+            }
+            
+            return datetime.utcnow() - timestamp < cache_ttl.get(cache_type, timedelta(minutes=5))
+        
+        def _update_catalog_cache(self, version: int, products: List[Product]) -> None:
+            """Обновляет кэш каталога"""
+            self.cache_service.set_cached_item("catalog", {
+                "version": version,
+                "products": products
+            }, "catalog")
+            logger.info(f"🔧 [Mock] Кэш каталога обновлен: {len(products)} продуктов")
+        
+        def clear_cache(self, cache_type: Optional[str] = None) -> None:
+            """Очищает кэш"""
+            self.cache_service.invalidate_cache(cache_type)
+            logger.info(f"🔧 [Mock] Кэш очищен: {cache_type if cache_type else 'все'}")
+        
+        def get_catalog_version(self) -> int:
+            """Получает версию каталога"""
+            try:
+                version = self.blockchain_service.get_catalog_version()
+                logger.info(f"🔧 [Mock] Версия каталога: {version}")
+                return version
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка получения версии каталога: {e}")
+                return 0
+        
+        # === МЕТОДЫ РАБОТЫ С МЕТАДАННЫМИ ===
+        
+        def create_product_metadata(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
+            """Создает метаданные продукта"""
+            try:
+                logger.info("🔧 [Mock] Создание метаданных продукта")
+                
+                metadata = {
+                    "id": product_data["id"],
+                    "title": product_data["title"],
+                    "organic_components": product_data["organic_components"],
+                    "cover_image": product_data["cover_image"],
+                    "categories": product_data["categories"],
+                    "forms": product_data["forms"],
+                    "species": product_data["species"],
+                    "prices": product_data["prices"],
+                    "created_at": datetime.now().isoformat()
+                }
+                
+                logger.info("🔧 [Mock] Метаданные созданы успешно")
+                return metadata
+                
+            except KeyError as e:
+                self.logger.error(f"🔧 [Mock] Отсутствует обязательное поле: {e}")
+                raise
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка создания метаданных: {e}")
+                raise
+        
+        def upload_product_metadata(self, product_metadata: Dict[str, Any]) -> str:
+            """Загружает метаданные продукта"""
+            try:
+                logger.info("🔧 [Mock] Загрузка метаданных продукта")
+                cid = self.storage_service.upload_json(product_metadata)
+                logger.info(f"🔧 [Mock] Метаданные загружены: {cid}")
+                return cid
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка загрузки метаданных: {e}")
+                raise
+        
+        def upload_media_file(self, file_path: str) -> str:
+            """Загружает медиафайл"""
+            try:
+                logger.info(f"🔧 [Mock] Загрузка медиафайла: {file_path}")
+                cid = self.storage_service.upload_media_file(file_path)
+                logger.info(f"🔧 [Mock] Медиафайл загружен: {cid}")
+                return cid
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка загрузки медиафайла: {e}")
+                raise
+        
+        def create_product_on_chain(self, ipfs_cid: str) -> str:
+            """Создает продукт в блокчейне"""
+            try:
+                logger.info(f"🔧 [Mock] Создание продукта в блокчейне: {ipfs_cid}")
+                
+                if not self._validate_ipfs_cid(ipfs_cid):
+                    raise ValueError(f"Некорректный CID: {ipfs_cid}")
+                
+                tx_hash = self.blockchain_service.create_product(ipfs_cid)
+                if not tx_hash:
+                    raise Exception("Транзакция не прошла")
+                
+                logger.info(f"🔧 [Mock] Продукт создан в блокчейне: {tx_hash}")
+                return tx_hash
+                
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка создания продукта в блокчейне: {e}")
+                raise
+        
+        # === МЕТОДЫ ОБРАБОТКИ ПРОДУКТОВ ===
+        
+        def _process_product_metadata(self, product_id: Union[int, str], ipfs_cid: str, active: bool) -> Optional[Product]:
+            """Обрабатывает метаданные продукта"""
+            try:
+                logger.info(f"🔧 [Mock] Обработка метаданных продукта: {product_id}")
+                
+                # Валидация CID
+                validation_result = self.validation_service.validate_cid(ipfs_cid)
+                if not validation_result["is_valid"]:
+                    self.logger.error(f"🔧 [Mock] Некорректный CID метаданных: {ipfs_cid}")
+                    return None
+                
+                # Загрузка метаданных
+                metadata = self.storage_service.download_json(ipfs_cid)
+                if not isinstance(metadata, dict):
+                    self.logger.error(f"🔧 [Mock] Некорректный формат метаданных: {product_id}")
+                    return None
+                
+                # Создание объекта Product
+                product = Product(
+                    id=product_id,
+                    alias=str(product_id),
+                    status=1 if active else 0,
+                    cid=ipfs_cid,
+                    title=metadata.get('title', ''),
+                    description=None,
+                    description_cid=metadata.get('description_cid', ''),
+                    cover_image_url=self._get_cached_image(metadata.get('cover_image', '')),
+                    categories=metadata.get('categories', []),
+                    forms=metadata.get('forms', []),
+                    species=metadata.get('species', ''),
+                    prices=[]
+                )
+                
+                logger.info(f"🔧 [Mock] Метаданные продукта {product_id} обработаны")
+                return product
+                
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка обработки метаданных продукта {product_id}: {e}")
+                return None
+        
+        async def _deserialize_product(self, product_data: tuple) -> Optional[Product]:
+            """Десериализует продукт из кортежа блокчейна"""
+            try:
+                if not hasattr(product_data, '__getitem__') or len(product_data) < 4:
+                    self.logger.error(f"🔧 [Mock] Некорректная структура product_data: {product_data}")
+                    return None
+                
+                product_id = product_data[0]
+                ipfs_cid = product_data[2]
+                is_active = bool(product_data[3])
+                
+                logger.info(f"🔧 [Mock] Десериализация продукта: {product_id}, {ipfs_cid}, {is_active}")
+                
+                # Загрузка метаданных
+                metadata = self.storage_service.download_json(ipfs_cid)
+                if not metadata:
+                    self.logger.warning(f"🔧 [Mock] Не удалось получить метаданные для продукта {product_id}")
+                    return None
+                
+                # Обработка через metadata_service
+                product = self.metadata_service.process_product_metadata(metadata)
+                if product:
+                    product.id = product_id
+                    product.cid = ipfs_cid
+                    product.status = 1 if is_active else 0
+                
+                logger.info(f"🔧 [Mock] Продукт {product_id} десериализован")
+                return product
+                
+            except Exception as e:
+                self.logger.error(f"🔧 [Mock] Ошибка десериализации продукта: {e}")
+                return None
+        
+        # === МЕТОДЫ РАБОТЫ С IPFS CID ===
+        
+        def _validate_ipfs_cid(self, cid: str) -> bool:
+            """Проверяет валидность IPFS CID"""
+            if not cid:
+                return False
+            import re
+            pattern = re.compile(r'^(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[A-Za-z2-7]{55})$')
+            return bool(pattern.match(cid))
+        
+        def _get_cached_description(self, description_cid: str) -> Optional[Description]:
+            """Получает кэшированное описание продукта"""
+            return self.cache_service.get_description_by_cid(description_cid)
+        
+        def _get_cached_image(self, image_cid: str) -> Optional[str]:
+            """Получает кэшированную ссылку на изображение"""
+            return self.cache_service.get_image_url_by_cid(image_cid)
+        
+        # === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
+        
+        def clear_state(self):
+            """Очищает внутреннее состояние для тестирования"""
+            self._products.clear()
+            self._metadata_cids.clear()
+            self._blockchain_ids.clear()
+            self._product_counter = 1
+            self._catalog_version = 1
+            self._cache_data.clear()
+            logger.info("🔧 [Mock] Внутреннее состояние очищено")
+        
+        def get_internal_state(self) -> Dict[str, Any]:
+            """Возвращает внутреннее состояние для отладки"""
+            return {
+                "products_count": len(self._products),
+                "metadata_cids_count": len(self._metadata_cids),
+                "blockchain_ids_count": len(self._blockchain_ids),
+                "product_counter": self._product_counter,
+                "catalog_version": self._catalog_version
+            }
+    
+    return MockProductRegistryService(
+        blockchain_service=mock_blockchain_service,
+        storage_service=mock_ipfs_storage,
+        validation_service=mock_validation_service,
+        account_service=mock_account_service
+    )
+
+@pytest.fixture(scope="function")
 def mock_registry_service_with_failing_storage(mock_blockchain_service, mock_validation_service, mock_account_service, mock_ipfs_storage_failing):
     """ProductRegistryService с моканным IPFS storage, который симулирует ошибки"""
     from bot.services.product.registry import ProductRegistryService
@@ -880,8 +1670,8 @@ def mock_registry_service_with_failing_storage(mock_blockchain_service, mock_val
         account_service=mock_account_service
     )
 
-@pytest.fixture
-def mock_registry_service_with_failing_validation(mock_blockchain_service, mock_ipfs_storage, mock_account_service, mock_validation_service_failing):
+@pytest.fixture(scope="function")
+def mock_product_registry_service_with_failing_validation(mock_blockchain_service, mock_ipfs_storage, mock_account_service, mock_validation_service_failing):
     """ProductRegistryService с моканным validation service, который симулирует ошибки"""
     from bot.services.product.registry import ProductRegistryService
     
@@ -895,7 +1685,7 @@ def mock_registry_service_with_failing_validation(mock_blockchain_service, mock_
 
 # === ИНТЕГРАЦИОННЫЕ ТЕСТЫ - НОВЫЕ ФИКСТУРЫ ===
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def integration_storage_config():
     """Конфигурация storage для интеграционных тестов с детальным логированием для DevOps"""
     # 🔍 Детальное логирование переменных окружения для DevOps мониторинга
@@ -1004,7 +1794,7 @@ def _get_real_arweave_storage():
         return _create_mock_storage()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def integration_registry_service_real_blockchain(integration_storage_config):
     """Интеграционный сервис с реальным блокчейном и настраиваемым storage"""
     from bot.dependencies import get_product_registry_service
@@ -1033,7 +1823,7 @@ def integration_registry_service_real_blockchain(integration_storage_config):
     return registry_service
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def seller_account():
     """Аккаунт продавца для тестирования"""
     seller_private_key = os.getenv("SELLER_PRIVATE_KEY")
@@ -1050,10 +1840,12 @@ def seller_account():
         pytest.skip(f"Ошибка создания аккаунта: {e}")
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def test_products():
     """Генерация тестовых продуктов для интеграционных тестов"""
-    return [
+    print("🔧 [Test Products] Создание тестовых продуктов")
+    
+    products = [
         {
             "id": "amanita1",
             "title": "Amanita muscaria — sliced caps and gills (1st grade)",
@@ -1085,14 +1877,427 @@ def test_products():
             "prices": [{"weight": "60", "weight_unit": "capsules", "price": "120", "currency": "EUR"}]
         }
     ]
+    
+    yield products
+    
+    print("🧹 [Test Products] Тестовые продукты очищены")
 
+# === ФИКСТУРЫ ДЛЯ ПРЕДВАРИТЕЛЬНОЙ ЗАГРУЗКИ ДАННЫХ ===
+
+@pytest.fixture(scope="function")
+async def preloaded_products_basic(mock_product_registry_service):
+    """
+    Фикстура для предварительной загрузки базовых тестовых продуктов.
+    Scope: function - каждый тест получает свежие данные.
+    """
+    products_data = [
+        {
+            "id": "preload_basic_001",
+            "title": "Basic Test Product 1",
+            "organic_components": [
+                {
+                    "biounit_id": "amanita_muscaria",
+                    "description_cid": "QmBasicTestCID001",
+                    "proportion": "100%"
+                }
+            ],
+            "cover_image": "QmBasicCoverCID001",
+            "categories": ["mushroom", "test"],
+            "forms": ["powder"],
+            "species": "Amanita muscaria",
+            "prices": [
+                {
+                    "weight": "100",
+                    "weight_unit": "g",
+                    "price": "50",
+                    "currency": "EUR"
+                }
+            ]
+        },
+        {
+            "id": "preload_basic_002",
+            "title": "Basic Test Product 2",
+            "organic_components": [
+                {
+                    "biounit_id": "amanita_pantherina",
+                    "description_cid": "QmBasicTestCID002",
+                    "proportion": "100%"
+                }
+            ],
+            "cover_image": "QmBasicCoverCID002",
+            "categories": ["mushroom", "test"],
+            "forms": ["capsules"],
+            "species": "Amanita pantherina",
+            "prices": [
+                {
+                    "weight": "60",
+                    "weight_unit": "capsules",
+                    "price": "75",
+                    "currency": "EUR"
+                }
+            ]
+        }
+    ]
+    
+    # Загружаем продукты в mock сервис
+    created_products = []
+    for product_data in products_data:
+        result = await mock_product_registry_service.create_product(product_data)
+        if result["status"] == "success":
+            created_products.append(result)
+            print(f"🔧 [Preload] Создан продукт: {product_data['id']}")
+        else:
+            print(f"⚠️ [Preload] Ошибка создания продукта {product_data['id']}: {result['error']}")
+    
+    yield created_products
+    
+    # Очистка после теста (автоматически)
+    print(f"🧹 [Preload] Очистка {len(created_products)} предзагруженных продуктов")
+
+@pytest.fixture(scope="function")
+async def preloaded_products_extended(mock_product_registry_service):
+    """
+    Фикстура для предварительной загрузки расширенных тестовых продуктов.
+    Scope: function - каждый тест получает свежие данные.
+    """
+    products_data = [
+        {
+            "id": "preload_extended_001",
+            "title": "Extended Test Product 1",
+            "organic_components": [
+                {
+                    "biounit_id": "amanita_muscaria",
+                    "description_cid": "QmExtendedTestCID001",
+                    "proportion": "70%"
+                },
+                {
+                    "biounit_id": "amanita_pantherina",
+                    "description_cid": "QmExtendedTestCID002",
+                    "proportion": "30%"
+                }
+            ],
+            "cover_image": "QmExtendedCoverCID001",
+            "categories": ["mushroom", "test", "extended"],
+            "forms": ["powder", "capsules"],
+            "species": "Amanita muscaria",
+            "prices": [
+                {
+                    "weight": "200",
+                    "weight_unit": "g",
+                    "price": "120",
+                    "currency": "EUR"
+                },
+                {
+                    "weight": "100",
+                    "weight_unit": "capsules",
+                    "price": "80",
+                    "currency": "EUR"
+                }
+            ]
+        },
+        {
+            "id": "preload_extended_002",
+            "title": "Extended Test Product 2",
+            "organic_components": [
+                {
+                    "biounit_id": "blue_lotus",
+                    "description_cid": "QmExtendedTestCID003",
+                    "proportion": "100%"
+                }
+            ],
+            "cover_image": "QmExtendedCoverCID002",
+            "categories": ["flower", "test", "extended"],
+            "forms": ["tincture"],
+            "species": "Blue Lotus",
+            "prices": [
+                {
+                    "weight": "50",
+                    "weight_unit": "ml",
+                    "price": "45",
+                    "currency": "EUR"
+                }
+            ]
+        }
+    ]
+    
+    # Загружаем продукты в mock сервис
+    created_products = []
+    for product_data in products_data:
+        result = await mock_product_registry_service.create_product(product_data)
+        if result["status"] == "success":
+            created_products.append(result)
+            print(f"🔧 [Preload] Создан расширенный продукт: {product_data['id']}")
+        else:
+            print(f"⚠️ [Preload] Ошибка создания расширенного продукта {product_data['id']}: {result['error']}")
+    
+    yield created_products
+    
+    # Очистка после теста (автоматически)
+    print(f"🧹 [Preload] Очистка {len(created_products)} расширенных продуктов")
+
+@pytest.fixture(scope="function")
+async def preloaded_products_validation(mock_product_registry_service):
+    """
+    Фикстура для предварительной загрузки продуктов для тестирования валидации.
+    Scope: function - каждый тест получает свежие данные.
+    """
+    products_data = [
+        {
+            "id": "preload_validation_001",
+            "title": "Validation Test Product 1",
+            "organic_components": [
+                {
+                    "biounit_id": "amanita_muscaria",
+                    "description_cid": "QmValidationTestCID001",
+                    "proportion": "100%"
+                }
+            ],
+            "cover_image": "QmValidationCoverCID001",
+            "categories": ["mushroom", "validation"],
+            "forms": ["powder"],
+            "species": "Amanita muscaria",
+            "prices": [
+                {
+                    "weight": "100",
+                    "weight_unit": "g",
+                    "price": "50",
+                    "currency": "EUR"
+                }
+            ]
+        },
+        {
+            "id": "preload_validation_002",
+            "title": "Validation Test Product 2",
+            "organic_components": [
+                {
+                    "biounit_id": "amanita_pantherina",
+                    "description_cid": "QmValidationTestCID002",
+                    "proportion": "100%"
+                }
+            ],
+            "cover_image": "QmValidationCoverCID002",
+            "categories": ["mushroom", "validation"],
+            "forms": ["capsules"],
+            "species": "Amanita pantherina",
+            "prices": [
+                {
+                    "weight": "60",
+                    "weight_unit": "capsules",
+                    "price": "75",
+                    "currency": "EUR"
+                }
+            ]
+        }
+    ]
+    
+    # Загружаем продукты в mock сервис
+    created_products = []
+    for product_data in products_data:
+        result = await mock_product_registry_service.create_product(product_data)
+        if result["status"] == "success":
+            created_products.append(result)
+            print(f"🔧 [Preload] Создан продукт для валидации: {product_data['id']}")
+        else:
+            print(f"⚠️ [Preload] Ошибка создания продукта для валидации {product_data['id']}: {result['error']}")
+    
+    yield created_products
+    
+    # Очистка после теста (автоматически)
+    print(f"🧹 [Preload] Очистка {len(created_products)} продуктов для валидации")
+
+@pytest.fixture(scope="function")
+def preloaded_categories():
+    """
+    Фикстура для предварительной загрузки категорий продуктов.
+    Scope: function - каждый тест получает свежие данные.
+    """
+    print("🔧 [Preload] Загрузка категорий продуктов")
+    
+    categories = [
+        "mushroom",
+        "flower", 
+        "herb",
+        "test",
+        "validation",
+        "extended",
+        "mental health",
+        "focus",
+        "ADHD support",
+        "mental force",
+        "energy",
+        "relaxation",
+        "sleep",
+        "immunity",
+        "digestion"
+    ]
+    
+    print(f"🔧 [Preload] Загружено {len(categories)} категорий")
+    yield categories
+    
+    print("🧹 [Preload] Категории продуктов очищены")
+
+@pytest.fixture(scope="function")
+def preloaded_forms():
+    """
+    Фикстура для предварительной загрузки форм продуктов.
+    Scope: function - каждый тест получает свежие данные.
+    """
+    print("🔧 [Preload] Загрузка форм продуктов")
+    
+    forms = [
+        "powder",
+        "capsules",
+        "tincture",
+        "tea",
+        "extract",
+        "mixed slices",
+        "dried",
+        "fresh",
+        "oil",
+        "cream"
+    ]
+    
+    print(f"🔧 [Preload] Загружено {len(forms)} форм")
+    yield forms
+    
+    print("🧹 [Preload] Формы продуктов очищены")
+
+@pytest.fixture(scope="function")
+def preloaded_species():
+    """
+    Фикстура для предварительной загрузки видов продуктов.
+    Scope: function - каждый тест получает свежие данные.
+    """
+    print("🔧 [Preload] Загрузка видов продуктов")
+    
+    species = [
+        "Amanita muscaria",
+        "Amanita pantherina",
+        "Blue Lotus",
+        "Chaga",
+        "Cordyceps militaris",
+        "Lion's Mane",
+        "Reishi",
+        "Chamomile",
+        "Lavender",
+        "Peppermint"
+    ]
+    
+    print(f"🔧 [Preload] Загружено {len(species)} видов")
+    yield species
+    
+    print("🧹 [Preload] Виды продуктов очищены")
+
+@pytest.fixture(scope="function")
+def preloaded_biounits():
+    """
+    Фикстура для предварительной загрузки биологических единиц.
+    Scope: function - каждый тест получает свежие данные.
+    """
+    print("🔧 [Preload] Загрузка биологических единиц")
+    
+    biounits = [
+        "amanita_muscaria",
+        "amanita_pantherina",
+        "blue_lotus",
+        "chaga",
+        "cordyceps_militaris",
+        "lions_mane",
+        "reishi",
+        "chamomile",
+        "lavender",
+        "peppermint"
+    ]
+    
+    print(f"🔧 [Preload] Загружено {len(biounits)} биологических единиц")
+    yield biounits
+    
+    print("🧹 [Preload] Биологические единицы очищены")
+
+@pytest.fixture(scope="function")
+async def preloaded_all_data(mock_product_registry_service):
+    """
+    Фикстура для предварительной загрузки всех типов данных.
+    Scope: function - каждый тест получает свежие данные.
+    """
+    # Загружаем продукты
+    basic_products = await preloaded_products_basic(mock_product_registry_service)
+    extended_products = await preloaded_products_extended(mock_product_registry_service)
+    validation_products = await preloaded_products_validation(mock_product_registry_service)
+    
+    # Загружаем справочные данные
+    categories = preloaded_categories()
+    forms = preloaded_forms()
+    species = preloaded_species()
+    biounits = preloaded_biounits()
+    
+    # Собираем все данные
+    all_data = {
+        "products": {
+            "basic": basic_products,
+            "extended": extended_products,
+            "validation": validation_products
+        },
+        "reference": {
+            "categories": categories,
+            "forms": forms,
+            "species": species,
+            "biounits": biounits
+        }
+    }
+    
+    print(f"🔧 [Preload] Загружены все данные: {len(basic_products)} + {len(extended_products)} + {len(validation_products)} продуктов, {len(categories)} категорий, {len(forms)} форм")
+    
+    yield all_data
+    
+    # Очистка происходит автоматически через yield в отдельных фикстурах
+    print("🧹 [Preload] Очистка всех предзагруженных данных")
+
+@pytest.fixture(params=["basic", "extended", "validation"])
+def product_type_parametrized(request):
+    """
+    Фикстура для параметризованного тестирования разных типов продуктов.
+    Scope: function - каждый тест получает свежие данные.
+    """
+    product_type = request.param
+    print(f"🔧 [Preload] Параметризованный тип продукта: {product_type}")
+    
+    yield product_type
+    
+    print(f"🧹 [Preload] Параметризованный тип продукта {product_type} очищен")
+
+@pytest.fixture(params=["mushroom", "flower", "herb"])
+def category_parametrized(request):
+    """
+    Фикстура для параметризованного тестирования разных категорий.
+    Scope: function - каждый тест получает свежие данные.
+    """
+    category = request.param
+    print(f"🔧 [Preload] Параметризованная категория: {category}")
+    
+    yield category
+    
+    print(f"🧹 [Preload] Параметризованная категория {category} очищена")
+
+@pytest.fixture(params=["powder", "capsules", "tincture"])
+def form_parametrized(request):
+    """
+    Фикстура для параметризованного тестирования разных форм.
+    Scope: function - каждый тест получает свежие данные.
+    """
+    form = request.param
+    print(f"🔧 [Preload] Параметризованная форма: {form}")
+    
+    yield form
+    
+    print(f"🧹 [Preload] Параметризованная форма {form} очищена")
 
 # === ТЕСТЫ ДЛЯ ПРОВЕРКИ ФИКСТУР ===
 
 def test_integration_storage_config_mock():
     """Тест фикстуры integration_storage_config в mock режиме"""
     # Сохраняем оригинальное значение переменной окружения
-    original_storage = os.getenv("INTEGRATION_STORAGE")
+    original_storage = os.getenv("INTEGRATION_STORAME")
     
     try:
         # Устанавливаем mock режим
@@ -1114,6 +2319,62 @@ def test_integration_storage_config_mock():
             os.environ["INTEGRATION_STORAGE"] = original_storage
         else:
             os.environ.pop("INTEGRATION_STORAGE", None)
+
+
+def test_preloaded_fixtures():
+    """Тест новых фикстур для предварительной загрузки данных"""
+    # Тестируем синхронные фикстуры
+    categories = preloaded_categories()
+    forms = preloaded_forms()
+    species = preloaded_species()
+    biounits = preloaded_biounits()
+    
+    # Проверяем структуру данных
+    assert isinstance(categories, list)
+    assert isinstance(forms, list)
+    assert isinstance(species, list)
+    assert isinstance(biounits, list)
+    
+    # Проверяем содержимое
+    assert len(categories) > 0
+    assert len(forms) > 0
+    assert len(species) > 0
+    assert len(biounits) > 0
+    
+    # Проверяем конкретные значения
+    assert "mushroom" in categories
+    assert "powder" in forms
+    assert "Amanita muscaria" in species
+    assert "amanita_muscaria" in biounits
+    
+    print("✅ Тест новых фикстур для предварительной загрузки данных пройден")
+
+
+@pytest.mark.asyncio
+async def test_preloaded_products_fixtures(mock_product_registry_service):
+    """Тест асинхронных фикстур для предварительной загрузки продуктов"""
+    # Тестируем асинхронные фикстуры
+    basic_products = await preloaded_products_basic(mock_product_registry_service)
+    extended_products = await preloaded_products_extended(mock_product_registry_service)
+    validation_products = await preloaded_products_validation(mock_product_registry_service)
+    
+    # Проверяем структуру данных
+    assert isinstance(basic_products, list)
+    assert isinstance(extended_products, list)
+    assert isinstance(validation_products, list)
+    
+    # Проверяем содержимое
+    assert len(basic_products) > 0
+    assert len(extended_products) > 0
+    assert len(validation_products) > 0
+    
+    # Проверяем, что продукты созданы успешно
+    for product in basic_products + extended_products + validation_products:
+        assert "status" in product
+        assert product["status"] == "success"
+        assert "id" in product
+    
+    print("✅ Тест асинхронных фикстур для предварительной загрузки продуктов пройден")
 
 
 def test_integration_storage_config_fallback():
