@@ -11,6 +11,7 @@ from decimal import Decimal
 from .base import BaseConverter
 from bot.api.models.product import PriceModel
 from bot.model.product import PriceInfo
+from bot.validation import ValidationFactory, ValidationResult
 
 
 class PriceConverter(BaseConverter[PriceModel, PriceInfo]):
@@ -196,7 +197,7 @@ class PriceConverter(BaseConverter[PriceModel, PriceInfo]):
     
     def validate_api_model(self, api_model: PriceModel) -> bool:
         """
-        Расширенная валидация API модели.
+        Валидирует API модель через ValidationFactory.
         
         Args:
             api_model: API модель для валидации
@@ -205,15 +206,10 @@ class PriceConverter(BaseConverter[PriceModel, PriceInfo]):
             bool: True если модель валидна, False если нет
         """
         try:
-            # Базовая валидация
-            if not super().validate_api_model(api_model):
-                return False
-            
-            # Дополнительная валидация полей
-            if api_model.price <= 0:
-                return False
-            
-            if not api_model.currency or not api_model.currency.strip():
+            # Валидируем цену и валюту через PriceValidator
+            price_validator = ValidationFactory.get_price_validator()
+            price_result = price_validator.validate_with_currency(api_model.price, api_model.currency)
+            if not price_result.is_valid:
                 return False
             
             # Проверяем, что указан либо вес, либо объем, но не оба
@@ -230,7 +226,7 @@ class PriceConverter(BaseConverter[PriceModel, PriceInfo]):
     
     def validate_service_model(self, service_model: PriceInfo) -> bool:
         """
-        Расширенная валидация Service модели.
+        Валидирует Service модель через ValidationFactory.
         
         Args:
             service_model: Service модель для валидации
@@ -239,15 +235,10 @@ class PriceConverter(BaseConverter[PriceModel, PriceInfo]):
             bool: True если модель валидна, False если нет
         """
         try:
-            # Базовая валидация
-            if not super().validate_service_model(service_model):
-                return False
-            
-            # Дополнительная валидация полей
-            if service_model.price <= 0:
-                return False
-            
-            if not service_model.currency or not service_model.currency.strip():
+            # Валидируем цену и валюту через PriceValidator
+            price_validator = ValidationFactory.get_price_validator()
+            price_result = price_validator.validate_with_currency(service_model.price, service_model.currency)
+            if not price_result.is_valid:
                 return False
             
             # Проверяем, что указан либо вес, либо объем, но не оба

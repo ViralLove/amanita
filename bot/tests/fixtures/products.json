@@ -2,6 +2,7 @@
     "valid_products": [
         {
             "id": "amanita1",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Amanita muscaria — sliced caps and gills (1st grade)",
             "organic_components": [
                 {
@@ -17,7 +18,7 @@
                 "ADHD support",
                 "mental force"
             ],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "forms": ["mixed slices"],
             "species": "Amanita muscaria",
             "prices": [
@@ -31,6 +32,7 @@
         },
         {
             "id": "blue_lotus_tincture",
+            "cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
             "title": "Blue Lotus — Tinctura",
             "organic_components": [
                 {
@@ -46,7 +48,7 @@
                 "ADHD support",
                 "mental force"
             ],
-            "cover_image": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
+            "cover_image_url": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
             "forms": ["tincture"],
             "species": "Nymphaea caerulea (Blue Lotus)",
             "prices": [
@@ -60,6 +62,7 @@
         },
         {
             "id": "amanita_multiple_forms",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Amanita muscaria — Multiple Forms",
             "organic_components": [
                 {
@@ -72,7 +75,7 @@
                 "mushroom",
                 "mental health"
             ],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "forms": ["powder", "capsules", "tincture"],
             "species": "Amanita muscaria",
             "prices": [
@@ -92,104 +95,26 @@
         },
         {
             "id": "sleep_formula_1",
+            "cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
             "title": "Формула глубокого сна",
             "organic_components": [
                 {
                     "biounit_id": "blue_lotus",
                     "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
                     "proportion": "50%"
-                },
-                {
-                    "biounit_id": "passionflower",
-                    "description_cid": "QmYXGiCLB1sPtkoskNWA5dCo8d9uW6RVVS94uq2xf6awQ7",
-                    "proportion": "30%"
-                },
-                {
-                    "biounit_id": "mint",
-                    "description_cid": "QmR88CGcBUqvHFMavUeuodQEuCDHMP4zKKxdN3QMYz7Ayj",
-                    "proportion": "20%"
                 }
             ],
             "categories": [
-                "sleep_support",
-                "relaxation",
-                "herbal_blend"
+                "plant",
+                "mental health",
+                "sleep"
             ],
-            "cover_image": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
-            "forms": ["blend"],
-            "species": "Herbal Formula",
-            "prices": [
-                {
-                    "weight": "100",
-                    "weight_unit": "g",
-                    "price": "45",
-                    "currency": "EUR"
-                }
-            ]
-        },
-        {
-            "id": "test_product_1",
-            "title": "Test Product for API Testing",
-            "organic_components": [
-                {
-                    "biounit_id": "test_component",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "100%"
-                }
-            ],
-            "categories": ["test", "api_testing"],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
-            "forms": ["test"],
-            "species": "Test species",
-            "prices": [
-                {
-                    "weight": "100",
-                    "weight_unit": "g",
-                    "price": "100",
-                    "currency": "EUR"
-                }
-            ]
-        },
-        {
-            "id": "test_product_2",
-            "title": "Second Test Product",
-            "organic_components": [
-                {
-                    "biounit_id": "test_component_2",
-                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
-                    "proportion": "100%"
-                }
-            ],
-            "categories": ["test", "validation"],
-            "cover_image": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
-            "forms": ["powder"],
-            "species": "Test species 2",
-            "prices": [
-                {
-                    "weight": "50",
-                    "weight_unit": "g",
-                    "price": "50",
-                    "currency": "EUR"
-                }
-            ]
-        },
-        {
-            "id": "test_product_3",
-            "title": "Third Test Product",
-            "organic_components": [
-                {
-                    "biounit_id": "test_component_3",
-                    "description_cid": "QmYXGiCLB1sPtkoskNWA5dCo8d9uW6RVVS94uq2xf6awQ7",
-                    "proportion": "100%"
-                }
-            ],
-            "categories": ["test", "update_testing"],
-            "cover_image": "QmR88CGcBUqvHFMavUeuodQEuCDHMP4zKKxdN3QMYz7Ayj",
+            "cover_image_url": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
             "forms": ["tincture"],
-            "species": "Test species 3",
+            "species": "Blue Lotus + Valerian",
             "prices": [
                 {
-                    "volume": "30",
+                    "volume": "50",
                     "volume_unit": "ml",
                     "price": "30",
                     "currency": "EUR"
@@ -197,70 +122,183 @@
             ]
         },
         {
-            "id": "test_product_8",
-            "title": "Product for Update Testing",
+            "id": "focus_enhancer_1",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+            "title": "Усилитель концентрации",
             "organic_components": [
                 {
-                    "biounit_id": "test_component_8",
+                    "biounit_id": "amanita_muscaria",
                     "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "100%"
+                    "proportion": "70%"
+                },
+                {
+                    "biounit_id": "blue_lotus",
+                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+                    "proportion": "30%"
                 }
             ],
-            "categories": ["test", "update_testing"],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "categories": [
+                "mushroom",
+                "plant",
+                "mental health",
+                "focus"
+            ],
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "forms": ["powder"],
-            "species": "Test species 8",
+            "species": "Amanita + Blue Lotus",
+            "prices": [
+                {
+                    "weight": "100",
+                    "weight_unit": "g",
+                    "price": "60",
+                    "currency": "EUR"
+                }
+            ]
+        },
+        {
+            "id": "premium_blend_1",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+            "title": "Премиум смесь для медитации",
+            "organic_components": [
+                {
+                    "biounit_id": "amanita_muscaria",
+                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                    "proportion": "60%"
+                },
+                {
+                    "biounit_id": "blue_lotus",
+                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+                    "proportion": "40%"
+                }
+            ],
+            "categories": [
+                "mushroom",
+                "plant",
+                "mental health",
+                "meditation"
+            ],
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "forms": ["powder", "tincture"],
+            "species": "Amanita + Blue Lotus Premium",
             "prices": [
                 {
                     "weight": "100",
                     "weight_unit": "g",
                     "price": "80",
                     "currency": "EUR"
-                }
-            ]
-        },
-        {
-            "id": "test_product_9",
-            "title": "Product for Status Testing",
-            "organic_components": [
+                },
                 {
-                    "biounit_id": "test_component_9",
-                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
-                    "proportion": "100%"
-                }
-            ],
-            "categories": ["test", "status_testing"],
-            "cover_image": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
-            "forms": ["capsules"],
-            "species": "Test species 9",
-            "prices": [
-                {
-                    "weight": "50",
-                    "weight_unit": "g",
+                    "volume": "50",
+                    "volume_unit": "ml",
                     "price": "45",
                     "currency": "EUR"
                 }
             ]
         },
         {
-            "id": "amanita_powder",
-            "title": "Amanita Muscaria Powder",
+            "id": "stress_relief_1",
+            "cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+            "title": "Антистресс формула",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria_powder",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                    "biounit_id": "blue_lotus",
+                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
                     "proportion": "100%"
                 }
             ],
-            "categories": ["mushroom", "powder", "mental_health"],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
-            "forms": ["powder"],
-            "species": "Amanita muscaria",
+            "categories": [
+                "plant",
+                "mental health",
+                "stress_relief"
+            ],
+            "cover_image_url": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
+            "forms": ["tincture"],
+            "species": "Blue Lotus",
             "prices": [
                 {
-                    "weight": "25",
-                    "weight_unit": "g",
+                    "volume": "30",
+                    "volume_unit": "ml",
                     "price": "25",
+                    "currency": "EUR"
+                }
+            ]
+        },
+        {
+            "id": "energy_boost_1",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+            "title": "Энергетический бустер",
+            "organic_components": [
+                {
+                    "biounit_id": "amanita_muscaria",
+                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                    "proportion": "80%"
+                },
+                {
+                    "biounit_id": "blue_lotus",
+                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+                    "proportion": "20%"
+                }
+            ],
+            "categories": [
+                "mushroom",
+                "plant",
+                "energy",
+                "vitality"
+            ],
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "forms": ["powder"],
+            "species": "Amanita + Blue Lotus Energy",
+            "prices": [
+                {
+                    "weight": "100",
+                    "weight_unit": "g",
+                    "price": "70",
+                    "currency": "EUR"
+                }
+            ]
+        },
+        {
+            "id": "wellness_complex_1",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+            "title": "Комплексное оздоровление",
+            "organic_components": [
+                {
+                    "biounit_id": "amanita_muscaria",
+                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                    "proportion": "50%"
+                },
+                {
+                    "biounit_id": "blue_lotus",
+                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+                    "proportion": "50%"
+                }
+            ],
+            "categories": [
+                "mushroom",
+                "plant",
+                "wellness",
+                "holistic"
+            ],
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "forms": ["powder", "tincture", "capsules"],
+            "species": "Amanita + Blue Lotus Wellness",
+            "prices": [
+                {
+                    "weight": "100",
+                    "weight_unit": "g",
+                    "price": "90",
+                    "currency": "EUR"
+                },
+                {
+                    "volume": "50",
+                    "volume_unit": "ml",
+                    "price": "50",
+                    "currency": "EUR"
+                },
+                {
+                    "weight": "60",
+                    "weight_unit": "capsules",
+                    "price": "40",
                     "currency": "EUR"
                 }
             ]
@@ -269,19 +307,22 @@
     "invalid_products": [
         {
             "id": "invalid_empty_fields",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "",
             "organic_components": [],
             "categories": [],
-            "cover_image": "",
+            "cover_image_url": "",
             "forms": [],
             "species": "",
             "prices": []
         },
         {
             "id": "invalid_missing_organic_components",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Test Product Missing Components",
+            "organic_components": [],
             "categories": ["test"],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "forms": ["test"],
             "species": "test",
             "prices": [
@@ -295,6 +336,7 @@
         },
         {
             "id": "invalid_price_format",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Test Product",
             "organic_components": [
                 {
@@ -304,7 +346,7 @@
                 }
             ],
             "categories": ["test"],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "forms": ["test"],
             "species": "test",
             "prices": [
@@ -318,6 +360,7 @@
         },
         {
             "id": "invalid_cid_format",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Test Product",
             "organic_components": [
                 {
@@ -327,7 +370,7 @@
                 }
             ],
             "categories": ["test"],
-            "cover_image": "invalid_cid",
+            "cover_image_url": "invalid_cid",
             "forms": ["test"],
             "species": "test",
             "prices": [
@@ -341,6 +384,7 @@
         },
         {
             "id": "invalid_currency",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Test Product",
             "organic_components": [
                 {
@@ -350,7 +394,7 @@
                 }
             ],
             "categories": ["test"],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "forms": ["test"],
             "species": "test",
             "prices": [
@@ -364,6 +408,7 @@
         },
         {
             "id": "invalid_proportion_format",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Test Product Invalid Proportion",
             "organic_components": [
                 {
@@ -373,7 +418,7 @@
                 }
             ],
             "categories": ["test"],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "forms": ["test"],
             "species": "test",
             "prices": [
@@ -387,6 +432,7 @@
         },
         {
             "id": "invalid_proportion_sum",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Test Product Invalid Proportion Sum",
             "organic_components": [
                 {
@@ -401,7 +447,7 @@
                 }
             ],
             "categories": ["test"],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "forms": ["test"],
             "species": "test",
             "prices": [
@@ -415,6 +461,7 @@
         },
         {
             "id": "invalid_duplicate_biounit_id",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Test Product Duplicate Biounit ID",
             "organic_components": [
                 {
@@ -429,7 +476,7 @@
                 }
             ],
             "categories": ["test"],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "forms": ["test"],
             "species": "test",
             "prices": [
@@ -445,6 +492,7 @@
     "test_scenarios": {
         "create_product_success": {
             "id": "AMANITA1",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Amanita muscaria — sliced caps and gills (1st grade)",
             "organic_components": [
                 {
@@ -460,7 +508,7 @@
                 "ADHD support",
                 "mental force"
             ],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "forms": ["powder"],
             "species": "Amanita muscaria",
             "prices": [
@@ -474,6 +522,7 @@
         },
         "update_product_success": {
             "id": "test_product_8",
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Updated Product Title",
             "organic_components": [
                 {
@@ -483,7 +532,7 @@
                 }
             ],
             "categories": ["test", "updated"],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "forms": ["powder", "capsules"],
             "species": "Updated Test species",
             "prices": [

@@ -115,6 +115,152 @@ class TestOrganicComponentConverter:
         assert api_model.description_cid == "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG"
         assert api_model.proportion == "100%"
     
+    def test_validate_api_model_success(self):
+        """Тест успешной валидации API модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult
+        mock_cid_result = Mock(spec=ValidationResult)
+        mock_cid_result.is_valid = True
+        
+        mock_proportion_result = Mock(spec=ValidationResult)
+        mock_proportion_result.is_valid = True
+        
+        # Создаем моки валидаторов
+        mock_cid_validator = Mock()
+        mock_cid_validator.validate.return_value = mock_cid_result
+        
+        mock_proportion_validator = Mock()
+        mock_proportion_validator.validate.return_value = mock_proportion_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.organic_component_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_cid_validator.return_value = mock_cid_validator
+            mock_factory.get_proportion_validator.return_value = mock_proportion_validator
+            
+            # Тестируем валидацию
+            api_model = OrganicComponentAPI(
+                biounit_id="amanita_muscaria",
+                description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                proportion="100%"
+            )
+            
+            result = self.converter.validate_api_model(api_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_cid_validator.assert_called_once()
+            mock_factory.get_proportion_validator.assert_called_once()
+            mock_cid_validator.validate.assert_called_once()
+            mock_proportion_validator.validate.assert_called_once()
+            assert result is True
+    
+    def test_validate_api_model_failure(self):
+        """Тест неуспешной валидации API модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult с ошибкой
+        mock_result = Mock(spec=ValidationResult)
+        mock_result.is_valid = False
+        mock_result.error_message = "CID validation failed"
+        
+        # Создаем мок валидатора
+        mock_validator = Mock()
+        mock_validator.validate.return_value = mock_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.organic_component_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_cid_validator.return_value = mock_validator
+            mock_factory.get_proportion_validator.return_value = mock_validator
+            
+            # Тестируем валидацию с валидными данными для создания модели
+            api_model = OrganicComponentAPI(
+                biounit_id="amanita_muscaria",
+                description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                proportion="100%"
+            )
+            
+            result = self.converter.validate_api_model(api_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_cid_validator.assert_called_once()
+            mock_validator.validate.assert_called_once()
+            assert result is False
+    
+    def test_validate_service_model_success(self):
+        """Тест успешной валидации Service модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult
+        mock_cid_result = Mock(spec=ValidationResult)
+        mock_cid_result.is_valid = True
+        
+        mock_proportion_result = Mock(spec=ValidationResult)
+        mock_proportion_result.is_valid = True
+        
+        # Создаем моки валидаторов
+        mock_cid_validator = Mock()
+        mock_cid_validator.validate.return_value = mock_cid_result
+        
+        mock_proportion_validator = Mock()
+        mock_proportion_validator.validate.return_value = mock_proportion_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.organic_component_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_cid_validator.return_value = mock_cid_validator
+            mock_factory.get_proportion_validator.return_value = mock_proportion_validator
+            
+            # Тестируем валидацию
+            service_model = OrganicComponent(
+                biounit_id="amanita_muscaria",
+                description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                proportion="100%"
+            )
+            
+            result = self.converter.validate_service_model(service_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_cid_validator.assert_called_once()
+            mock_factory.get_proportion_validator.assert_called_once()
+            mock_cid_validator.validate.assert_called_once()
+            mock_proportion_validator.validate.assert_called_once()
+            assert result is True
+    
+    def test_validate_service_model_failure(self):
+        """Тест неуспешной валидации Service модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult с ошибкой
+        mock_result = Mock(spec=ValidationResult)
+        mock_result.is_valid = False
+        mock_result.error_message = "Proportion validation failed"
+        
+        # Создаем мок валидатора
+        mock_validator = Mock()
+        mock_validator.validate.return_value = mock_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.organic_component_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_cid_validator.return_value = mock_validator
+            mock_factory.get_proportion_validator.return_value = mock_validator
+            
+            # Тестируем валидацию с валидными данными для создания модели
+            service_model = OrganicComponent(
+                biounit_id="amanita_muscaria",
+                description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                proportion="100%"
+            )
+            
+            result = self.converter.validate_service_model(service_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_cid_validator.assert_called_once()
+            mock_validator.validate.assert_called_once()
+            assert result is False
+    
     def test_invalid_cid_format(self):
         """Тест обработки невалидного CID"""
         # Pydantic валидация происходит при создании модели
@@ -238,6 +384,136 @@ class TestPriceConverter:
         
         with pytest.raises(ValueError):
             self.converter.api_to_service(api_model)
+    
+    def test_validate_api_model_success(self):
+        """Тест успешной валидации API модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult
+        mock_result = Mock(spec=ValidationResult)
+        mock_result.is_valid = True
+        
+        # Создаем мок валидатора
+        mock_validator = Mock()
+        mock_validator.validate_with_currency.return_value = mock_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.price_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_price_validator.return_value = mock_validator
+            
+            # Тестируем валидацию
+            api_model = PriceModel(
+                price=100,
+                currency="EUR",
+                weight="100",
+                weight_unit="g"
+            )
+            
+            result = self.converter.validate_api_model(api_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_price_validator.assert_called_once()
+            mock_validator.validate_with_currency.assert_called_once_with(100, "EUR")
+            assert result is True
+    
+    def test_validate_api_model_failure(self):
+        """Тест неуспешной валидации API модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult с ошибкой
+        mock_result = Mock(spec=ValidationResult)
+        mock_result.is_valid = False
+        mock_result.error_message = "Price validation failed"
+        
+        # Создаем мок валидатора
+        mock_validator = Mock()
+        mock_validator.validate_with_currency.return_value = mock_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.price_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_price_validator.return_value = mock_validator
+            
+            # Тестируем валидацию с валидными данными для создания модели
+            api_model = PriceModel(
+                price=100,  # Валидная цена
+                currency="EUR",
+                weight="100",
+                weight_unit="g"
+            )
+            
+            result = self.converter.validate_api_model(api_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_price_validator.assert_called_once()
+            mock_validator.validate_with_currency.assert_called_once_with(100, "EUR")
+            assert result is False
+    
+    def test_validate_service_model_success(self):
+        """Тест успешной валидации Service модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult
+        mock_result = Mock(spec=ValidationResult)
+        mock_result.is_valid = True
+        
+        # Создаем мок валидатора
+        mock_validator = Mock()
+        mock_validator.validate_with_currency.return_value = mock_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.price_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_price_validator.return_value = mock_validator
+            
+            # Тестируем валидацию
+            service_model = PriceInfo(
+                price=100,
+                currency="EUR",
+                weight="100",
+                weight_unit="g"
+            )
+            
+            result = self.converter.validate_service_model(service_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_price_validator.assert_called_once()
+            mock_validator.validate_with_currency.assert_called_once_with(100, "EUR")
+            assert result is True
+    
+    def test_validate_service_model_failure(self):
+        """Тест неуспешной валидации Service модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult с ошибкой
+        mock_result = Mock(spec=ValidationResult)
+        mock_result.is_valid = False
+        mock_result.error_message = "Currency validation failed"
+        
+        # Создаем мок валидатора
+        mock_validator = Mock()
+        mock_validator.validate_with_currency.return_value = mock_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.price_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_price_validator.return_value = mock_validator
+        
+            # Тестируем валидацию с валидными данными для создания модели
+            service_model = PriceInfo(
+                price=100,
+                currency="EUR",  # Валидная валюта
+                weight="100",
+                weight_unit="g"
+            )
+            
+            result = self.converter.validate_service_model(service_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_price_validator.assert_called_once()
+            mock_validator.validate_with_currency.assert_called_once_with(100, "EUR")
+            assert result is False
 
 
 class TestProductConverter:
@@ -254,32 +530,49 @@ class TestProductConverter:
     
     def test_valid_api_to_service(self):
         """Тест конвертации валидной API модели в Service модель"""
-        api_model = ProductUploadIn(
-            id=1,
-            title="Test Product",
-            organic_components=[
-                OrganicComponentAPI(
-                    biounit_id="amanita_muscaria",
-                    description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    proportion="100%"
-                )
-            ],
-            cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
-            categories=["mushroom"],
-            forms=["powder"],
-            species="Amanita Muscaria",
-            prices=[
-                PriceModel(price=100, currency="EUR")
-            ]
-        )
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
         
-        service_model = self.converter.api_to_service(api_model)
+        # Создаем мок ValidationResult
+        mock_result = Mock(spec=ValidationResult)
+        mock_result.is_valid = True
         
-        assert isinstance(service_model, Product)
-        assert service_model.id == "1"  # API int → Service str
-        assert service_model.title == "Test Product"
-        assert len(service_model.organic_components) == 1
-        assert len(service_model.prices) == 1
+        # Создаем мок валидатора
+        mock_validator = Mock()
+        mock_validator.validate.return_value = mock_result
+        
+        # Создаем мок ValidationFactory для модели Product
+        with patch('bot.model.product.ValidationFactory') as mock_factory:
+            mock_factory.get_cid_validator.return_value = mock_validator
+            mock_factory.get_proportion_validator.return_value = mock_validator
+            mock_factory.get_price_validator.return_value = mock_validator
+            
+            api_model = ProductUploadIn(
+                id=1,
+                title="Test Product",
+                organic_components=[
+                    OrganicComponentAPI(
+                        biounit_id="amanita_muscaria",
+                        description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                        proportion="100%"
+                    )
+                ],
+                cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                categories=["mushroom"],
+                forms=["powder"],
+                species="Amanita Muscaria",
+                prices=[
+                    PriceModel(price=100, currency="EUR")
+                ]
+            )
+            
+            service_model = self.converter.api_to_service(api_model)
+            
+            assert isinstance(service_model, Product)
+            assert service_model.id == 1  # API int остается int в Service
+            assert service_model.title == "Test Product"
+            assert len(service_model.organic_components) == 1
+            assert len(service_model.prices) == 1
     
     def test_valid_service_to_api(self):
         """Тест конвертации валидной Service модели в API модель"""
@@ -287,7 +580,7 @@ class TestProductConverter:
             id="1",
             alias="test",
             status=0,
-            cid="test",
+            cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             title="Test Product",
             organic_components=[
                 OrganicComponent(
@@ -337,7 +630,7 @@ class TestProductConverter:
         result = self.converter.api_to_dict(api_model)
         
         assert isinstance(result, dict)
-        assert result["id"] == "1"  # int → str для сервиса
+        assert result["id"] == 1  # int остается int для сервиса
         assert result["title"] == "Test Product"
         assert len(result["organic_components"]) == 1
         assert len(result["prices"]) == 1
@@ -396,3 +689,187 @@ class TestProductConverter:
                     PriceModel(price=100, currency="EUR")
                 ]
             )
+    
+    def test_validate_api_model_success(self):
+        """Тест успешной валидации API модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult
+        mock_result = Mock(spec=ValidationResult)
+        mock_result.is_valid = True
+        
+        # Создаем мок валидатора
+        mock_validator = Mock()
+        mock_validator.validate.return_value = mock_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.product_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_product_validator.return_value = mock_validator
+            
+            # Тестируем валидацию
+            api_model = ProductUploadIn(
+                id=1,
+                title="Test Product",
+                organic_components=[
+                    OrganicComponentAPI(
+                        biounit_id="amanita_muscaria",
+                        description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                        proportion="100%"
+                    )
+                ],
+                cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                categories=["mushroom"],
+                forms=["powder"],
+                species="Amanita Muscaria",
+                prices=[
+                    PriceModel(price=100, currency="EUR")
+                ]
+            )
+            
+            result = self.converter.validate_api_model(api_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_product_validator.assert_called_once()
+            mock_validator.validate.assert_called_once()
+            assert result is True
+    
+    def test_validate_api_model_failure(self):
+        """Тест неуспешной валидации API модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult с ошибкой
+        mock_result = Mock(spec=ValidationResult)
+        mock_result.is_valid = False
+        mock_result.error_message = "Validation failed"
+        
+        # Создаем мок валидатора
+        mock_validator = Mock()
+        mock_validator.validate.return_value = mock_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.product_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_product_validator.return_value = mock_validator
+            
+            # Тестируем валидацию
+            api_model = ProductUploadIn(
+                id=1,
+                title="Test Product",
+                organic_components=[
+                    OrganicComponentAPI(
+                        biounit_id="amanita_muscaria",
+                        description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                        proportion="100%"
+                    )
+                ],
+                cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                categories=["mushroom"],
+                forms=["powder"],
+                species="Amanita Muscaria",
+                prices=[
+                    PriceModel(price=100, currency="EUR")
+                ]
+            )
+            
+            result = self.converter.validate_api_model(api_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_product_validator.assert_called_once()
+            mock_validator.validate.assert_called_once()
+            assert result is False
+    
+    def test_validate_service_model_success(self):
+        """Тест успешной валидации Service модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult
+        mock_result = Mock(spec=ValidationResult)
+        mock_result.is_valid = True
+        
+        # Создаем мок валидатора
+        mock_validator = Mock()
+        mock_validator.validate.return_value = mock_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.product_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_product_validator.return_value = mock_validator
+            
+            # Тестируем валидацию
+            service_model = Product(
+                id="1",
+                alias="test",
+                status=0,
+                cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                title="Test Product",
+                organic_components=[
+                    OrganicComponent(
+                        biounit_id="amanita_muscaria",
+                        description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                        proportion="100%"
+                    )
+                ],
+                cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                categories=["mushroom"],
+                forms=["powder"],
+                species="Amanita Muscaria",
+                prices=[
+                    PriceInfo(price=100, currency="EUR")
+                ]
+            )
+            
+            result = self.converter.validate_service_model(service_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_product_validator.assert_called_once()
+            mock_validator.validate.assert_called_once()
+            assert result is True
+    
+    def test_validate_service_model_failure(self):
+        """Тест неуспешной валидации Service модели через ValidationFactory"""
+        from unittest.mock import patch, Mock
+        from bot.validation import ValidationResult
+        
+        # Создаем мок ValidationResult с ошибкой
+        mock_result = Mock(spec=ValidationResult)
+        mock_result.is_valid = False
+        mock_result.error_message = "Validation failed"
+        
+        # Создаем мок валидатора
+        mock_validator = Mock()
+        mock_validator.validate.return_value = mock_result
+        
+        # Создаем мок ValidationFactory
+        with patch('bot.api.converters.product_converter.ValidationFactory') as mock_factory:
+            mock_factory.get_product_validator.return_value = mock_validator
+            
+            # Тестируем валидацию
+            service_model = Product(
+                id="1",
+                alias="test",
+                status=0,
+                cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                title="Test Product",
+                organic_components=[
+                    OrganicComponent(
+                        biounit_id="amanita_muscaria",
+                        description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                        proportion="100%"
+                    )
+                ],
+                cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                categories=["mushroom"],
+                forms=["powder"],
+                species="Amanita Muscaria",
+                prices=[
+                    PriceInfo(price=100, currency="EUR")
+                ]
+            )
+            
+            result = self.converter.validate_service_model(service_model)
+            
+            # Проверяем, что ValidationFactory был вызван
+            mock_factory.get_product_validator.assert_called_once()
+            mock_validator.validate.assert_called_once()
+            assert result is False

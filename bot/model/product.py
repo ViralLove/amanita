@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from dataclasses import dataclass
 from .organic_component import OrganicComponent
+from bot.validation import ValidationFactory, ValidationResult
 
 @dataclass
 class DosageInstruction:
@@ -146,6 +147,7 @@ class Description:
             ]
         }
 
+@dataclass
 class PriceInfo:
     """
     Структура для хранения и обработки информации о цене продукта.
@@ -183,95 +185,105 @@ class PriceInfo:
         'oz_fl': Decimal('29.5735')
     }
 
-    def __init__(
-        self,
-        price: Union[int, float, str, Decimal],
-        weight: Optional[Union[int, float, str]] = None,
-        weight_unit: Optional[str] = None,
-        volume: Optional[Union[int, float, str]] = None,
-        volume_unit: Optional[str] = None,
-        currency: str = 'EUR',
-        form: Optional[str] = None
-    ):
+    # Поля dataclass
+    price: Union[int, float, str, Decimal]
+    currency: str = 'EUR'
+    weight: Optional[Union[int, float, str]] = None
+    weight_unit: Optional[str] = None
+    volume: Optional[Union[int, float, str]] = None
+    volume_unit: Optional[str] = None
+    form: Optional[str] = None
+
+    def __post_init__(self):
         """
-        Инициализирует объект PriceInfo.
-
-        Args:
-            price: Цена в указанной валюте
-            weight: Вес продукта (если применимо)
-            weight_unit: Единица измерения веса (g, kg, oz, lb)
-            volume: Объем продукта (если применимо)
-            volume_unit: Единица измерения объема (ml, l, oz_fl)
-            currency: Код валюты
-            form: Форма продукта (например, "powder", "whole")
-
+        Валидация данных после инициализации dataclass.
+        Использует единую систему валидации из ValidationFactory.
+        
         Raises:
-            ValueError: Если переданы некорректные значения
+            ValueError: Если валидация не прошла
         """
-        # Валидация и установка цены
-        self.price = self._validate_price(price)
-        self.currency = self._validate_currency(currency)
+        # Получаем валидаторы из фабрики
+        price_validator = ValidationFactory.get_price_validator()
+        
+        # Валидация цены с использованием единого валидатора
+        price_result = price_validator.validate(self.price)
+        if not price_result.is_valid:
+            raise ValueError(f"price: {price_result.error_message}")
+        
+        # Конвертируем цену в Decimal для внутреннего использования
+        self.price = Decimal(str(self.price))
+        
+        # Валидация валюты
+        if not self.currency:
+            raise ValueError("currency: Поле обязательно для заполнения")
+        
+        # Проверяем, что currency является строкой
+        if not isinstance(self.currency, str):
+            raise ValueError(f"currency: Должен быть строкой, получен {type(self.currency).__name__}")
+        
+        if not self.currency.strip():
+            raise ValueError("currency: Поле обязательно для заполнения")
+        
+        currency = self.currency.upper().strip()
+        if currency not in self.SUPPORTED_CURRENCIES:
+            raise ValueError(f"currency: Неподдерживаемая валюта '{currency}'. "
+                           f"Поддерживаемые валюты: {', '.join(self.SUPPORTED_CURRENCIES.keys())}")
+        self.currency = currency
 
         # Валидация веса/объема
-        if weight is not None and volume is not None:
+        if self.weight is not None and self.volume is not None:
             raise ValueError("Нельзя одновременно указывать вес и объем")
 
         # Обработка веса
-        if weight is not None:
-            if weight_unit not in self.SUPPORTED_WEIGHT_UNITS:
-                raise ValueError(f"Неподдерживаемая единица веса: {weight_unit}. "
+        if self.weight is not None:
+            if not self.weight_unit:
+                raise ValueError("weight_unit: Должен быть указан при указании веса")
+            
+            if self.weight_unit not in self.SUPPORTED_WEIGHT_UNITS:
+                raise ValueError(f"weight_unit: Неподдерживаемая единица веса '{self.weight_unit}'. "
                                f"Поддерживаемые единицы: {', '.join(self.SUPPORTED_WEIGHT_UNITS)}")
-            self.weight = self._validate_numeric("weight", weight)
-            self.weight_unit = weight_unit
+            
+            # Валидация числового значения веса
+            try:
+                self.weight = Decimal(str(self.weight))
+                if self.weight <= 0:
+                    raise ValueError("weight: Должен быть положительным числом")
+            except (ValueError, TypeError, ArithmeticError) as e:
+                raise ValueError(f"weight: Некорректное значение '{self.weight}'") from e
+            
+            # Сбрасываем объем
             self.volume = None
             self.volume_unit = None
         
         # Обработка объема
-        elif volume is not None:
-            if volume_unit not in self.SUPPORTED_VOLUME_UNITS:
-                raise ValueError(f"Неподдерживаемая единица объема: {volume_unit}. "
+        elif self.volume is not None:
+            if not self.volume_unit:
+                raise ValueError("volume_unit: Должен быть указан при указании объема")
+            
+            if self.volume_unit not in self.SUPPORTED_VOLUME_UNITS:
+                raise ValueError(f"volume_unit: Неподдерживаемая единица объема '{self.volume_unit}'. "
                                f"Поддерживаемые единицы: {', '.join(self.SUPPORTED_VOLUME_UNITS)}")
-            self.volume = self._validate_numeric("volume", volume)
-            self.volume_unit = volume_unit
+            
+            # Валидация числового значения объема
+            try:
+                self.volume = Decimal(str(self.volume))
+                if self.volume <= 0:
+                    raise ValueError("volume: Должен быть положительным числом")
+            except (ValueError, TypeError, ArithmeticError) as e:
+                raise ValueError(f"volume: Некорректное значение '{self.volume}'") from e
+            
+            # Сбрасываем вес
             self.weight = None
             self.weight_unit = None
         
-        # Если ни вес, ни объем не указаны
+        # Если ни вес, ни объем не указаны - это нормально для простых цен
         else:
             self.weight = None
             self.weight_unit = None
             self.volume = None
             self.volume_unit = None
 
-        self.form = form
-
-    def _validate_price(self, price: Union[int, float, str, Decimal]) -> Decimal:
-        """Проверяет и конвертирует цену в Decimal."""
-        try:
-            price_decimal = Decimal(str(price))
-            if price_decimal <= 0:
-                raise ValueError("Цена должна быть положительным числом")
-            return price_decimal
-        except (ValueError, TypeError, ArithmeticError) as e:
-            raise ValueError(f"Некорректное значение цены: {price}") from e
-
-    def _validate_numeric(self, field: str, value: Union[int, float, str]) -> Decimal:
-        """Проверяет и конвертирует числовое значение в Decimal."""
-        try:
-            numeric_value = Decimal(str(value))
-            if numeric_value <= 0:
-                raise ValueError(f"{field} должен быть положительным числом")
-            return numeric_value
-        except (ValueError, TypeError, ArithmeticError) as e:
-            raise ValueError(f"Некорректное значение для {field}: {value}") from e
-
-    def _validate_currency(self, currency: str) -> str:
-        """Проверяет и нормализует код валюты."""
-        currency = currency.upper()
-        if currency not in self.SUPPORTED_CURRENCIES:
-            raise ValueError(f"Неподдерживаемая валюта: {currency}. "
-                           f"Поддерживаемые валюты: {', '.join(self.SUPPORTED_CURRENCIES.keys())}")
-        return currency
+    # Устаревшие методы валидации удалены - теперь используется единая система валидации
 
     @property
     def currency_symbol(self) -> str:
@@ -502,6 +514,7 @@ class PriceInfo:
         """Возвращает строковое представление объекта."""
         return f"PriceInfo({self.format_full(include_form=True)})"
 
+@dataclass
 class Product:
     """
     Модель продукта, представляющая товар в каталоге.
@@ -519,106 +532,135 @@ class Product:
         species (str): Биологический вид
         prices (List[PriceInfo]): Список цен
     """
+    id: Union[int, str]
+    alias: str
+    status: int
+    cid: str
+    title: str
+    organic_components: List[OrganicComponent]
+    cover_image_url: str
+    categories: List[str]
+    forms: List[str]
+    species: str
+    prices: List[PriceInfo]
 
-    def __init__(
-        self,
-        id: Union[int, str],
-        alias: str,
-        status: int,
-        cid: str,
-        title: str,
-        organic_components: List[OrganicComponent],
-        cover_image_url: str,
-        categories: List[str],
-        forms: List[str],
-        species: str,
-        prices: List[PriceInfo]
-    ):
+    def __post_init__(self):
         """
-        Инициализирует объект Product.
-        
-        Args:
-            id: Уникальный идентификатор продукта (блокчейн ID)
-            alias: Бизнес-идентификатор продукта из метаданных
-            status: Статус продукта (0 - неактивен, 1 - активен)
-            cid: Content Identifier
-            title: Название продукта
-            organic_components: Список компонентов продукта
-            cover_image_url: Ссылка на основное изображение
-            categories: Список категорий
-            forms: Список форм продукта
-            species: Биологический вид
-            prices: Список цен
+        Валидация данных после инициализации dataclass.
+        Использует единую систему валидации из ValidationFactory.
         
         Raises:
-            ValueError: Если переданы некорректные значения полей
+            ValueError: Если валидация не прошла
         """
-        # Валидация id
-        if isinstance(id, (int, str)):
-            self.id = id
-        else:
-            raise ValueError("ID должен быть числом или строкой")
-
-        # Валидация alias
-        if not alias:
-            raise ValueError("Alias не может быть пустым")
-        self.alias = alias
-
-        # Валидация status
-        if status not in [0, 1]:
-            raise ValueError("Status должен быть 0 или 1")
-        self.status = status
-
-        # Валидация cid
-        if not cid:
-            raise ValueError("CID не может быть пустым")
-        self.cid = cid
-
-        # Валидация title
-        if not title:
-            raise ValueError("Title не может быть пустым")
-        self.title = title
-
+        # Получаем валидаторы из фабрики
+        cid_validator = ValidationFactory.get_cid_validator()
+        
+        # Валидация CID
+        cid_result = cid_validator.validate(self.cid)
+        if not cid_result.is_valid:
+            raise ValueError(f"CID: {cid_result.error_message}")
+        
         # Валидация organic_components
-        if not isinstance(organic_components, list):
-            raise ValueError("Organic components должен быть списком")
-        if not organic_components:
-            raise ValueError("Organic components не может быть пустым")
+        if not self.organic_components:
+            raise ValueError("organic_components не может быть пустым")
         
-        # Валидация каждого компонента
-        for component in organic_components:
-            if not isinstance(component, OrganicComponent):
-                raise ValueError("Каждый элемент organic_components должен быть объектом OrganicComponent")
-        
-        self.organic_components = organic_components
-
-        # Валидация cover_image_url
-        if not cover_image_url:
-            raise ValueError("Cover image URL не может быть пустым")
-        self.cover_image_url = cover_image_url
-
-        # Валидация categories
-        if not isinstance(categories, list):
-            raise ValueError("Categories должен быть списком")
-        self.categories = categories
-
-        # Валидация forms
-        if not isinstance(forms, list):
-            raise ValueError("Forms должен быть списком")
-        self.forms = forms
-
-        # Валидация species
-        if not species:
-            raise ValueError("Species не может быть пустым")
-        self.species = species
-
         # Валидация prices
-        if not isinstance(prices, list):
-            raise ValueError("Prices должен быть списком")
-        for price in prices:
-            if not isinstance(price, PriceInfo):
-                raise ValueError("Каждый элемент prices должен быть объектом PriceInfo")
-        self.prices = prices
+        if not self.prices:
+            raise ValueError("prices не может быть пустым")
+        
+        # Валидация title
+        if not self.title or not self.title.strip():
+            raise ValueError("title не может быть пустым")
+        
+        # Валидация species
+        if not self.species or not self.species.strip():
+            raise ValueError("species не может быть пустым")
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'Product':
+        """
+        Создает объект Product из словаря.
+        
+        Args:
+            data: Словарь с данными продукта
+            
+        Returns:
+            Product: Новый объект продукта
+            
+        Raises:
+            ValueError: Если в данных отсутствуют обязательные поля
+        """
+        if not isinstance(data, dict):
+            raise ValueError("Входные данные должны быть словарем")
+
+        # Обязательные поля
+        required_fields = ['id', 'title', 'cover_image_url', 'species']
+        for field in required_fields:
+            if field not in data:
+                raise ValueError(f"Отсутствует обязательное поле '{field}'")
+
+        # Обратная совместимость: поддержка старого формата с description
+        if 'organic_components' in data:
+            # Новый формат с компонентами
+            organic_components_data = data['organic_components']
+            if not isinstance(organic_components_data, list):
+                raise ValueError("organic_components должен быть списком")
+            
+            organic_components = [OrganicComponent.from_dict(comp) for comp in organic_components_data]
+        elif 'description' in data and 'description_cid' in data:
+            # Старый формат: создаем один компонент из description
+            organic_components = [OrganicComponent(
+                biounit_id=data.get('species', 'unknown'),
+                description_cid=data['description_cid'],
+                proportion='100%'
+            )]
+        else:
+            raise ValueError("Должны быть указаны либо organic_components, либо description + description_cid")
+
+        # Создаем объекты PriceInfo
+        prices = [PriceInfo.from_dict(p) for p in data.get('prices', [])]
+
+        # Обратная совместимость: поддержка поля 'form' (единственное число)
+        if 'forms' in data:
+            forms_value = data.get('forms', [])
+        else:
+            single_form = data.get('form')
+            forms_value = [single_form] if single_form else []
+
+        return cls(
+            id=data['id'],
+            alias=data.get('alias', str(data['id'])),  # Используем id как alias по умолчанию
+            status=data.get('status', 0),  # Продукт создается неактивным по умолчанию
+            cid=data.get('cid', str(data['id'])),  # Используем id как CID по умолчанию
+            title=data['title'],
+            organic_components=organic_components,
+            cover_image_url=data['cover_image_url'],
+            categories=data.get('categories', []),
+            forms=forms_value,
+            species=data['species'],
+            prices=prices
+        )
+
+    def to_dict(self) -> Dict:
+        """
+        Преобразует объект Product в словарь.
+        
+        Returns:
+            Dict: Словарь с данными продукта
+        """
+        return {
+            'id': self.id,
+            'alias': self.alias,
+            'status': self.status,
+            'cid': self.cid,
+            'title': self.title,
+            'organic_components': [comp.to_dict() for comp in self.organic_components],
+            'cover_image_url': self.cover_image_url,
+            'categories': self.categories,
+            'forms': self.forms,
+            'species': self.species,
+            'prices': [price.to_dict() for price in self.prices]
+        }
 
     @property
     def price_infos(self) -> List[PriceInfo]:
@@ -795,88 +837,27 @@ class Product:
         else:
             return "0"
 
-    @classmethod
-    def from_json(cls, data: Dict) -> 'Product':
-        """
-        Создает объект Product из JSON-данных.
-        
-        Args:
-            data: Словарь с данными продукта
-            
-        Returns:
-            Product: Новый объект продукта
-            
-        Raises:
-            ValueError: Если в данных отсутствуют обязательные поля
-        """
-        if not isinstance(data, dict):
-            raise ValueError("Входные данные должны быть словарем")
+    # 🔧 УНИФИКАЦИЯ: Убраны дублирующие методы from_json/to_json
+    # Используйте from_dict() и to_dict() для единообразного интерфейса сериализации
 
-        # Обязательные поля
-        required_fields = ['id', 'title', 'cover_image_url', 'species']
-        for field in required_fields:
-            if field not in data:
-                raise ValueError(f"Отсутствует обязательное поле '{field}'")
-
-        # Обратная совместимость: поддержка старого формата с description
-        if 'organic_components' in data:
-            # Новый формат с компонентами
-            organic_components_data = data['organic_components']
-            if not isinstance(organic_components_data, list):
-                raise ValueError("organic_components должен быть списком")
-            
-            organic_components = [OrganicComponent.from_dict(comp) for comp in organic_components_data]
-        elif 'description' in data and 'description_cid' in data:
-            # Старый формат: создаем один компонент из description
-            organic_components = [OrganicComponent(
-                biounit_id=data.get('species', 'unknown'),
-                description_cid=data['description_cid'],
-                proportion='100%'
-            )]
-        else:
-            raise ValueError("Должны быть указаны либо organic_components, либо description + description_cid")
-
-        # Создаем объекты PriceInfo
-        prices = [PriceInfo.from_dict(p) for p in data.get('prices', [])]
-
-        # Обратная совместимость: поддержка поля 'form' (единственное число)
-        if 'forms' in data:
-            forms_value = data.get('forms', [])
-        else:
-            single_form = data.get('form')
-            forms_value = [single_form] if single_form else []
-
-        return cls(
-            id=data['id'],
-            alias=data.get('alias', str(data['id'])),  # Используем id как alias по умолчанию
-            status=data.get('status', 0),  # Продукт создается неактивным по умолчанию
-            cid=data.get('cid', str(data['id'])),  # Используем id как CID по умолчанию
-            title=data['title'],
-            organic_components=organic_components,
-            cover_image_url=data['cover_image_url'],
-            categories=data.get('categories', []),
-            forms=forms_value,
-            species=data['species'],
-            prices=prices
+    def __eq__(self, other: object) -> bool:
+        """Сравнивает два объекта Product."""
+        if not isinstance(other, Product):
+            return NotImplemented
+        return (
+            self.id == other.id and
+            self.alias == other.alias and
+            self.status == other.status and
+            self.cid == other.cid and
+            self.title == other.title and
+            self.organic_components == other.organic_components and
+            self.cover_image_url == other.cover_image_url and
+            self.categories == other.categories and
+            self.forms == other.forms and
+            self.species == other.species and
+            self.prices == other.prices
         )
 
-    def to_json(self) -> Dict:
-        """
-        Преобразует объект Product в JSON-формат.
-        
-        Returns:
-            Dict: Словарь с данными продукта
-        """
-        return {
-            'id': self.id,
-            'alias': self.alias,
-            'status': self.status,
-            'cid': self.cid,
-            'title': self.title,
-            'organic_components': [comp.to_dict() for comp in self.organic_components],
-            'cover_image_url': self.cover_image_url,
-            'categories': self.categories,
-            'forms': self.forms,
-            'species': self.species,
-            'prices': [price.to_dict() for price in self.prices]
-        }
+    def __repr__(self) -> str:
+        """Возвращает строковое представление объекта."""
+        return f"Product(id={self.id}, title={self.title}, price={self.price})"

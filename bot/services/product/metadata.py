@@ -1,18 +1,16 @@
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 import logging
-from bot.model.product import Product, PriceInfo
-from bot.services.product.cache import ProductCacheService
+from bot.validation import ValidationFactory, ValidationResult
 
 logger = logging.getLogger(__name__)
 
 class ProductMetadataService:
-    """Сервис для работы с метаданными продуктов"""
+    """Сервис для работы с метаданными продуктов (валидация и парсинг JSON)"""
     
     def __init__(self, storage):
         self.logger = logging.getLogger(__name__)
         self.storage = storage
-        self.cache_service = ProductCacheService()
     
     def create_product_metadata(
         self,
@@ -26,7 +24,8 @@ class ProductMetadataService:
         attributes: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Создает метаданные продукта"""
-        return {
+        # Валидируем входные данные через ValidationFactory
+        metadata_data = {
             "title": title,
             "description": description,
             "price": str(price),
@@ -37,143 +36,107 @@ class ProductMetadataService:
             "attributes": attributes or {},
             "created_at": datetime.utcnow().isoformat() + "Z"
         }
+        
+        # Валидируем метаданные через ValidationFactory
+        validator = ValidationFactory.get_product_validator()
+        validation_result = validator.validate(metadata_data)
+        
+        if not validation_result.is_valid:
+            self.logger.error(f"❌ [ProductMetadataService] Валидация метаданных не прошла: {validation_result.error_message}")
+            raise ValueError(f"Invalid metadata: {validation_result.error_message}")
+        
+        self.logger.info(f"✅ [ProductMetadataService] Метаданные успешно валидированы")
+        return metadata_data
     
-    def process_product_metadata(self, metadata: Dict[str, Any]) -> Optional[Product]:
-        """Обрабатывает метаданные продукта и создает объект Product"""
+    def validate_and_parse_metadata(self, metadata: Dict[str, Any]) -> ValidationResult:
+        """
+        Валидирует и парсит метаданные продукта.
+        
+        Args:
+            metadata: Словарь с метаданными продукта
+            
+        Returns:
+            ValidationResult: Результат валидации с дополнительной информацией
+        """
         try:
-            self.logger.info(f"[process_product_metadata] Входные данные: type={type(metadata)}, value={repr(metadata)[:500]}")
+            self.logger.info(f"[validate_and_parse_metadata] Входные данные: type={type(metadata)}, value={repr(metadata)[:500]}")
             
-            # Извлекаем базовые поля
-            title = metadata.get('title', '')
-            product_id = metadata.get('id', '')  # Блокчейн ID будет установлен позже
-            alias = metadata.get('id', '')  # Бизнес-идентификатор из метаданных
-
-            cover_image_cid = metadata.get('cover_image', '')
-            cover_image_url = self.cache_service.get_image_url_by_cid(cover_image_cid)
+            # Валидируем метаданные через ValidationFactory
+            validator = ValidationFactory.get_product_validator()
+            validation_result = validator.validate(metadata)
             
-            if not cover_image_url:
-                self.logger.warning(f"Картинка по CID {cover_image_cid} не найдена!")
+            if not validation_result.is_valid:
+                self.logger.error(f"❌ [ProductMetadataService] Валидация метаданных не прошла: {validation_result.error_message}")
+                return validation_result
             
-            # Обрабатываем категории
-            categories = metadata.get('categories', [])
+            self.logger.info(f"✅ [ProductMetadataService] Метаданные успешно валидированы")
             
-            # Обрабатываем формы
-            forms = metadata.get('forms', [])
-            # Если есть поле 'form' (единственное число), добавляем его в список форм
-            if 'form' in metadata and metadata['form']:
-                if not forms:  # Если forms пустой, создаем список с одним элементом
-                    forms = [metadata['form']]
-                elif metadata['form'] not in forms:  # Если формы нет в списке, добавляем
-                    forms.append(metadata['form'])
+            # Дополнительная проверка обязательных полей
+            required_fields = ['title', 'organic_components', 'prices']
+            missing_fields = []
             
-            # Получаем вид
-            species = metadata.get('species', '')
+            for field in required_fields:
+                if not metadata.get(field):
+                    missing_fields.append(field)
             
-            # Обрабатываем цены
-            prices_data = metadata.get('prices', [])
-            prices = [PriceInfo.from_dict(price) for price in prices_data]
-
-            # Обрабатываем organic_components
-            organic_components_data = metadata.get('organic_components', [])
-            if not organic_components_data:
-                self.logger.error("organic_components не может быть пустым!")
-                return None
+            if missing_fields:
+                error_message = f"Отсутствуют обязательные поля: {', '.join(missing_fields)}"
+                self.logger.error(f"❌ [ProductMetadataService] {error_message}")
+                return ValidationResult(
+                    is_valid=False,
+                    error_message=error_message,
+                    field_name=missing_fields[0],
+                    field_value=None,
+                    error_code="MISSING_REQUIRED_FIELD",
+                    suggestions=[]
+                )
             
-            # Создаем OrganicComponent объекты
-            from bot.model.organic_component import OrganicComponent
-            organic_components = []
-            for component_data in organic_components_data:
-                try:
-                    component = OrganicComponent(
-                        biounit_id=component_data['biounit_id'],
-                        description_cid=component_data['description_cid'],
-                        proportion=component_data['proportion']
-                    )
-                    organic_components.append(component)
-                except Exception as e:
-                    self.logger.error(f"Ошибка создания OrganicComponent: {e}")
-                    return None
+            # Проверяем корректность organic_components
+            organic_components = metadata.get('organic_components', [])
+            if not isinstance(organic_components, list) or len(organic_components) == 0:
+                error_message = "organic_components должен быть непустым списком"
+                self.logger.error(f"❌ [ProductMetadataService] {error_message}")
+                return ValidationResult(
+                    is_valid=False,
+                    error_message=error_message,
+                    field_name="organic_components",
+                    field_value=organic_components,
+                    error_code="INVALID_ORGANIC_COMPONENTS",
+                    suggestions=[]
+                )
             
-            # Создаем объект продукта (неактивный по умолчанию)
-            product = Product(
-                id=product_id,  # Временно используем ID из метаданных, будет заменен на блокчейн ID
-                alias=alias,    # Бизнес-идентификатор из метаданных
-                status=0,       # Продукт создается неактивным
-                cid=cover_image_cid,
-                title=title,
-                organic_components=organic_components,
-                cover_image_url=cover_image_url or "",
-                categories=categories,
-                forms=forms,
-                species=species,
-                prices=prices
+            # Проверяем корректность prices
+            prices = metadata.get('prices', [])
+            if not isinstance(prices, list) or len(prices) == 0:
+                error_message = "prices должен быть непустым списком"
+                self.logger.error(f"❌ [ProductMetadataService] {error_message}")
+                return ValidationResult(
+                    is_valid=False,
+                    error_message=error_message,
+                    field_name="prices",
+                    field_value=prices,
+                    error_code="INVALID_PRICES",
+                    suggestions=[]
+                )
+            
+            self.logger.info(f"✅ [ProductMetadataService] Метаданные полностью валидны")
+            return ValidationResult(
+                is_valid=True,
+                error_message=None,
+                field_name=None,
+                field_value=metadata,
+                error_code="VALID",
+                suggestions=[]
             )
             
-            self.logger.info(f"Product: {product}")
-            return product
-            
         except Exception as e:
-            self.logger.error(f"Error processing product metadata: {e}")
-            return None
-    
-    def process_description_metadata(self, description_data: Any) -> Optional[Any]:
-        """Обрабатывает метаданные описания и создает объект Description"""
-        try:
-            self.logger.info(f"[process_description_metadata] Входные данные: type={type(description_data)}, value={repr(description_data)[:500]}")
-            
-            # Если это уже объект, возвращаем его
-            if hasattr(description_data, 'biounit_id') and hasattr(description_data, 'description_cid'):
-                self.logger.info(f"[process_description_metadata] Данные уже являются объектом OrganicComponent")
-                return description_data
-            
-            # Если это словарь, создаем OrganicComponent из него
-            if isinstance(description_data, dict):
-                self.logger.info(f"[process_description_metadata] Обрабатываем словарь: keys={list(description_data.keys())}")
-                try:
-                    from bot.model.organic_component import OrganicComponent
-                    component = OrganicComponent(
-                        biounit_id=description_data['biounit_id'],
-                        description_cid=description_data['description_cid'],
-                        proportion=description_data['proportion']
-                    )
-                    self.logger.info(f"[process_description_metadata] Успешно создан объект OrganicComponent из словаря")
-                    return component
-                except Exception as e:
-                    self.logger.error(f"[process_description_metadata] Ошибка создания OrganicComponent из словаря: {e}")
-                    return None
-            
-            # Если это строка, пытаемся распарсить как JSON
-            if isinstance(description_data, str):
-                self.logger.info(f"[process_description_metadata] Обрабатываем строку длиной {len(description_data)}")
-                import json
-                try:
-                    parsed_data = json.loads(description_data)
-                    self.logger.info(f"[process_description_metadata] JSON успешно распарсен, тип: {type(parsed_data)}")
-                    if isinstance(parsed_data, dict):
-                        self.logger.info(f"[process_description_metadata] Создаем OrganicComponent из распарсенного JSON")
-                        from bot.model.organic_component import OrganicComponent
-                        component = OrganicComponent(
-                            biounit_id=parsed_data['biounit_id'],
-                            description_cid=parsed_data['description_cid'],
-                            proportion=parsed_data['proportion']
-                        )
-                        self.logger.info(f"[process_description_metadata] Успешно создан объект OrganicComponent из JSON строки")
-                        return component
-                    else:
-                        self.logger.error(f"[process_description_metadata] JSON строка не содержит словарь: {type(parsed_data)}")
-                        return None
-                except json.JSONDecodeError as e:
-                    self.logger.error(f"[process_description_metadata] Не удалось распарсить JSON строку: {e}")
-                    return None
-            
-            self.logger.error(f"[process_description_metadata] Неподдерживаемый тип данных для описания: {type(description_data)}")
-            return None
-            
-        except Exception as e:
-            self.logger.error(f"[process_description_metadata] Неожиданная ошибка: {e}")
-        return None 
-
-    def process_metadata(self, metadata: Dict[str, Any]) -> Optional[Product]:
-        """Обрабатывает метаданные и создает объект Product (устаревший метод, используйте process_product_metadata)"""
-        self.logger.warning("Используется устаревший метод process_metadata, используйте process_product_metadata")
-        return self.process_product_metadata(metadata)
+            error_message = f"Ошибка валидации метаданных: {str(e)}"
+            self.logger.error(f"❌ [ProductMetadataService] {error_message}")
+            return ValidationResult(
+                is_valid=False,
+                error_message=error_message,
+                field_name=None,
+                field_value=None,
+                error_code="VALIDATION_ERROR",
+                suggestions=[]
+            )

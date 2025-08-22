@@ -10,6 +10,7 @@ from typing import Dict, Any
 from .base import BaseConverter
 from bot.api.models.product import OrganicComponentAPI
 from bot.model.organic_component import OrganicComponent
+from bot.validation import ValidationFactory, ValidationResult
 
 
 class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicComponent]):
@@ -154,7 +155,7 @@ class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicCompon
     
     def validate_api_model(self, api_model: OrganicComponentAPI) -> bool:
         """
-        Расширенная валидация API модели.
+        Валидирует API модель через ValidationFactory.
         
         Args:
             api_model: API модель для валидации
@@ -163,26 +164,27 @@ class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicCompon
             bool: True если модель валидна, False если нет
         """
         try:
-            # Базовая валидация
-            if not super().validate_api_model(api_model):
+            # Конвертируем API модель в словарь для валидации
+            data = {
+                'biounit_id': api_model.biounit_id,
+                'description_cid': api_model.description_cid,
+                'proportion': api_model.proportion
+            }
+            
+            # Валидируем biounit_id (обязательное поле)
+            if not data['biounit_id'] or not data['biounit_id'].strip():
                 return False
             
-            # Дополнительная валидация полей
-            if not api_model.biounit_id or not api_model.biounit_id.strip():
+            # Валидируем description_cid через CIDValidator
+            cid_validator = ValidationFactory.get_cid_validator()
+            cid_result = cid_validator.validate(data['description_cid'])
+            if not cid_result.is_valid:
                 return False
             
-            if not api_model.description_cid or not api_model.description_cid.strip():
-                return False
-            
-            if not api_model.proportion or not api_model.proportion.strip():
-                return False
-            
-            # Проверяем формат CID
-            if not api_model.description_cid.startswith('Qm'):
-                return False
-            
-            # Проверяем длину CID
-            if len(api_model.description_cid) < 46:
+            # Валидируем proportion через ProportionValidator
+            proportion_validator = ValidationFactory.get_proportion_validator()
+            proportion_result = proportion_validator.validate(data['proportion'])
+            if not proportion_result.is_valid:
                 return False
             
             return True
@@ -192,7 +194,7 @@ class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicCompon
     
     def validate_service_model(self, service_model: OrganicComponent) -> bool:
         """
-        Расширенная валидация Service модели.
+        Валидирует Service модель через ValidationFactory.
         
         Args:
             service_model: Service модель для валидации
@@ -201,22 +203,30 @@ class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicCompon
             bool: True если модель валидна, False если нет
         """
         try:
-            # Базовая валидация
-            if not super().validate_service_model(service_model):
+            # Конвертируем Service модель в словарь для валидации
+            data = {
+                'biounit_id': service_model.biounit_id,
+                'description_cid': service_model.description_cid,
+                'proportion': service_model.proportion
+            }
+            
+            # Валидируем biounit_id (обязательное поле)
+            if not data['biounit_id'] or not data['biounit_id'].strip():
                 return False
             
-            # Дополнительная валидация полей
-            if not service_model.biounit_id or not service_model.biounit_id.strip():
+            # Валидируем description_cid через CIDValidator
+            cid_validator = ValidationFactory.get_cid_validator()
+            cid_result = cid_validator.validate(data['description_cid'])
+            if not cid_result.is_valid:
                 return False
             
-            if not service_model.description_cid or not service_model.description_cid.strip():
+            # Валидируем proportion через ProportionValidator
+            proportion_validator = ValidationFactory.get_proportion_validator()
+            proportion_result = proportion_validator.validate(data['proportion'])
+            if not proportion_result.is_valid:
                 return False
             
-            if not service_model.proportion or not service_model.proportion.strip():
-                return False
-            
-            # Проверяем валидность пропорции
-            return service_model.validate_proportion()
+            return True
             
         except Exception:
             return False

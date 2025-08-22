@@ -1,6 +1,7 @@
 from typing import Dict, Optional
 from dataclasses import dataclass
 import re
+from bot.validation import ValidationFactory, ValidationResult
 
 
 @dataclass
@@ -18,43 +19,54 @@ class OrganicComponent:
     proportion: str
 
     def __post_init__(self):
-        """Валидация данных после инициализации"""
-        self._validate_fields()
-        self._validate_proportion_format()
-
-    def _validate_fields(self):
-        """Валидация обязательных полей"""
+        """
+        Валидация данных после инициализации dataclass.
+        Использует единую систему валидации из ValidationFactory.
+        
+        Raises:
+            ValueError: Если валидация не прошла
+        """
+        # Получаем валидаторы из фабрики
+        cid_validator = ValidationFactory.get_cid_validator()
+        proportion_validator = ValidationFactory.get_proportion_validator()
+        
+        # Валидация biounit_id
         if not self.biounit_id or not self.biounit_id.strip():
             raise ValueError("biounit_id не может быть пустым")
         
-        if not self.description_cid or not self.description_cid.strip():
-            raise ValueError("description_cid не может быть пустым")
+        # Проверка формата biounit_id (должен содержать только буквы, цифры и подчеркивания)
+        biounit_pattern = r'^[a-zA-Z0-9_]+$'
+        if not re.match(biounit_pattern, self.biounit_id):
+            raise ValueError(f"biounit_id '{self.biounit_id}' содержит недопустимые символы. Разрешены только буквы, цифры и подчеркивания")
         
-        if not self.proportion or not self.proportion.strip():
-            raise ValueError("proportion не может быть пустым")
+        # Проверка длины biounit_id (от 1 до 50 символов)
+        if len(self.biounit_id) > 50:
+            raise ValueError(f"biounit_id '{self.biounit_id}' слишком длинный. Максимальная длина: 50 символов")
+        
+        # Валидация description_cid с использованием единого валидатора
+        cid_result = cid_validator.validate(self.description_cid)
+        if not cid_result.is_valid:
+            raise ValueError(f"description_cid: {cid_result.error_message}")
+        
+        # Валидация proportion с использованием единого валидатора
+        proportion_result = proportion_validator.validate(self.proportion)
+        if not proportion_result.is_valid:
+            raise ValueError(f"proportion: {proportion_result.error_message}")
 
-    def _validate_proportion_format(self):
-        """Валидация формата пропорции"""
-        # Поддерживаемые форматы: "50%", "100g", "30ml", "25%"
-        proportion_pattern = r'^(\d+(?:\.\d+)?)(%|g|ml|kg|l|oz|lb|fl_oz)$'
-        
-        if not re.match(proportion_pattern, self.proportion):
-            raise ValueError(
-                f"Некорректный формат пропорции: {self.proportion}. "
-                f"Поддерживаемые форматы: 50%, 100g, 30ml, 25%"
-            )
+    # Устаревшие методы валидации удалены - теперь используется единая система валидации
 
     def validate_proportion(self) -> bool:
         """
-        Валидация корректности пропорции.
+        Валидация корректности пропорции с использованием единого валидатора.
         
         Returns:
             bool: True если пропорция корректна, False если нет
         """
         try:
-            self._validate_proportion_format()
-            return True
-        except ValueError:
+            proportion_validator = ValidationFactory.get_proportion_validator()
+            result = proportion_validator.validate(self.proportion)
+            return result.is_valid
+        except Exception:
             return False
 
     def get_proportion_value(self) -> float:

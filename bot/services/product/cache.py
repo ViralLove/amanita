@@ -5,6 +5,7 @@ import json
 import traceback
 from bot.model.product import Description, DosageInstruction
 from bot.services.core.ipfs_factory import IPFSFactory
+from bot.validation import ValidationFactory, ValidationResult
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,43 @@ class ProductCacheService:
             self._initialized = True
             self.logger.info(f"ProductCacheService initialization completed")
     
+    def _validate_cached_data(self, data: Any, data_type: str) -> ValidationResult:
+        """
+        Валидирует кэшированные данные через ValidationFactory.
+        
+        Args:
+            data: Данные для валидации
+            data_type: Тип данных ('product', 'description', 'image')
+            
+        Returns:
+            ValidationResult: Результат валидации
+        """
+        try:
+            if data_type == 'product':
+                # Валидируем данные продукта
+                validator = ValidationFactory.get_product_validator()
+                return validator.validate(data)
+            elif data_type == 'description':
+                # Валидируем CID описания
+                validator = ValidationFactory.get_cid_validator()
+                return validator.validate(data)
+            elif data_type == 'image':
+                # Валидируем CID изображения
+                validator = ValidationFactory.get_cid_validator()
+                return validator.validate(data)
+            else:
+                return ValidationResult.failure(
+                    f"Неизвестный тип данных для валидации: {data_type}",
+                    field_name="data_type",
+                    error_code="UNKNOWN_DATA_TYPE"
+                )
+        except Exception as e:
+            return ValidationResult.failure(
+                f"Ошибка валидации кэшированных данных: {str(e)}",
+                field_name="validation_error",
+                error_code="VALIDATION_ERROR"
+            )
+    
     @property
     def storage_service(self):
         """Lazy loading storage service для избежания циркулярных зависимостей"""
@@ -95,8 +133,16 @@ class ProductCacheService:
                 value, timestamp = cached_data
                 
                 if self._is_cache_valid(timestamp, cache_type):
-                    self.logger.info(f"[ProductCacheService] ✅ Кэш валиден для key='{key}', cache_type='{cache_type}'")
-                    return value
+                    # Валидируем кэшированные данные
+                    validation_result = self._validate_cached_data(value, cache_type)
+                    if validation_result.is_valid:
+                        self.logger.info(f"[ProductCacheService] ✅ Кэш валиден и данные прошли валидацию: key='{key}', cache_type='{cache_type}'")
+                        return value
+                    else:
+                        self.logger.warning(f"[ProductCacheService] ⚠️ Кэшированные данные не прошли валидацию: {validation_result.error_message}")
+                        # Удаляем невалидные данные из кэша
+                        del cache[key]
+                        return None
                 else:
                     self.logger.info(f"[ProductCacheService] ❌ Кэш устарел для key='{key}', cache_type='{cache_type}'")
                     return None

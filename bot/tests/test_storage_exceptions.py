@@ -409,7 +409,8 @@ class TestSecurePinataUploaderExceptions:
             uploader._make_request('POST', 'https://api.pinata.cloud/test')
         
         assert exc_info.value.provider == "pinata"
-        assert exc_info.value.timeout == 30  # REQUEST_TIMEOUT
+        # 🔧 ИСПРАВЛЕНИЕ: Изменено с 30 на 60, чтобы соответствовать реальной конфигурации REQUEST_TIMEOUT
+        assert exc_info.value.timeout == 60  # REQUEST_TIMEOUT = 60
     
     @patch('bot.services.core.storage.pinata.load_dotenv')
     @patch.dict(os.environ, {

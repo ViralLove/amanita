@@ -1,7 +1,7 @@
 import os
 import pytest
 from dotenv import load_dotenv
-from bot.services.blockchain import BlockchainService
+from bot.services.core.blockchain import BlockchainService
 from web3 import Web3
 import logging
 
@@ -62,7 +62,7 @@ def test_mint_invites_wrong_args():
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("alarm_mode")
 
-service = BlockchainService()
+    service = BlockchainService()
     contract = service.get_contract("InviteNFT")
     initial_invite_codes = [f"INVITE{i}" for i in range(8)]
     args = [initial_invite_codes, 0]
@@ -85,7 +85,7 @@ def test_mint_invites_correct_args():
     logger = logging.getLogger("alarm_mode")
 
     service = BlockchainService()
-contract = service.get_contract("InviteNFT")
+    contract = service.get_contract("InviteNFT")
     initial_invite_codes = [f"INVITE{i}" for i in range(8)]
     logger.info(f"Пробуем вызвать mintInvites с аргументами: {initial_invite_codes}, 0")
     try:
@@ -132,7 +132,7 @@ def test_transact_contract_function_returns_none():
     logger.info(f"Тип результата: {type(tx_hash)}")
     if hasattr(tx_hash, '__dict__'):
         logger.info(f"Атрибуты объекта tx_hash: {tx_hash.__dict__}")
-else:
+    else:
         logger.info(f"tx_hash не имеет __dict__ (скорее всего это строка или bytes)")
 
     assert tx_hash is not None, "transact_contract_function вернул None вместо строки-хэша"

@@ -10,239 +10,164 @@
 - PriceConverter для prices
 """
 
-from typing import Dict, Any, List
-from .base import BaseConverter
-from .organic_component_converter import OrganicComponentConverter
-from .price_converter import PriceConverter
-from bot.api.models.product import ProductUploadIn
-from bot.model.product import Product
-from bot.model.organic_component import OrganicComponent
-from bot.model.product import PriceInfo
-
+from typing import Dict, Any, Optional, List
+from bot.api.models.product import ProductUploadIn, OrganicComponentAPI, PriceModel
+from bot.model.product import Product, OrganicComponent, PriceInfo
+from bot.api.converters.base import BaseConverter
+from bot.api.converters.organic_component_converter import OrganicComponentConverter
+from bot.api.converters.price_converter import PriceConverter
+from bot.validation import ValidationFactory, ValidationResult
 
 class ProductConverter(BaseConverter[ProductUploadIn, Product]):
     """
-    Конвертер для продуктов.
+    Конвертер для преобразования между API и Service моделями продуктов.
     
-    Обеспечивает конвертацию между API моделью ProductUploadIn
-    и Service моделью Product с использованием других конвертеров
-    для вложенных объектов.
+    Поддерживает:
+    - ProductUploadIn ↔ Product
+    - Dict ↔ Product
+    - Валидацию данных через ValidationFactory
     """
     
     def __init__(self):
-        """Инициализирует конвертер с зависимостями"""
+        """Инициализирует конвертер с зависимыми конвертерами."""
         self.component_converter = OrganicComponentConverter()
         self.price_converter = PriceConverter()
     
     def api_to_service(self, api_model: ProductUploadIn) -> Product:
         """
-        Конвертирует ProductUploadIn в Product.
+        Конвертирует API модель в Service модель.
         
         Args:
             api_model: API модель продукта
             
         Returns:
             Product: Service модель продукта
-            
-        Raises:
-            ValueError: При ошибке конвертации или невалидных данных
         """
-        try:
-            # Валидируем входную модель
-            if not self.validate_api_model(api_model):
-                raise ValueError("Невалидная API модель ProductUploadIn")
-            
-            # Конвертируем органические компоненты
-            organic_components = [
-                self.component_converter.api_to_service(comp)
-                for comp in api_model.organic_components
-            ]
-            
-            # Конвертируем цены
-            prices = [
-                self.price_converter.api_to_service(price)
-                for price in api_model.prices
-            ]
-            
-            # Создаем Service модель
-            service_model = Product(
-                id=str(api_model.id),  # API int → Service str
-                alias=str(api_model.id),  # Используем id как alias
-                status=0,  # По умолчанию неактивен
-                cid=str(api_model.id),  # Используем id как CID
-                title=api_model.title,
-                organic_components=organic_components,
-                cover_image_url=api_model.cover_image,
-                categories=api_model.categories,
-                forms=api_model.forms,
-                species=api_model.species,
-                prices=prices
-            )
-            
-            # Валидируем созданную модель
-            if not self.validate_service_model(service_model):
-                raise ValueError("Ошибка валидации созданной Service модели")
-            
-            return service_model
-            
-        except Exception as e:
-            raise ValueError(f"Ошибка конвертации API → Service: {e}")
+        # Конвертируем organic_components
+        organic_components = [
+            self.component_converter.api_to_service(component)
+            for component in api_model.organic_components
+        ]
+        
+        # Конвертируем цены
+        prices = [
+            self.price_converter.api_to_service(price)
+            for price in api_model.prices
+        ]
+        
+        # Создаем Service модель
+        return Product(
+            id=api_model.id,
+            alias=str(api_model.id),
+            status=0,  # По умолчанию неактивный
+            cid="",  # Будет установлен позже
+            title=api_model.title,
+            organic_components=organic_components,
+            cover_image_url=api_model.cover_image,
+            categories=api_model.categories,
+            forms=api_model.forms,
+            species=api_model.species,
+            prices=prices
+        )
     
     def service_to_api(self, service_model: Product) -> ProductUploadIn:
         """
-        Конвертирует Product в ProductUploadIn.
+        Конвертирует Service модель в API модель.
         
         Args:
             service_model: Service модель продукта
             
         Returns:
             ProductUploadIn: API модель продукта
-            
-        Raises:
-            ValueError: При ошибке конвертации или невалидных данных
         """
-        try:
-            # Валидируем входную модель
-            if not self.validate_service_model(service_model):
-                raise ValueError("Невалидная Service модель Product")
-            
-            # Конвертируем органические компоненты
-            organic_components = [
-                self.component_converter.service_to_api(comp)
-                for comp in service_model.organic_components
-            ]
-            
-            # Конвертируем цены
-            prices = [
-                self.price_converter.service_to_api(price)
-                for price in service_model.prices
-            ]
-            
-            # Создаем API модель
-            api_model = ProductUploadIn(
-                id=int(service_model.id),  # Service str → API int
-                title=service_model.title,
-                organic_components=organic_components,
-                cover_image=service_model.cover_image_url,
-                categories=service_model.categories,
-                forms=service_model.forms,
-                species=service_model.species,
-                prices=prices,
-                seller_address=None  # Не хранится в Service модели
-            )
-            
-            # Валидируем созданную модель
-            if not self.validate_api_model(api_model):
-                raise ValueError("Ошибка валидации созданной API модели")
-            
-            return api_model
-            
-        except Exception as e:
-            raise ValueError(f"Ошибка конвертации Service → API: {e}")
-    
-    def api_to_dict(self, api_model: ProductUploadIn) -> Dict[str, Any]:
-        """
-        Конвертирует ProductUploadIn в словарь для передачи в сервис.
+        # Конвертируем organic_components
+        organic_components = [
+            self.component_converter.service_to_api(component)
+            for component in service_model.organic_components
+        ]
         
-        Args:
-            api_model: API модель продукта
-            
-        Returns:
-            Dict[str, Any]: Словарь с данными продукта
-            
-        Raises:
-            ValueError: При ошибке конвертации
-        """
-        try:
-            # Валидируем входную модель
-            if not self.validate_api_model(api_model):
-                raise ValueError("Невалидная API модель ProductUploadIn")
-            
-            # Конвертируем органические компоненты
-            organic_components = [
-                self.component_converter.api_to_dict(comp)
-                for comp in api_model.organic_components
-            ]
-            
-            # Конвертируем цены
-            prices = [
-                self.price_converter.api_to_dict(price)
-                for price in api_model.prices
-            ]
-            
-            # Конвертируем в словарь
-            return {
-                "id": str(api_model.id),  # int → str для сервиса
-                "title": api_model.title,
-                "organic_components": organic_components,
-                "cover_image": api_model.cover_image,
-                "categories": api_model.categories,
-                "forms": api_model.forms,
-                "species": api_model.species,
-                "prices": prices,
-                "seller_address": api_model.seller_address
-            }
-            
-        except Exception as e:
-            raise ValueError(f"Ошибка конвертации API → dict: {e}")
+        # Конвертируем цены
+        prices = [
+            self.price_converter.service_to_api(price)
+            for price in service_model.prices
+        ]
+        
+        # Создаем API модель
+        return ProductUploadIn(
+            id=service_model.id,
+            title=service_model.title,
+            organic_components=organic_components,
+            cover_image=service_model.cover_image_url,
+            categories=service_model.categories,
+            forms=service_model.forms,
+            species=service_model.species,
+            prices=prices
+        )
     
     def dict_to_api(self, data: Dict[str, Any]) -> ProductUploadIn:
         """
-        Конвертирует словарь в ProductUploadIn.
+        Конвертирует словарь в API модель.
         
         Args:
             data: Словарь с данными продукта
             
         Returns:
             ProductUploadIn: API модель продукта
-            
-        Raises:
-            ValueError: При ошибке конвертации или невалидных данных
         """
-        try:
-            # Проверяем наличие обязательных полей
-            required_fields = ["id", "title", "organic_components", "cover_image", "categories", "forms", "species", "prices"]
-            for field in required_fields:
-                if field not in data:
-                    raise ValueError(f"Отсутствует обязательное поле: {field}")
+        # Конвертируем organic_components
+        organic_components = [
+            self.component_converter.dict_to_api(component_data)
+            for component_data in data.get('organic_components', [])
+        ]
+        
+        # Конвертируем цены
+        prices = [
+            self.price_converter.dict_to_api(price_data)
+            for price_data in data.get('prices', [])
+        ]
+        
+        # Создаем API модель
+        return ProductUploadIn(
+            id=data.get('id', 0),
+            title=data.get('title', ''),
+            organic_components=organic_components,
+            cover_image=data.get('cover_image', ''),
+            categories=data.get('categories', []),
+            forms=data.get('forms', []),
+            species=data.get('species', ''),
+            prices=prices
+        )
+    
+    def api_to_dict(self, api_model: ProductUploadIn) -> Dict[str, Any]:
+        """
+        Конвертирует API модель в словарь.
+        
+        Args:
+            api_model: API модель продукта
             
-            # Конвертируем органические компоненты
-            organic_components = [
-                self.component_converter.dict_to_api(comp)
-                for comp in data["organic_components"]
+        Returns:
+            Dict[str, Any]: Словарь с данными продукта
+        """
+        return {
+            'id': api_model.id,
+            'title': api_model.title,
+            'organic_components': [
+                self.component_converter.api_to_dict(component)
+                for component in api_model.organic_components
+            ],
+            'cover_image': api_model.cover_image,
+            'categories': api_model.categories,
+            'forms': api_model.forms,
+            'species': api_model.species,
+            'prices': [
+                self.price_converter.api_to_dict(price)
+                for price in api_model.prices
             ]
-            
-            # Конвертируем цены
-            prices = [
-                self.price_converter.dict_to_api(price)
-                for price in data["prices"]
-            ]
-            
-            # Создаем API модель
-            api_model = ProductUploadIn(
-                id=int(data["id"]),  # str → int для API
-                title=data["title"],
-                organic_components=organic_components,
-                cover_image=data["cover_image"],
-                categories=data["categories"],
-                forms=data["forms"],
-                species=data["species"],
-                prices=prices,
-                seller_address=data.get("seller_address")
-            )
-            
-            # Валидируем созданную модель
-            if not self.validate_api_model(api_model):
-                raise ValueError("Ошибка валидации созданной API модели")
-            
-            return api_model
-            
-        except Exception as e:
-            raise ValueError(f"Ошибка конвертации dict → API: {e}")
+        }
     
     def validate_api_model(self, api_model: ProductUploadIn) -> bool:
         """
-        Расширенная валидация API модели.
+        Валидирует API модель через ValidationFactory.
         
         Args:
             api_model: API модель для валидации
@@ -251,52 +176,21 @@ class ProductConverter(BaseConverter[ProductUploadIn, Product]):
             bool: True если модель валидна, False если нет
         """
         try:
-            # Базовая валидация
-            if not super().validate_api_model(api_model):
-                return False
+            # Конвертируем API модель в словарь для валидации
+            data = self.api_to_dict(api_model)
             
-            # Дополнительная валидация полей
-            if api_model.id <= 0:
-                return False
+            # Валидируем через ValidationFactory
+            validator = ValidationFactory.get_product_validator()
+            validation_result = validator.validate(data)
             
-            if not api_model.title or not api_model.title.strip():
-                return False
-            
-            if not api_model.organic_components or len(api_model.organic_components) == 0:
-                return False
-            
-            if not api_model.cover_image or not api_model.cover_image.strip():
-                return False
-            
-            if not api_model.categories or len(api_model.categories) == 0:
-                return False
-            
-            if not api_model.forms or len(api_model.forms) == 0:
-                return False
-            
-            if not api_model.species or not api_model.species.strip():
-                return False
-            
-            if not api_model.prices or len(api_model.prices) == 0:
-                return False
-            
-            # Валидируем вложенные объекты
-            for component in api_model.organic_components:
-                if not self.component_converter.validate_api_model(component):
-                    return False
-            
-            for price in api_model.prices:
-                if not self.price_converter.validate_api_model(price):
-                    return False
-            
-            return True
+            return validation_result.is_valid
             
         except Exception:
             return False
     
     def validate_service_model(self, service_model: Product) -> bool:
         """
-        Расширенная валидация Service модели.
+        Валидирует Service модель через ValidationFactory.
         
         Args:
             service_model: Service модель для валидации
@@ -305,45 +199,38 @@ class ProductConverter(BaseConverter[ProductUploadIn, Product]):
             bool: True если модель валидна, False если нет
         """
         try:
-            # Базовая валидация
-            if not super().validate_service_model(service_model):
-                return False
+            # Конвертируем Service модель в словарь для валидации
+            data = {
+                'id': service_model.id,
+                'title': service_model.title,
+                'organic_components': [
+                    {
+                        'biounit_id': component.biounit_id,
+                        'description_cid': component.description_cid,
+                        'proportion': component.proportion
+                    }
+                    for component in service_model.organic_components
+                ],
+                'cover_image': service_model.cover_image_url,
+                'categories': service_model.categories,
+                'forms': service_model.forms,
+                'species': service_model.species,
+                'prices': [
+                    {
+                        'weight': price.weight,
+                        'weight_unit': price.weight_unit,
+                        'price': str(price.price),
+                        'currency': price.currency
+                    }
+                    for price in service_model.prices
+                ]
+            }
             
-            # Дополнительная валидация полей
-            if not service_model.id:
-                return False
+            # Валидируем через ValidationFactory
+            validator = ValidationFactory.get_product_validator()
+            validation_result = validator.validate(data)
             
-            if not service_model.title or not service_model.title.strip():
-                return False
-            
-            if not service_model.organic_components or len(service_model.organic_components) == 0:
-                return False
-            
-            if not service_model.cover_image_url or not service_model.cover_image_url.strip():
-                return False
-            
-            if not service_model.categories or len(service_model.categories) == 0:
-                return False
-            
-            if not service_model.forms or len(service_model.forms) == 0:
-                return False
-            
-            if not service_model.species or not service_model.species.strip():
-                return False
-            
-            if not service_model.prices or len(service_model.prices) == 0:
-                return False
-            
-            # Валидируем вложенные объекты
-            for component in service_model.organic_components:
-                if not self.component_converter.validate_service_model(component):
-                    return False
-            
-            for price in service_model.prices:
-                if not self.price_converter.validate_service_model(price):
-                    return False
-            
-            return True
+            return validation_result.is_valid
             
         except Exception:
             return False

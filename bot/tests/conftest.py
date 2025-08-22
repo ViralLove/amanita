@@ -67,7 +67,27 @@ def mock_blockchain_service(monkeypatch):
             self._next_blockchain_id = 1
             self.product_statuses.clear()
             self.product_cids.clear()
+            
+            # 🔧 ИСПРАВЛЕНИЕ: Инициализируем тестовые данные с корректными статусами
+            self._initialize_test_data()
+            
             logger.info("🔧 [MockBlockchainService] Состояние сброшено для изоляции тестов")
+        
+        def _initialize_test_data(self):
+            """Инициализация тестовых данных для изоляции тестов"""
+            # Создаем тестовый продукт с ID=1 и статусом False (неактивный)
+            self.product_statuses[1] = False
+            self.product_cids[1] = "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG"
+            
+            # 🔧 ИСПРАВЛЕНИЕ: Создаем только статусы для ID 2-8, но НЕ создаем тестовые CID
+            # Это позволит create_product создать правильные CID для динамически создаваемых продуктов
+            for i in range(2, 9):  # ID от 2 до 8
+                self.product_statuses[i] = False  # 🔧 ИСПРАВЛЕНИЕ: Все продукты неактивны по умолчанию
+                # НЕ создаем тестовые CID - они будут созданы через create_product
+            
+            logger.info(f"🔧 [MockBlockchainService] Инициализированы тестовые данные: {len(self.product_statuses)} продуктов")
+            logger.info(f"   - product_statuses: {self.product_statuses}")
+            logger.info(f"   - product_cids: {self.product_cids}")
         
         def _generate_next_blockchain_id(self):
             """Генерирует следующий уникальный blockchain ID"""
@@ -87,14 +107,14 @@ def mock_blockchain_service(monkeypatch):
             Убрали жестко закодированный продукт с ID 42 для динамического тестирования
             """
             return [
-                (1, "0x0000000000000000000000000000000000000001", "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG", True),
-                (2, "0x0000000000000000000000000000000000000002", "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1", True),
-                (3, "0x0000000000000000000000000000000000000003", "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B", True),
-                (4, "0x0000000000000000000000000000000000000004", "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz", True),
-                (5, "0x0000000000000000000000000000000000000005", "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy", True),
-                (6, "0x0000000000000000000000000000000000000006", "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd", True),
-                (7, "0x0000000000000000000000000000000000000007", "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa", True),
-                (8, "0x0000000000000000000000000000000000000008", "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S", True)
+                (1, "0x0000000000000000000000000000000000000001", "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG", False),
+                (2, "0x0000000000000000000000000000000000000002", "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1", False),
+                (3, "0x0000000000000000000000000000000000000003", "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B", False),
+                (4, "0x0000000000000000000000000000000000000004", "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz", False),
+                (5, "0x0000000000000000000000000000000000000005", "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy", False),
+                (6, "0x0000000000000000000000000000000000000006", "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd", False),
+                (7, "0x0000000000000000000000000000000000000007", "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa", False),
+                (8, "0x0000000000000000000000000000000000000008", "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S", False)
                 # Убрали продукт с ID 42 - теперь он создается динамически в тестах
             ]
         
@@ -112,28 +132,19 @@ def mock_blockchain_service(monkeypatch):
 
         # Возвращает фиктивный продукт по id. Структура соответствует ProductRegistry.Product.
         def get_product(self, product_id):
-            """
-            Возвращает фиктивный продукт по id. Структура соответствует ProductRegistry.Product.
-            Теперь работает с любыми динамически созданными ID.
-            """
-            # ИСПРАВЛЕНИЕ: Всегда возвращаем актуальный статус из product_statuses
-            status = self.product_statuses.get(product_id, False)
+            """Получает продукт по ID (mock)"""
+            # Приводим product_id к int для корректного поиска
+            try:
+                product_id_int = int(product_id)
+            except (ValueError, TypeError):
+                logger.warning(f"⚠️ [MockBlockchainService] Невалидный product_id: {product_id}")
+                return None
             
-            # ДОПОЛНИТЕЛЬНАЯ ДИАГНОСТИКА: Логируем состояние product_statuses
+            # Получаем статус продукта
+            status = self.product_statuses.get(product_id_int, False)
             logger.info(f"🔍 [MockBlockchainService] get_product вызван для ID={product_id}")
             logger.info(f"   - product_statuses: {self.product_statuses}")
-            logger.info(f"   - status для ID {product_id}: {status}")
-            
-            # КРИТИЧЕСКАЯ ПРОБЛЕМА: status возвращается неправильно!
-            # Давайте проверим, что происходит с product_statuses
-            logger.warning(f"🚨 [MockBlockchainService] КРИТИЧЕСКАЯ ПРОБЛЕМА: status={status} для ID={product_id}")
-            logger.warning(f"🚨 [MockBlockchainService] product_statuses содержит: {self.product_statuses}")
-            
-            # ПРОБЛЕМА НАЙДЕНА: product_id приходит как строка, а в product_statuses ключи - числа!
-            # Нужно привести product_id к int
-            product_id_int = int(product_id) if isinstance(product_id, str) else product_id
-            status = self.product_statuses.get(product_id_int, False)
-            logger.warning(f"🚨 [MockBlockchainService] ИСПРАВЛЕНИЕ: product_id={product_id} -> {product_id_int}, status={status}")
+            logger.info(f"   - status для ID {product_id_int}: {status}")
             
             # Проверяем, существует ли продукт с таким ID
             if product_id_int in self.product_cids:
@@ -142,9 +153,17 @@ def mock_blockchain_service(monkeypatch):
                 logger.info(f"🔍 [MockBlockchainService] Получен продукт: ID={product_id_int}, CID={cid}, Status={status}")
                 return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", cid, status)
             else:
-                # Продукт не был создан, возвращаем None для CID
-                logger.warning(f"⚠️ [MockBlockchainService] Продукт {product_id_int} не найден в product_cids, но статус: {status}")
-                return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", None, status)
+                # 🔧 ИСПРАВЛЕНИЕ: Если продукт не найден в product_cids, 
+                # но есть в product_statuses, возвращаем None для CID
+                # Это позволит sync_with_blockchain_service найти правильные данные
+                if product_id_int in self.product_statuses:
+                    logger.info(f"🔧 [MockBlockchainService] Продукт {product_id_int} найден в product_statuses, но не в product_cids")
+                    logger.info(f"🔧 [MockBlockchainService] Возвращаем None для CID, чтобы sync_with_blockchain_service мог найти правильные данные")
+                    return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", None, status)
+                else:
+                    # Продукт не найден, возвращаем None для CID
+                    logger.info(f"🔍 [MockBlockchainService] Продукт {product_id_int} не найден в product_cids, но статус: {status}")
+                    return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", None, status)
 
         # Имитация создания продукта в блокчейне. Сохраняет CID для синхронизации с MockIPFSStorage.
         async def create_product(self, ipfs_cid):
@@ -156,12 +175,12 @@ def mock_blockchain_service(monkeypatch):
             # Сохраняем связь между blockchain ID и IPFS CID
             self.product_cids[product_id] = ipfs_cid
             
-            # Устанавливаем статус продукта как неактивный по умолчанию
+            # 🔧 ИСПРАВЛЕНИЕ: Продукты создаются неактивными по умолчанию (status=False)
             self.product_statuses[product_id] = False
             
             logger.info(f"🔗 [MockBlockchainService] Создан продукт: ID={product_id}, CID={ipfs_cid}")
             
-            return "0x123"
+            return "0x123"  # Хэш транзакции
 
         # Имитация активации продукта в блокчейне. Всегда возвращает фиктивный tx_hash '0xsetactive'.
         async def set_product_active(self, private_key, product_id, is_active):
@@ -229,6 +248,200 @@ def mock_blockchain_service(monkeypatch):
             # Сбрасываем счетчик blockchain ID
             self._next_blockchain_id = 1
             logger.info("🧹 [MockBlockchainService] Состояние очищено, счетчик ID сброшен")
+        
+        # 🔧 НОВОЕ: Поддержка InviteNFT методов для AccountService
+        def _call_contract_read_function(self, contract_address, function_name, *args):
+            """Универсальный метод для вызова read функций контрактов"""
+            logger.info(f"🔍 [MockBlockchainService] _call_contract_read_function: {function_name} с аргументами {args}")
+            
+            # Определяем тип контракта по адресу или функции
+            if function_name in ["isSeller", "userInviteCount", "isUserActivated", "getAllActivatedUsers", 
+                               "batchValidateInviteCodes", "getTokenIdByInviteCode", "getInviteCodeByTokenId",
+                               "isInviteTokenUsed", "getInviteCreatedAt", "getInviteExpiry", 
+                               "getInviteMinter", "getInviteFirstOwner", "validateInviteCode"]:
+                return self._call_invite_nft_function(function_name, *args)
+            else:
+                # Для других функций возвращаем None (не поддерживаются в этом моке)
+                logger.warning(f"⚠️ [MockBlockchainService] Функция {function_name} не поддерживается")
+                return None
+        
+        def _call_invite_nft_function(self, function_name, *args):
+            """Вызов функций InviteNFT контракта"""
+            logger.info(f"🔍 [MockBlockchainService] InviteNFT функция: {function_name} с аргументами {args}")
+            
+            if function_name == "isSeller":
+                user_address = args[0] if args else "0x0000000000000000000000000000000000000000"
+                return self._is_seller(user_address)
+            elif function_name == "userInviteCount":
+                user_address = args[0] if args else "0x0000000000000000000000000000000000000000"
+                return self._user_invite_count(user_address)
+            elif function_name == "isUserActivated":
+                user_address = args[0] if args else "0x0000000000000000000000000000000000000000"
+                return self._is_user_activated(user_address)
+            elif function_name == "getAllActivatedUsers":
+                return self._get_all_activated_users()
+            elif function_name == "batchValidateInviteCodes":
+                invite_codes = args[0] if args else []
+                user_address = args[1] if len(args) > 1 else "0x0000000000000000000000000000000000000000"
+                return self._batch_validate_invite_codes(invite_codes, user_address)
+            elif function_name == "getTokenIdByInviteCode":
+                invite_code = args[0] if args else ""
+                return self._get_token_id_by_invite_code(invite_code)
+            elif function_name == "getInviteCodeByTokenId":
+                token_id = args[0] if args else 0
+                return self._get_invite_code_by_token_id(token_id)
+            elif function_name == "isInviteTokenUsed":
+                token_id = args[0] if args else 0
+                return self._is_invite_token_used(token_id)
+            elif function_name == "getInviteCreatedAt":
+                token_id = args[0] if args else 0
+                return self._get_invite_created_at(token_id)
+            elif function_name == "getInviteExpiry":
+                token_id = args[0] if args else 0
+                return self._get_invite_expiry(token_id)
+            elif function_name == "getInviteMinter":
+                token_id = args[0] if args else 0
+                return self._get_invite_minter(token_id)
+            elif function_name == "getInviteFirstOwner":
+                token_id = args[0] if args else 0
+                return self._get_invite_first_owner(token_id)
+            elif function_name == "validateInviteCode":
+                invite_code = args[0] if args else ""
+                return self._validate_invite_code(invite_code)
+            else:
+                logger.warning(f"⚠️ [MockBlockchainService] Неизвестная InviteNFT функция: {function_name}")
+                return None
+        
+        def _is_seller(self, user_address):
+            """Проверка роли продавца"""
+            return self._get_invite_nft_test_data()["seller_roles"].get(user_address, False)
+        
+        def _user_invite_count(self, user_address):
+            """Количество инвайтов пользователя"""
+            return self._get_invite_nft_test_data()["user_invite_counts"].get(user_address, 0)
+        
+        def _is_user_activated(self, user_address):
+            """Проверка активации пользователя"""
+            return self._get_invite_nft_test_data()["activated_users"].get(user_address, 0) != 0
+        
+        def _get_all_activated_users(self):
+            """Получение всех активированных пользователей"""
+            activated = self._get_invite_nft_test_data()["activated_users"]
+            return [addr for addr, status in activated.items() if status != 0]
+        
+        def _batch_validate_invite_codes(self, invite_codes, user_address):
+            """Пакетная валидация инвайт кодов"""
+            success_array = []
+            reasons_array = []
+            invite_data = self._get_invite_nft_test_data()["invite_codes"]
+            
+            for code in invite_codes:
+                if code in invite_data:
+                    invite_info = invite_data[code]
+                    if invite_info["used"]:
+                        success_array.append(False)
+                        reasons_array.append("already_used")
+                    elif invite_info["expiry"] != 0 and invite_info["expiry"] < time.time():
+                        success_array.append(False)
+                        reasons_array.append("expired")
+                    else:
+                        success_array.append(True)
+                        reasons_array.append("")
+                else:
+                    success_array.append(False)
+                    reasons_array.append("not_found")
+            
+            return success_array, reasons_array
+        
+        def _get_token_id_by_invite_code(self, invite_code):
+            """Получение token ID по инвайт коду"""
+            invite_data = self._get_invite_nft_test_data()["invite_codes"]
+            if invite_code in invite_data:
+                return invite_data[invite_code]["token_id"]
+            return 0
+        
+        def _get_invite_code_by_token_id(self, token_id):
+            """Получение инвайт кода по token ID"""
+            invite_data = self._get_invite_nft_test_data()["invite_codes"]
+            for code, data in invite_data.items():
+                if data["token_id"] == token_id:
+                    return code
+            return ""
+        
+        def _is_invite_token_used(self, token_id):
+            """Проверка использования инвайт токена"""
+            invite_data = self._get_invite_nft_test_data()["invite_codes"]
+            for data in invite_data.values():
+                if data["token_id"] == token_id:
+                    return data["used"]
+            return False
+        
+        def _get_invite_created_at(self, token_id):
+            """Получение времени создания инвайта"""
+            return int(time.time()) - 3600  # 1 час назад
+        
+        def _get_invite_expiry(self, token_id):
+            """Получение времени истечения инвайта"""
+            invite_data = self._get_invite_nft_test_data()["invite_codes"]
+            for data in invite_data.values():
+                if data["token_id"] == token_id:
+                    return data["expiry"]
+            return 0
+        
+        def _get_invite_minter(self, token_id):
+            """Получение адреса минтера инвайта"""
+            return "0x1234567890abcdef1234567890abcdef12345678"
+        
+        def _get_invite_first_owner(self, token_id):
+            """Получение адреса первого владельца инвайта"""
+            return "0x1234567890abcdef1234567890abcdef12345678"
+        
+        def _validate_invite_code(self, invite_code):
+            """Валидация инвайт кода"""
+            invite_data = self._get_invite_nft_test_data()["invite_codes"]
+            if invite_code in invite_data:
+                invite_info = invite_data[invite_code]
+                if invite_info["used"]:
+                    return False, "already_used"
+                elif invite_info["expiry"] != 0 and invite_info["expiry"] < time.time():
+                    return False, "expired"
+                else:
+                    return True, ""
+            else:
+                return False, "not_found"
+        
+        def _get_invite_nft_test_data(self):
+            """Получение тестовых данных для InviteNFT"""
+            if not hasattr(self, '_invite_nft_data'):
+                import time
+                self._invite_nft_data = {
+                    "invite_codes": {
+                        "AMANITA-TEST-CODE1": {"token_id": 1, "used": False, "expiry": 0},
+                        "AMANITA-TEST-CODE2": {"token_id": 2, "used": True, "expiry": 0},
+                        "AMANITA-TEST-CODE3": {"token_id": 3, "used": False, "expiry": 0},
+                        "AMANITA-TEST-CODE4": {"token_id": 4, "used": False, "expiry": 0},
+                        "AMANITA-TEST-CODE5": {"token_id": 5, "used": False, "expiry": 0}
+                    },
+                    "user_invite_counts": {
+                        "0x1234567890abcdef1234567890abcdef12345678": 2,
+                        "0x0987654321098765432109876543210987654321": 0,
+                        "0x1111111111111111111111111111111111111111": 5,
+                        "0x2222222222222222222222222222222222222222": 1
+                    },
+                    "activated_users": {
+                        "0x1234567890abcdef1234567890abcdef12345678": 1,
+                        "0x0987654321098765432109876543210987654321": 0,
+                        "0x1111111111111111111111111111111111111111": 1,
+                        "0x2222222222222222222222222222222222222222": 0
+                    },
+                    "seller_roles": {
+                        "0x1234567890abcdef1234567890abcdef12345678": True,
+                        "0x0987654321098765432109876543210987654321": False,
+                        "0x1111111111111111111111111111111111111111": True,
+                        "0x2222222222222222222222222222222222222222": False
+                    }
+                }
+            return self._invite_nft_data
     
     # Подменяем BlockchainService на мок
     monkeypatch.setattr(blockchain, "BlockchainService", MockBlockchainService)
@@ -237,20 +450,23 @@ def mock_blockchain_service(monkeypatch):
 
 @pytest.fixture(scope="function")
 def mock_validation_service():
-    """Универсальный мок для ProductValidationService"""
+    """Универсальный мок для ProductValidationService с ValidationResult"""
+    from bot.validation import ValidationResult
+    
     class MockProductValidationService:
         def __init__(self, should_fail_validation=False):
             self.should_fail_validation = should_fail_validation
             self.validation_calls = []
         
-        async def validate_product_data(self, product_data):
+        async def validate_product_data(self, product_data, storage_service=None):
             self.validation_calls.append(product_data)
             
             if self.should_fail_validation:
-                return {
-                    "is_valid": False,
-                    "errors": ["Mock validation failed"]
-                }
+                return ValidationResult.failure(
+                    "Mock validation failed",
+                    field_name="mock_error",
+                    error_code="MOCK_VALIDATION_FAILED"
+                )
             
             # Простая валидация для тестов (обновлена для многокомпонентных продуктов)
             required_fields = ["title", "organic_components", "forms"]
@@ -275,22 +491,60 @@ def mock_validation_service():
                                 if comp_field not in component:
                                     errors.append(f"organic_components[{i}].{comp_field}: Поле обязательно")
             
-            return {
-                "is_valid": len(errors) == 0,
-                "errors": errors
-            }
+            if errors:
+                return ValidationResult.failure(
+                    "; ".join(errors),
+                    field_name="validation_errors",
+                    error_code="VALIDATION_ERRORS"
+                )
+            
+            return ValidationResult.success()
     
     return MockProductValidationService()
 
 
 @pytest.fixture(scope="function")
 def mock_account_service():
-    """Универсальный мок для AccountService"""
+    """Универсальный мок для AccountService с полной функциональностью для InviteNFT"""
     class MockAccountService:
         def __init__(self):
             self.private_key = "0x1234567890abcdef"
             self.address = "0x1234567890abcdef1234567890abcdef12345678"
             self.balance = "1000000000000000000"  # 1 ETH
+            
+            # 🔧 НОВОЕ: Тестовые данные для AccountService
+            self._initialize_test_data()
+        
+        def _initialize_test_data(self):
+            """Инициализация тестовых данных для AccountService"""
+            self.test_sellers = {
+                "0x1234567890abcdef1234567890abcdef12345678": True,
+                "0x0987654321098765432109876543210987654321": False,
+                "0x1111111111111111111111111111111111111111": True,
+                "0x2222222222222222222222222222222222222222": False
+            }
+            
+            self.test_user_invite_counts = {
+                "0x1234567890abcdef1234567890abcdef12345678": 2,
+                "0x0987654321098765432109876543210987654321": 0,
+                "0x1111111111111111111111111111111111111111": 5,
+                "0x2222222222222222222222222222222222222222": 1
+            }
+            
+            self.test_activated_users = {
+                "0x1234567890abcdef1234567890abcdef12345678": True,
+                "0x0987654321098765432109876543210987654321": False,
+                "0x1111111111111111111111111111111111111111": True,
+                "0x2222222222222222222222222222222222222222": False
+            }
+            
+            self.test_invite_codes = {
+                "AMANITA-TEST-CODE1": {"valid": True, "used": False},
+                "AMANITA-TEST-CODE2": {"valid": True, "used": True},
+                "AMANITA-TEST-CODE3": {"valid": True, "used": False},
+                "AMANITA-TEST-CODE4": {"valid": False, "used": False},
+                "AMANITA-TEST-CODE5": {"valid": True, "used": False}
+            }
         
         def get_private_key(self):
             return self.private_key
@@ -303,6 +557,73 @@ def mock_account_service():
         
         async def sign_transaction(self, transaction):
             return f"0xsigned_{transaction}"
+        
+        # 🔧 НОВОЕ: Методы для InviteNFT функциональности
+        async def is_seller(self, user_address: str) -> bool:
+            """Проверка роли продавца"""
+            return self.test_sellers.get(user_address, False)
+        
+        async def validate_invite_code(self, invite_code: str, user_address: str) -> bool:
+            """Валидация инвайт кода для пользователя"""
+            if invite_code not in self.test_invite_codes:
+                return False
+            
+            invite_data = self.test_invite_codes[invite_code]
+            if not invite_data["valid"] or invite_data["used"]:
+                return False
+            
+            # Проверяем, что у пользователя есть доступ к инвайту
+            user_count = self.test_user_invite_counts.get(user_address, 0)
+            return user_count > 0
+        
+        async def is_user_activated(self, user_address: str) -> bool:
+            """Проверка активации пользователя"""
+            return self.test_activated_users.get(user_address, False)
+        
+        async def get_all_activated_users(self) -> list:
+            """Получение всех активированных пользователей"""
+            return [addr for addr, activated in self.test_activated_users.items() if activated]
+        
+        async def batch_validate_invite_codes(self, invite_codes: list, user_address: str) -> tuple:
+            """Пакетная валидация инвайт кодов"""
+            success_array = []
+            reasons_array = []
+            
+            for code in invite_codes:
+                is_valid = await self.validate_invite_code(code, user_address)
+                success_array.append(is_valid)
+                reasons_array.append("" if is_valid else "invalid_or_used")
+            
+            return success_array, reasons_array
+        
+        async def activate_and_mint_invites(self, invite_codes: list, user_address: str) -> bool:
+            """Активация и минт инвайтов"""
+            # Проверяем, что пользователь является продавцом
+            if not await self.is_seller(user_address):
+                return False
+            
+            # Проверяем все инвайт коды
+            for code in invite_codes:
+                if not await self.validate_invite_code(code, user_address):
+                    return False
+            
+            # Симулируем успешную активацию
+            return True
+        
+        async def get_seller_account(self) -> dict:
+            """Получение аккаунта продавца"""
+            return {
+                "address": self.address,
+                "private_key": self.private_key,
+                "is_seller": True,
+                "balance": self.balance
+            }
+        
+        def _generate_random_code(self) -> str:
+            """Генерация случайного кода (внутренний метод)"""
+            import random
+            import string
+            return "AMANITA-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     
     return MockAccountService()
 
@@ -332,7 +653,7 @@ def mock_ipfs_storage_failing():
                         "proportion": "100%"
                     }
                 ],
-                "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
                 "categories": ["mushroom", "mental health", "focus", "ADHD support", "mental force"],
                 "forms": ["mixed slices"],
                 "species": "Amanita muscaria",
@@ -368,16 +689,19 @@ def mock_ipfs_storage_failing():
 @pytest.fixture(scope="function")
 def mock_validation_service_failing():
     """Мок ProductValidationService с симуляцией ошибок"""
+    from bot.validation import ValidationResult
+    
     class MockProductValidationServiceFailing:
         def __init__(self):
             self.validation_calls = []
         
-        async def validate_product_data(self, product_data):
+        async def validate_product_data(self, product_data, storage_service=None):
             self.validation_calls.append(product_data)
-            return {
-                "is_valid": False,
-                "errors": ["Mock validation failed"]
-            }
+            return ValidationResult.failure(
+                "Mock validation failed",
+                field_name="mock_error",
+                error_code="MOCK_VALIDATION_FAILED"
+            )
     
     return MockProductValidationServiceFailing()
 
@@ -453,7 +777,7 @@ def mock_ipfs_service(monkeypatch):
                         "proportion": "100%"
                     }
                 ],
-                "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
                 "categories": ["mushroom", "mental health", "focus", "ADHD support", "mental force"],
                 "forms": ["mixed slices"],
                 "species": "Amanita muscaria",
@@ -793,24 +1117,223 @@ def mock_config():
 
 @pytest.fixture(scope="function")
 def mock_ipfs_storage():
-    """Универсальный мок для IPFS/Arweave storage с консистентным хранением данных"""
+    """Универсальный мок для IPFS/Arweave storage сервиса"""
+    
     class MockIPFSStorage:
         def __init__(self, should_fail_upload=False, should_fail_download=False):
             self.should_fail_upload = should_fail_upload
             self.should_fail_download = should_fail_download
-            # Внутреннее хранилище для консистентности upload/download
-            self._storage = {}  # CID -> data mapping
-            self._counter = 0   # Счетчик для генерации уникальных CID
-            # Ссылка на blockchain service для синхронизации
-            self.blockchain_service = None
-            # Обратная совместимость для существующих тестов
-            self.uploaded_files = []
             self.uploaded_jsons = []
             self.downloaded_json = {}
-            self.gateway_url_prefix = "https://mocked.ipfs/"
+            self._storage = {}
+            self._counter = 0
             
-            # 🔧 ИЗОЛЯЦИЯ: Сбрасываем состояние при каждом создании фикстуры
-            self._reset_state()
+            # Загружаем тестовые данные при инициализации
+            self._populate_test_data()
+        
+        # 🔧 ИСПРАВЛЕНИЕ: Добавляю синхронизацию с MockBlockchainService
+        def sync_with_blockchain_service(self, blockchain_service):
+            """Синхронизирует MockIPFSStorage с MockBlockchainService"""
+            if hasattr(blockchain_service, 'product_cids'):
+                for blockchain_id, cid in blockchain_service.product_cids.items():
+                    if cid not in self._storage:
+                        # 🔧 ИСПРАВЛЕНИЕ: Ищем оригинальные данные продукта по business_id
+                        # Нужно найти продукт, который был создан с этим blockchain_id
+                        original_data = None
+                        
+                        # Ищем по всем сохраненным данным
+                        for stored_cid, stored_data in self._storage.items():
+                            # Проверяем, есть ли у нас данные с business_id, который соответствует этому blockchain_id
+                            # В тестах мы создаем продукт с business_id='amanita1', а blockchain_id=8
+                            # Нужно найти данные, которые были созданы для этого продукта
+                            if 'created_at' in stored_data:  # Это недавно созданный продукт
+                                original_data = stored_data.copy()
+                                break
+                        
+                        if original_data:
+                            # Используем оригинальные данные, но обновляем CID и blockchain_id
+                            original_data['cid'] = cid
+                            original_data['blockchain_id'] = blockchain_id
+                            self._storage[cid] = original_data
+                            logger.info(f"🔧 [MockIPFSStorage] Синхронизирован CID {cid} с оригинальными данными для blockchain ID {blockchain_id}")
+                        else:
+                            # Создаем тестовые данные для CID, если оригинальных нет
+                            test_data = {
+                                "id": blockchain_id,
+                                "cid": cid,
+                                "title": f"Test Product {blockchain_id}",
+                                "organic_components": [
+                                    {
+                                        "biounit_id": f"test_component_{blockchain_id}",
+                                        "description_cid": cid,
+                                        "proportion": "100%"
+                                    }
+                                ],
+                                "cover_image_url": cid,
+                                "categories": ["test"],
+                                "forms": ["test_form"],
+                                "species": "Test Species",
+                                "prices": [{"weight": "100", "weight_unit": "g", "price": "10", "currency": "EUR"}]
+                            }
+                            self._storage[cid] = test_data
+                            logger.info(f"🔧 [MockIPFSStorage] Синхронизирован CID {cid} с тестовыми данными для blockchain ID {blockchain_id}")
+        
+        def _reset_state(self):
+            """Сброс состояния для изоляции тестов"""
+            self.uploaded_jsons.clear()
+            self.downloaded_json.clear()
+            
+            # После сброса состояния заново загружаем тестовые данные
+            self._populate_test_data()
+            
+            logger.info("🔧 [MockIPFSStorage] Состояние сброшено для изоляции тестов")
+        
+        def _populate_test_data(self):
+            """Предзаполняет хранилище тестовыми данными для продуктов"""
+            # Тестовые данные для продуктов, которые возвращает mock blockchain service (8 продуктов)
+            test_products = {
+                "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG": {
+                    "id": 1,
+                    "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                    "title": "Amanita muscaria — sliced caps and gills (1st grade)",
+                    "organic_components": [
+                        {
+                            "biounit_id": "amanita_muscaria",
+                            "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                            "proportion": "100%"
+                        }
+                    ],
+                    "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                    "categories": ["mushroom", "mental health", "focus", "ADHD support", "mental force"],
+                    "forms": ["mixed slices"],
+                    "species": "Amanita muscaria",
+                    "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
+                },
+                "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1": {
+                    "id": 2,
+                    "cid": "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1",
+                    "title": "Amanita pantherina — premium powder",
+                    "organic_components": [
+                        {
+                            "biounit_id": "amanita_pantherina",
+                            "description_cid": "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1",
+                            "proportion": "100%"
+                        }
+                    ],
+                    "cover_image_url": "QmPantherinaCoverCID",
+                    "categories": ["mushroom", "mental health", "focus"],
+                    "forms": ["powder"],
+                    "species": "Amanita pantherina",
+                    "prices": [{"weight": "100", "weight_unit": "g", "price": "90", "currency": "EUR"}]
+                },
+                "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B": {
+                    "id": 3,
+                    "cid": "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B",
+                    "title": "Blue Lotus — flower extract",
+                    "organic_components": [
+                        {
+                            "biounit_id": "blue_lotus",
+                            "description_cid": "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B",
+                            "proportion": "100%"
+                        }
+                    ],
+                    "cover_image_url": "QmBlueLotusCoverCID",
+                    "categories": ["flower", "relaxation", "sleep"],
+                    "forms": ["tincture"],
+                    "species": "Blue Lotus",
+                    "prices": [{"weight": "100", "weight_unit": "g", "price": "45", "currency": "EUR"}]
+                },
+                "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz": {
+                    "id": 4,
+                    "cid": "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz",
+                    "title": "Chaga — medicinal mushroom",
+                    "organic_components": [
+                        {
+                            "biounit_id": "chaga",
+                            "description_cid": "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz",
+                            "proportion": "100%"
+                        }
+                    ],
+                    "cover_image_url": "QmChagaCoverCID",
+                    "categories": ["mushroom", "immunity", "antioxidant"],
+                    "forms": ["powder", "capsules"],
+                    "species": "Chaga",
+                    "prices": [{"weight": "100", "weight_unit": "g", "price": "70", "currency": "EUR"}]
+                },
+                "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy": {
+                    "id": 5,
+                    "cid": "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy",
+                    "title": "Lion's Mane — cognitive support",
+                    "organic_components": [
+                        {
+                            "biounit_id": "lions_mane",
+                            "description_cid": "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy",
+                            "proportion": "100%"
+                        }
+                    ],
+                    "cover_image_url": "QmLionsManeCoverCID",
+                    "categories": ["mushroom", "cognitive", "memory"],
+                    "forms": ["powder"],
+                    "species": "Lion's Mane",
+                    "prices": [{"weight": "100", "weight_unit": "g", "price": "85", "currency": "EUR"}]
+                },
+                "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd": {
+                    "id": 6,
+                    "cid": "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd",
+                    "title": "Reishi — longevity mushroom",
+                    "organic_components": [
+                        {
+                            "biounit_id": "reishi",
+                            "description_cid": "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd",
+                            "proportion": "100%"
+                        }
+                    ],
+                    "cover_image_url": "QmReishiCoverCID",
+                    "categories": ["mushroom", "longevity", "stress"],
+                    "forms": ["powder", "tincture"],
+                    "species": "Reishi",
+                    "prices": [{"weight": "100", "weight_unit": "g", "price": "95", "currency": "EUR"}]
+                },
+                "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa": {
+                    "id": 7,
+                    "cid": "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa",
+                    "title": "Cordyceps — energy boost",
+                    "organic_components": [
+                        {
+                            "biounit_id": "cordyceps",
+                            "description_cid": "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa",
+                            "proportion": "100%"
+                        }
+                    ],
+                    "cover_image_url": "QmCordycepsCoverCID",
+                    "categories": ["mushroom", "energy", "endurance"],
+                    "forms": ["powder", "capsules"],
+                    "species": "Cordyceps",
+                    "prices": [{"weight": "100", "weight_unit": "g", "price": "88", "currency": "EUR"}]
+                },
+                "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S": {
+                    "id": 8,
+                    "cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+                    "title": "Turkey Tail — immune support",
+                    "organic_components": [
+                        {
+                            "biounit_id": "turkey_tail",
+                            "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+                            "proportion": "100%"
+                        }
+                    ],
+                    "cover_image_url": "QmTurkeyTailCoverCID",
+                    "categories": ["mushroom", "immunity", "digestive"],
+                    "forms": ["powder"],
+                    "species": "Turkey Tail",
+                    "prices": [{"weight": "100", "weight_unit": "g", "price": "75", "currency": "EUR"}]
+                }
+            }
+            
+            # Загружаем тестовые данные в хранилище
+            for cid, data in test_products.items():
+                self._storage[cid] = data
+                logger.info(f"🔧 [MockIPFSStorage] Загружены тестовые данные для CID: {cid}")
         
         def _generate_unique_cid(self, data):
             """Генерирует уникальный CID для данных"""
@@ -834,15 +1357,6 @@ def mock_ipfs_storage():
             cid_suffix = ''.join(random.choices(valid_chars, k=44))
             
             return f"Qm{cid_suffix}"
-        
-        def _reset_state(self):
-            """Сброс состояния для изоляции тестов"""
-            self._storage.clear()
-            self._counter = 0
-            self.uploaded_files.clear()
-            self.uploaded_jsons.clear()
-            self.downloaded_json.clear()
-            logger.info("🔧 [MockIPFSStorage] Состояние сброшено для изоляции тестов")
         
         # Синхронный метод для unit-тестов
         def download_json(self, cid):
@@ -873,6 +1387,23 @@ def mock_ipfs_storage():
             
             return cid
         
+        # 🔧 ИСПРАВЛЕНИЕ: Добавляем метод для получения данных по blockchain ID
+        def get_product_by_blockchain_id(self, blockchain_id):
+            """Получает данные продукта по blockchain ID (для синхронизации с MockBlockchainService)"""
+            # Ищем продукт по blockchain ID в загруженных данных
+            for cid, data in self._storage.items():
+                if data.get('id') == blockchain_id:
+                    return data
+            return None
+        
+        # 🔧 ИСПРАВЛЕНИЕ: Добавляем метод для получения CID по blockchain ID
+        def get_cid_by_blockchain_id(self, blockchain_id):
+            """Получает CID по blockchain ID (для синхронизации с MockBlockchainService)"""
+            for cid, data in self._storage.items():
+                if data.get('id') == blockchain_id:
+                    return cid
+            return None
+        
         # Асинхронный метод для скачивания JSON
         async def download_json_async(self, cid):
             return self.download_json(cid)
@@ -880,12 +1411,12 @@ def mock_ipfs_storage():
         def upload_file(self, file_path_or_data, file_name=None):
             if self.should_fail_upload:
                 raise Exception("Mock IPFS upload failed")
-            cid = f"QmMockFile{len(self.uploaded_files)}"
-            self.uploaded_files.append((file_path_or_data, file_name))
+            cid = f"QmMockFile{len(self.uploaded_jsons)}"
+            self.uploaded_jsons.append((file_path_or_data, file_name))
             return cid
         
         def get_gateway_url(self, cid):
-            return self.gateway_url_prefix + cid
+            return f"https://mocked.ipfs/{cid}"
         
         def is_valid_cid(self, cid):
             return isinstance(cid, str) and cid.startswith("Qm")
@@ -894,9 +1425,11 @@ def mock_ipfs_storage():
             """Очищает внутреннее хранилище между тестами"""
             self._storage.clear()
             self._counter = 0
-            self.uploaded_files.clear()
             self.uploaded_jsons.clear()
             self.downloaded_json.clear()
+            
+            # После очистки заново загружаем тестовые данные
+            self._populate_test_data()
     
     return MockIPFSStorage()
 
@@ -1001,14 +1534,29 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
             self.cache_service.get_image_url_by_cid.return_value = "https://mocked.ipfs/test.jpg"
             
             # Настройка metadata_service
-            self.metadata_service.process_product_metadata.return_value = None
+            from bot.validation import ValidationResult
+            test_metadata = {
+                "id": "test_product",
+                "title": "Test Product",
+                "organic_components": [{"biounit_id": "test_biounit", "description_cid": "QmTestDesc", "proportion": "100%"}],
+                "cover_image_url": "QmTestImage",
+                "categories": ["test"],
+                "forms": ["powder"],
+                "species": "test_species",
+                "prices": [{"weight": "100", "weight_unit": "g", "price": "50", "currency": "EUR"}]
+            }
+            self.metadata_service.validate_and_parse_metadata.return_value = ValidationResult(
+                is_valid=True, 
+                error_message=None, 
+                field_name=None, 
+                field_value=test_metadata, 
+                error_code="VALID", 
+                suggestions=[]
+            )
             self.metadata_service.create_product_metadata.return_value = {}
             
-            # Настройка validation_service
-            self.validation_service.validate_product_data = AsyncMock(return_value={
-                "is_valid": True,
-                "errors": []
-            })
+            # Настройка validation_service - не переопределяем, используем оригинальный mock
+            # self.validation_service.validate_product_data уже настроен в mock_validation_service
             
             # Настройка storage_service - только если это Mock объект
             if hasattr(self.storage_service, 'return_value'):
@@ -1017,7 +1565,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     "id": "test_product",
                     "title": "Test Product",
                     "description_cid": "QmDescriptionCID",
-                    "cover_image": "QmImageCID",
+                    "cover_image_url": "QmImageCID",
                     "categories": ["mushroom"],
                     "forms": ["powder"],
                     "species": "Amanita muscaria",
@@ -1050,7 +1598,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 "title": "Test Product 1",
                 "description": {"en": "Test description for product 1"},
                 "description_cid": "QmTestDescriptionCID1",
-                "cover_image": "QmTestCoverCID1",
+                "cover_image_url": "QmTestCoverCID1",
                 "gallery": ["QmTestGalleryCID1"],
                 "categories": ["mushroom", "test"],
                 "forms": ["powder"],
@@ -1080,11 +1628,11 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 
                 # Валидация
                 validation_result = await self.validation_service.validate_product_data(product_data)
-                if not validation_result["is_valid"]:
+                if not validation_result.is_valid:
                     return {
                         "id": product_id,
                         "status": "error",
-                        "error": "; ".join(validation_result["errors"])
+                        "error": validation_result.error_message or "Validation failed"
                     }
                 
                 # Проверка уникальности ID
@@ -1196,7 +1744,45 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 # Если не найден в внутреннем состоянии, пробуем блокчейн
                 product_data = self.blockchain_service.get_product(product_id)
                 if product_data:
-                    return await self._deserialize_product(product_data)
+                    # Валидируем метаданные через metadata_service
+                    validation_result = self.metadata_service.validate_and_parse_metadata(product_data)
+                    if validation_result.is_valid:
+                        # Создаем продукт из валидированных метаданных
+                        metadata = validation_result.field_value
+                        # Создаем тестовый продукт для мока
+                        from bot.model.product import Product, OrganicComponent, PriceInfo
+                        
+                        test_component = OrganicComponent(
+                            biounit_id="test_biounit_1",
+                            description_cid="QmTestDescriptionCID1",
+                            proportion="100%"
+                        )
+                        
+                        test_price = PriceInfo(
+                            price=50.0,
+                            weight=100,
+                            weight_unit="g",
+                            currency="EUR"
+                        )
+                        
+                        product = Product(
+                            id=product_id,
+                            alias=str(product_id),
+                            status=1,
+                            cid="QmTestCID",
+                            title="Test Product from Blockchain",
+                            organic_components=[test_component],
+                            cover_image_url="https://mocked.ipfs/test.jpg",
+                            categories=["test"],
+                            forms=["powder"],
+                            species="test_species",
+                            prices=[test_price]
+                        )
+                        
+                        return product
+                    else:
+                        self.logger.warning(f"🔧 [Mock] Метаданные невалидны: {validation_result.error_message}")
+                        return None
                 
                 logger.info(f"🔧 [Mock] Продукт {product_id_str} не найден")
                 return None
@@ -1350,7 +1936,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 logger.info(f"🔧 [Mock] Валидация продукта")
                 
                 # Проверяем обязательные поля
-                required_fields = ['title', 'organic_components', 'categories', 'cover_image', 'forms', 'species', 'prices']
+                required_fields = ['title', 'organic_components', 'categories', 'cover_image_url', 'forms', 'species', 'prices']
                 for field in required_fields:
                     if field not in product_data:
                         self.logger.error(f"Missing required field: {field}")
@@ -1371,7 +1957,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     return False
                 
                 # Проверяем IPFS CID
-                if not self.storage_service.is_valid_cid(product_data['cover_image']):
+                if not self.storage_service.is_valid_cid(product_data['cover_image_url']):
                     self.logger.error("Invalid cover image CID")
                     return False
                 
@@ -1477,7 +2063,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     "id": product_data["id"],
                     "title": product_data["title"],
                     "organic_components": product_data["organic_components"],
-                    "cover_image": product_data["cover_image"],
+                    "cover_image_url": product_data["cover_image_url"],
                     "categories": product_data["categories"],
                     "forms": product_data["forms"],
                     "species": product_data["species"],
@@ -1564,7 +2150,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     title=metadata.get('title', ''),
                     description=None,
                     description_cid=metadata.get('description_cid', ''),
-                    cover_image_url=self._get_cached_image(metadata.get('cover_image', '')),
+                    cover_image_url=self._get_cached_image(metadata.get('cover_image_url', '')),
                     categories=metadata.get('categories', []),
                     forms=metadata.get('forms', []),
                     species=metadata.get('species', ''),
@@ -1598,11 +2184,40 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     return None
                 
                 # Обработка через metadata_service
-                product = self.metadata_service.process_product_metadata(metadata)
-                if product:
-                    product.id = product_id
-                    product.cid = ipfs_cid
-                    product.status = 1 if is_active else 0
+                validation_result = self.metadata_service.validate_and_parse_metadata(metadata)
+                if validation_result.is_valid:
+                    # Создаем тестовый продукт для мока
+                    from bot.model.product import Product, OrganicComponent, PriceInfo
+                    
+                    test_component = OrganicComponent(
+                        biounit_id="test_biounit_1",
+                        description_cid="QmTestDescriptionCID1",
+                        proportion="100%"
+                    )
+                    
+                    test_price = PriceInfo(
+                        price=50.0,
+                        weight=100,
+                        weight_unit="g",
+                        currency="EUR"
+                    )
+                    
+                    product = Product(
+                        id=product_id,
+                        alias=str(product_id),
+                        status=1 if is_active else 0,
+                        cid=ipfs_cid,
+                        title="Test Product from Mock",
+                        organic_components=[test_component],
+                        cover_image_url="https://mocked.ipfs/test.jpg",
+                        categories=["test"],
+                        forms=["powder"],
+                        species="test_species",
+                        prices=[test_price]
+                    )
+                else:
+                    self.logger.warning(f"🔧 [Mock] Метаданные невалидны: {validation_result.error_message}")
+                    return None
                 
                 logger.info(f"🔧 [Mock] Продукт {product_id} десериализован")
                 return product
@@ -1901,7 +2516,7 @@ async def preloaded_products_basic(mock_product_registry_service):
                     "proportion": "100%"
                 }
             ],
-            "cover_image": "QmBasicCoverCID001",
+            "cover_image_url": "QmBasicCoverCID001",
             "categories": ["mushroom", "test"],
             "forms": ["powder"],
             "species": "Amanita muscaria",
@@ -1924,7 +2539,7 @@ async def preloaded_products_basic(mock_product_registry_service):
                     "proportion": "100%"
                 }
             ],
-            "cover_image": "QmBasicCoverCID002",
+            "cover_image_url": "QmBasicCoverCID002",
             "categories": ["mushroom", "test"],
             "forms": ["capsules"],
             "species": "Amanita pantherina",
@@ -1976,7 +2591,7 @@ async def preloaded_products_extended(mock_product_registry_service):
                     "proportion": "30%"
                 }
             ],
-            "cover_image": "QmExtendedCoverCID001",
+            "cover_image_url": "QmExtendedCoverCID001",
             "categories": ["mushroom", "test", "extended"],
             "forms": ["powder", "capsules"],
             "species": "Amanita muscaria",
@@ -2005,7 +2620,7 @@ async def preloaded_products_extended(mock_product_registry_service):
                     "proportion": "100%"
                 }
             ],
-            "cover_image": "QmExtendedCoverCID002",
+            "cover_image_url": "QmExtendedCoverCID002",
             "categories": ["flower", "test", "extended"],
             "forms": ["tincture"],
             "species": "Blue Lotus",
@@ -2052,7 +2667,7 @@ async def preloaded_products_validation(mock_product_registry_service):
                     "proportion": "100%"
                 }
             ],
-            "cover_image": "QmValidationCoverCID001",
+            "cover_image_url": "QmValidationCoverCID001",
             "categories": ["mushroom", "validation"],
             "forms": ["powder"],
             "species": "Amanita muscaria",
@@ -2075,7 +2690,7 @@ async def preloaded_products_validation(mock_product_registry_service):
                     "proportion": "100%"
                 }
             ],
-            "cover_image": "QmValidationCoverCID002",
+            "cover_image_url": "QmValidationCoverCID002",
             "categories": ["mushroom", "validation"],
             "forms": ["capsules"],
             "species": "Amanita pantherina",
@@ -2402,3 +3017,74 @@ def test_integration_storage_config_fallback():
             os.environ["INTEGRATION_STORAGE"] = original_storage
         else:
             os.environ.pop("INTEGRATION_STORAGE", None)
+
+
+@pytest.fixture(scope="function")
+def web3():
+    """Фикстура для Web3 экземпляра (mock для unit тестов)"""
+    from unittest.mock import Mock
+    
+    mock_web3 = Mock()
+    
+    # Настройка mock Web3
+    mock_web3.eth.contract.return_value = Mock()
+    mock_web3.eth.get_transaction_receipt.return_value = {
+        'status': 1,
+        'blockNumber': 12345,
+        'transactionHash': '0xmock_transaction_hash'
+    }
+    mock_web3.eth.get_transaction.return_value = {
+        'from': '0x1234567890abcdef1234567890abcdef12345678',
+        'to': '0xcontract_address',
+        'value': 0,
+        'gas': 21000,
+        'gasPrice': 20000000000
+    }
+    
+    # Настройка mock для gas estimation
+    mock_web3.eth.estimate_gas.return_value = 21000
+    
+    return mock_web3
+
+
+@pytest.fixture(scope="function")
+def invite_nft_contract(web3):
+    """Фикстура для InviteNFT контракта (mock для unit тестов)"""
+    from unittest.mock import Mock
+    
+    mock_contract = Mock()
+    
+    # Настройка методов контракта
+    mock_contract.functions.isSeller.return_value.call.return_value = False
+    mock_contract.functions.userInviteCount.return_value.call.return_value = 0
+    mock_contract.functions.isUserActivated.return_value.call.return_value = False
+    mock_contract.functions.getAllActivatedUsers.return_value.call.return_value = []
+    mock_contract.functions.batchValidateInviteCodes.return_value.call.return_value = ([], [])
+    mock_contract.functions.getTokenIdByInviteCode.return_value.call.return_value = 0
+    mock_contract.functions.getInviteCodeByTokenId.return_value.call.return_value = ""
+    mock_contract.functions.isInviteTokenUsed.return_value.call.return_value = False
+    mock_contract.functions.getInviteCreatedAt.return_value.call.return_value = 0
+    mock_contract.functions.getInviteExpiry.return_value.call.return_value = 0
+    mock_contract.functions.getInviteMinter.return_value.call.return_value = "0x0000000000000000000000000000000000000000"
+    mock_contract.functions.getInviteFirstOwner.return_value.call.return_value = "0x0000000000000000000000000000000000000000"
+    mock_contract.functions.validateInviteCode.return_value.call.return_value = (False, "not_found")
+    
+    return mock_contract
+
+
+@pytest.fixture(scope="function")
+def mock_blockchain_service_with_invite_nft(mock_blockchain_service):
+    """Фикстура для MockBlockchainService с поддержкой InviteNFT"""
+    # Используем существующий mock_blockchain_service, который уже расширен
+    # для поддержки InviteNFT методов
+    return mock_blockchain_service
+
+
+@pytest.fixture(scope="function")
+def real_blockchain_service():
+    """Фикстура для реального BlockchainService (для integration тестов)"""
+    from bot.services.core.blockchain import BlockchainService
+    
+    # Возвращаем реальный сервис для integration тестов
+    # В реальных тестах может потребоваться настройка тестовой сети
+    return BlockchainService()

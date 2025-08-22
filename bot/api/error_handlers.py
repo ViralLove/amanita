@@ -9,6 +9,7 @@ import logging
 
 from bot.api.models.errors import (
     ValidationErrorResponse,
+    UnifiedValidationErrorResponse,
     AuthenticationErrorResponse,
     AuthorizationErrorResponse,
     NotFoundErrorResponse,
@@ -71,9 +72,31 @@ async def pydantic_validation_error_handler(request: Request, exc: ValidationErr
 # 422: Кастомные исключения валидации продуктов
 async def product_validation_exception_handler(request: Request, exc: Exception):
     """Обработчик для кастомных исключений валидации продуктов"""
-    from bot.api.exceptions.validation import ProductValidationError
+    from bot.api.exceptions.validation import ProductValidationError, UnifiedValidationError
     
-    if isinstance(exc, ProductValidationError):
+    if isinstance(exc, UnifiedValidationError):
+        logger.warning(f"422 Unified validation error: {exc.message} | field={exc.field} | path={request.url.path}")
+        
+        details = [ErrorDetail(
+            field=exc.field,
+            message=exc.message,
+            value=exc.value,
+            error_code=exc.error_code,
+            suggestions=exc.details.get('suggestions', []) if exc.details else None
+        )]
+        
+        response = UnifiedValidationErrorResponse(
+            success=False,
+            message="Ошибка валидации данных",
+            details=details,
+            validation_source="api",
+            timestamp=Timestamp(get_current_timestamp()),
+            path=str(request.url.path)
+        )
+        
+        return JSONResponse(status_code=422, content=response.model_dump())
+    
+    elif isinstance(exc, ProductValidationError):
         logger.warning(f"422 Product validation error: {exc.message} | field={exc.field} | path={request.url.path}")
         
         details = [ErrorDetail(

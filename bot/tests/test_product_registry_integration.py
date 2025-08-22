@@ -636,6 +636,11 @@ async def integration_registry_service(
         pytest.skip("AMANITA_REGISTRY_CONTRACT_ADDRESS не установлен")
     
     try:
+        # 🔧 ИСПРАВЛЕНИЕ: Синхронизируем mock сервисы перед созданием ProductRegistryService
+        if hasattr(mock_ipfs_storage, 'sync_with_blockchain_service'):
+            mock_ipfs_storage.sync_with_blockchain_service(mock_blockchain_service)
+            logger.info("🔧 [DEVOPS] MockIPFSStorage синхронизирован с MockBlockchainService")
+        
         # Создаем ProductRegistryService с использованием Mock архитектуры для обратной совместимости
         registry_service = ProductRegistryService(
             blockchain_service=mock_blockchain_service,

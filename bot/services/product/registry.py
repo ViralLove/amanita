@@ -18,7 +18,8 @@ from bot.services.product.metadata import ProductMetadataService
 from bot.services.product.cache import ProductCacheService
 from bot.services.product.storage import ProductStorageService
 from bot.services.product.validation import ProductValidationService
-from bot.services.product.validation_utils import ValidationError
+from bot.services.product.assembler import ProductAssembler
+from bot.validation.exceptions import ValidationError
 from bot.services.core.account import AccountService
 from bot.services.product.exceptions import InvalidProductIdError, ProductNotFoundError
 
@@ -47,7 +48,7 @@ class ProductRegistryService:
         'image': timedelta(hours=12)
     }
 
-    def __init__(self, blockchain_service: Optional[BlockchainService] = None, storage_service: Optional[ProductStorageService] = None, validation_service: Optional[ProductValidationService] = None, account_service: Optional['AccountService'] = None):
+    def __init__(self, blockchain_service: Optional[BlockchainService] = None, storage_service: Optional[ProductStorageService] = None, validation_service: Optional[ProductValidationService] = None, account_service: Optional['AccountService'] = None, assembler: Optional[ProductAssembler] = None):
         """
         Инициализирует сервис реестра продуктов.
         
@@ -56,6 +57,7 @@ class ProductRegistryService:
             storage_service: Сервис для работы с хранилищем
             validation_service: Сервис для валидации продуктов
             account_service: Сервис для работы с аккаунтами (если None, создается автоматически)
+            assembler: Сервис для сборки продуктов (если None, создается автоматически)
         """
         # Инициализируем logger
         self.logger = logging.getLogger(__name__)
@@ -74,6 +76,9 @@ class ProductRegistryService:
         
         # Инициализируем сервис метаданных
         self.metadata_service = ProductMetadataService(self.storage_service)
+        
+        # Инициализируем ProductAssembler для централизованной сборки продуктов
+        self.assembler = assembler or ProductAssembler()
         
         # Инициализируем AccountService
         if account_service is None:
@@ -141,18 +146,7 @@ class ProductRegistryService:
         """
         return self.cache_service.get_image_url_by_cid(image_cid)
 
-    def _process_product_metadata(self, product_id: Union[int, str], ipfs_cid: str, active: bool) -> Optional[Product]:
-        """
-        Обрабатывает метаданные продукта.
-        
-        Args:
-            product_id: ID продукта
-            ipfs_cid: CID метаданных продукта
-            active: Статус активности продукта
-            
-        Returns:
-            Optional[Product]: Объект продукта или None в случае ошибки
-        """
+
         try:
             self.logger.info(f"[ProductRegistry] Обработка метаданных продукта {product_id}:")
             self.logger.info(f"  - ID: {product_id} (тип: {type(product_id)})")
@@ -161,9 +155,8 @@ class ProductRegistryService:
 
             # Валидируем CID через сервис валидации
             validation_result = self.validation_service.validate_cid(ipfs_cid)
-            if not validation_result["is_valid"]:
-                errors = validation_result.get("errors", [])
-                error_msg = "; ".join(errors)
+            if not validation_result.is_valid:
+                error_msg = validation_result.error_message or "Invalid CID"
                 self.logger.error(f"[ProductRegistry] Некорректный CID метаданных продукта {product_id}: {error_msg}")
                 return None
 
@@ -192,7 +185,7 @@ class ProductRegistryService:
                 self.logger.warning(f"[ProductRegistry] Описание продукта {product_id} отсутствует и в description_cid и в metadata")
             
             # Обрабатываем изображения
-            cover_image = self._get_cached_image(metadata.get('cover_image', ''))
+            cover_image = self._get_cached_image(metadata.get('cover_image_url', ''))
             gallery = [self._get_cached_image(cid) for cid in metadata.get('gallery', [])]
             gallery = [url for url in gallery if url]  # Фильтруем None
 
@@ -297,11 +290,12 @@ class ProductRegistryService:
                 "id": product_data["id"],
                 "title": product_data["title"],
                 "organic_components": product_data["organic_components"],
-                "cover_image": product_data["cover_image"],
+                "cover_image_url": product_data["cover_image_url"],
                 "categories": product_data["categories"],
                 "forms": forms_value,
                 "species": product_data["species"],
                 "prices": product_data["prices"],
+                "cid": product_data.get("cid", ""),  # 🔧 ИСПРАВЛЕНИЕ: Добавляем поле cid
                 "created_at": datetime.now().isoformat()
             }
             
@@ -503,103 +497,24 @@ class ProductRegistryService:
             bool: True если данные валидны, False если нет
         """
         try:
-            # Проверяем обязательные поля
-            required_fields = ['title', 'organic_components', 'categories', 'cover_image', 'forms', 'species', 'prices']
-            for field in required_fields:
-                if field not in product_data:
-                    self.logger.error(f"Missing required field: {field}")
-                    return False
-                    
-                if not product_data[field]:
-                    if field == 'prices':
-                        self.logger.error("Список цен не может быть пустым")
-                    elif field == 'forms':
-                        self.logger.error("Список форм не может быть пустым")
-                    else:
-                        self.logger.error(f"Empty required field: {field}")
-                    return False
-
-            # Проверяем цены
-            if not isinstance(product_data['prices'], list):
-                self.logger.error("Цены должны быть списком")
+            self.logger.info(f"🔍 [ProductRegistry] Начинаем валидацию продукта")
+            
+            # Используем validation_service для валидации
+            validation_result = await self.validation_service.validate_product_data(
+                product_data, 
+                storage_service=self.storage_service
+            )
+            
+            # Обрабатываем результат валидации
+            if not validation_result.is_valid:
+                self.logger.error(f"❌ [ProductRegistry] Валидация продукта не прошла: {validation_result.error_message}")
                 return False
-                
-            if not product_data['prices']:
-                self.logger.error("Список цен не может быть пустым")
-                return False
-                
-            for price in product_data['prices']:
-                # Проверяем обязательные поля цены
-                price_fields = ['price', 'currency']
-                for field in price_fields:
-                    if field not in price:
-                        self.logger.error(f"Missing required price field: {field}")
-                        return False
-                        
-                # Проверяем что цена это число
-                try:
-                    float(price['price'])
-                except ValueError:
-                    self.logger.error("Invalid price value")
-                    return False
-                    
-                # Проверяем валюту
-                if price['currency'] not in ['EUR', 'USD']:
-                    self.logger.error("Invalid currency")
-                    return False
-                    
-                # Проверяем единицы измерения
-                if 'weight' in price:
-                    if 'weight_unit' not in price or price['weight_unit'] not in ['g', 'kg']:
-                        self.logger.error("Invalid weight unit")
-                        return False
-                elif 'volume' in price:
-                    if 'volume_unit' not in price or price['volume_unit'] not in ['ml', 'l']:
-                        self.logger.error("Invalid volume unit")
-                        return False
-                else:
-                    self.logger.error("Missing weight or volume")
-                    return False
-
-            # Проверяем формы
-            if not isinstance(product_data['forms'], list):
-                self.logger.error("Формы должны быть списком")
-                return False
-                
-            if not product_data['forms']:
-                self.logger.error("Список форм не может быть пустым")
-                return False
-
-            # Проверяем IPFS CID для organic_components
-            if not isinstance(product_data['organic_components'], list):
-                self.logger.error("organic_components должен быть списком")
-                return False
-                
-            if not product_data['organic_components']:
-                self.logger.error("organic_components не может быть пустым")
-                return False
-                
-            for component in product_data['organic_components']:
-                if not isinstance(component, dict):
-                    self.logger.error("Каждый элемент organic_components должен быть словарем")
-                    return False
-                    
-                if 'description_cid' not in component:
-                    self.logger.error("Каждый компонент должен содержать description_cid")
-                    return False
-                    
-                if not self.storage_service.is_valid_cid(component['description_cid']):
-                    self.logger.error(f"Invalid description CID: {component['description_cid']}")
-                    return False
-                
-            if not self.storage_service.is_valid_cid(product_data['cover_image']):
-                self.logger.error("Invalid cover image CID")
-                return False
-
+            
+            self.logger.info(f"✅ [ProductRegistry] Валидация продукта прошла успешно")
             return True
             
         except Exception as e:
-            self.logger.error(f"Error validating product: {e}")
+            self.logger.error(f"❌ [ProductRegistry] Ошибка валидации продукта: {e}")
             return False
 
     async def _check_product_id_exists(self, product_id: Union[str, int]) -> bool:
@@ -727,12 +642,12 @@ class ProductRegistryService:
             
             # 1. Валидация
             validation_result = await self.validation_service.validate_product_data(product_data)
-            if not validation_result["is_valid"]:
-                self.logger.error(f"❌ Валидация продукта {product_id} не прошла: {validation_result['errors']}")
+            if not validation_result.is_valid:
+                self.logger.error(f"❌ Валидация продукта {product_id} не прошла: {validation_result.error_message}")
                 return {
                     "id": product_id,
                     "status": "error",
-                    "error": "; ".join(validation_result["errors"])
+                    "error": validation_result.error_message or "Validation failed"
                 }
             
             # 2. Проверка уникальности ID
@@ -1090,6 +1005,8 @@ class ProductRegistryService:
     async def _deserialize_product(self, product_data: tuple) -> Optional[Product]:
         """
         Десериализует продукт из кортежа блокчейна и метаданных IPFS.
+        Использует ProductAssembler для централизованной сборки продукта.
+        
         Args:
             product_data: tuple (id, seller, ipfsCID, active)
         Returns:
@@ -1110,13 +1027,13 @@ class ProductRegistryService:
                 self.logger.warning(f"Не удалось получить метаданные для продукта {product_id}")
                 return None
 
-            # Обрабатываем метаданные через сервис
-            product = self.metadata_service.process_product_metadata(metadata)
+            # Используем ProductAssembler для централизованной сборки продукта
+            product = self.assembler.assemble_product(product_data, metadata)
             if product:
-                product.id = product_id
-                product.cid = ipfs_cid
-                product.is_active = is_active
-                product.status = 1 if is_active else 0  # Обновляем статус на основе активности
+                self.logger.info(f"✅ Продукт {product_id} успешно собран через ProductAssembler")
+            else:
+                self.logger.error(f"❌ Не удалось собрать продукт {product_id} через ProductAssembler")
+            
             return product
         except Exception as e:
             self.logger.error(f"Ошибка десериализации продукта: {e}")

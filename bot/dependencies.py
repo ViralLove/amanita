@@ -9,6 +9,7 @@ from bot.services.core.api_key import ApiKeyService
 from bot.services.core.account import AccountService
 from bot.services.product.registry import ProductRegistryService
 from bot.services.product.validation import ProductValidationService
+from bot.services.product.assembler import ProductAssembler
 from bot.services.core.ipfs_factory import IPFSFactory
 
 
@@ -35,6 +36,11 @@ def get_blockchain_service() -> BlockchainService:
 def get_product_validation_service() -> ProductValidationService:
     """Dependency provider для ProductValidationService"""
     return ProductValidationService()
+
+
+def get_product_assembler() -> ProductAssembler:
+    """Dependency provider для ProductAssembler"""
+    return ProductAssembler()
 
 
 def get_ipfs_factory() -> IPFSFactory:
@@ -65,6 +71,7 @@ def get_product_registry_service(
     storage_service: ProductStorageService = None,
     validation_service: ProductValidationService = None,
     account_service: AccountService = None,
+    assembler: ProductAssembler = None,
 ) -> ProductRegistryService:
     """Dependency provider для ProductRegistryService"""
     if blockchain_service is None:
@@ -75,10 +82,13 @@ def get_product_registry_service(
         validation_service = get_product_validation_service()
     if account_service is None:
         account_service = get_account_service(blockchain_service)
+    if assembler is None:
+        assembler = get_product_assembler()
     
     return ProductRegistryService(
         blockchain_service=blockchain_service,
         storage_service=storage_service,
         validation_service=validation_service,
-        account_service=account_service
+        account_service=account_service,
+        assembler=assembler
     ) 

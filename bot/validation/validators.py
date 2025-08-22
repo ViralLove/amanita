@@ -327,7 +327,26 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
         
         # Валидируем ID
         product_id = value.get('id')
-        if not product_id or product_id <= 0:
+        if not product_id:
+            return ValidationResult.failure(
+                "ID продукта не может быть пустым",
+                field_name="id",
+                field_value=product_id,
+                error_code="MISSING_PRODUCT_ID"
+            )
+        
+        # ID может быть строкой (business ID) или числом (blockchain ID)
+        # Проверяем, что это не пустая строка
+        if isinstance(product_id, str) and not product_id.strip():
+            return ValidationResult.failure(
+                "ID продукта не может быть пустой строкой",
+                field_name="id",
+                field_value=product_id,
+                error_code="EMPTY_PRODUCT_ID"
+            )
+        
+        # Если это число, проверяем, что оно положительное
+        if isinstance(product_id, (int, float)) and product_id <= 0:
             return ValidationResult.failure(
                 "ID продукта должен быть положительным числом",
                 field_name="id",

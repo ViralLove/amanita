@@ -16,7 +16,7 @@ from typing import List, Optional, Union, Dict, Any
 from pydantic import BaseModel, Field, validator
 from bot.model.organic_component import OrganicComponent
 
-from api.exceptions.validation import (
+from bot.api.exceptions.validation import (
     InvalidCIDError, InvalidProductFormError, EmptyCategoriesError
 )
 from bot.validation import CIDValidator, ProportionValidator, PriceValidator
