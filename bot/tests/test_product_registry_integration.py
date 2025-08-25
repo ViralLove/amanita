@@ -941,10 +941,10 @@ async def test_integration_product_lifecycle_deactivation(integration_registry_s
     
     # Assert - Проверяем полученный продукт
     assert product is not None, "Продукт должен быть получен из блокчейна"
-    assert str(product.id) == str(blockchain_id), f"ID продукта должен совпадать: ожидался {blockchain_id}, получен {product.id}"
+    assert product.business_id == "amanita1", f"Business ID продукта должен быть 'amanita1', получен {product.business_id}"
     assert product.status == 0, f"Статус созданного продукта должен быть 0 (неактивный), получен: {product.status}"
     
-    logger.info(f"✅ Продукт подтвержден в блокчейне: ID={product.id}, статус={product.status} (неактивный)")
+    logger.info(f"✅ Продукт подтвержден в блокчейне: Business ID={product.business_id}, статус={product.status} (неактивный)")
     
     # IMPLEMENTED: Активация продукта с ожиданием транзакции
     # - Изменение статуса на 1 через update_product_status()
@@ -1005,7 +1005,7 @@ async def test_integration_product_lifecycle_deactivation(integration_registry_s
         
         # Assert - Проверяем обновленный продукт
         assert updated_product is not None, "Обновленный продукт должен быть получен"
-        assert str(updated_product.id) == str(blockchain_id), f"ID обновленного продукта должен совпадать: ожидался {blockchain_id}, получен {updated_product.id}"
+        assert updated_product.business_id == "amanita1", f"Business ID обновленного продукта должен быть 'amanita1', получен {updated_product.business_id}"
         assert updated_product.status == 1, f"Статус должен быть 1 (активный) после активации, получен: {updated_product.status}"
         
         logger.info(f"✅ Статус продукта подтвержден в блокчейне: {updated_product.status} (активный)")
@@ -1078,7 +1078,7 @@ async def test_integration_product_lifecycle_deactivation(integration_registry_s
         
         # Assert - Проверяем деактивированный продукт
         assert deactivated_product is not None, "Деактивированный продукт должен быть получен"
-        assert str(deactivated_product.id) == str(blockchain_id), f"ID деактивированного продукта должен совпадать: ожидался {blockchain_id}, получен {deactivated_product.id}"
+        assert deactivated_product.business_id == "amanita1", f"Business ID деактивированного продукта должен быть 'amanita1', получен {deactivated_product.business_id}"
         assert deactivated_product.status == 0, f"Статус должен быть 0 (неактивный) после деактивации, получен: {deactivated_product.status}"
         
         logger.info(f"✅ Статус продукта подтвержден в блокчейне: {deactivated_product.status} (неактивный)")
@@ -1107,7 +1107,7 @@ async def test_integration_product_lifecycle_deactivation(integration_registry_s
         
         # Assert - Проверяем доступность и статус
         assert final_product is not None, "Деактивированный продукт должен быть доступен"
-        assert str(final_product.id) == str(blockchain_id), f"ID продукта должен совпадать: ожидался {blockchain_id}, получен {final_product.id}"
+        assert final_product.business_id == "amanita1", f"Business ID продукта должен быть 'amanita1', получен {final_product.business_id}"
         assert final_product.status == 0, f"Статус деактивированного продукта должен быть 0, получен: {final_product.status}"
         
         # ДЕТАЛЬНАЯ ДИАГНОСТИКА ФИНАЛЬНОГО ПРОДУКТА
@@ -1116,7 +1116,7 @@ async def test_integration_product_lifecycle_deactivation(integration_registry_s
         logger.info(f"   - test_product['title']: '{test_product['title']}'")
         logger.info(f"   - original_product_data['title']: '{original_product_data['title']}'")
         logger.info(f"   - blockchain_id: {blockchain_id}")
-        logger.info(f"   - final_product.id: {final_product.id}")
+        logger.info(f"   - final_product.business_id: {final_product.business_id}")
         logger.info(f"   - final_product.status: {final_product.status}")
         logger.info(f"   - final_product.cid: {getattr(final_product, 'cid', 'НЕТ')}")
         logger.info(f"   - Все атрибуты final_product: {dir(final_product)}")
@@ -1296,7 +1296,7 @@ async def test_integration_product_metadata_integrity(integration_registry_servi
         
         # Assert - Проверяем обновленный продукт
         assert updated_product is not None, "Обновленный продукт должен быть получен"
-        assert str(updated_product.id) == str(blockchain_id), f"ID обновленного продукта должен совпадать: ожидался {blockchain_id}, получен {updated_product.id}"
+        assert updated_product.business_id == "blue_lotus_tincture", f"Business ID обновленного продукта должен быть 'blue_lotus_tincture', получен {updated_product.business_id}"
         assert updated_product.status == 1, f"Статус должен быть 1 после активации, получен: {updated_product.status}"
         
         logger.info(f"✅ Статус второго продукта подтвержден в блокчейне: {updated_product.status}")
@@ -1327,8 +1327,8 @@ async def test_integration_product_metadata_integrity(integration_registry_servi
         logger.info("🔍 Проверяем ID и заголовок")
         
         # Проверяем ID
-        assert str(product.id) == str(blockchain_id), f"ID продукта должен совпадать с blockchain_id: ожидался {blockchain_id}, получен {product.id}"
-        assert str(product.id) == str(active_product_id), f"ID продукта должен совпадать с active_product_id: ожидался {active_product_id}, получен {product.id}"
+        assert product.business_id == "blue_lotus_tincture", f"Business ID продукта должен быть 'blue_lotus_tincture', получен {product.business_id}"
+        assert product.business_id == "blue_lotus_tincture", f"Business ID продукта должен быть 'blue_lotus_tincture', получен {product.business_id}"
         
         # Проверяем заголовок
         assert product.title == active_product_original_data['title'], f"Заголовок должен совпадать: ожидался '{active_product_original_data['title']}', получен '{product.title}'"
@@ -1341,7 +1341,7 @@ async def test_integration_product_metadata_integrity(integration_registry_servi
         html_pattern = re.compile(r'<[^>]+>')
         assert not html_pattern.search(product.title), f"Заголовок не должен содержать HTML-теги: {product.title}"
         
-        logger.info(f"✅ ID и заголовок валидны: ID={product.id}, title='{product.title}'")
+        logger.info(f"✅ Business ID и заголовок валидны: Business ID={product.business_id}, title='{product.title}'")
         
         # TODO: 2.4 Детальная проверка метаданных - статус и CID
         logger.info("🔍 Проверяем статус и CID")
@@ -1525,7 +1525,7 @@ async def test_integration_product_metadata_integrity(integration_registry_servi
                 public_attrs.append(attr)
     
             # Ожидаемые поля (обновлены для новой архитектуры с organic_components)
-        expected_fields = ['id', 'alias', 'status', 'cid', 'title', 'cover_image_url', 'categories', 'forms', 'species', 'prices', 'is_active', 'organic_components']
+        expected_fields = ['business_id', 'blockchain_id', 'status', 'cid', 'title', 'cover_image_url', 'categories', 'forms', 'species', 'prices', 'organic_components']
     
     # Проверяем наличие всех ожидаемых полей
     for field in expected_fields:
@@ -1537,8 +1537,8 @@ async def test_integration_product_metadata_integrity(integration_registry_servi
     assert len(extra_fields) == 0, f"Продукт не должен иметь лишних полей: {extra_fields}"
     
     # Проверяем типы данных всех полей
-    assert isinstance(product.id, (int, str)), f"Поле 'id' должно быть числом или строкой, получено: {type(product.id)}"
-    assert isinstance(product.alias, str), f"Поле 'alias' должно быть строкой, получено: {type(product.alias)}"
+    assert isinstance(product.business_id, str), f"Поле 'business_id' должно быть строкой, получено: {type(product.business_id)}"
+    assert isinstance(product.blockchain_id, int), f"Поле 'blockchain_id' должно быть числом, получено: {type(product.blockchain_id)}"
     assert isinstance(product.status, int), f"Поле 'status' должно быть числом, получено: {type(product.status)}"
     assert isinstance(product.cid, str), f"Поле 'cid' должно быть строкой, получено: {type(product.cid)}"
     assert isinstance(product.title, str), f"Поле 'title' должно быть строкой, получено: {type(product.title)}"
@@ -1547,7 +1547,6 @@ async def test_integration_product_metadata_integrity(integration_registry_servi
     assert isinstance(product.forms, list), f"Поле 'forms' должно быть списком, получено: {type(product.forms)}"
     assert isinstance(product.species, str), f"Поле 'species' должно быть строкой, получено: {type(product.species)}"
     assert isinstance(product.prices, list), f"Поле 'prices' должно быть списком, получено: {type(product.prices)}"
-    assert isinstance(product.is_active, bool), f"Поле 'is_active' должно быть boolean, получено: {type(product.is_active)}"
     assert isinstance(product.organic_components, list), f"Поле 'organic_components' должно быть списком, получено: {type(product.organic_components)}"
     
     logger.info(f"✅ Структура продукта корректна: {len(expected_fields)} полей, типы данных валидны")

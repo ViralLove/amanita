@@ -40,9 +40,20 @@ class ProductStorageService:
             if not self.validate_ipfs_cid(cid):
                 self.logger.warning(f"Invalid CID format: {cid}")
                 return None
-                
-            return await self.ipfs.download_json_async(cid)
             
+            # Проверяем доступные методы у IPFS провайдера
+            if hasattr(self.ipfs, 'download_json_async'):
+                # Асинхронный метод доступен
+                return await self.ipfs.download_json_async(cid)
+            elif hasattr(self.ipfs, 'download_json'):
+                # Синхронный метод доступен - запускаем в executor
+                import asyncio
+                loop = asyncio.get_event_loop()
+                return await loop.run_in_executor(None, self.ipfs.download_json, cid)
+            else:
+                self.logger.error(f"IPFS провайдер не поддерживает download_json методы: {type(self.ipfs)}")
+                return None
+                
         except Exception as e:
             self.logger.error(f"Error downloading JSON from IPFS: {e}")
             return None

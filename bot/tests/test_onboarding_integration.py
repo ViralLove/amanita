@@ -4,7 +4,7 @@ import os
 import pytest
 import logging
 from datetime import datetime
-from bot.services.blockchain import BlockchainService
+from bot.services.core.blockchain import BlockchainService
 from eth_account import Account
 from dotenv import load_dotenv
 from bot.tests.utils.invite_code_generator import generate_invite_code, validate_invite_code

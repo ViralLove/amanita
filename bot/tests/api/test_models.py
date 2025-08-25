@@ -196,3 +196,224 @@ class TestAuthModels:
         assert response.success is True
         assert str(response.request_id) == "test-123"
         assert int(response.timestamp) == 1640995200 
+
+# ============================================================================
+# ТЕСТЫ ДЛЯ НОВЫХ МОДЕЛЕЙ КАТАЛОГА ПРОДАВЦА
+# ============================================================================
+
+from bot.api.models.product import ProductCatalogItem, ProductCatalogResponse
+
+class TestProductCatalogItem:
+    """Тесты для модели ProductCatalogItem"""
+    
+    def test_valid_product_catalog_item(self):
+        """Тест создания валидного ProductCatalogItem"""
+        valid_data = {
+            "id": "123",
+            "title": "Amanita Muscaria Powder",
+            "status": 1,
+            "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+            "categories": ["mushroom", "powder"],
+            "forms": ["powder"],
+            "species": "Amanita Muscaria",
+            "cover_image_url": "https://ipfs.io/ipfs/QmImageCID",
+            "prices": [
+                {
+                    "price": 50,
+                    "currency": "EUR",
+                    "weight": "100",
+                    "weight_unit": "g",
+                    "form": "powder"
+                }
+            ]
+        }
+        
+        item = ProductCatalogItem(**valid_data)
+        
+        assert item.id == "123"
+        assert item.title == "Amanita Muscaria Powder"
+        assert item.status == 1
+        assert item.cid == "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG"
+        assert item.categories == ["mushroom", "powder"]
+        assert item.forms == ["powder"]
+        assert item.species == "Amanita Muscaria"
+        assert item.cover_image_url == "https://ipfs.io/ipfs/QmImageCID"
+        assert len(item.prices) == 1
+        assert item.prices[0]["price"] == 50
+        assert item.prices[0]["currency"] == "EUR"
+    
+    def test_product_catalog_item_without_optional_fields(self):
+        """Тест создания ProductCatalogItem без опциональных полей"""
+        minimal_data = {
+            "id": "123",
+            "title": "Test Product",
+            "status": 0,
+            "cid": "QmTestCID",
+            "categories": [],
+            "forms": [],
+            "species": "Test Species",
+            "prices": []
+        }
+        
+        item = ProductCatalogItem(**minimal_data)
+        
+        assert item.id == "123"
+        assert item.title == "Test Product"
+        assert item.status == 0
+        assert item.cid == "QmTestCID"
+        assert item.categories == []
+        assert item.forms == []
+        assert item.species == "Test Species"
+        assert item.cover_image_url is None
+        assert item.prices == []
+    
+    def test_product_catalog_item_status_validation(self):
+        """Тест валидации статуса продукта"""
+        # Валидные статусы
+        valid_statuses = [0, 1]
+        for status in valid_statuses:
+            data = {
+                "id": "123",
+                "title": "Test Product",
+                "status": status,
+                "cid": "QmTestCID",
+                "categories": [],
+                "forms": [],
+                "species": "Test Species",
+                "prices": []
+            }
+            item = ProductCatalogItem(**data)
+            assert item.status == status
+        
+        # Невалидные статусы
+        invalid_statuses = [-1, 2, 10]
+        for status in invalid_statuses:
+            data = {
+                "id": "123",
+                "title": "Test Product",
+                "status": status,
+                "cid": "QmTestCID",
+                "categories": [],
+                "forms": [],
+                "species": "Test Species",
+                "prices": []
+            }
+            with pytest.raises(ValueError):
+                ProductCatalogItem(**data)
+
+class TestProductCatalogResponse:
+    """Тесты для модели ProductCatalogResponse"""
+    
+    def test_valid_product_catalog_response(self):
+        """Тест создания валидного ProductCatalogResponse"""
+        valid_data = {
+            "seller_address": "0x742d35cc6634c0532925a3b8d4c9db96c4b4d8b6",
+            "total_count": 2,
+            "products": [
+                {
+                    "id": "123",
+                    "title": "Product 1",
+                    "status": 1,
+                    "cid": "QmCID1",
+                    "categories": ["category1"],
+                    "forms": ["form1"],
+                    "species": "Species 1",
+                    "prices": []
+                },
+                {
+                    "id": "456",
+                    "title": "Product 2",
+                    "status": 1,
+                    "cid": "QmCID2",
+                    "categories": ["category2"],
+                    "forms": ["form2"],
+                    "species": "Species 2",
+                    "prices": []
+                }
+            ],
+            "catalog_version": 10,
+            "last_updated": "2024-01-15T10:30:00Z"
+        }
+        
+        response = ProductCatalogResponse(**valid_data)
+        
+        assert response.seller_address == "0x742d35cc6634c0532925a3b8d4c9db96c4b4d8b6"
+        assert response.total_count == 2
+        assert len(response.products) == 2
+        assert response.catalog_version == 10
+        assert response.last_updated == "2024-01-15T10:30:00Z"
+        
+        # Проверяем продукты
+        assert response.products[0].id == "123"
+        assert response.products[0].title == "Product 1"
+        assert response.products[1].id == "456"
+        assert response.products[1].title == "Product 2"
+    
+    def test_product_catalog_response_without_optional_fields(self):
+        """Тест создания ProductCatalogResponse без опциональных полей"""
+        minimal_data = {
+            "seller_address": "0x742d35cc6634c0532925a3b8d4c9db96c4b4d8b6",
+            "total_count": 0,
+            "products": []
+        }
+        
+        response = ProductCatalogResponse(**minimal_data)
+        
+        assert response.seller_address == "0x742d35cc6634c0532925a3b8d4c9db96c4b4d8b6"
+        assert response.total_count == 0
+        assert response.products == []
+        assert response.catalog_version is None
+        assert response.last_updated is None
+    
+    def test_product_catalog_response_total_count_validation(self):
+        """Тест валидации total_count"""
+        # Валидные значения
+        valid_counts = [0, 1, 100, 1000]
+        for count in valid_counts:
+            data = {
+                "seller_address": "0x742d35cc6634c0532925a3b8d4c9db96c4b4d8b6",
+                "total_count": count,
+                "products": []
+            }
+            response = ProductCatalogResponse(**data)
+            assert response.total_count == count
+        
+        # Невалидные значения
+        invalid_counts = [-1, -10]
+        for count in invalid_counts:
+            data = {
+                "seller_address": "0x742d35cc6634c0532925a3b8d4c9db96c4b4d8b6",
+                "total_count": count,
+                "products": []
+            }
+            with pytest.raises(ValueError):
+                ProductCatalogResponse(**data)
+    
+    def test_product_catalog_response_products_consistency(self):
+        """Тест согласованности total_count и количества продуктов"""
+        # Случай когда total_count не соответствует количеству продуктов
+        data = {
+            "seller_address": "0x742d35cc6634c0532925a3b8d4c9db96c4b4d8b6",
+            "total_count": 5,
+            "products": [
+                {
+                    "id": "123",
+                    "title": "Product 1",
+                    "status": 1,
+                    "cid": "QmCID1",
+                    "categories": ["category1"],
+                    "forms": ["form1"],
+                    "species": "Species 1",
+                    "prices": []
+                }
+            ]
+        }
+        
+        # Модель должна принять данные (валидация только типов, не бизнес-логики)
+        response = ProductCatalogResponse(**data)
+        assert response.total_count == 5
+        assert len(response.products) == 1
+
+# ============================================================================
+# ЗАВЕРШЕНИЕ ТЕСТОВ
+# ============================================================================ 

@@ -1,24 +1,25 @@
-# API Facade and Authentication - AMANITA Python Microservice
+# AMANITA API - Аутентификация и безопасность
 
 ## Обзор
-Документ описывает архитектуру API фасада и систему аутентификации для Python микросервиса AMANITA, который обеспечивает интеграцию с e-commerce платформами (WooCommerce, Shopify, Magento и др.).
 
-## Архитектурная схема
+AMANITA API представляет собой FastAPI-приложение для интеграции с e-commerce платформами (WooCommerce, Shopify, Magento) через стандартные механизмы безопасности. API использует существующую архитектуру Telegram бота и расширяет её для внешних клиентов.
+
+## Архитектура
 
 ```
-[E-commerce Client] → [API Gateway/Facade] → [Business Logic Layer] → [Blockchain Layer]
-     (WooCommerce)         (FastAPI)              (Services)           (Contracts)
+[E-commerce Client] → [FastAPI] → [ServiceFactory] → [Existing Services] → [Blockchain]
+     (WooCommerce)      (API)         (DI)              (Bot Services)     (Contracts)
 ```
 
-## 1. API Gateway Architecture
+## 1. API Gateway
 
 ### 1.1 FastAPI как основа
-- **FastAPI** - современный, быстрый веб-фреймворк с автоматической документацией
-- **Pydantic** - валидация данных и сериализация
-- **Uvicorn** - ASGI сервер для production
-- **OpenAPI/Swagger** - автоматическая генерация документации
+- **FastAPI** - веб-фреймворк с автоматической документацией
+- **Pydantic** - валидация данных
+- **Uvicorn** - ASGI сервер
+- **OpenAPI/Swagger** - автоматическая документация
 
-### 1.3 Интеграция с существующим main.py
+### 1.2 Интеграция с существующим main.py
 ```python
 # bot/main.py - расширенная версия
 import asyncio
@@ -60,12 +61,12 @@ if __name__ == "__main__":
 ```
 
 **Преимущества интеграции:**
-- **Единая точка входа** для бота и API
-- **Общие сервисы** и конфигурация
-- **Параллельная работа** Telegram бота и API сервера
-- **Минимальные изменения** существующего кода
+- Единая точка входа для бота и API
+- Общие сервисы и конфигурация
+- Параллельная работа Telegram бота и API сервера
+- Минимальные изменения существующего кода
 
-### 1.2 Структура API слоя (интеграция с существующей архитектурой)
+### 1.3 Структура API слоя
 
 ```
 bot/                          # Существующая архитектура Telegram бота
@@ -116,77 +117,98 @@ bot/                          # Существующая архитектура 
 ```
 
 **Принципы интеграции:**
-- **Переиспользование** существующих сервисов через ServiceFactory
-- **Общие модели** данных между ботом и API
-- **Единая конфигурация** для блокчейна и внешних сервисов
-- **Изоляция** API логики в отдельном слое
-- **Совместимость** с существующей архитектурой Telegram бота
+- Переиспользование существующих сервисов через ServiceFactory
+- Общие модели данных между ботом и API
+- Единая конфигурация для блокчейна и внешних сервисов
+- Изоляция API логики в отдельном слое
+- Совместимость с существующей архитектурой Telegram бота
 
 ## 2. Аутентификация и безопасность
 
-### 2.1 API Key Authentication
-- **HMAC-SHA256** подписи для всех запросов
-- **API Key** + **Secret Key** пара для каждого клиента
-- **Timestamp** для предотвращения replay атак
-- **Nonce** для уникальности запросов
+### 2.1 HMAC Middleware
+
+API использует HMAC-SHA256 аутентификацию для всех защищенных эндпоинтов:
+
+```python
+class HMACMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Пропускаем аутентификацию для определенных путей
+        if self._should_skip_auth(request.url.path):
+            return await call_next(request)
+        
+        # Проверяем наличие заголовков аутентификации
+        if not self._has_auth_headers(request):
+            return JSONResponse(status_code=401, content={"error": "Missing authentication headers"})
+        
+        try:
+            # Извлекаем заголовки аутентификации
+            auth_headers = self._extract_auth_headers(request)
+            
+            # Валидируем timestamp
+            self._validate_timestamp(auth_headers["timestamp"])
+            
+            # Валидируем nonce
+            self._validate_nonce(auth_headers["nonce"])
+            
+            # Валидируем API ключ и получаем секретный ключ
+            secret_key = await self._validate_api_key(auth_headers["api_key"])
+            
+            # Валидируем HMAC подпись
+            await self._validate_signature(request, auth_headers, secret_key)
+            
+            # Добавляем контекст продавца в request state
+            request.state.seller_address = auth_headers["api_key"]
+            
+            # Продолжаем обработку запроса
+            response = await call_next(request)
+            return response
+            
+        except Exception as e:
+            return JSONResponse(status_code=401, content={"error": str(e)})
+```
 
 ### 2.2 Структура аутентификации
+
+**Обязательные заголовки:**
+```http
+X-API-Key: seller_public_key
+X-Timestamp: 1640995200
+X-Nonce: unique_nonce_string
+X-Signature: hmac_signature
+```
+
+**Процесс подписи:**
+1. Сбор данных: метод + путь + тело запроса + timestamp + nonce
+2. Создание строки: `{method}\n{path}\n{body}\n{timestamp}\n{nonce}`
+3. HMAC подпись: `hmac.new(secret_key, message, hashlib.sha256).hexdigest()`
+4. Валидация: проверка подписи, timestamp, nonce на сервере
+
+### 2.3 Публичные пути
+
+Следующие пути не требуют аутентификации:
 ```python
-# Пример структуры заголовков
-{
-    "X-API-Key": "seller_public_key",
-    "X-Timestamp": "1640995200",
-    "X-Nonce": "unique_nonce_string",
-    "X-Signature": "hmac_signature"
+skip_paths = {
+    "/", "/health", "/health/detailed", "/hello", 
+    "/docs", "/redoc", "/openapi.json"
 }
 ```
 
-### 2.3 Процесс подписи
-1. **Сбор данных**: метод + путь + тело запроса + timestamp + nonce
-2. **Создание строки**: `{method}\n{path}\n{body}\n{timestamp}\n{nonce}`
-3. **HMAC подпись**: `hmac.new(secret_key, message, hashlib.sha256).hexdigest()`
-4. **Валидация**: проверка подписи, timestamp, nonce на сервере
+### 2.4 Fallback механизм
 
-### 2.4 Хранение ключей
-- **Database**: зашифрованные ключи в PostgreSQL
-- **Redis**: кэш активных ключей для быстрого доступа
-- **Encryption**: AES-256 для хранения secret keys
-- **Rotation**: автоматическая ротация ключей
-
-## 3. Middleware Architecture
-
-### 3.1 Аутентификация Middleware
+Если ApiKeyService недоступен, система использует fallback:
 ```python
-class AuthMiddleware:
-    async def __call__(self, request, call_next):
-        # 1. Извлечение заголовков
-        # 2. Валидация API Key
-        # 3. Проверка подписи
-        # 4. Валидация timestamp и nonce
-        # 5. Добавление seller context
-        # 6. Продолжение обработки
+if not self.api_key_service:
+    # Fallback на базовую проверку если ApiKeyService недоступен
+    if not api_key or len(api_key) < 10:
+        raise InvalidAPIKeyError("API key is invalid or too short")
+    # Возвращаем дефолтный секретный ключ для совместимости
+    return self.config.get("secret_key", "default-secret-key-change-in-production")
 ```
 
-### 3.2 Rate Limiting
-- **Redis-based** rate limiting
-- **Per API Key** лимиты
-- **Sliding window** алгоритм
-- **Configurable** лимиты по эндпоинтам
+## 3. Интеграция с существующими сервисами
 
-### 3.3 Логирование
-- **Structured logging** с JSON форматом
-- **Request/Response** логирование
-- **Performance metrics** (время ответа, размер запроса)
-- **Error tracking** с контекстом
+### 3.1 Использование ServiceFactory в API
 
-### 3.4 CORS
-- **Configurable** origins для разных клиентов
-- **Preflight** обработка
-- **Credentials** поддержка
-
-## 4. Интеграция API с существующими сервисами
-
-### 4.1 Использование ServiceFactory в API
 ```python
 # bot/api/routes/products.py
 from fastapi import APIRouter, Depends
@@ -224,7 +246,8 @@ async def create_product(
     )
 ```
 
-### 4.2 Переиспользование моделей данных
+### 3.2 Переиспользование моделей данных
+
 ```python
 # bot/api/models/requests.py
 from pydantic import BaseModel
@@ -247,7 +270,8 @@ class ProductCreateRequest(BaseModel):
         )
 ```
 
-### 4.3 Общие утилиты и конфигурация
+### 3.3 Общие утилиты и конфигурация
+
 ```python
 # bot/api/config.py
 from bot.config import *  # Импорт существующей конфигурации
@@ -262,9 +286,9 @@ BLOCKCHAIN_RPC_URL = BLOCKCHAIN_RPC_URL  # Из bot/config.py
 CONTRACT_ADDRESSES = CONTRACT_ADDRESSES   # Из bot/config.py
 ```
 
-## 5. Модели данных
+## 4. Модели данных
 
-### 5.1 Request Models
+### 4.1 Request Models
 ```python
 class BaseRequest(BaseModel):
     timestamp: int
@@ -278,7 +302,7 @@ class ProductCreateRequest(BaseRequest):
     # ... другие поля
 ```
 
-### 5.2 Response Models
+### 4.2 Response Models
 ```python
 class BaseResponse(BaseModel):
     success: bool
@@ -291,7 +315,7 @@ class ProductResponse(BaseResponse):
     ipfs_cid: str
 ```
 
-### 5.3 Error Models
+### 4.3 Error Models
 ```python
 class APIError(BaseModel):
     code: str
@@ -300,9 +324,9 @@ class APIError(BaseModel):
     request_id: str
 ```
 
-## 6. Обработка ошибок
+## 5. Обработка ошибок
 
-### 6.1 Иерархия исключений
+### 5.1 Иерархия исключений
 ```python
 class AmanitaAPIException(Exception):
     """Base exception for all API errors"""
@@ -317,7 +341,7 @@ class BlockchainError(AmanitaAPIException):
     """Blockchain interaction errors"""
 ```
 
-### 6.2 HTTP Status Codes
+### 5.2 HTTP Status Codes
 - **200** - Success
 - **201** - Created
 - **400** - Bad Request (validation errors)
@@ -327,7 +351,7 @@ class BlockchainError(AmanitaAPIException):
 - **429** - Too Many Requests (rate limit exceeded)
 - **500** - Internal Server Error
 
-### 6.3 Error Handler
+### 5.3 Error Handler
 ```python
 @app.exception_handler(AmanitaAPIException)
 async def amanita_exception_handler(request, exc):
@@ -342,9 +366,9 @@ async def amanita_exception_handler(request, exc):
     )
 ```
 
-## 7. Конфигурация и развертывание
+## 6. Конфигурация и развертывание
 
-### 7.1 Environment Variables
+### 6.1 Environment Variables
 ```bash
 # API Configuration
 API_HOST=0.0.0.0
@@ -368,7 +392,7 @@ RATE_LIMIT_REQUESTS=100
 RATE_LIMIT_WINDOW=3600
 ```
 
-### 7.2 Docker Configuration
+### 6.2 Docker Configuration
 ```dockerfile
 FROM python:3.11-slim
 
@@ -382,122 +406,110 @@ EXPOSE 8000
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-### 7.3 Health Checks
+### 6.3 Health Checks
 - **/health** - базовый health check
 - **/health/detailed** - детальная проверка всех компонентов
 - **/metrics** - Prometheus метрики
 
-## 8. Мониторинг и метрики
+## 7. Мониторинг и метрики
 
-### 8.1 Prometheus Metrics
-- **Request count** по эндпоинтам
-- **Response time** percentiles
-- **Error rate** по типам ошибок
-- **Active connections**
-- **Rate limiting** статистика
+### 7.1 Prometheus Metrics
+- Request count по эндпоинтам
+- Response time percentiles
+- Error rate по типам ошибок
+- Active connections
+- Rate limiting статистика
 
-### 8.2 Logging Strategy
-- **Structured logging** с correlation IDs
-- **Log levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL
-- **Log aggregation** через ELK stack или аналоги
-- **Audit trail** для всех операций
+### 7.2 Logging Strategy
+- Structured logging с correlation IDs
+- Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- Log aggregation через ELK stack или аналоги
+- Audit trail для всех операций
 
-### 8.3 Alerting
-- **High error rate** (>5%)
-- **High response time** (>2s)
-- **Rate limit** превышения
-- **Authentication failures**
-- **Blockchain** ошибки
+### 7.3 Alerting
+- High error rate (>5%)
+- High response time (>2s)
+- Rate limit превышения
+- Authentication failures
+- Blockchain ошибки
 
-## 9. Безопасность
+## 8. Масштабируемость
 
-### 9.1 Защита от атак
-- **SQL Injection** - параметризованные запросы
-- **XSS** - валидация входных данных
-- **CSRF** - HMAC подписи
-- **DDoS** - rate limiting + CDN
-- **Replay attacks** - timestamp + nonce
+### 8.1 Горизонтальное масштабирование
+- Stateless API серверы
+- Load balancer (nginx/haproxy)
+- Database connection pooling
+- Redis для кэширования и сессий
 
-### 9.2 Шифрование
-- **TLS 1.3** для транспорта
-- **AES-256** для хранения секретов
-- **Argon2** для хеширования паролей
-- **Key rotation** автоматическая
+### 8.2 Кэширование
+- Redis для API responses
+- Database query caching
+- Blockchain data caching
+- CDN для статических ресурсов
 
-### 9.3 Аудит
-- **Request logging** всех запросов
-- **Authentication events** логирование
-- **Blockchain transactions** отслеживание
-- **Admin actions** аудит
+### 8.3 Асинхронная обработка
+- Celery для фоновых задач
+- Message queues (Redis/RabbitMQ)
+- Event-driven архитектура
+- Webhooks для уведомлений
 
-## 10. Масштабируемость
+## 9. Документация
 
-### 10.1 Горизонтальное масштабирование
-- **Stateless** API серверы
-- **Load balancer** (nginx/haproxy)
-- **Database** connection pooling
-- **Redis** для кэширования и сессий
+### 9.1 OpenAPI/Swagger
+- Автоматическая генерация из кода
+- Interactive документация
+- Request/Response примеры
+- Authentication схемы
 
-### 10.2 Кэширование
-- **Redis** для API responses
-- **Database** query caching
-- **Blockchain** data caching
-- **CDN** для статических ресурсов
+### 9.2 SDK и примеры
+- Python SDK для клиентов
+- PHP SDK для WooCommerce
+- JavaScript SDK для веб-клиентов
+- Postman коллекции
 
-### 10.3 Асинхронная обработка
-- **Celery** для фоновых задач
-- **Message queues** (Redis/RabbitMQ)
-- **Event-driven** архитектура
-- **Webhooks** для уведомлений
+### 9.3 Интеграционные гайды
+- WooCommerce интеграция
+- Shopify интеграция
+- Magento интеграция
+- Custom интеграции
 
-## 11. Документация
+## 10. Тестирование
 
-### 11.1 OpenAPI/Swagger
-- **Автоматическая** генерация из кода
-- **Interactive** документация
-- **Request/Response** примеры
-- **Authentication** схемы
+### 10.1 Unit Tests
+- Pytest для тестирования
+- Mock внешних зависимостей
+- Coverage > 90%
+- CI/CD интеграция
 
-### 11.2 SDK и примеры
-- **Python SDK** для клиентов
-- **PHP SDK** для WooCommerce
-- **JavaScript SDK** для веб-клиентов
-- **Postman** коллекции
+### 10.2 Integration Tests
+- Test database с фикстурами
+- Mock blockchain для тестов
+- API testing с реальными запросами
+- Performance тестирование
 
-### 11.3 Интеграционные гайды
-- **WooCommerce** интеграция
-- **Shopify** интеграция
-- **Magento** интеграция
-- **Custom** интеграции
-
-## 12. Тестирование
-
-### 12.1 Unit Tests
-- **Pytest** для тестирования
-- **Mock** внешних зависимостей
-- **Coverage** > 90%
-- **CI/CD** интеграция
-
-### 12.2 Integration Tests
-- **Test database** с фикстурами
-- **Mock blockchain** для тестов
-- **API testing** с реальными запросами
-- **Performance** тестирование
-
-### 12.3 Security Testing
-- **Penetration testing** регулярно
-- **Vulnerability scanning** автоматически
-- **Code security** анализ
-- **Dependency** проверки
+### 10.3 Security Testing
+- Penetration testing регулярно
+- Vulnerability scanning автоматически
+- Code security анализ
+- Dependency проверки
 
 ## Заключение
 
-Данная архитектура обеспечивает:
-- **Безопасность** через HMAC аутентификацию
-- **Масштабируемость** через stateless дизайн
-- **Надежность** через обработку ошибок
-- **Мониторинг** через метрики и логирование
-- **Документацию** через OpenAPI
-- **Тестируемость** через comprehensive тесты
+AMANITA API представляет собой расширение существующей архитектуры Telegram бота для внешних клиентов. API использует стандартные механизмы безопасности (HMAC аутентификация) и переиспользует существующие сервисы через ServiceFactory.
 
-Архитектура готова для интеграции с различными e-commerce платформами и может быть легко расширена для новых клиентов.
+**Ключевые особенности:**
+- HMAC аутентификация для всех защищенных эндпоинтов
+- Fallback механизм при недоступности ApiKeyService
+- Переиспользование существующих сервисов и моделей
+- Стандартные практики безопасности и обработки ошибок
+- Планы на блокчейн интеграцию (не реализовано в текущей версии)
+
+**Текущий статус:**
+- ✅ HMAC аутентификация реализована
+- ✅ Fallback механизм работает
+- ✅ Интеграция с существующими сервисами
+- ❌ Блокчейн интеграция - только планы
+- ❌ Context-aware security - не реализовано
+- ❌ Threat intelligence - не реализовано
+
+API готов для базового использования и может быть расширен для блокчейн интеграции в будущем.

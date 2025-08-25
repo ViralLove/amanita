@@ -426,15 +426,19 @@ AMANITA_API_LOG_FILE=logs/amanita_api.log
 AMANITA_API_LOG_MAX_SIZE=10485760
 AMANITA_API_LOG_BACKUP_COUNT=5
 
-# Безопасность
-AMANITA_API_HMAC_SECRET_KEY=your-secret-key
-AMANITA_API_HMAC_TIMESTAMP_WINDOW=300
-AMANITA_API_HMAC_NONCE_CACHE_TTL=600
+# Безопасность - HMAC аутентификация
+AMANITA_API_KEY=ak_seller_node_amanita_launch_september_2025  # API ключ для аутентификации
+AMANITA_API_SECRET=sk_seller_secret_amanita_mvp_2024_secure_key  # Секретный ключ для HMAC подписи
+AMANITA_API_HMAC_TIMESTAMP_WINDOW=300  # Окно валидации timestamp (5 минут)
+AMANITA_API_HMAC_NONCE_CACHE_TTL=600   # TTL для nonce кэша (10 минут)
 AMANITA_API_TRUSTED_HOSTS=your-domain.com
 
 # CORS
 AMANITA_API_CORS_ORIGINS=https://your-frontend.com
 AMANITA_API_CORS_ALLOW_CREDENTIALS=true
+
+# Примечание: AMANITA_API_HMAC_SECRET_KEY не используется в текущей реализации
+# HMAC подписи создаются с использованием AMANITA_API_SECRET
 ```
 
 ### Запуск в production

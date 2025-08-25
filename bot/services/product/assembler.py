@@ -8,6 +8,7 @@ ProductRegistryService и ProductMetadataService, предоставляя ед�
 
 from typing import Dict, Any, Optional, Tuple
 import logging
+import json
 from bot.model.product import Product
 from bot.validation import ValidationFactory, ValidationResult
 
@@ -61,7 +62,7 @@ class ProductAssembler:
                 return None
             
             product_id, ipfs_cid, is_active = blockchain_info
-            self.logger.info(f"✅ Данные блокчейна извлечены: ID={product_id}, CID={ipfs_cid}, Active={is_active}")
+            self.logger.info(f"✅ Данные блокчейна извлечены: blockchain_id={product_id}, CID={ipfs_cid}, Active={is_active}")
             
             # Шаг 2: Валидация метаданных через ValidationFactory
             validation_result = self._validate_metadata(metadata)
@@ -82,7 +83,7 @@ class ProductAssembler:
             # Шаг 4: Установка блокчейн-данных
             self._set_blockchain_data(product, product_id, ipfs_cid, is_active)
             
-            self.logger.info(f"🎉 Продукт {product_id} успешно собран")
+            self.logger.info(f"🎉 Продукт {product.business_id} (blockchain_id={product_id}) успешно собран")
             return product
             
         except Exception as e:
@@ -104,14 +105,14 @@ class ProductAssembler:
                 self.logger.error(f"Некорректная структура blockchain_data: {blockchain_data}")
                 return None
             
-            product_id = blockchain_data[0]  # ID продукта
+            product_id = blockchain_data[0]  # blockchain_id продукта
             seller = blockchain_data[1]      # Адрес продавца
             ipfs_cid = blockchain_data[2]    # IPFS CID
             is_active = bool(blockchain_data[3])  # Статус активности
             
             # Валидация извлеченных данных
             if not isinstance(product_id, (int, str)) or not product_id:
-                self.logger.error(f"Некорректный product_id: {product_id}")
+                self.logger.error(f"Некорректный blockchain_id: {product_id}")
                 return None
             
             if not ipfs_cid or not isinstance(ipfs_cid, str):
@@ -139,6 +140,10 @@ class ProductAssembler:
                 self.logger.error(f"Метаданные должны быть словарем, получен: {type(metadata)}")
                 return False
             
+            # 🔍 ДЕТАЛЬНЫЙ ВЫВОД JSON МЕТАДАННЫХ
+            self.logger.info(f"📋 ПОЛНЫЙ JSON ПРОДУКТА:")
+            self.logger.info(f"{json.dumps(metadata, ensure_ascii=False, indent=2)}")
+            
             # Используем единую систему валидации
             validator = ValidationFactory.get_product_validator()
             validation_result = validator.validate(metadata)
@@ -164,13 +169,31 @@ class ProductAssembler:
             Product: Созданный объект продукта или None при ошибке
         """
         try:
+            self.logger.info(f"🔍 Начинаем создание Product из метаданных")
+            self.logger.info(f"📋 Структура метаданных: {list(metadata.keys())}")
+            
+            # Логируем business_id и organic_components детально
+            business_id = metadata.get('business_id', 'N/A')
+            self.logger.info(f"🏷️ Business ID: {business_id}")
+            
+            if 'organic_components' in metadata:
+                self.logger.info(f"🔬 Найдены organic_components: {len(metadata['organic_components'])} компонентов")
+                for i, comp in enumerate(metadata['organic_components']):
+                    self.logger.info(f"  Компонент {i+1}: biounit_id='{comp.get('biounit_id', 'N/A')}', description_cid='{comp.get('description_cid', 'N/A')}', proportion='{comp.get('proportion', 'N/A')}'")
+            else:
+                self.logger.warning("⚠️ organic_components не найдены в метаданных")
+            
             # 🔧 УНИФИКАЦИЯ: Используем from_dict вместо from_json для единообразного интерфейса
+            self.logger.info("🏗️ Вызываем Product.from_dict()...")
             product = Product.from_dict(metadata)
-            self.logger.info(f"Продукт создан с заголовком: {product.title}")
+            self.logger.info(f"✅ Продукт создан с business_id: {product.business_id}, заголовком: {product.title}")
             return product
             
         except Exception as e:
-            self.logger.error(f"Ошибка создания продукта из метаданных: {e}")
+            self.logger.error(f"❌ Ошибка создания продукта из метаданных: {e}")
+            self.logger.error(f"📋 Тип ошибки: {type(e).__name__}")
+            import traceback
+            self.logger.error(f"🔍 Stack trace: {traceback.format_exc()}")
             return None
     
     def _set_blockchain_data(self, product: Product, product_id: int, ipfs_cid: str, is_active: bool) -> None:
@@ -179,19 +202,18 @@ class ProductAssembler:
         
         Args:
             product: Объект продукта для обновления
-            product_id: ID продукта из блокчейна
+            product_id: ID продукта из блокчейна (blockchain_id)
             ipfs_cid: IPFS CID из блокчейна
             is_active: Статус активности из блокчейна
         """
         try:
-            # Устанавливаем блокчейн-данные
-            product.id = product_id
-            product.cid = ipfs_cid
-            product.is_active = is_active
-            product.status = 1 if is_active else 0
+            # Устанавливаем блокчейн-данные в правильные поля
+            product.blockchain_id = product_id  # blockchain_id из блокчейна
+            product.cid = ipfs_cid              # IPFS CID из блокчейна
+            product.status = 1 if is_active else 0  # Статус активности
             
-            self.logger.info(f"Блокчейн-данные установлены: ID={product_id}, CID={ipfs_cid}, Status={product.status}")
+            self.logger.info(f"✅ Блокчейн-данные установлены: blockchain_id={product_id}, CID={ipfs_cid}, Status={product.status}")
             
         except Exception as e:
-            self.logger.error(f"Ошибка установки блокчейн-данных: {e}")
+            self.logger.error(f"❌ Ошибка установки блокчейн-данных: {e}")
             raise

@@ -185,7 +185,7 @@ python3 bot/utility/upload_organic_descriptions.py --log-cli-level DEBUG
 
 ### CSV с базовой информацией
 Начальные данные о продуктах хранятся в `bot/catalog/Iveta_catalog.csv`. Этот файл содержит базовую информацию:
-- ID продукта
+- Business ID продукта (уникальный строковый идентификатор)
 - Название
 - Цена
 - Описание
@@ -213,7 +213,7 @@ python3 bot/utility/upload_organic_descriptions.py --log-cli-level DEBUG
 2. **Создание отдельных JSON-файлов**:
 ```json
 {
-  "id": "amanita_powder",
+  "business_id": "amanita_powder",
   "title": "Мухомор красный молотый",
   "price": "2000",
   "description": "Порошок из шляпок мухомора...",
@@ -242,7 +242,7 @@ python3 bot/utility/upload_organic_descriptions.py --log-cli-level DEBUG
   // ... другие продукты
 ]
 ```
-Это исходная структура данных для хранения в контракте.
+Это исходная структура данных для хранения в контракте. Поле `id` здесь соответствует `business_id` из метаданных.
 
 ## 3.3 Интеграция с биологическими единицами
 
@@ -257,7 +257,7 @@ TODO Я пока проставляла ссылки на CID описаний �
 ### Пример интеграции
 ```json
 {
-  "id": "amanita_powder",
+  "business_id": "amanita_powder",
   "organic_biounit_id": "amanita_muscaria",
   "organic_description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
   "form": "powder",
@@ -314,7 +314,7 @@ DEPLOY_ACTION=4 npx hardhat run scripts/deploy_full.js
 {
   "products": [
         {
-        "id": "amanita1",
+        "business_id": "amanita1",
         "title": "Amanita muscaria — sliced caps and gills (1st grade)",
         "description_cid": "QmbCeGjVDtazNrFD8DFXhGFisMVqitHwxePR96KxPB15H5",
         ...

@@ -57,13 +57,13 @@ class ProductConverter(BaseConverter[ProductUploadIn, Product]):
         
         # Создаем Service модель
         return Product(
-            id=api_model.id,
-            alias=str(api_model.id),
+            business_id=str(api_model.id),  # 🔧 ИСПРАВЛЕНО: заменено id на business_id
+            blockchain_id=api_model.id,      # 🔧 ИСПРАВЛЕНО: добавлено blockchain_id
             status=0,  # По умолчанию неактивный
             cid="",  # Будет установлен позже
             title=api_model.title,
             organic_components=organic_components,
-            cover_image_url=api_model.cover_image,
+            cover_image_url=api_model.cover_image_url,
             categories=api_model.categories,
             forms=api_model.forms,
             species=api_model.species,
@@ -94,10 +94,10 @@ class ProductConverter(BaseConverter[ProductUploadIn, Product]):
         
         # Создаем API модель
         return ProductUploadIn(
-            id=service_model.id,
+            id=int(service_model.business_id) if service_model.business_id.isdigit() else 1,  # 🔧 ИСПРАВЛЕНО: используем business_id
             title=service_model.title,
             organic_components=organic_components,
-            cover_image=service_model.cover_image_url,
+            cover_image_url=service_model.cover_image_url,
             categories=service_model.categories,
             forms=service_model.forms,
             species=service_model.species,
@@ -131,7 +131,7 @@ class ProductConverter(BaseConverter[ProductUploadIn, Product]):
             id=data.get('id', 0),
             title=data.get('title', ''),
             organic_components=organic_components,
-            cover_image=data.get('cover_image', ''),
+            cover_image_url=data.get('cover_image_url', ''),
             categories=data.get('categories', []),
             forms=data.get('forms', []),
             species=data.get('species', ''),
@@ -155,7 +155,7 @@ class ProductConverter(BaseConverter[ProductUploadIn, Product]):
                 self.component_converter.api_to_dict(component)
                 for component in api_model.organic_components
             ],
-            'cover_image': api_model.cover_image,
+            'cover_image_url': api_model.cover_image_url,
             'categories': api_model.categories,
             'forms': api_model.forms,
             'species': api_model.species,
@@ -201,7 +201,7 @@ class ProductConverter(BaseConverter[ProductUploadIn, Product]):
         try:
             # Конвертируем Service модель в словарь для валидации
             data = {
-                'id': service_model.id,
+                'id': service_model.business_id,  # 🔧 ИСПРАВЛЕНО: используем business_id вместо id
                 'title': service_model.title,
                 'organic_components': [
                     {
@@ -211,7 +211,7 @@ class ProductConverter(BaseConverter[ProductUploadIn, Product]):
                     }
                     for component in service_model.organic_components
                 ],
-                'cover_image': service_model.cover_image_url,
+                'cover_image_url': service_model.cover_image_url,
                 'categories': service_model.categories,
                 'forms': service_model.forms,
                 'species': service_model.species,

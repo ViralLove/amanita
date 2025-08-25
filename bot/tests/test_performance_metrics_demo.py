@@ -1,7 +1,11 @@
+"""
+Демонстрация метрик производительности для тестов
+"""
+
 import pytest
 import time
 import logging
-from tests.utils.performance_metrics import measure_performance, measure_fixture_performance
+from bot.tests.utils.performance_metrics import measure_performance, measure_fixture_performance
 
 logger = logging.getLogger(__name__)
 

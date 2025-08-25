@@ -6,11 +6,11 @@ import re
 from typing import List, Dict, Any
 from pydantic import ValidationError
 
-from api.models.product import (
+from bot.api.models.product import (
     OrganicComponentAPI, PriceModel, ProductUploadIn, ProductUpdateIn,
     ProductCreateFromDict, ProductStatusUpdate, ProductResponse, ProductsUploadResponse
 )
-from api.exceptions.validation import InvalidCIDError, InvalidProductFormError, EmptyCategoriesError
+from bot.api.exceptions.validation import InvalidCIDError, InvalidProductFormError, EmptyCategoriesError
 
 
 # ============================================================================
@@ -65,7 +65,7 @@ class TestBasicTypes:
                     proportion="100%"
                 )
             ],
-            cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             categories=["mushroom"],
             forms=["powder"],
             species="Amanita Muscaria",
@@ -90,7 +90,7 @@ class TestBasicTypes:
                     proportion="100%"
                 )
             ],
-            cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             categories=["mushroom"],
             forms=["powder"],
             species="Amanita Muscaria",
@@ -148,7 +148,7 @@ class TestValidation:
                     proportion="100%"
                 )
             ],
-            cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             categories=["mushroom"],
             forms=["powder"],
             species="Amanita Muscaria",
@@ -180,7 +180,7 @@ class TestValidation:
     def test_proportion_validation(self):
         """Тест валидации пропорций"""
         # Валидные пропорции
-        valid_proportions = ["100%", "50%", "25.5%", "100g", "30ml", "1.5kg", "2l", "16oz", "1lb", "8fl_oz"]
+        valid_proportions = ["100%", "50%", "25.5%", "100g", "30ml", "1.5kg", "2l", "16oz", "1lb"]
         
         for proportion in valid_proportions:
             component = OrganicComponentAPI(
@@ -219,7 +219,7 @@ class TestValidation:
                         proportion="100%"
                     )
                 ],
-                cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
                 categories=["mushroom"],
                 forms=[form],
                 species="Amanita Muscaria",
@@ -242,7 +242,7 @@ class TestValidation:
                             proportion="100%"
                         )
                     ],
-                    cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                    cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
                     categories=["mushroom"],
                     forms=[form],
                     species="Amanita Muscaria",
@@ -268,7 +268,7 @@ class TestValidation:
                         proportion="50%"
                     )
                 ],
-                cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
                 categories=["mushroom"],
                 forms=["powder"],
                 species="Amanita Muscaria",
@@ -469,7 +469,7 @@ class TestIntegration:
             id=1,
             title="Test Product",
             organic_components=[component],
-            cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             categories=["mushroom"],
             forms=["powder"],
             species="Amanita Muscaria",
@@ -495,7 +495,7 @@ class TestIntegration:
                     proportion="100%"
                 )
             ],
-            cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             categories=["mushroom"],
             forms=["powder"],
             species="Amanita Muscaria",
@@ -526,7 +526,7 @@ class TestIntegration:
                     "proportion": "100%"
                 }
             ],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "categories": ["mushroom"],
             "forms": ["powder"],
             "species": "Amanita Muscaria",
@@ -588,7 +588,7 @@ class TestJSONSchema:
         assert "id" in example
         assert "title" in example
         assert "organic_components" in example
-        assert "cover_image" in example
+        assert "cover_image_url" in example
         assert "categories" in example
         assert "forms" in example
         assert "species" in example

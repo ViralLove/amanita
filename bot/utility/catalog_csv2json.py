@@ -133,12 +133,18 @@ def convert_catalog_to_json(
                 
                 # Формируем элемент каталога
                 catalog_item = {
-                    "id": row['product_id'],
+                    "business_id": row['product_id'],
                     "title": row['product_name'],
-                    "description_cid": description_cid or "",  # Используем пустую строку если CID не найден
+                    "organic_components": [
+                        {
+                            "biounit_id": biounit_id,
+                            "description_cid": description_cid or "",
+                            "proportion": "100%"
+                        }
+                    ] if description_cid else [],
                     "categories": [category.strip() for category in row['categories'].split(',')],
-                    "cover_image": cover_image_cid,
-                    "form": row['form'],
+                    "cover_image_url": cover_image_cid,
+                    "forms": [row['form']],
                     "species": row['species'],
                     "prices": prices
                 }

@@ -13,7 +13,7 @@ Pydantic модели для продуктов с бизнес-валидаци
 """
 
 from typing import List, Optional, Union, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from bot.model.organic_component import OrganicComponent
 
 from bot.api.exceptions.validation import (
@@ -40,14 +40,16 @@ class OrganicComponentAPI(BaseModel):
     description_cid: str = Field(..., min_length=1, description="CID описания биоединицы в IPFS")
     proportion: str = Field(..., min_length=1, description="Пропорция компонента (например, '50%', '100g', '30ml')")
     
-    @validator('biounit_id')
+    @field_validator('biounit_id')
+    @classmethod
     def validate_biounit_id(cls, v):
         """Валидация biounit_id"""
         if not v or not v.strip():
             raise ValueError("biounit_id: Поле обязательно для заполнения")
         return v.strip()
     
-    @validator('description_cid')
+    @field_validator('description_cid')
+    @classmethod
     def validate_description_cid(cls, v):
         """Валидация description_cid"""
         if not v or not v.strip():
@@ -67,7 +69,8 @@ class OrganicComponentAPI(BaseModel):
 
         return v.strip()
     
-    @validator('proportion')
+    @field_validator('proportion')
+    @classmethod
     def validate_proportion(cls, v):
         """Валидация пропорции"""
         if not v or not v.strip():
@@ -79,15 +82,15 @@ class OrganicComponentAPI(BaseModel):
 
         return v.strip()
     
-    class Config:
-        """Конфигурация Pydantic модели"""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "biounit_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
         }
+    )
 
 class PriceModel(BaseModel):
     """Модель цены продукта"""
@@ -103,33 +106,35 @@ class ProductUploadIn(BaseModel):
     """Модель для входящего продукта с валидацией (новая архитектура с organic_components)"""
     id: int = Field(..., gt=0, description="Уникальный идентификатор продукта (должен быть положительным числом)")
     title: str = Field(..., min_length=1, description="Название продукта")
-    organic_components: List[OrganicComponentAPI] = Field(..., min_items=1, description="Список органических компонентов продукта")
-    cover_image: str = Field(..., description="CID обложки")
+    organic_components: List[OrganicComponentAPI] = Field(..., min_length=1, description="Список органических компонентов продукта")
+    cover_image_url: str = Field(..., description="CID обложки")
     categories: List[str] = Field(..., description="Список категорий")
     forms: List[str] = Field(..., description="Список форм продукта")
     species: str = Field(..., min_length=1, description="Вид продукта")
-    prices: List[PriceModel] = Field(..., min_items=1, description="Массив цен")
+    prices: List[PriceModel] = Field(..., min_length=1, description="Массив цен")
     seller_address: Optional[str] = Field(None, description="Адрес продавца (Ethereum адрес)")
 
-    @validator('cover_image')
+    @field_validator('cover_image_url')
+    @classmethod
     def validate_cid_format(cls, v):
         """Строгая валидация CID обложки"""
         if not v or not v.strip():
-            raise ValueError("cover_image: Поле обязательно для заполнения")
+            raise ValueError("cover_image_url: Поле обязательно для заполнения")
 
         # Сначала проверяем префикс, как требуют тесты
         if not v.startswith('Qm'):
-            raise InvalidCIDError("cover_image", v)
+            raise InvalidCIDError("cover_image_url", v)
 
         result = _cid_validator_strict.validate(v)
         if not result.is_valid:
             if result.error_code in {"CID_TOO_SHORT"}:
-                raise ValueError("cover_image: Некорректная длина CID")
-            raise InvalidCIDError("cover_image", v)
+                raise ValueError("cover_image_url: Некорректная длина CID")
+            raise InvalidCIDError("cover_image_url", v)
 
         return v
 
-    @validator('organic_components')
+    @field_validator('organic_components')
+    @classmethod
     def validate_organic_components(cls, v):
         """Строгая валидация списка органических компонентов"""
         if not v or len(v) == 0:
@@ -148,7 +153,8 @@ class ProductUploadIn(BaseModel):
         
         return v
 
-    @validator('forms')
+    @field_validator('forms')
+    @classmethod
     def validate_product_forms(cls, v):
         """Строгая валидация списка форм продукта"""
         if not v or len(v) == 0:
@@ -165,7 +171,8 @@ class ProductUploadIn(BaseModel):
         
         return v
 
-    @validator('categories')
+    @field_validator('categories')
+    @classmethod
     def validate_categories(cls, v):
         """Строгая валидация списка категорий"""
         if not v or len(v) == 0:
@@ -177,7 +184,8 @@ class ProductUploadIn(BaseModel):
         
         return v
 
-    @validator('seller_address')
+    @field_validator('seller_address')
+    @classmethod
     def validate_seller_address(cls, v):
         """Валидация адреса продавца (Ethereum адрес)"""
         if v is None:
@@ -189,7 +197,7 @@ class ProductUploadIn(BaseModel):
         
         if not re.match(address_pattern, v):
             raise ValueError(
-                f"seller_address: Некорректный формат Ethereum адреса '{v}'. "
+                f"seller_address: Некорректный формат Ethereum адрес '{v}'. "
                 f"Ожидается формат: 0x + 40 hex символов"
             )
         
@@ -214,9 +222,8 @@ class ProductUploadIn(BaseModel):
         
         return ", ".join(component_summaries)
     
-    class Config:
-        """Конфигурация Pydantic модели"""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": 1,
                 "title": "Amanita Muscaria — Powder",
@@ -227,7 +234,7 @@ class ProductUploadIn(BaseModel):
                         "proportion": "100%"
                     }
                 ],
-                "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
                 "categories": ["mushroom", "medicinal"],
                 "forms": ["powder"],
                 "species": "Amanita Muscaria",
@@ -242,42 +249,45 @@ class ProductUploadIn(BaseModel):
                 "seller_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
             }
         }
+    )
 
 class ProductUploadRequest(BaseModel):
     """Модель для запроса загрузки продуктов"""
-    products: List[ProductUploadIn] = Field(..., min_items=1, description="Список продуктов для загрузки")
+    products: List[ProductUploadIn] = Field(..., min_length=1, description="Список продуктов для загрузки")
 
 class ProductUpdateIn(BaseModel):
     """Модель для обновления продукта (новая архитектура с organic_components)"""
     title: Optional[str] = Field(None, min_length=1, description="Название продукта")
-    organic_components: Optional[List[OrganicComponentAPI]] = Field(None, min_items=1, description="Список органических компонентов продукта")
-    cover_image: Optional[str] = Field(None, description="CID обложки")
+    organic_components: Optional[List[OrganicComponentAPI]] = Field(None, min_length=1, description="Список органических компонентов продукта")
+    cover_image_url: Optional[str] = Field(None, description="CID обложки")
     categories: Optional[List[str]] = Field(None, description="Список категорий")
-    forms: Optional[List[str]] = Field(None, min_items=1, description="Список форм продукта")
+    forms: Optional[List[str]] = Field(None, min_length=1, description="Список форм продукта")
     species: Optional[str] = Field(None, min_length=1, description="Вид продукта")
-    prices: Optional[List[PriceModel]] = Field(None, min_items=1, description="Массив цен")
+    prices: Optional[List[PriceModel]] = Field(None, min_length=1, description="Массив цен")
     seller_address: Optional[str] = Field(None, description="Адрес продавца (Ethereum адрес)")
 
-    @validator('cover_image')
+    @field_validator('cover_image_url')
+    @classmethod
     def validate_cid_format(cls, v):
         """Строгая валидация CID обложки для обновления"""
         if v is not None:
             if not v.strip():
-                raise ValueError("cover_image: Поле не может быть пустым")
+                raise ValueError("cover_image_url: Поле не может быть пустым")
 
             # Сначала проверяем префикс, как требуют тесты
             if not v.startswith('Qm'):
-                raise InvalidCIDError("cover_image", v)
+                raise InvalidCIDError("cover_image_url", v)
 
             result = _cid_validator_strict.validate(v)
             if not result.is_valid:
                 if result.error_code in {"CID_TOO_SHORT"}:
-                    raise ValueError("cover_image: Некорректная длина CID")
-                raise InvalidCIDError("cover_image", v)
+                    raise ValueError("cover_image_url: Некорректная длина CID")
+                raise InvalidCIDError("cover_image_url", v)
         
         return v
 
-    @validator('organic_components')
+    @field_validator('organic_components')
+    @classmethod
     def validate_organic_components(cls, v):
         """Валидация списка органических компонентов для обновления"""
         if v is not None:
@@ -297,7 +307,8 @@ class ProductUpdateIn(BaseModel):
         
         return v
 
-    @validator('forms')
+    @field_validator('forms')
+    @classmethod
     def validate_product_forms(cls, v):
         if v is not None:
             if not v or len(v) == 0:
@@ -308,15 +319,15 @@ class ProductUpdateIn(BaseModel):
                     raise InvalidProductFormError(form)
         return v
 
-    @validator('categories')
+    @field_validator('categories')
+    @classmethod
     def validate_categories(cls, v):
         if v is not None and (not v or len(v) == 0):
             raise EmptyCategoriesError()
         return v
     
-    class Config:
-        """Конфигурация Pydantic модели"""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "title": "Amanita Muscaria — Premium Powder",
                 "organic_components": [
@@ -326,42 +337,45 @@ class ProductUpdateIn(BaseModel):
                         "proportion": "100%"
                     }
                 ],
-                "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
                 "categories": ["mushroom", "medicinal", "premium"],
                 "forms": ["powder", "capsules"],
                 "species": "Amanita Muscaria",
                 "seller_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
             }
         }
+    )
 
 class ProductCreateFromDict(BaseModel):
     """Модель для создания продукта из словаря (для совместимости с тестами)"""
     id: int = Field(..., gt=0, description="Уникальный идентификатор продукта (должен быть положительным числом)")
     title: str = Field(..., min_length=1, description="Название продукта")
-    organic_components: List[Dict[str, Any]] = Field(..., min_items=1, description="Список органических компонентов как словари")
-    cover_image: str = Field(..., description="CID обложки")
+    organic_components: List[Dict[str, Any]] = Field(..., min_length=1, description="Список органических компонентов как словари")
+    cover_image_url: str = Field(..., description="CID обложки")
     categories: List[str] = Field(..., description="Список категорий")
     forms: List[str] = Field(..., description="Список форм продукта")
     species: str = Field(..., min_length=1, description="Вид продукта")
-    prices: List[Dict[str, Any]] = Field(..., min_items=1, description="Массив цен как словари")
+    prices: List[Dict[str, Any]] = Field(..., min_length=1, description="Массив цен как словари")
     seller_address: Optional[str] = Field(None, description="Адрес продавца (Ethereum адрес)")
 
-    @validator('cover_image')
+    @field_validator('cover_image_url')
+    @classmethod
     def validate_cid_format(cls, v):
         """Строгая валидация CID обложки"""
         if not v or not v.strip():
-            raise ValueError("cover_image: Поле обязательно для заполнения")
+            raise ValueError("cover_image_url: Поле обязательно для заполнения")
         
         if not v.startswith('Qm'):
-            raise InvalidCIDError("cover_image", v)
+            raise InvalidCIDError("cover_image_url", v)
         
         # Проверяем минимальную длину CID
         if len(v) < 46:  # Qm + 44 символа хеша
-            raise ValueError("cover_image: Некорректная длина CID")
+            raise ValueError("cover_image_url: Некорректная длина CID")
         
         return v
 
-    @validator('organic_components')
+    @field_validator('organic_components')
+    @classmethod
     def validate_organic_components_dict(cls, v):
         """Строгая валидация списка органических компонентов из словарей"""
         if not v or len(v) == 0:
@@ -394,7 +408,8 @@ class ProductCreateFromDict(BaseModel):
         
         return v
 
-    @validator('forms')
+    @field_validator('forms')
+    @classmethod
     def validate_product_forms(cls, v):
         """Строгая валидация списка форм продукта"""
         if not v or len(v) == 0:
@@ -411,7 +426,8 @@ class ProductCreateFromDict(BaseModel):
         
         return v
 
-    @validator('categories')
+    @field_validator('categories')
+    @classmethod
     def validate_categories(cls, v):
         """Строгая валидация списка категорий"""
         if not v or len(v) == 0:
@@ -442,9 +458,8 @@ class ProductCreateFromDict(BaseModel):
         
         return ", ".join(component_summaries)
     
-    class Config:
-        """Конфигурация Pydantic модели"""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "test_product_001",
                 "title": "Test Product",
@@ -455,7 +470,7 @@ class ProductCreateFromDict(BaseModel):
                         "proportion": "100%"
                     }
                 ],
-                "cover_image": "QmTestCoverCID1234567890123456789012345678901234567890",
+                "cover_image_url": "QmTestCoverCID1234567890123456789012345678901234567890",
                 "categories": ["test_category"],
                 "forms": ["powder"],
                 "species": "Test Species",
@@ -469,19 +484,20 @@ class ProductCreateFromDict(BaseModel):
                 ]
             }
         }
+    )
 
 
 class ProductStatusUpdate(BaseModel):
     """Модель для обновления статуса продукта"""
     status: int = Field(..., ge=0, le=1, description="Статус продукта (0 - неактивен, 1 - активен)")
     
-    class Config:
-        """Конфигурация Pydantic модели"""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "status": 1
             }
         }
+    )
 
 class ProductResponse(BaseModel):
     """Модель ответа для продукта"""
@@ -492,9 +508,8 @@ class ProductResponse(BaseModel):
     status: str = Field(..., description="Статус операции")
     error: Optional[str] = Field(None, description="Описание ошибки, если есть")
     
-    class Config:
-        """Конфигурация Pydantic модели"""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "amanita_muscaria_powder_001",
                 "blockchain_id": 12345,
@@ -504,14 +519,14 @@ class ProductResponse(BaseModel):
                 "error": None
             }
         }
+    )
 
 class ProductsUploadResponse(BaseModel):
     """Модель ответа для загрузки продуктов"""
     results: List[ProductResponse] = Field(..., description="Результаты загрузки продуктов")
     
-    class Config:
-        """Конфигурация Pydantic модели"""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "results": [
                     {
@@ -531,3 +546,80 @@ class ProductsUploadResponse(BaseModel):
                 ]
             }
         }
+    )
+
+class ProductCatalogItem(BaseModel):
+    """Модель продукта в каталоге продавца"""
+    id: str = Field(..., description="Уникальный идентификатор продукта")
+    title: str = Field(..., description="Название продукта")
+    status: int = Field(..., ge=0, le=1, description="Статус продукта (0 - неактивен, 1 - активен)")
+    cid: str = Field(..., description="IPFS CID метаданных продукта")
+    categories: List[str] = Field(default=[], description="Категории продукта")
+    forms: List[str] = Field(default=[], description="Формы продукта")
+    species: str = Field(..., description="Вид продукта")
+    cover_image_url: Optional[str] = Field(None, description="URL обложки продукта")
+    prices: List[Dict[str, Any]] = Field(default=[], description="Цены продукта")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "123",
+                "title": "Amanita Muscaria Powder",
+                "status": 1,
+                "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                "categories": ["mushroom", "powder"],
+                "forms": ["powder"],
+                "species": "Amanita Muscaria",
+                "cover_image_url": "https://ipfs.io/ipfs/QmImageCID",
+                "prices": [
+                    {
+                        "price": 50,
+                        "currency": "EUR",
+                        "weight": "100",
+                        "weight_unit": "g",
+                        "form": "powder"
+                    }
+                ]
+            }
+        }
+    )
+
+class ProductCatalogResponse(BaseModel):
+    """Модель ответа для каталога продавца"""
+    seller_address: str = Field(..., description="Ethereum адрес продавца")
+    total_count: int = Field(..., ge=0, description="Общее количество продуктов в каталоге")
+    products: List[ProductCatalogItem] = Field(..., description="Список продуктов в каталоге")
+    catalog_version: Optional[int] = Field(None, description="Версия каталога из блокчейна")
+    last_updated: Optional[str] = Field(None, description="Время последнего обновления каталога")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "seller_address": "0x1234567890123456789012345678901234567890",
+                "total_count": 5,
+                "catalog_version": 10,
+                "last_updated": "2024-01-15T10:30:00Z",
+                "products": [
+                    {
+                        "id": "123",
+                        "title": "Amanita Muscaria Powder",
+                        "status": 1,
+                        "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+                        "categories": ["mushroom", "powder"],
+                        "forms": ["powder"],
+                        "species": "Amanita Muscaria",
+                        "cover_image_url": "https://ipfs.io/ipfs/QmImageCID",
+                        "prices": [
+                            {
+                                "price": 50,
+                                "currency": "EUR",
+                                "weight": "100",
+                                "weight_unit": "g",
+                                "form": "powder"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    )

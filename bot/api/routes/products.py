@@ -12,11 +12,131 @@ from bot.api.models.product import (
 )
 from bot.api.exceptions.validation import ProductValidationError, UnifiedValidationError
 from bot.api.converters import ConverterFactory
+from bot.api.models.common import EthereumAddress
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/products", tags=["products"])
+
+@router.get("/{seller_address}")
+async def get_seller_catalog(
+    seller_address: str,
+    registry_service: ProductRegistryService = Depends(get_product_registry_service),
+    http_request: Request = None
+):
+    """
+    Получает каталог продуктов текущего продавца.
+    
+    Args:
+        seller_address: Ethereum адрес продавца
+        registry_service: Сервис реестра продуктов
+        http_request: HTTP запрос для логирования
+        
+    Returns:
+        Каталог продуктов продавца
+        
+    Raises:
+        HTTPException: При ошибках валидации или доступа
+    """
+    logger.info(f"[API] Получен запрос GET /products/{seller_address}")
+    logger.info(f"[API] Начинаем обработку запроса для продавца: {seller_address}")
+    
+    try:
+        # 1. Валидация Ethereum адреса через общий стандарт
+        logger.info(f"[API] Шаг 1: Валидация Ethereum адреса: {seller_address}")
+        try:
+            validated_address = EthereumAddress(seller_address)
+            seller_address = str(validated_address)  # Нормализованный адрес
+            logger.info(f"[API] ✅ Ethereum адрес валидирован: {seller_address}")
+        except ValueError as e:
+            logger.warning(f"[API] ❌ Некорректный формат Ethereum адреса: {seller_address}, ошибка: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Некорректный формат Ethereum адреса: {seller_address}. Ожидается формат: 0x + 40 hex символов"
+            )
+        
+        # 2. Проверка прав доступа (только текущий продавец может получить свой каталог)
+        logger.info(f"[API] Шаг 2: Проверка прав доступа")
+        current_seller_address = registry_service.seller_account.address
+        logger.info(f"[API] Текущий продавец: {current_seller_address}")
+        logger.info(f"[API] Запрошенный адрес: {seller_address}")
+        
+        if seller_address.lower() != current_seller_address.lower():
+            logger.warning(f"[API] ❌ Попытка доступа к каталогу другого продавца. Запрошен: {seller_address}, текущий: {current_seller_address}")
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: can only view own catalog"
+            )
+        
+        logger.info(f"[API] ✅ Доступ к каталогу подтвержден для продавца: {seller_address}")
+        
+        # 3. Получение каталога через существующий функционал
+        logger.info(f"[API] Шаг 3: Запрашиваем каталог для продавца: {seller_address}")
+        logger.info(f"[API] Вызываем registry_service.get_all_products()...")
+        products = await registry_service.get_all_products()
+        
+        logger.info(f"[API] ✅ Получено {len(products)} продуктов для продавца {seller_address}")
+        if products:
+            logger.info(f"[API] Первый продукт: business_id={products[0].business_id if hasattr(products[0], 'business_id') else 'N/A'}")
+        else:
+            logger.info(f"[API] ⚠️ Каталог пуст - 0 продуктов")
+        
+        # 4. Формирование ответа
+        logger.info(f"[API] Шаг 4: Формирование ответа для {len(products)} продуктов")
+        response_data = {
+            "seller_address": seller_address,
+            "total_count": len(products),
+            "products": [
+                {
+                    "business_id": str(product.business_id),  # 🔧 ИСПРАВЛЕНО: заменено id на business_id
+                    "blockchain_id": product.blockchain_id if hasattr(product, 'blockchain_id') and product.blockchain_id else None,  # 🔧 ДОБАВЛЕНО: blockchain_id (сохраняем оригинальный тип)
+                    "title": product.title,
+                    "status": product.status,
+                    "cid": product.cid,
+                    "categories": product.categories,
+                    "forms": product.forms,
+                    "species": product.species,
+                    "cover_image_url": product.cover_image_url,
+                    "organic_components": [
+                        {
+                            "biounit_id": component.biounit_id,
+                            "description_cid": component.description_cid,
+                            "proportion": component.proportion
+                        } for component in product.organic_components
+                    ] if hasattr(product, 'organic_components') and product.organic_components else [],  # 🔧 ДОБАВЛЕНО: organic_components
+                    "prices": [
+                        {
+                            "price": price.price,
+                            "currency": price.currency,
+                            "weight": price.weight,
+                            "weight_unit": price.weight_unit,
+                            "volume": price.volume,
+                            "volume_unit": price.volume_unit,
+                            "form": price.form
+                        } for price in product.prices
+                    ] if product.prices else []
+                } for product in products
+            ]
+        }
+        
+        logger.info(f"[API] ✅ Каталог успешно сформирован для продавца {seller_address}")
+        logger.info(f"[API] 📊 Структура ответа: seller_address={response_data['seller_address']}, total_count={response_data['total_count']}, products_count={len(response_data['products'])}")
+        return response_data
+        
+    except HTTPException as http_ex:
+        # Перебрасываем HTTPException без изменений
+        logger.warning(f"[API] ⚠️ HTTPException переброшен: status_code={http_ex.status_code}, detail={http_ex.detail}")
+        raise
+    except Exception as e:
+        logger.error(f"[API] ❌ Неожиданная ошибка при получении каталога продавца {seller_address}: {e}")
+        import traceback
+        logger.error(f"[API] 🔍 Полный traceback ошибки:")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 @router.post("/upload", response_model=ProductsUploadResponse)
 async def upload_products(

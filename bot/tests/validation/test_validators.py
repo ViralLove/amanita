@@ -275,8 +275,10 @@ class TestProductValidator:
     def test_valid_product(self):
         """Тест валидного продукта."""
         valid_product = {
-            "id": 1,
+            "business_id": "test_product_1",
             "title": "Test Product",
+            "cover_image_url": "Qm123456789",
+            "species": "Amanita muscaria",
             "organic_components": [
                 {
                     "biounit_id": "amanita_muscaria",
@@ -285,34 +287,39 @@ class TestProductValidator:
                 }
             ]
         }
-        
+
         result = self.validator.validate(valid_product)
         assert result.is_valid, "Продукт должен быть валидным"
-    
+
     def test_invalid_product_type(self):
-        """Тест продукта неправильного типа."""
-        result = self.validator.validate("not a dict")
+        """Тест невалидного типа продукта."""
+        invalid_product = "not a dict"
+
+        result = self.validator.validate(invalid_product)
         assert not result.is_valid
         assert result.error_code == "INVALID_PRODUCT_TYPE"
-    
+
     def test_missing_required_fields(self):
         """Тест отсутствующих обязательных полей."""
         incomplete_product = {
-            "id": 1,
+            "business_id": "test_product_1",
             "title": "Test Product"
-            # отсутствует organic_components
+            # отсутствует cover_image_url, species, organic_components
         }
-        
+
         result = self.validator.validate(incomplete_product)
         assert not result.is_valid
         assert result.error_code == "MISSING_REQUIRED_FIELD"
-        assert "organic_components" in result.error_message
-    
+        # Первое отсутствующее поле - cover_image_url
+        assert "cover_image_url" in result.error_message
+
     def test_invalid_product_id(self):
-        """Тест невалидного ID продукта."""
+        """Тест невалидного business_id продукта."""
         invalid_product = {
-            "id": 0,  # невалидный ID
+            "business_id": "",  # пустой business_id
             "title": "Test Product",
+            "cover_image_url": "Qm123456789",
+            "species": "Amanita muscaria",
             "organic_components": [
                 {
                     "biounit_id": "amanita_muscaria",
@@ -321,16 +328,18 @@ class TestProductValidator:
                 }
             ]
         }
-        
+
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
-        assert result.error_code == "INVALID_PRODUCT_ID"
-    
+        assert result.error_code == "MISSING_BUSINESS_ID"
+
     def test_empty_title(self):
         """Тест пустого заголовка."""
         invalid_product = {
-            "id": 1,
+            "business_id": "test_product_1",
             "title": "",  # пустой заголовок
+            "cover_image_url": "Qm123456789",
+            "species": "Amanita muscaria",
             "organic_components": [
                 {
                     "biounit_id": "amanita_muscaria",
@@ -339,28 +348,32 @@ class TestProductValidator:
                 }
             ]
         }
-        
+
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
         assert result.error_code == "EMPTY_TITLE"
-    
+
     def test_empty_organic_components(self):
         """Тест пустых органических компонентов."""
         invalid_product = {
-            "id": 1,
+            "business_id": "test_product_1",
             "title": "Test Product",
+            "cover_image_url": "Qm123456789",
+            "species": "Amanita muscaria",
             "organic_components": []  # пустой список
         }
-        
+
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
         assert result.error_code == "EMPTY_ORGANIC_COMPONENTS"
-    
+
     def test_invalid_component(self):
         """Тест невалидного компонента."""
         invalid_product = {
-            "id": 1,
+            "business_id": "test_product_1",
             "title": "Test Product",
+            "cover_image_url": "Qm123456789",
+            "species": "Amanita muscaria",
             "organic_components": [
                 {
                     "biounit_id": "",  # пустой biounit_id
@@ -369,36 +382,38 @@ class TestProductValidator:
                 }
             ]
         }
-        
+
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
         assert result.error_code == "EMPTY_BIOUNIT_ID"
-    
+
     def test_invalid_cover_image(self):
         """Тест невалидного изображения."""
         invalid_product = {
-            "id": 1,
+            "business_id": "test_product_1",
             "title": "Test Product",
+            "cover_image_url": "invalid_cid",  # невалидный CID
+            "species": "Amanita muscaria",
             "organic_components": [
                 {
                     "biounit_id": "amanita_muscaria",
                     "description_cid": "Qm123456789",
                     "proportion": "100%"
                 }
-            ],
-            "cover_image": "invalid_cid"  # невалидный CID
+            ]
         }
-        
+
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
-        assert result.field_name == "cover_image"
-        assert result.error_code == "INVALID_CID_PREFIX"
-    
+        assert result.field_name == "cover_image_url"
+
     def test_invalid_price(self):
         """Тест невалидной цены."""
         invalid_product = {
-            "id": 1,
+            "business_id": "test_product_1",
             "title": "Test Product",
+            "cover_image_url": "Qm123456789",
+            "species": "Amanita muscaria",
             "organic_components": [
                 {
                     "biounit_id": "amanita_muscaria",
@@ -413,7 +428,7 @@ class TestProductValidator:
                 }
             ]
         }
-        
+
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
         assert result.error_code == "PRICE_TOO_LOW"

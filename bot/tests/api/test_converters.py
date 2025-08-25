@@ -557,7 +557,7 @@ class TestProductConverter:
                         proportion="100%"
                     )
                 ],
-                cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
                 categories=["mushroom"],
                 forms=["powder"],
                 species="Amanita Muscaria",
@@ -569,7 +569,7 @@ class TestProductConverter:
             service_model = self.converter.api_to_service(api_model)
             
             assert isinstance(service_model, Product)
-            assert service_model.id == 1  # API int остается int в Service
+            assert service_model.business_id == "1"  # 🔧 ИСПРАВЛЕНО: используем business_id вместо id
             assert service_model.title == "Test Product"
             assert len(service_model.organic_components) == 1
             assert len(service_model.prices) == 1
@@ -577,8 +577,8 @@ class TestProductConverter:
     def test_valid_service_to_api(self):
         """Тест конвертации валидной Service модели в API модель"""
         service_model = Product(
-            id="1",
-            alias="test",
+            business_id="test_product_001",  # 🔧 ИСПРАВЛЕНО: заменено id на business_id
+            blockchain_id=1,                 # 🔧 ИСПРАВЛЕНО: добавлено blockchain_id
             status=0,
             cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             title="Test Product",
@@ -601,7 +601,7 @@ class TestProductConverter:
         api_model = self.converter.service_to_api(service_model)
         
         assert isinstance(api_model, ProductUploadIn)
-        assert api_model.id == 1  # Service str → API int
+        assert api_model.id == 1  # Service business_id → API int (конвертируется в конвертере)
         assert api_model.title == "Test Product"
         assert len(api_model.organic_components) == 1
         assert len(api_model.prices) == 1
@@ -618,7 +618,7 @@ class TestProductConverter:
                     proportion="100%"
                 )
             ],
-            cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             categories=["mushroom"],
             forms=["powder"],
             species="Amanita Muscaria",
@@ -647,7 +647,7 @@ class TestProductConverter:
                     "proportion": "100%"
                 }
             ],
-            "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+            "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
             "categories": ["mushroom"],
             "forms": ["powder"],
             "species": "Amanita Muscaria",
@@ -718,7 +718,7 @@ class TestProductConverter:
                         proportion="100%"
                     )
                 ],
-                cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
                 categories=["mushroom"],
                 forms=["powder"],
                 species="Amanita Muscaria",
@@ -763,7 +763,7 @@ class TestProductConverter:
                         proportion="100%"
                     )
                 ],
-                cover_image="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+                cover_image_url="QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
                 categories=["mushroom"],
                 forms=["powder"],
                 species="Amanita Muscaria",
@@ -798,8 +798,8 @@ class TestProductConverter:
             
             # Тестируем валидацию
             service_model = Product(
-                id="1",
-                alias="test",
+                business_id="test_product_002",  # 🔧 ИСПРАВЛЕНО: заменено id на business_id
+                blockchain_id=2,                 # 🔧 ИСПРАВЛЕНО: добавлено blockchain_id
                 status=0,
                 cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 title="Test Product",
@@ -846,8 +846,8 @@ class TestProductConverter:
             
             # Тестируем валидацию
             service_model = Product(
-                id="1",
-                alias="test",
+                business_id="test_product_003",  # 🔧 ИСПРАВЛЕНО: заменено id на business_id
+                blockchain_id=3,                 # 🔧 ИСПРАВЛЕНО: добавлено blockchain_id
                 status=0,
                 cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 title="Test Product",

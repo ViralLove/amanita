@@ -55,11 +55,11 @@ async def test_validate_product_data_valid():
     
     logger.info("📝 Подготавливаем валидные тестовые данные")
     valid_data = {
-        "id": 1,
+        "business_id": "1",
         "title": "Test Product",
         "organic_components": [{"biounit_id": "Amanita_muscaria", "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG", "proportion": "100%"}],
         "categories": ["mushroom"],
-                        "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+        "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
         "forms": ["mixed slices"],
         "species": "Amanita muscaria",
         "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
@@ -89,7 +89,7 @@ async def test_validate_product_data_invalid():
     
     logger.info("📝 Подготавливаем невалидные тестовые данные")
     invalid_data = {
-        "id": 2,
+        "business_id": "2",
         "title": "",  # Пустой заголовок
         "organic_components": [{"biounit_id": "Amanita_muscaria", "description_cid": "invalid_cid", "proportion": "100%"}],  # Невалидный CID
         "categories": [],  # Пустые категории
@@ -123,7 +123,7 @@ async def test_validate_product_data_missing_required():
     
     logger.info("📝 Подготавливаем данные с недостающими полями")
     incomplete_data = {
-        "id": 3,
+        "business_id": "3",
         # Отсутствует title
         "organic_components": [{"biounit_id": "Amanita_muscaria", "description_cid": "QmdoqBWBZoupjQWFfBxMMJD5N9dJSFTyjVEV1AVL8oNEVSG", "proportion": "100%"}],
         "categories": ["mushroom"],
@@ -132,7 +132,7 @@ async def test_validate_product_data_missing_required():
         "species": "Amanita muscaria"
         # Отсутствует prices
     }
-    logger.info(f"🔍 Данные с недостающими полями: ID {incomplete_data['id']}")
+    logger.info(f"🔍 Данные с недостающими полями: ID {incomplete_data['business_id']}")
     
     logger.info("🚀 Вызываем validate_product_data")
     result = await validation_service.validate_product_data(incomplete_data)
@@ -183,7 +183,7 @@ async def test_update_product_success():
     # Мокаем метод get_product для возврата валидного продукта
     from bot.model.product import Product, Description, PriceInfo
     test_description = Description(
-        id="test1",
+        business_id="test1",
         title="Test Description",
         scientific_name="Amanita muscaria",
         generic_description="Test generic description",
@@ -201,8 +201,8 @@ async def test_update_product_success():
     )
     
     existing_product = Product(
-        id="1",
-        alias="test-product",
+        business_id="1",
+        blockchain_id=1,
         status=1,
         cid="QmOldCID123",
         title="Old Title",
@@ -217,11 +217,11 @@ async def test_update_product_success():
     
     # Подготавливаем данные для обновления
     update_data = {
-        "id": "1",
+        "business_id": "1",
         "title": "Updated Product Title",
         "description_cid": "QmNewDescCID123",
         "categories": ["mushroom", "medicinal"],
-                        "cover_image_url": "QmNewImageCID123",
+        "cover_image_url": "QmNewImageCID123",
         "forms": ["tincture"],
         "species": "Amanita muscaria",
         "organic_components": [{
@@ -239,7 +239,7 @@ async def test_update_product_success():
     
     # Проверяем результат
     assert result["status"] == "success"
-    assert result["id"] == "1"
+    assert result["business_id"] == "1"
     
     logger.info("✅ Юнит-тест успешного обновления продукта завершен")
 
@@ -271,13 +271,18 @@ async def test_update_product_not_found():
     
     # Подготавливаем данные для обновления
     update_data = {
-        "id": "999",
+        "business_id": "999",
         "title": "Non-existent Product",
         "description_cid": "QmDescCID123",
         "categories": ["mushroom"],
         "cover_image_url": "QmImageCID123",
         "forms": ["powder"],
         "species": "Amanita muscaria",
+        "organic_components": [{
+            "biounit_id": "Amanita_muscaria",
+            "description_cid": "QmDescCID123",
+            "proportion": "100%"
+        }],
         "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
     }
     
@@ -288,7 +293,7 @@ async def test_update_product_not_found():
     
     # Проверяем результат
     assert result["status"] == "error"
-    assert result["id"] == "999"
+    assert result["business_id"] == "999"
     assert "не найден" in result["error"]
     
     logger.info("✅ Юнит-тест обновления несуществующего продукта завершен")
@@ -324,13 +329,18 @@ async def test_update_product_validation_error():
     
     # Подготавливаем невалидные данные для обновления
     invalid_update_data = {
-        "id": "1",
+        "business_id": "1",
         "title": "",  # Пустой заголовок
         "description_cid": "invalid_cid",  # Невалидный CID
         "categories": ["mushroom"],
         "cover_image_url": "QmImageCID123",
         "forms": ["powder"],
         "species": "Amanita muscaria",
+        "organic_components": [{
+            "biounit_id": "Amanita_muscaria",
+            "description_cid": "QmDescCID123",
+            "proportion": "100%"
+        }],
         "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
     }
     
@@ -341,7 +351,7 @@ async def test_update_product_validation_error():
     
     # Проверяем результат - ожидаем ошибку валидации
     assert result["status"] == "error"
-    assert result["id"] == "1"
+    assert result["business_id"] == "1"
     # Проверяем, что есть ошибка валидации
     assert result["error"] is not None
     
@@ -387,8 +397,8 @@ async def test_update_product_status_success():
     )
     
     existing_product = Product(
-        id="1",
-        alias="test-product",
+        business_id="1",
+        blockchain_id=1,
         status=0,  # Неактивный
         cid="QmCID123",
         title="Test Product",
@@ -486,8 +496,8 @@ async def test_update_product_status_idempotency():
     )
     
     existing_product = Product(
-        id="1",
-        alias="test-product",
+        business_id="1",
+        blockchain_id=1,
         status=1,  # Уже активный
         cid="QmCID123",
         title="Test Product",
@@ -561,24 +571,34 @@ async def test_validate_product_update():
     
     # Подготавливаем старые и новые данные
     old_data = {
-        "id": "1",
+        "business_id": "1",
         "title": "Old Title",
         "description_cid": "QmOldDescCID123",
         "categories": ["mushroom"],
         "cover_image_url": "QmOldImageCID123",
         "forms": ["powder"],
         "species": "Amanita muscaria",
+        "organic_components": [{
+            "biounit_id": "Amanita_muscaria",
+            "description_cid": "QmOldDescCID123",
+            "proportion": "100%"
+        }],
         "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
     }
     
     new_data = {
-        "id": "1",  # Тот же ID
+        "business_id": "1",  # Тот же ID
         "title": "New Title",
         "description_cid": "QmNewDescCID123",
         "categories": ["mushroom", "medicinal"],
         "cover_image_url": "QmNewImageCID123",
         "forms": ["tincture"],
         "species": "Amanita muscaria",
+        "organic_components": [{
+            "biounit_id": "Amanita_muscaria",
+            "description_cid": "QmNewDescCID123",
+            "proportion": "100%"
+        }],
         "prices": [{"weight": "50", "weight_unit": "ml", "price": "120", "currency": "EUR"}]
     }
     
@@ -610,24 +630,34 @@ async def test_validate_product_update_id_change():
     
     # Подготавливаем старые и новые данные с изменением ID
     old_data = {
-        "id": "1",
+        "business_id": "1",
         "title": "Old Title",
         "description_cid": "QmOldDescCID123",
         "categories": ["mushroom"],
         "cover_image_url": "QmOldImageCID123",
         "forms": ["powder"],
         "species": "Amanita muscaria",
+        "organic_components": [{
+            "biounit_id": "Amanita_muscaria",
+            "description_cid": "QmOldDescCID123",
+            "proportion": "100%"
+        }],
         "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
     }
     
     new_data = {
-        "id": "2",  # Измененный ID
+        "business_id": "2",  # Измененный ID
         "title": "New Title",
         "description_cid": "QmNewDescCID123",
         "categories": ["mushroom"],
         "cover_image_url": "QmNewImageCID123",
         "forms": ["powder"],
         "species": "Amanita muscaria",
+        "organic_components": [{
+            "biounit_id": "Amanita_muscaria",
+            "description_cid": "QmNewDescCID123",
+            "proportion": "100%"
+        }],
         "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
     }
     
@@ -662,7 +692,7 @@ async def test_create_product_success(mock_product_registry_service):
     
     # Arrange
     product_data = {
-        "id": "test1",
+        "business_id": "test1",
         "title": "Test Product",
         "description_cid": "QmValidCID123",
         "categories": ["mushroom"],
@@ -686,7 +716,7 @@ async def test_create_product_success(mock_product_registry_service):
     logger.info(f"📊 Результат: {result}")
     
     assert result["status"] == "success"
-    assert result["id"] == "test1"
+    assert result["business_id"] == "test1"
     assert result["metadata_cid"] is not None  # Проверяем что CID существует
     assert result["blockchain_id"] is not None  # Проверяем что blockchain_id существует (динамический)
     assert result["tx_hash"] == "0x123"
@@ -702,7 +732,7 @@ async def test_create_product_validation_error(mock_product_registry_service_wit
     
     # Arrange
     product_data = {
-        "id": "test1",
+        "business_id": "test1",
         "title": "",  # Невалидное название
         "description_cid": "QmValidCID123",
         "categories": ["mushroom"],
@@ -726,7 +756,7 @@ async def test_create_product_validation_error(mock_product_registry_service_wit
     logger.info(f"📊 Результат: {result}")
     
     assert result["status"] == "error"
-    assert result["id"] == "test1"
+    assert result["business_id"] == "test1"
     assert "Mock validation failed" in result["error"]  # Используем мок из фикстуры
     
     logger.info("✅ Тест ошибки валидации завершен")
@@ -739,7 +769,7 @@ async def test_create_product_ipfs_upload_error(mock_registry_service_with_faili
     
     # Arrange
     product_data = {
-        "id": "test1",
+        "business_id": "test1",
         "title": "Test Product",
         "description_cid": "QmValidCID123",
         "categories": ["mushroom"],
@@ -763,7 +793,7 @@ async def test_create_product_ipfs_upload_error(mock_registry_service_with_faili
     logger.info(f"📊 Результат: {result}")
     
     assert result["status"] == "error"
-    assert result["id"] == "test1"
+    assert result["business_id"] == "test1"
     # Проверяем, что произошла ошибка (конкретный текст может отличаться в зависимости от реализации)
     assert result["error"] is not None
     
@@ -777,7 +807,7 @@ async def test_create_product_blockchain_error(mock_blockchain_service_with_erro
     
     # Arrange
     product_data = {
-        "id": "test1",
+        "business_id": "test1",
         "title": "Test Product",
         "description_cid": "QmValidCID123",
         "categories": ["mushroom"],
@@ -816,7 +846,7 @@ async def test_create_product_blockchain_error(mock_blockchain_service_with_erro
     logger.info(f"📊 Результат: {result}")
     
     assert result["status"] == "error"
-    assert result["id"] == "test1"
+    assert result["business_id"] == "test1"
     assert "Blockchain transaction failed" in result["error"]
     # При ошибке блокчейна дополнительные поля не возвращаются
     
@@ -836,7 +866,7 @@ async def test_create_product_blockchain_id_error(mock_blockchain_service_with_i
     
     # Arrange
     product_data = {
-        "id": "test1",
+        "business_id": "test1",
         "title": "Test Product",
         "description_cid": "QmValidCID123",
         "categories": ["mushroom"],
@@ -860,7 +890,7 @@ async def test_create_product_blockchain_id_error(mock_blockchain_service_with_i
     mock_storage_service.upload_json = AsyncMock(return_value="QmNewMetadataCID123")
     # Настраиваем download_json для возврата данных вместо корутины
     mock_storage_service.download_json = Mock(return_value={
-        "id": "test_product",
+        "business_id": "test_product",
         "title": "Test Product",
         "description_cid": "QmDescriptionCID",
         "cover_image_url": "QmImageCID",
@@ -891,7 +921,7 @@ async def test_create_product_blockchain_id_error(mock_blockchain_service_with_i
     logger.info(f"📊 Результат: {result}")
     
     assert result["status"] == "error"
-    assert result["id"] == "test1"
+    assert result["business_id"] == "test1"
     assert result["error"] is not None
     # При ошибке получения ID дополнительные поля не возвращаются
     
@@ -912,20 +942,20 @@ async def test_create_product_idempotency():
     
     # Arrange - создаем моки напрямую
     product_data = {
-        "id": "test1",
-        "title": "Test Product",
-        "description_cid": "QmDescriptionCID123",
-        "categories": ["mushroom"],
-        "cover_image_url": "QmValidImageCID123",
-        "forms": ["powder"],
-        "species": "Amanita muscaria",
-        "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "business_id": "test1",
+            "title": "Test Product",
             "description_cid": "QmDescriptionCID123",
-            "proportion": "100%"
-        }],
-        "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
-    }
+            "categories": ["mushroom"],
+            "cover_image_url": "QmValidImageCID123",
+            "forms": ["powder"],
+            "species": "Amanita muscaria",
+            "organic_components": [{
+                "biounit_id": "Amanita_muscaria",
+                "description_cid": "QmDescriptionCID123",
+                "proportion": "100%"
+            }],
+            "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
+        }
     
     mock_blockchain = Mock()
     mock_blockchain.create_product = AsyncMock(return_value="0x123")
@@ -936,8 +966,8 @@ async def test_create_product_idempotency():
     
     mock_storage = Mock()
     mock_storage.upload_json = AsyncMock(return_value="QmNewMetadataCID123")
-    mock_storage.download_json = Mock(return_value={
-        "id": "test_product",
+    mock_storage.download_json = AsyncMock(return_value={
+        "business_id": "test_product",
         "title": "Test Product",
         "description_cid": "QmDescriptionCID",
         "cover_image_url": "QmImageCID",
@@ -1009,12 +1039,19 @@ async def test_create_product_success_simple():
     
     mock_storage = Mock()
     mock_storage.upload_json = AsyncMock(return_value="QmMockJson123")
-    mock_storage.download_json = Mock(return_value={
-        "id": "test_product",
+    mock_storage.download_json = AsyncMock(return_value={
+        "business_id": "test_product",
         "title": "Test Product",
-        "description": "Test description",
+        "cover_image_url": "QmValidImageCID123",
         "categories": ["mushroom"],
-        "forms": ["powder"]
+        "forms": ["powder"],
+        "species": "Amanita muscaria",
+        "organic_components": [{
+            "biounit_id": "Amanita_muscaria",
+            "description_cid": "QmValidCID123",
+            "proportion": "100%"
+        }],
+        "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
     })
     
     mock_validation = Mock()
@@ -1035,7 +1072,7 @@ async def test_create_product_success_simple():
     )
     
     product_data = {
-        "id": "test1",
+        "business_id": "test1",
         "title": "Test Product",
         "description_cid": "QmValidCID123",
         "categories": ["mushroom"],
@@ -1059,7 +1096,7 @@ async def test_create_product_success_simple():
     logger.info(f"📊 Результат: {result}")
     
     assert result["status"] == "success"
-    assert result["id"] == "test1"
+    assert result["business_id"] == "test1"
     assert result["metadata_cid"] == "QmMockJson123"
     assert result["blockchain_id"] == "42"  # Возвращается как строка
     assert result["tx_hash"] == "0x123"
@@ -1086,13 +1123,15 @@ async def test_get_all_products_success():
     ])
     
     mock_storage = Mock()
-    mock_storage.download_json = Mock(return_value={
-        "id": "test_product",
+    mock_storage.download_json = AsyncMock(return_value={
+        "business_id": "test_product",
         "title": "Test Product",
+        "cover_image_url": "QmValidImageCID123",
         "categories": ["mushroom"],
         "forms": ["powder"],
+        "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "test_species",
+            "biounit_id": "Amanita_muscaria",
             "description_cid": "QmDescCID",
             "proportion": "100%"
         }],
@@ -1132,13 +1171,15 @@ async def test_get_all_products_cache_hit():
     mock_blockchain.get_all_products = Mock(return_value=[])
     
     mock_storage = Mock()
-    mock_storage.download_json = Mock(return_value={
-        "id": "test_product",
+    mock_storage.download_json = AsyncMock(return_value={
+        "business_id": "test_product",
         "title": "Test Product",
+        "cover_image_url": "QmValidImageCID123",
         "categories": ["mushroom"],
         "forms": ["powder"],
+        "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "test_species",
+            "biounit_id": "Amanita_muscaria",
             "description_cid": "QmDescCID",
             "proportion": "100%"
         }],
@@ -1230,13 +1271,15 @@ async def test_get_all_products_blockchain_error():
     mock_blockchain.get_all_products = Mock(return_value=[])
     
     mock_storage = Mock()
-    mock_storage.download_json = Mock(return_value={
-        "id": "test_product",
+    mock_storage.download_json = AsyncMock(return_value={
+        "business_id": "test_product",
         "title": "Test Product",
+        "cover_image_url": "QmValidImageCID123",
         "categories": ["mushroom"],
         "forms": ["powder"],
+        "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "test_species",
+            "biounit_id": "Amanita_muscaria",
             "description_cid": "QmDescCID",
             "proportion": "100%"
         }],
@@ -1289,7 +1332,7 @@ async def test_get_product_success(mock_registry_service):
     
     assert product is not None
     assert isinstance(product, Product)
-    assert product.id == 1
+    assert product.blockchain_id == 1
     # 🔧 ИСПРАВЛЕНИЕ: Проверяем реальный заголовок из тестовых данных IPFS
     assert product.title == "Amanita muscaria — sliced caps and gills (1st grade)"
     assert product.status == 0
@@ -1352,7 +1395,7 @@ async def test_get_product_metadata_error():
     mock_blockchain.get_product = Mock(return_value=(1, "0x123", "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG", True))
     
     mock_storage = Mock()
-    mock_storage.download_json = Mock(side_effect=Exception("IPFS download failed"))
+    mock_storage.download_json = AsyncMock(side_effect=Exception("IPFS download failed"))
     
     mock_validation = Mock()
     mock_account = Mock()
@@ -1396,7 +1439,7 @@ async def test_get_product_string_id(mock_registry_service):
     
     assert product is not None
     assert isinstance(product, Product)
-    assert product.id == 1
+    assert product.blockchain_id == 1
     # 🔧 ИСПРАВЛЕНИЕ: Проверяем реальный заголовок из тестовых данных IPFS
     assert product.title == "Amanita muscaria — sliced caps and gills (1st grade)"
     assert product.status == 0
@@ -1983,8 +2026,8 @@ async def test_deserialize_product_success():
     )
     
     test_product = Product(
-        id=1,
-        alias="test-product",
+        business_id="test-product",
+        blockchain_id=1,
         status=1,
         cid="QmTestCID123",
         title="Test Product",
@@ -2000,7 +2043,8 @@ async def test_deserialize_product_success():
     registry_service.assembler = mock_assembler
     
     # Настраиваем мок storage_service для возврата метаданных
-    mock_storage.download_json = Mock(return_value={
+    mock_storage.download_json = AsyncMock(return_value={
+        "business_id": "test-product",
         "title": "Test Product",
         "description_cid": "QmDescCID123",
         "cover_image_url": "QmImageCID123",
@@ -2022,7 +2066,7 @@ async def test_deserialize_product_success():
     logger.info(f"📊 Результат: {result}")
     
     assert result is not None
-    assert result.id == 1
+    assert result.blockchain_id == 1
     assert result.title == "Test Product"
     assert result.status == 1
     
@@ -2084,7 +2128,7 @@ async def test_deserialize_product_metadata_error():
     )
     
     # Настраиваем мок storage_service для возврата None (ошибка)
-    mock_storage.download_json = Mock(return_value=None)
+    mock_storage.download_json = AsyncMock(return_value=None)
     
     # Тестовые данные продукта
     product_data = (1, "0x123456789", "QmTestCID123", True)
@@ -2126,7 +2170,7 @@ async def test_get_cached_description_success():
     
     # Настраиваем мок cache_service для возврата описания
     mock_description = Description(
-        id="desc1",
+        business_id="desc1",
         title="Test Description",
         scientific_name="Test Scientific Name",
         generic_description="Test generic description",
@@ -2146,7 +2190,7 @@ async def test_get_cached_description_success():
     logger.info(f"📊 Результат: {result}")
     
     assert result is not None
-    assert result.id == "desc1"
+    assert result.business_id == "desc1"
     assert result.title == "Test Description"
     assert result.generic_description == "Test generic description"
     assert result.scientific_name == "Test Scientific Name"
@@ -2376,7 +2420,7 @@ async def test_update_catalog_cache_success():
     
     # Создаем объекты Description для продуктов
     description1 = Description(
-        id="desc1",
+        business_id="desc1",
         title="Test Description 1",
         scientific_name="Test Scientific Name 1",
         generic_description="Test generic description 1",
@@ -2387,7 +2431,7 @@ async def test_update_catalog_cache_success():
     )
     
     description2 = Description(
-        id="desc2",
+        business_id="desc2",
         title="Test Description 2",
         scientific_name="Test Scientific Name 2",
         generic_description="Test generic description 2",
@@ -2412,8 +2456,8 @@ async def test_update_catalog_cache_success():
         
     products = [
         Product(
-            id=1,
-            alias="test-product-1",
+            business_id="test-product-1",
+            blockchain_id=1,
             status=1,
             cid="QmTestCID1",
             title="Test Product 1",
@@ -2425,8 +2469,8 @@ async def test_update_catalog_cache_success():
             prices=[PriceInfo(price=50, weight=100, weight_unit="g", currency="EUR")]
         ),
         Product(
-            id=2,
-            alias="test-product-2",
+            business_id="test-product-2",
+            blockchain_id=2,
             status=1,
             cid="QmTestCID2",
             title="Test Product 2",
@@ -2520,7 +2564,7 @@ async def test_update_catalog_cache_large_products(mock_blockchain_service, mock
     for i in range(100):  # 100 продуктов
         # Создаем объект Description для каждого продукта
         description = Description(
-            id=f"desc{i}",
+            business_id=f"desc{i}",
             title=f"Test Description {i}",
             scientific_name=f"Test Scientific Name {i}",
             generic_description=f"Test generic description {i}",
@@ -2538,8 +2582,8 @@ async def test_update_catalog_cache_large_products(mock_blockchain_service, mock
         )
         
         product = Product(
-            id=i,
-            alias=f"test-product-{i}",
+            business_id=f"test-product-{i}",
+            blockchain_id=i,
             status=1,
             cid=f"QmTestCID{i}",
             title=f"Test Product {i}",
@@ -2696,8 +2740,8 @@ async def test_check_product_id_exists_existing_by_alias():
     )
     
     mock_product = Product(
-        id=1,  # Blockchain ID (числовой)
-        alias="existing-business-id",  # Business ID (строковый)
+        business_id="existing-business-id",  # Business ID (строковый)
+        blockchain_id=1,  # Blockchain ID (числовой)
         status=1,
         cid="QmMockCID",
         title="Mock Product",
@@ -2749,8 +2793,8 @@ async def test_check_product_id_exists_existing_by_id():
     )
     
     mock_product = Product(
-        id="amanita1",  # Строковый business ID
-        alias="amanita-muscaria-1",
+        business_id="amanita1",  # Строковый business ID
+        blockchain_id=1,
         status=1,
         cid="QmMockCID",
         title="Mock Product",
@@ -2871,8 +2915,8 @@ async def test_create_product_duplicate_id_prevention():
     mock_blockchain.get_product_id_from_tx = AsyncMock(return_value=42)
     
     mock_storage = Mock()
-    mock_storage.download_json = Mock(return_value={
-        "id": "test_product",
+    mock_storage.download_json = AsyncMock(return_value={
+        "business_id": "test_product",
         "title": "Test Product",
         "description_cid": "QmDescriptionCID",
         "cover_image_url": "QmImageCID",
@@ -2911,8 +2955,8 @@ async def test_create_product_duplicate_id_prevention():
     )
     
     existing_product = Product(
-        id=1,  # Blockchain ID
-        alias="duplicate-business-id",  # Business ID который будет дублироваться
+        business_id="duplicate-business-id",  # Business ID который будет дублироваться
+        blockchain_id=1,  # Blockchain ID
         status=1,
         cid="QmExistingCID",
         title="Existing Product",
@@ -2926,7 +2970,8 @@ async def test_create_product_duplicate_id_prevention():
     
     # Тестовые данные продукта с дублирующимся business ID
     test_product_data = {
-        "id": "duplicate-business-id",  # Тот же business ID что у существующего продукта
+        "id": "duplicate-business-id",  # Используем id для обратной совместимости с текущей логикой
+        "business_id": "duplicate-business-id",  # Тот же business ID что у существующего продукта
         "title": "New Product",
         "description_cid": "QmNewDesc",
         "categories": ["new"],
@@ -2957,7 +3002,7 @@ async def test_create_product_duplicate_id_prevention():
         # Проверяем что создание завершилось ошибкой
         assert result["status"] == "error", f"Создание продукта с дублирующимся business ID должно завершиться ошибкой: {result}"
         assert "уже существует" in result["error"], f"Сообщение об ошибке должно содержать информацию о дублировании: {result['error']}"
-        assert result["id"] == "duplicate-business-id", "ID в результате должен соответствовать переданному"
+        assert result["business_id"] == "duplicate-business-id", "ID в результате должен соответствовать переданному"
     
     logger.info("✅ Дублирование business ID корректно предотвращено")
 
@@ -2974,7 +3019,8 @@ async def test_create_product_unique_id_success(mock_blockchain_service, mock_ip
     
     # Тестовые данные продукта с уникальным business ID
     test_product_data = {
-        "id": "unique-business-id",
+        "id": "unique-business-id",  # Используем id для обратной совместимости с текущей логикой
+        "business_id": "unique-business-id",
         "title": "Unique Product",
         "description_cid": "QmUniqueDesc",
         "categories": ["unique"],
@@ -3008,14 +3054,14 @@ async def test_create_product_unique_id_success(mock_blockchain_service, mock_ip
     
     with patch.object(service, 'validation_service', mock_validation_service), \
          patch.object(service, 'get_all_products', return_value=[]), \
-         patch.object(service, 'create_product_metadata', return_value={"id": "unique-business-id", "title": "Test"}):
+         patch.object(service, 'create_product_metadata', return_value={"business_id": "unique-business-id", "title": "Test"}):
         
         # Создаем продукт с уникальным business ID
         result = await service.create_product(test_product_data)
         
         # Проверяем что создание прошло успешно
         assert result["status"] == "success", f"Создание продукта с уникальным business ID должно быть успешным: {result}"
-        assert result["id"] == "unique-business-id", "ID в результате должен соответствовать переданному"
+        assert result["business_id"] == "unique-business-id", "ID в результате должен соответствовать переданному"
         assert result["metadata_cid"] == "QmMockCID123", "Метаданные должны быть загружены в IPFS"
         assert result["tx_hash"] == "0x123456789", "Транзакция должна быть выполнена"
         
@@ -3111,7 +3157,7 @@ async def test_edge_cases_empty_id_unit(mock_blockchain_service, mock_ipfs_servi
     )
     
     empty_id_product = {
-        "id": "",  # Пустой ID
+        "business_id": "",  # Пустой ID
         "title": "Test Product with Empty ID",
         "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
@@ -3143,7 +3189,7 @@ async def test_edge_cases_none_id_unit(mock_blockchain_service, mock_ipfs_servic
     )
     
     none_id_product = {
-        "id": None,  # None ID
+        "business_id": None,  # None ID
         "title": "Test Product with None ID",
         "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
@@ -3182,7 +3228,7 @@ async def test_edge_cases_long_id_unit(mock_blockchain_service, mock_ipfs_servic
     
     long_id = "test_long_id_" + "x" * 250  # 264 символа
     long_id_product = {
-        "id": long_id,
+        "business_id": long_id,
         "title": "Test Product with Long ID",
         "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
@@ -3232,7 +3278,7 @@ async def test_edge_cases_special_chars_id_unit(mock_blockchain_service, mock_ip
     
     special_chars_id = "test-id@#$%^&*()+={}[]|\\:;\"'<>?,./~`"
     special_id_product = {
-        "id": special_chars_id,
+        "business_id": special_chars_id,
         "title": "Test Product with Special Chars ID",
         "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
@@ -3276,13 +3322,18 @@ async def test_create_product_calls_blockchain_validation_when_blockchain_id_exi
     
     # Тестовые данные продукта
     test_product_data = {
-        "id": "blockchain-validation-test",
+        "business_id": "blockchain-validation-test",
         "title": "Test Product",
         "description_cid": "QmTestDesc",
         "categories": ["test"],
         "cover_image_url": "QmTestImage",
         "forms": ["test_form"],
         "species": "Test Species",
+        "organic_components": [{
+            "biounit_id": "Test_Species",
+            "description_cid": "QmTestDesc",
+            "proportion": "100%"
+        }],
         "prices": [{"weight": "100", "weight_unit": "g", "price": "50", "currency": "EUR"}]
     }
     
@@ -3302,7 +3353,7 @@ async def test_create_product_calls_blockchain_validation_when_blockchain_id_exi
     
     with patch.object(service, 'validation_service', mock_validation_service), \
          patch.object(service, 'get_all_products', return_value=[]), \
-         patch.object(service, 'create_product_metadata', return_value={"id": "blockchain-validation-test", "title": "Test"}):
+         patch.object(service, 'create_product_metadata', return_value={"business_id": "blockchain-validation-test", "title": "Test"}):
         
         # Создаем продукт
         result = await service.create_product(test_product_data)
@@ -3329,13 +3380,18 @@ async def test_create_product_skips_blockchain_validation_when_no_blockchain_id_
     
     # Тестовые данные продукта
     test_product_data = {
-        "id": "blockchain-validation-test-no-id",
+        "business_id": "blockchain-validation-test-no-id",
         "title": "Test Product No ID",
         "description_cid": "QmTestDesc",
         "categories": ["test"],
         "cover_image_url": "QmTestImage",
         "forms": ["test_form"],
         "species": "Test Species",
+        "organic_components": [{
+            "biounit_id": "Test_Species",
+            "description_cid": "QmTestDesc",
+            "proportion": "100%"
+        }],
         "prices": [{"weight": "100", "weight_unit": "g", "price": "50", "currency": "EUR"}]
     }
     
@@ -3355,7 +3411,7 @@ async def test_create_product_skips_blockchain_validation_when_no_blockchain_id_
     
     with patch.object(service, 'validation_service', mock_validation_service), \
          patch.object(service, 'get_all_products', return_value=[]), \
-         patch.object(service, 'create_product_metadata', return_value={"id": "blockchain-validation-test-no-id", "title": "Test"}):
+         patch.object(service, 'create_product_metadata', return_value={"business_id": "blockchain-validation-test-no-id", "title": "Test"}):
         
         # Создаем продукт
         result = await service.create_product(test_product_data)

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Тест валидации статуса продукта"""
+"""
+Тесты для валидации статуса продукта
+"""
 
 import pytest
-from api.models.product import ProductStatusUpdate
+from bot.api.models.product import ProductStatusUpdate
 from pydantic import ValidationError
 
 def test_valid_statuses():

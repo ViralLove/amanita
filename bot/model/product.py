@@ -64,7 +64,7 @@ class Description:
     Структура для хранения и обработки информации о описании продукта.
     
     Attributes:
-        id (str): Уникальный идентификатор продукта
+        business_id (str): Бизнес-идентификатор продукта
         title (str): Название продукта
         scientific_name (str): Научное название
         generic_description (str): Общее описание
@@ -73,7 +73,7 @@ class Description:
         warnings (Optional[str]): Предупреждения
         dosage_instructions (List[DosageInstruction]): Инструкции по дозировке
     """
-    id: str
+    business_id: str
     title: str
     scientific_name: str
     generic_description: str
@@ -100,7 +100,7 @@ class Description:
             raise ValueError("Входные данные должны быть словарем")
             
         # Проверяем обязательные поля
-        required_fields = ['id', 'title', 'scientific_name', 'generic_description']
+        required_fields = ['business_id', 'title', 'scientific_name', 'generic_description']
         for field in required_fields:
             if field not in data:
                 raise ValueError(f"Отсутствует обязательное поле '{field}'")
@@ -116,7 +116,7 @@ class Description:
             ]
         
         return cls(
-            id=data['id'],
+            business_id=data['business_id'],
             title=data['title'],
             scientific_name=data['scientific_name'],
             generic_description=data['generic_description'],
@@ -134,7 +134,7 @@ class Description:
             Dict: Словарь с данными описания
         """
         return {
-            'id': self.id,
+            'business_id': self.business_id,
             'title': self.title,
             'scientific_name': self.scientific_name,
             'generic_description': self.generic_description,
@@ -520,8 +520,8 @@ class Product:
     Модель продукта, представляющая товар в каталоге.
     
     Attributes:
-        id (Union[int, str]): Уникальный идентификатор продукта (блокчейн ID)
-        alias (str): Бизнес-идентификатор продукта из метаданных
+        business_id (str): Бизнес-идентификатор продукта из метаданных
+        blockchain_id (Union[int, str]): Уникальный идентификатор продукта в блокчейне
         status (int): Статус продукта (0 - неактивен, 1 - активен)
         cid (str): Content Identifier - ссылка на контент в IPFS/Arweave
         title (str): Название продукта
@@ -532,8 +532,8 @@ class Product:
         species (str): Биологический вид
         prices (List[PriceInfo]): Список цен
     """
-    id: Union[int, str]
-    alias: str
+    business_id: str
+    blockchain_id: Union[int, str]
     status: int
     cid: str
     title: str
@@ -555,10 +555,14 @@ class Product:
         # Получаем валидаторы из фабрики
         cid_validator = ValidationFactory.get_cid_validator()
         
-        # Валидация CID
-        cid_result = cid_validator.validate(self.cid)
+        # Валидация business_id (НЕ как CID!)
+        if not self.business_id or not isinstance(self.business_id, str):
+            raise ValueError("business_id должен быть непустой строкой")
+        
+        # Валидация cover_image_url как CID
+        cid_result = cid_validator.validate(self.cover_image_url)
         if not cid_result.is_valid:
-            raise ValueError(f"CID: {cid_result.error_message}")
+            raise ValueError(f"cover_image_url: {cid_result.error_message}")
         
         # Валидация organic_components
         if not self.organic_components:
@@ -590,11 +594,17 @@ class Product:
         Raises:
             ValueError: Если в данных отсутствуют обязательные поля
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"🔍 Product.from_dict: начинаем создание продукта")
+        logger.info(f"📋 Доступные поля: {list(data.keys())}")
+        
         if not isinstance(data, dict):
             raise ValueError("Входные данные должны быть словарем")
 
         # Обязательные поля
-        required_fields = ['id', 'title', 'cover_image_url', 'species']
+        required_fields = ['business_id', 'title', 'cover_image_url', 'species']
         for field in required_fields:
             if field not in data:
                 raise ValueError(f"Отсутствует обязательное поле '{field}'")
@@ -602,13 +612,25 @@ class Product:
         # Обратная совместимость: поддержка старого формата с description
         if 'organic_components' in data:
             # Новый формат с компонентами
+            logger.info(f"🔬 Используем новый формат с organic_components")
             organic_components_data = data['organic_components']
             if not isinstance(organic_components_data, list):
                 raise ValueError("organic_components должен быть списком")
             
-            organic_components = [OrganicComponent.from_dict(comp) for comp in organic_components_data]
+            logger.info(f"🏗️ Создаем {len(organic_components_data)} OrganicComponent объектов...")
+            organic_components = []
+            for i, comp in enumerate(organic_components_data):
+                logger.info(f"  Создаем компонент {i+1}: {comp}")
+                try:
+                    component = OrganicComponent.from_dict(comp)
+                    organic_components.append(component)
+                    logger.info(f"  ✅ Компонент {i+1} создан успешно")
+                except Exception as e:
+                    logger.error(f"  ❌ Ошибка создания компонента {i+1}: {e}")
+                    raise
         elif 'description' in data and 'description_cid' in data:
             # Старый формат: создаем один компонент из description
+            logger.info(f"🔬 Используем старый формат с description")
             organic_components = [OrganicComponent(
                 biounit_id=data.get('species', 'unknown'),
                 description_cid=data['description_cid'],
@@ -628,10 +650,10 @@ class Product:
             forms_value = [single_form] if single_form else []
 
         return cls(
-            id=data['id'],
-            alias=data.get('alias', str(data['id'])),  # Используем id как alias по умолчанию
+            business_id=data['business_id'],
+            blockchain_id=data.get('blockchain_id', 0),  # Блокчейн ID по умолчанию
             status=data.get('status', 0),  # Продукт создается неактивным по умолчанию
-            cid=data.get('cid', str(data['id'])),  # Используем id как CID по умолчанию
+            cid=data.get('cid', ''),  # CID метаданных
             title=data['title'],
             organic_components=organic_components,
             cover_image_url=data['cover_image_url'],
@@ -649,8 +671,8 @@ class Product:
             Dict: Словарь с данными продукта
         """
         return {
-            'id': self.id,
-            'alias': self.alias,
+            'business_id': self.business_id,
+            'blockchain_id': self.blockchain_id,
             'status': self.status,
             'cid': self.cid,
             'title': self.title,
@@ -860,4 +882,4 @@ class Product:
 
     def __repr__(self) -> str:
         """Возвращает строковое представление объекта."""
-        return f"Product(id={self.id}, title={self.title}, price={self.price})"
+        return f"Product(business_id={self.business_id}, blockchain_id={self.blockchain_id}, title={self.title})"

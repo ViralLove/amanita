@@ -9,7 +9,7 @@ import logging
 from dotenv import load_dotenv
 
 #from services.ar_weave import ArWeaveUploader
-from bot.services.ipfs_factory import IPFSFactory
+from bot.services.core.ipfs_factory import IPFSFactory
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -113,24 +113,25 @@ def upload_images(
 
             logger.info(f"🚀 Загружаем {file_path.name} (размер: {file_size/1024:.1f}KB, тип: {mime_type})")
             
-            # Загрузка файла
+            try:
+                # Загрузка файла
                 cid = uploader.upload_file(str(file_path))
-            upload_time = time.time() - file_start_time
-            
-            file_info.update({
-                "status": "success",
-                "upload_time": upload_time,
-                "cid": cid
-            })
-            
-            logger.info(f"✅ Загружен {file_path.name} -> {cid} за {upload_time:.1f}с")
-            processed_files += 1
-
+                upload_time = time.time() - file_start_time
+                
+                file_info.update({
+                    "status": "success",
+                    "upload_time": upload_time,
+                    "cid": cid
+                })
+                
+                logger.info(f"✅ Загружен {file_path.name} -> {cid} за {upload_time:.1f}с")
+                processed_files += 1
+                
             except Exception as e:
-            error_msg = f"Ошибка при загрузке: {str(e)}"
-            file_info["error"] = error_msg
-            logger.error(f"❌ Ошибка при загрузке {file_path.name}: {error_msg}")
-            failed_files += 1
+                error_msg = f"Ошибка при загрузке: {str(e)}"
+                file_info["error"] = error_msg
+                logger.error(f"❌ Ошибка при загрузке {file_path.name}: {error_msg}")
+                failed_files += 1
             
         finally:
             upload_log[file_path.name] = file_info

@@ -1,10 +1,15 @@
 import os
 import json
+import sys
 from pathlib import Path
 from datetime import datetime
-from bot.services.ipfs_factory import IPFSFactory
 from typing import List, Dict
 import logging
+
+# Добавляем путь к модулям бота
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from bot.services.core.ipfs_factory import IPFSFactory
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -45,9 +50,9 @@ def prepare_registry_data(
 
     # Обрабатываем каждый продукт
     for idx, product in enumerate(products_data, start=1):
-        product_id = product.get("id")
+        product_id = product.get("business_id")
         if not product_id:
-            logger.warning(f"⚠️ Продукт #{idx} без ID — пропускаем!")
+            logger.warning(f"⚠️ Продукт #{idx} без business_id — пропускаем!")
             continue
 
         # Сохраняем отдельный JSON-файл

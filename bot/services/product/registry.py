@@ -287,7 +287,7 @@ class ProductRegistryService:
             # Создаем базовую структуру метаданных (строгий стандарт: только 'forms')
             forms_value = product_data["forms"]
             metadata = {
-                "id": product_data["id"],
+                "business_id": product_data["business_id"],
                 "title": product_data["title"],
                 "organic_components": product_data["organic_components"],
                 "cover_image_url": product_data["cover_image_url"],
@@ -372,19 +372,21 @@ class ProductRegistryService:
         """Получает все продукты с кэшированием"""
 
         self.logger.info(f"[ProductRegistry] get_all_products id(self)={id(self)}")
+        self.logger.info(f"[ProductRegistry] 🚀 Начинаем получение всех продуктов")
 
         try:
             # Проверяем версию каталога
+            self.logger.info(f"[ProductRegistry] 📊 Проверяем версию каталога...")
             catalog_version = self.blockchain_service.get_catalog_version()
-            self.logger.info(f"[ProductRegistry] Текущая версия каталога: {catalog_version}")
+            self.logger.info(f"[ProductRegistry] ✅ Текущая версия каталога: {catalog_version}")
             
             # Проверяем кэш
-            self.logger.info(f"[ProductRegistry] Проверяем кэш каталога...")
+            self.logger.info(f"[ProductRegistry] 🔍 Проверяем кэш каталога...")
             cached_catalog = self.cache_service.get_cached_item("catalog", "catalog")
             
             if cached_catalog:
                 products_in_cache = cached_catalog.get('products', [])
-                self.logger.info(f"[ProductRegistry] Найден кэш каталога: version={cached_catalog.get('version')}, products_count={len(products_in_cache)}")
+                self.logger.info(f"[ProductRegistry] 📦 Найден кэш каталога: version={cached_catalog.get('version')}, products_count={len(products_in_cache)}")
 
                 # Если версия совпадает и кэш не пустой — используем его
                 if cached_catalog.get("version") == catalog_version and len(products_in_cache) > 0:
@@ -396,43 +398,55 @@ class ProductRegistryService:
                 else:
                     self.logger.info(f"[ProductRegistry] ❌ Кэш устарел: cached_version={cached_catalog.get('version')}, current_version={catalog_version}")
             else:
-                self.logger.info(f"[ProductRegistry] Кэш каталога пуст")
+                self.logger.info(f"[ProductRegistry] 📭 Кэш каталога пуст")
             
             # Получаем продукты из блокчейна
-            self.logger.info(f"[ProductRegistry] Загружаем продукты из блокчейна...")
+            self.logger.info(f"[ProductRegistry] 🔗 Загружаем продукты из блокчейна...")
             products_data = self.blockchain_service.get_all_products()
+            self.logger.info(f"[ProductRegistry] 📊 Получено {len(products_data) if products_data else 0} продуктов из блокчейна")
+            
             if not products_data:
-                self.logger.warning("No products found in blockchain")
+                self.logger.warning(f"[ProductRegistry] ⚠️ No products found in blockchain")
                 return []
             
             # Обрабатываем каждый продукт через унифицированный метод
             products = []
-            self.logger.info(f"Products data: {products_data}")
-            for product_data in products_data:
+            self.logger.info(f"[ProductRegistry] 🔄 Начинаем обработку {len(products_data)} продуктов из блокчейна")
+            self.logger.info(f"[ProductRegistry] 📋 Products data: {products_data}")
+            
+            for i, product_data in enumerate(products_data):
                 try:
+                    self.logger.info(f"[ProductRegistry] 🔍 Обрабатываем продукт {i+1}/{len(products_data)}: {product_data}")
                     # Используем унифицированный метод десериализации
                     product = await self._deserialize_product(product_data)
                     if product:
                         products.append(product)
+                        self.logger.info(f"[ProductRegistry] ✅ Продукт {i+1} успешно обработан: ID={product.id if hasattr(product, 'id') else 'N/A'}")
+                    else:
+                        self.logger.warning(f"[ProductRegistry] ⚠️ Продукт {i+1} не удалось обработать")
                         
                 except Exception as e:
-                    self.logger.error(f"Error processing product: {e}")
+                    self.logger.error(f"[ProductRegistry] ❌ Error processing product {i+1}: {e}")
                     continue
             
             # Обновляем кэш
-            self.logger.info(f"[ProductRegistry] Сохраняем каталог в кэш: version={catalog_version}, products_count={len(products)}")
+            self.logger.info(f"[ProductRegistry] 💾 Сохраняем каталог в кэш: version={catalog_version}, products_count={len(products)}")
             self.cache_service.set_cached_item("catalog", {
                 "version": catalog_version,
                 "products": products
             }, "catalog")
             self.logger.info(f"[ProductRegistry] ✅ Каталог успешно сохранен в кэш")
             
+            self.logger.info(f"[ProductRegistry] 🎉 ФИНАЛЬНЫЙ РЕЗУЛЬТАТ: возвращаем {len(products)} продуктов")
             return products
             
         except Exception as e:
-            self.logger.error(f"Error getting all products: {e}")
+            self.logger.error(f"[ProductRegistry] ❌ Критическая ошибка в get_all_products: {e}")
+            import traceback
+            self.logger.error(f"[ProductRegistry] 🔍 Полный traceback ошибки:")
+            self.logger.error(traceback.format_exc())
             return []
-    
+
     async def get_product(self, product_id: Union[str, int]) -> Product:
         """
         Получает продукт по ID.
@@ -637,25 +651,26 @@ class ProductRegistryService:
         Возвращает dict с результатом (id, metadata_cid, blockchain_id, tx_hash, status, error)
         """
         try:
-            product_id = product_data.get("id")
-            self.logger.info(f"🆕 Начинаем создание продукта с ID: {product_id}")
+            # Получаем business_id из данных продукта (приоритет) или id (обратная совместимость)
+            business_id = product_data.get("business_id") or product_data.get("id")
+            self.logger.info(f"🆕 Начинаем создание продукта с business ID: {business_id}")
             
             # 1. Валидация
             validation_result = await self.validation_service.validate_product_data(product_data)
             if not validation_result.is_valid:
-                self.logger.error(f"❌ Валидация продукта {product_id} не прошла: {validation_result.error_message}")
+                self.logger.error(f"❌ Валидация продукта {business_id} не прошла: {validation_result.error_message}")
                 return {
-                    "id": product_id,
+                    "business_id": business_id,
                     "status": "error",
                     "error": validation_result.error_message or "Validation failed"
                 }
             
-            # 2. Проверка уникальности ID
-            if product_id and await self._check_product_id_exists(product_id):
-                error_msg = f"Продукт с ID '{product_id}' уже существует. Используйте уникальный ID."
+            # 2. Проверка уникальности business ID
+            if business_id and await self._check_product_id_exists(business_id):
+                error_msg = f"Продукт с business ID '{business_id}' уже существует. Используйте уникальный business ID."
                 self.logger.error(f"❌ {error_msg}")
                 return {
-                    "id": product_id,
+                    "business_id": business_id,
                     "status": "error",
                     "error": error_msg
                 }
@@ -667,7 +682,7 @@ class ProductRegistryService:
             logger.info(f"[DEBUG] upload_json вернул: {metadata_cid} (тип: {type(metadata_cid)})")
             if not metadata_cid:
                 return {
-                    "id": product_id,
+                    "business_id": business_id,
                     "status": "error",
                     "error": "Ошибка загрузки метаданных в IPFS"
                 }
@@ -675,7 +690,7 @@ class ProductRegistryService:
             tx_hash = await self.blockchain_service.create_product(metadata_cid)
             if not tx_hash:
                 return {
-                    "id": product_id,
+                    "business_id": business_id,
                     "metadata_cid": metadata_cid,
                     "status": "error",
                     "error": "Ошибка записи в блокчейн"
@@ -687,14 +702,14 @@ class ProductRegistryService:
             if blockchain_id is not None:
                 blockchain_exists = self._check_blockchain_product_exists(blockchain_id)
                 if not blockchain_exists:
-                    self.logger.warning(f"⚠️ Продукт {product_id} создан (tx: {tx_hash}), но не найден в блокчейне (ID: {blockchain_id})")
+                    self.logger.warning(f"⚠️ Продукт {business_id} создан (tx: {tx_hash}), но не найден в блокчейне (ID: {blockchain_id})")
                     # Не считаем это критической ошибкой - возможна задержка синхронизации
                 else:
-                    self.logger.debug(f"🔗 Подтверждено: продукт {product_id} существует в блокчейне (ID: {blockchain_id})")
+                    self.logger.debug(f"🔗 Подтверждено: продукт {business_id} существует в блокчейне (ID: {blockchain_id})")
             
-            self.logger.info(f"✅ Продукт {product_id} успешно создан")
+            self.logger.info(f"✅ Продукт {business_id} успешно создан")
             return {
-                "id": product_id,
+                "business_id": business_id,
                 "metadata_cid": metadata_cid,
                 "blockchain_id": str(blockchain_id) if blockchain_id is not None else None,
                 "tx_hash": str(tx_hash) if tx_hash is not None else None,
@@ -704,7 +719,7 @@ class ProductRegistryService:
         except Exception as e:
             self.logger.error(f"❌ Критическая ошибка при создании продукта: {e}")
             return {
-                "id": product_data.get("id"),
+                "business_id": business_id,
                 "status": "error",
                 "error": str(e)
             }
@@ -734,7 +749,7 @@ class ProductRegistryService:
             if existing_product is None:
                 self.logger.error(f"[ProductRegistry] Продукт {product_id} не найден")
                 return {
-                    "id": product_id,
+                    "business_id": product_data.get("business_id", product_id),
                     "status": "error",
                     "error": f"Продукт с ID {product_id} не найден"
                 }
@@ -757,7 +772,7 @@ class ProductRegistryService:
                     if product_owner_address.lower() != current_seller_address.lower():
                         self.logger.error(f"[ProductRegistry] Недостаточно прав для обновления продукта {product_id}")
                         return {
-                            "id": product_id,
+                            "business_id": product_data.get("business_id", product_id),
                             "status": "error",
                             "error": f"Недостаточно прав для обновления продукта {product_id}"
                         }
@@ -769,7 +784,7 @@ class ProductRegistryService:
             except Exception as e:
                 self.logger.error(f"[ProductRegistry] Ошибка при проверке прав доступа: {e}")
                 return {
-                    "id": product_id,
+                    "business_id": product_data.get("business_id", product_id),
                     "status": "error",
                     "error": f"Ошибка при проверке прав доступа: {str(e)}"
                 }
@@ -781,7 +796,7 @@ class ProductRegistryService:
             if not is_valid:
                 self.logger.error(f"[ProductRegistry] Валидация продукта {product_id} не прошла")
                 return {
-                    "id": product_id,
+                    "business_id": product_data.get("business_id", product_id),
                     "status": "error",
                     "error": f"Данные продукта {product_id} не прошли валидацию"
                 }
@@ -807,7 +822,7 @@ class ProductRegistryService:
                 if not new_metadata_cid:
                     self.logger.error(f"[ProductRegistry] Не удалось загрузить метаданные в IPFS для продукта {product_id}")
                     return {
-                        "id": product_id,
+                        "business_id": product_data.get("business_id", product_id),
                         "status": "error",
                         "error": f"Не удалось загрузить метаданные в IPFS для продукта {product_id}"
                     }
@@ -817,7 +832,7 @@ class ProductRegistryService:
             except Exception as e:
                 self.logger.error(f"[ProductRegistry] Ошибка при обновлении метаданных в IPFS: {e}")
                 return {
-                    "id": product_id,
+                    "business_id": product_data.get("business_id", product_id),
                     "status": "error",
                     "error": f"Ошибка при обновлении метаданных в IPFS: {str(e)}"
                 }
@@ -840,7 +855,7 @@ class ProductRegistryService:
             except Exception as e:
                 self.logger.error(f"[ProductRegistry] Ошибка при обновлении в блокчейне: {e}")
                 return {
-                    "id": product_id,
+                    "business_id": product_data.get("business_id", product_id),
                     "status": "error",
                     "error": f"Ошибка при обновлении в блокчейне: {str(e)}"
                 }
@@ -849,7 +864,7 @@ class ProductRegistryService:
             self.logger.info(f"[ProductRegistry] Обновление продукта {product_id} завершено успешно")
             
             return {
-                "id": product_id,
+                "business_id": product_data.get("business_id", product_id),
                 "metadata_cid": new_metadata_cid,
                 "blockchain_id": blockchain_id,
                 "tx_hash": tx_hash,
@@ -863,7 +878,7 @@ class ProductRegistryService:
             self.logger.error(f"[ProductRegistry] Трассировка: {traceback.format_exc()}")
             
             return {
-                "id": product_id,
+                "business_id": product_data.get("business_id", product_id),
                 "status": "error",
                 "error": f"Ошибка в атомарной операции обновления: {str(e)}"
             }
@@ -1013,28 +1028,38 @@ class ProductRegistryService:
             Product или None
         """
         try:
+            self.logger.info(f"[ProductRegistry] 🔍 Начинаем десериализацию продукта: {product_data}")
+            
             if not hasattr(product_data, '__getitem__') or len(product_data) < 4:
-                self.logger.error(f"Некорректная структура product_data: {product_data}")
+                self.logger.error(f"[ProductRegistry] ❌ Некорректная структура product_data: {product_data}")
                 return None
 
             product_id = product_data[0]  # Блокчейн ID
             ipfs_cid = product_data[2]
             is_active = bool(product_data[3])
 
-            self.logger.info(f"🔍 Получаем метаданные продукта: {product_id}, {ipfs_cid}, {is_active}")
-            metadata = self.storage_service.download_json(ipfs_cid)
+            self.logger.info(f"[ProductRegistry] 📋 Извлечены данные: ID={product_id}, CID={ipfs_cid}, Active={is_active}")
+            self.logger.info(f"[ProductRegistry] 🔗 Загружаем метаданные из IPFS: {ipfs_cid}")
+            
+            metadata = await self.storage_service.download_json(ipfs_cid)
             if not metadata:
-                self.logger.warning(f"Не удалось получить метаданные для продукта {product_id}")
+                self.logger.warning(f"[ProductRegistry] ⚠️ Не удалось получить метаданные для продукта {product_id}")
                 return None
 
+            self.logger.info(f"[ProductRegistry] ✅ Метаданные загружены: {type(metadata)}, keys={list(metadata.keys()) if isinstance(metadata, dict) else 'N/A'}")
+
             # Используем ProductAssembler для централизованной сборки продукта
+            self.logger.info(f"[ProductRegistry] 🔧 Вызываем ProductAssembler.assemble_product...")
             product = self.assembler.assemble_product(product_data, metadata)
             if product:
-                self.logger.info(f"✅ Продукт {product_id} успешно собран через ProductAssembler")
+                self.logger.info(f"[ProductRegistry] ✅ Продукт {product_id} успешно собран через ProductAssembler")
             else:
-                self.logger.error(f"❌ Не удалось собрать продукт {product_id} через ProductAssembler")
+                self.logger.error(f"[ProductRegistry] ❌ Не удалось собрать продукт {product_id} через ProductAssembler")
             
             return product
         except Exception as e:
-            self.logger.error(f"Ошибка десериализации продукта: {e}")
+            self.logger.error(f"[ProductRegistry] ❌ Ошибка десериализации продукта: {e}")
+            import traceback
+            self.logger.error(f"[ProductRegistry] 🔍 Полный traceback ошибки:")
+            self.logger.error(traceback.format_exc())
             return None

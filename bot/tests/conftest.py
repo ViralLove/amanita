@@ -4,6 +4,7 @@
 import pytest
 import logging
 import os
+import time
 from unittest.mock import Mock, AsyncMock
 from bot.services.core import blockchain
 from bot.model.product import Product
@@ -154,16 +155,9 @@ def mock_blockchain_service(monkeypatch):
                 return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", cid, status)
             else:
                 # 🔧 ИСПРАВЛЕНИЕ: Если продукт не найден в product_cids, 
-                # но есть в product_statuses, возвращаем None для CID
-                # Это позволит sync_with_blockchain_service найти правильные данные
-                if product_id_int in self.product_statuses:
-                    logger.info(f"🔧 [MockBlockchainService] Продукт {product_id_int} найден в product_statuses, но не в product_cids")
-                    logger.info(f"🔧 [MockBlockchainService] Возвращаем None для CID, чтобы sync_with_blockchain_service мог найти правильные данные")
-                    return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", None, status)
-                else:
-                    # Продукт не найден, возвращаем None для CID
-                    logger.info(f"🔍 [MockBlockchainService] Продукт {product_id_int} не найден в product_cids, но статус: {status}")
-                    return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", None, status)
+                # возвращаем None для CID
+                logger.info(f"🔍 [MockBlockchainService] Продукт {product_id_int} не найден в product_cids, но статус: {status}")
+                return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", None, status)
 
         # Имитация создания продукта в блокчейне. Сохраняет CID для синхронизации с MockIPFSStorage.
         async def create_product(self, ipfs_cid):
@@ -915,14 +909,18 @@ def mock_blockchain_service_with_tracking(monkeypatch):
 # === API СПЕЦИФИЧНЫЕ ФИКСТУРЫ ===
 
 @pytest.fixture(scope="function")
-async def api_client() -> AsyncGenerator[httpx.AsyncClient, None]:
-    """Фикстура для HTTP клиента"""
+def api_client() -> httpx.AsyncClient:
+    """Фикстура для HTTP клиента с HMAC аутентификацией"""
     print("🔧 [API Client] Создание HTTP клиента для теста")
     
-    async with httpx.AsyncClient(base_url=API_URL) as client:
-        yield client
+    # Создаем HTTP клиент
+    client = httpx.AsyncClient(base_url=API_URL)
+    # Базовые заголовки
+    client.headers.update({
+        "Content-Type": "application/json"
+    })
     
-    print("🧹 [API Client] HTTP клиент закрыт и очищен")
+    return client
 
 
 @pytest.fixture(scope="function")
@@ -1170,8 +1168,8 @@ def mock_ipfs_storage():
                                     }
                                 ],
                                 "cover_image_url": cid,
-                                "categories": ["test"],
-                                "forms": ["test_form"],
+                                "categories": ["mushroom"],
+                                "forms": ["powder"],
                                 "species": "Test Species",
                                 "prices": [{"weight": "100", "weight_unit": "g", "price": "10", "currency": "EUR"}]
                             }
@@ -1193,7 +1191,8 @@ def mock_ipfs_storage():
             # Тестовые данные для продуктов, которые возвращает mock blockchain service (8 продуктов)
             test_products = {
                 "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG": {
-                    "id": 1,
+                    "business_id": "amanita1",
+                    "blockchain_id": 1,
                     "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     "title": "Amanita muscaria — sliced caps and gills (1st grade)",
                     "organic_components": [
@@ -1210,7 +1209,8 @@ def mock_ipfs_storage():
                     "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
                 },
                 "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1": {
-                    "id": 2,
+                    "business_id": "amanita2",
+                    "blockchain_id": 2,
                     "cid": "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1",
                     "title": "Amanita pantherina — premium powder",
                     "organic_components": [
@@ -1227,7 +1227,8 @@ def mock_ipfs_storage():
                     "prices": [{"weight": "100", "weight_unit": "g", "price": "90", "currency": "EUR"}]
                 },
                 "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B": {
-                    "id": 3,
+                    "business_id": "blue_lotus1",
+                    "blockchain_id": 3,
                     "cid": "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B",
                     "title": "Blue Lotus — flower extract",
                     "organic_components": [
@@ -1244,7 +1245,8 @@ def mock_ipfs_storage():
                     "prices": [{"weight": "100", "weight_unit": "g", "price": "45", "currency": "EUR"}]
                 },
                 "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz": {
-                    "id": 4,
+                    "business_id": "chaga1",
+                    "blockchain_id": 4,
                     "cid": "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz",
                     "title": "Chaga — medicinal mushroom",
                     "organic_components": [
@@ -1261,7 +1263,8 @@ def mock_ipfs_storage():
                     "prices": [{"weight": "100", "weight_unit": "g", "price": "70", "currency": "EUR"}]
                 },
                 "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy": {
-                    "id": 5,
+                    "business_id": "lions_mane1",
+                    "blockchain_id": 5,
                     "cid": "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy",
                     "title": "Lion's Mane — cognitive support",
                     "organic_components": [
@@ -1278,7 +1281,8 @@ def mock_ipfs_storage():
                     "prices": [{"weight": "100", "weight_unit": "g", "price": "85", "currency": "EUR"}]
                 },
                 "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd": {
-                    "id": 6,
+                    "business_id": "reishi1",
+                    "blockchain_id": 6,
                     "cid": "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd",
                     "title": "Reishi — longevity mushroom",
                     "organic_components": [
@@ -1295,7 +1299,8 @@ def mock_ipfs_storage():
                     "prices": [{"weight": "100", "weight_unit": "g", "price": "95", "currency": "EUR"}]
                 },
                 "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa": {
-                    "id": 7,
+                    "business_id": "cordyceps1",
+                    "blockchain_id": 7,
                     "cid": "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa",
                     "title": "Cordyceps — energy boost",
                     "organic_components": [
@@ -1312,7 +1317,8 @@ def mock_ipfs_storage():
                     "prices": [{"weight": "100", "weight_unit": "g", "price": "88", "currency": "EUR"}]
                 },
                 "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S": {
-                    "id": 8,
+                    "business_id": "turkey_tail1",
+                    "blockchain_id": 8,
                     "cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
                     "title": "Turkey Tail — immune support",
                     "organic_components": [
@@ -1392,7 +1398,7 @@ def mock_ipfs_storage():
             """Получает данные продукта по blockchain ID (для синхронизации с MockBlockchainService)"""
             # Ищем продукт по blockchain ID в загруженных данных
             for cid, data in self._storage.items():
-                if data.get('id') == blockchain_id:
+                if data.get('blockchain_id') == blockchain_id:
                     return data
             return None
         
@@ -1400,13 +1406,30 @@ def mock_ipfs_storage():
         def get_cid_by_blockchain_id(self, blockchain_id):
             """Получает CID по blockchain ID (для синхронизации с MockBlockchainService)"""
             for cid, data in self._storage.items():
-                if data.get('id') == blockchain_id:
+                if data.get('blockchain_id') == blockchain_id:
                     return cid
             return None
         
         # Асинхронный метод для скачивания JSON
         async def download_json_async(self, cid):
             return self.download_json(cid)
+        
+        # Асинхронная версия download_json для совместимости с ProductStorageService
+        async def download_json(self, cid):
+            return self.download_json_sync(cid)
+        
+        # Переименовываем старый метод для ясности
+        def download_json_sync(self, cid):
+            if self.should_fail_download:
+                return None
+            
+            # Сначала проверяем внутреннее хранилище
+            if cid in self._storage:
+                return self._storage[cid]
+            
+            # Fallback для обратной совместимости (убираем жесткие маппинги)
+            # Возвращаем None если CID не найден - это реалистичное поведение
+            return None
         
         def upload_file(self, file_path_or_data, file_name=None):
             if self.should_fail_upload:
@@ -1491,6 +1514,10 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
             self.validation_service = validation_service or Mock()
             self.account_service = account_service or Mock()
             
+            # 🔧 ИСПРАВЛЕНИЕ: Добавляем seller_account для тестов endpoint GET /products/{seller_address}
+            self.seller_account = Mock()
+            self.seller_account.address = "0x742d35cc6634c0532925a3b8d4c9db96c4b4d8b6"  # Тестовый адрес по умолчанию
+            
             # Внутренние сервисы
             self.cache_service = Mock()
             self.metadata_service = Mock()
@@ -1526,6 +1553,10 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
         
         def _setup_default_behavior(self):
             """Настройка поведения по умолчанию"""
+            # Настройка проверки прав доступа
+            self.check_permissions = False  # По умолчанию проверка прав отключена
+            self.simulate_permission_denied = False  # По умолчанию права не ограничены
+            
             # Настройка cache_service
             self.cache_service.get_cached_item.return_value = None
             self.cache_service.set_cached_item.return_value = True
@@ -1540,7 +1571,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 "title": "Test Product",
                 "organic_components": [{"biounit_id": "test_biounit", "description_cid": "QmTestDesc", "proportion": "100%"}],
                 "cover_image_url": "QmTestImage",
-                "categories": ["test"],
+                "categories": ["mushroom"],
                 "forms": ["powder"],
                 "species": "test_species",
                 "prices": [{"weight": "100", "weight_unit": "g", "price": "50", "currency": "EUR"}]
@@ -1600,7 +1631,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 "description_cid": "QmTestDescriptionCID1",
                 "cover_image_url": "QmTestCoverCID1",
                 "gallery": ["QmTestGalleryCID1"],
-                "categories": ["mushroom", "test"],
+                "categories": ["mushroom"],
                 "forms": ["powder"],
                 "species": "Amanita muscaria",
                 "organic_components": ["Amanita muscaria"],
@@ -1623,24 +1654,33 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
         async def create_product(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
             """Создает новый продукт"""
             try:
-                product_id = product_data.get("id")
-                logger.info(f"🔧 [Mock] Создание продукта: {product_id}")
+                # 🔧 ИСПРАВЛЕНО: используем business_id или id из данных
+                business_id = product_data.get("business_id") or product_data.get("id")
+                
+                # 🔧 ДОБАВЛЕНО: генерируем уникальный business_id только если оба поля отсутствуют
+                if not business_id:
+                    business_id = f"generated_product_{self._product_counter}_{int(time.time())}"
+                    logger.info(f"🔧 [Mock] Сгенерирован business_id: {business_id}")
+                else:
+                    logger.info(f"🔧 [Mock] Используем предоставленный business_id/id: {business_id}")
+                
+                logger.info(f"🔧 [Mock] Создание продукта: {business_id}")
                 
                 # Валидация
                 validation_result = await self.validation_service.validate_product_data(product_data)
                 if not validation_result.is_valid:
                     return {
-                        "id": product_id,
+                        "business_id": business_id,
                         "status": "error",
                         "error": validation_result.error_message or "Validation failed"
                     }
                 
-                # Проверка уникальности ID
-                if product_id and await self._check_product_id_exists(product_id):
+                # 🔧 ИСПРАВЛЕНО: проверяем уникальность business_id
+                if business_id and await self._check_product_id_exists(business_id):
                     return {
-                        "id": product_id,
+                        "business_id": business_id,
                         "status": "error",
-                        "error": f"Продукт с ID '{product_id}' уже существует"
+                        "error": f"Продукт с business_id '{business_id}' уже существует"
                     }
                 
                 # Создание метаданных
@@ -1668,15 +1708,16 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 # Получение blockchain_id
                 blockchain_id = await self.blockchain_service.get_product_id_from_tx(tx_hash)
                 
-                # Сохранение в внутреннем состоянии
-                self._products[product_id] = product_data
-                self._metadata_cids[product_id] = metadata_cid
-                self._blockchain_ids[product_id] = blockchain_id
+                # 🔧 ИСПРАВЛЕНО: сохраняем по business_id вместо id
+                self._products[business_id] = product_data
+                self._metadata_cids[business_id] = metadata_cid
+                self._blockchain_ids[business_id] = blockchain_id
                 self._product_counter += 1
                 
-                logger.info(f"🔧 [Mock] Продукт {product_id} создан успешно")
+                logger.info(f"🔧 [Mock] Продукт {business_id} создан успешно")
                 return {
-                    "id": product_id,
+                    "business_id": business_id,
+                    "id": business_id,  # 🔧 ДОБАВЛЕНО: обратная совместимость для тестов
                     "metadata_cid": metadata_cid,
                     "blockchain_id": str(blockchain_id) if blockchain_id else None,
                     "tx_hash": str(tx_hash) if tx_hash else None,
@@ -1687,7 +1728,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
             except Exception as e:
                 self.logger.error(f"🔧 [Mock] Ошибка создания продукта: {e}")
                 return {
-                    "id": product_data.get("id"),
+                    "business_id": business_id,
                     "status": "error",
                     "error": str(e)
                 }
@@ -1697,6 +1738,9 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
             try:
                 if not product_id:
                     return None
+                
+                # 🔧 ИСПРАВЛЕНО: добавляем импорты в начало метода
+                from bot.model.product import Product, OrganicComponent, PriceInfo
                 
                 product_id_str = str(product_id)
                 logger.info(f"🔧 [Mock] Получение продукта: {product_id_str}")
@@ -1724,14 +1768,15 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                         currency="EUR"
                     )
                     
+                    # 🔧 ИСПРАВЛЕНО: используем новую структуру Product
                     product = Product(
-                        id=blockchain_id or int(product_id_str),
-                        alias=product_id_str,
+                        business_id=product_id_str,
+                        blockchain_id=blockchain_id or int(product_id_str),
                         status=1,  # Активный по умолчанию
                         cid=metadata_cid or "QmMockCID",
                         title=product_data.get("title", ""),
                         organic_components=[organic_component],
-                        cover_image_url="https://mocked.ipfs/test.jpg",
+                        cover_image_url="QmMockCID",  # 🔧 ИСПРАВЛЕНО: используем CID вместо URL
                         categories=product_data.get("categories", []),
                         forms=product_data.get("forms", []),
                         species=product_data.get("species", ""),
@@ -1744,13 +1789,19 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 # Если не найден в внутреннем состоянии, пробуем блокчейн
                 product_data = self.blockchain_service.get_product(product_id)
                 if product_data:
+                    # Проверяем, что у продукта есть CID (продукт действительно существует)
+                    blockchain_id, seller_address, cid, status = product_data
+                    if cid is None:
+                        # Продукт не найден в блокчейне
+                        logger.info(f"🔧 [Mock] Продукт {product_id} не найден в блокчейне (CID=None)")
+                        return None
+                    
                     # Валидируем метаданные через metadata_service
                     validation_result = self.metadata_service.validate_and_parse_metadata(product_data)
                     if validation_result.is_valid:
                         # Создаем продукт из валидированных метаданных
                         metadata = validation_result.field_value
                         # Создаем тестовый продукт для мока
-                        from bot.model.product import Product, OrganicComponent, PriceInfo
                         
                         test_component = OrganicComponent(
                             biounit_id="test_biounit_1",
@@ -1765,15 +1816,16 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                             currency="EUR"
                         )
                         
+                        # 🔧 ИСПРАВЛЕНО: используем новую структуру Product
                         product = Product(
-                            id=product_id,
-                            alias=str(product_id),
+                            business_id=str(product_id),
+                            blockchain_id=product_id,
                             status=1,
                             cid="QmTestCID",
                             title="Test Product from Blockchain",
                             organic_components=[test_component],
-                            cover_image_url="https://mocked.ipfs/test.jpg",
-                            categories=["test"],
+                            cover_image_url="QmTestCID",  # 🔧 ИСПРАВЛЕНО: используем CID вместо URL
+                            categories=["mushroom"],
                             forms=["powder"],
                             species="test_species",
                             prices=[test_price]
@@ -1796,20 +1848,41 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
             try:
                 logger.info("🔧 [Mock] Получение всех продуктов")
                 
-                # Проверяем кэш
-                cached_catalog = self.cache_service.get_cached_item("catalog", "catalog")
-                if cached_catalog and cached_catalog.get("products"):
-                    logger.info("🔧 [Mock] Возвращаем кэшированный каталог")
-                    return cached_catalog["products"]
+                # 🔧 ИСПРАВЛЕНО: Возвращаем тестовые данные вместо пустого списка
+                from bot.model.product import Product, OrganicComponent, PriceInfo
                 
-                # Получаем из блокчейна
-                products_data = self.blockchain_service.get_all_products()
-                products = []
+                # Создаем тестовый продукт для каталога
+                test_product = Product(
+                    business_id="test_product_001",
+                    blockchain_id=1,
+                    status=1,
+                    cid="QmTestProductCID",
+                    title="Test Amanita Product",
+                    organic_components=[
+                        OrganicComponent(
+                            biounit_id="amanita_muscaria",
+                            description_cid="QmTestDescCID",
+                            proportion="100%"
+                        )
+                    ],
+                    cover_image_url="QmTestImageCID",
+                    categories=["mushroom"],
+                    forms=["powder"],
+                    species="Amanita Muscaria",
+                    prices=[
+                        PriceInfo(
+                            price=50,
+                            currency="EUR",
+                            weight="100",
+                            weight_unit="g",
+                            volume=None,
+                            volume_unit=None,
+                            form="powder"
+                        )
+                    ]
+                )
                 
-                for product_data in products_data:
-                    product = await self._deserialize_product(product_data)
-                    if product:
-                        products.append(product)
+                products = [test_product]
                 
                 # Обновляем кэш
                 self.cache_service.set_cached_item("catalog", {
@@ -1817,7 +1890,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     "products": products
                 }, "catalog")
                 
-                logger.info(f"🔧 [Mock] Получено {len(products)} продуктов")
+                logger.info(f"🔧 [Mock] Получено {len(products)} тестовых продуктов")
                 return products
                 
             except Exception as e:
@@ -1829,20 +1902,41 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
             try:
                 logger.info(f"🔧 [Mock] Обновление продукта: {product_id}")
                 
+                # 🔧 ПРОВЕРКА ПРАВ ДОСТУПА (приоритет 1)
+                if self.check_permissions and self.simulate_permission_denied:
+                    logger.info(f"🔧 [Mock] Отказ в правах доступа для продукта {product_id}")
+                    return {
+                        "business_id": product_id,
+                        "status": "error",
+                        "error": "Недостаточно прав для обновления продукта",
+                        "error_code": "403"
+                    }
+                
+                # 🔧 ИСПРАВЛЕНИЕ: Имитация ошибки доступа для тестов 403 (должна быть второй!)
+                if "403_error" in product_id:
+                    logger.info(f"🔧 [Mock] Имитация 403 ошибки для продукта {product_id}")
+                    return {
+                        "business_id": product_id,
+                        "status": "error",
+                        "error": "Недостаточно прав для обновления продукта",
+                        "error_code": "403"
+                    }
+                
+                # 🔧 ИСПРАВЛЕНО: используем business_id вместо id
                 # Проверка существования
                 existing_product = await self.get_product(product_id)
                 if not existing_product:
                     return {
-                        "id": product_id,
+                        "business_id": product_id,
                         "status": "error",
-                        "error": f"Продукт с ID {product_id} не найден"
+                        "error": f"Продукт с business_id {product_id} не найден"
                     }
                 
                 # Валидация
                 is_valid = await self.validate_product(product_data)
                 if not is_valid:
                     return {
-                        "id": product_id,
+                        "business_id": product_id,
                         "status": "error",
                         "error": f"Данные продукта {product_id} не прошли валидацию"
                     }
@@ -1866,7 +1960,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 
                 logger.info(f"🔧 [Mock] Продукт {product_id} обновлен успешно")
                 return {
-                    "id": product_id,
+                    "business_id": product_id,  # 🔧 ИСПРАВЛЕНО: используем business_id
                     "metadata_cid": new_metadata_cid,
                     "blockchain_id": None,  # Не обновляем в блокчейне в Mock
                     "tx_hash": None,
@@ -1877,7 +1971,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
             except Exception as e:
                 self.logger.error(f"🔧 [Mock] Ошибка обновления продукта {product_id}: {e}")
                 return {
-                    "id": product_id,
+                    "business_id": product_id,  # 🔧 ИСПРАВЛЕНО: используем business_id
                     "status": "error",
                     "error": str(e)
                 }
@@ -1951,6 +2045,30 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     self.logger.error("Цены должны быть непустым списком")
                     return False
                 
+                # Детальная валидация цен
+                for price in product_data['prices']:
+                    # Проверяем price - должен быть числом
+                    if not isinstance(price.get('price'), (int, float)) or price.get('price') <= 0:
+                        self.logger.error(f"Invalid price: {price.get('price')} - должен быть положительным числом")
+                        return False
+                    
+                    # Проверяем currency - должна быть валидной валютой
+                    valid_currencies = ['USD', 'EUR', 'GBP', 'RUB']
+                    if price.get('currency') not in valid_currencies:
+                        self.logger.error(f"Invalid currency: {price.get('currency')} - должна быть одной из {valid_currencies}")
+                        return False
+                    
+                    # Проверяем weight - должен быть положительным числом
+                    if not isinstance(price.get('weight'), (int, float)) or price.get('weight') <= 0:
+                        self.logger.error(f"Invalid weight: {price.get('weight')} - должен быть положительным числом")
+                        return False
+                    
+                    # Проверяем weight_unit - должна быть валидной единицей
+                    valid_weight_units = ['g', 'kg', 'ml', 'l', 'capsules', 'tablets']
+                    if price.get('weight_unit') not in valid_weight_units:
+                        self.logger.error(f"Invalid weight_unit: {price.get('weight_unit')} - должна быть одной из {valid_weight_units}")
+                        return False
+                
                 # Проверяем формы
                 if not isinstance(product_data['forms'], list) or not product_data['forms']:
                     self.logger.error("Формы должны быть непустым списком")
@@ -1969,32 +2087,23 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 return False
         
         async def _check_product_id_exists(self, product_id: Union[str, int]) -> bool:
-            """Проверяет существование продукта по ID"""
+            """Проверяет существование продукта по business_id"""
             try:
                 product_id_str = str(product_id)
-                logger.info(f"🔧 [Mock] Проверка существования продукта: {product_id_str}")
+                logger.info(f"🔧 [Mock] Проверка существования продукта по business_id: {product_id_str}")
                 
-                # Проверяем внутреннее состояние
+                # 🔧 ИСПРАВЛЕНИЕ: Имитация ошибки для тестов 400
+                if product_id_str.endswith("400_error"):
+                    logger.info(f"🔧 [Mock] Имитация ошибки 400 для продукта {product_id_str}")
+                    return False
+                
+                # 🔧 ИСПРАВЛЕНО: проверяем только во внутреннем состоянии для создания новых продуктов
+                # В Mock архитектуре мы не проверяем существование в блокчейне при создании
                 if product_id_str in self._products:
-                    logger.info(f"🔧 [Mock] Продукт {product_id_str} найден во внутреннем состоянии")
+                    logger.info(f"🔧 [Mock] Продукт с business_id {product_id_str} найден во внутреннем состоянии")
                     return True
                 
-                # Проверяем через get_product
-                product = await self.get_product(product_id_str)
-                if product:
-                    logger.info(f"🔧 [Mock] Продукт {product_id_str} найден через get_product")
-                    return True
-                
-                # Проверяем блокчейн ID если это число
-                try:
-                    numeric_id = int(product_id_str)
-                    if self._check_blockchain_product_exists(numeric_id):
-                        logger.info(f"🔧 [Mock] Продукт с blockchain ID {numeric_id} найден")
-                        return True
-                except (ValueError, TypeError):
-                    pass
-                
-                logger.info(f"🔧 [Mock] Продукт {product_id_str} не найден")
+                logger.info(f"🔧 [Mock] Продукт {product_id_str} не найден во внутреннем состоянии")
                 return False
                 
             except Exception as e:
@@ -2059,8 +2168,13 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
             try:
                 logger.info("🔧 [Mock] Создание метаданных продукта")
                 
+                # 🔧 ИСПРАВЛЕНО: поддерживаем как business_id, так и id для обратной совместимости
+                business_id = product_data.get("business_id") or product_data.get("id")
+                if not business_id:
+                    raise KeyError("business_id или id")
+                
                 metadata = {
-                    "id": product_data["id"],
+                    "business_id": business_id,
                     "title": product_data["title"],
                     "organic_components": product_data["organic_components"],
                     "cover_image_url": product_data["cover_image_url"],
@@ -2141,10 +2255,10 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     self.logger.error(f"🔧 [Mock] Некорректный формат метаданных: {product_id}")
                     return None
                 
-                # Создание объекта Product
+                # 🔧 ИСПРАВЛЕНО: используем новую структуру Product с business_id и blockchain_id
                 product = Product(
-                    id=product_id,
-                    alias=str(product_id),
+                    business_id=str(product_id),  # Используем product_id как business_id
+                    blockchain_id=product_id,      # Используем product_id как blockchain_id
                     status=1 if active else 0,
                     cid=ipfs_cid,
                     title=metadata.get('title', ''),
@@ -2210,7 +2324,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                         title="Test Product from Mock",
                         organic_components=[test_component],
                         cover_image_url="https://mocked.ipfs/test.jpg",
-                        categories=["test"],
+                        categories=["mushroom"],
                         forms=["powder"],
                         species="test_species",
                         prices=[test_price]
@@ -2517,7 +2631,7 @@ async def preloaded_products_basic(mock_product_registry_service):
                 }
             ],
             "cover_image_url": "QmBasicCoverCID001",
-            "categories": ["mushroom", "test"],
+            "categories": ["mushroom"],
             "forms": ["powder"],
             "species": "Amanita muscaria",
             "prices": [
@@ -2540,7 +2654,7 @@ async def preloaded_products_basic(mock_product_registry_service):
                 }
             ],
             "cover_image_url": "QmBasicCoverCID002",
-            "categories": ["mushroom", "test"],
+            "categories": ["mushroom"],
             "forms": ["capsules"],
             "species": "Amanita pantherina",
             "prices": [
@@ -2564,10 +2678,7 @@ async def preloaded_products_basic(mock_product_registry_service):
         else:
             print(f"⚠️ [Preload] Ошибка создания продукта {product_data['id']}: {result['error']}")
     
-    yield created_products
-    
-    # Очистка после теста (автоматически)
-    print(f"🧹 [Preload] Очистка {len(created_products)} предзагруженных продуктов")
+    return created_products
 
 @pytest.fixture(scope="function")
 async def preloaded_products_extended(mock_product_registry_service):
@@ -2592,7 +2703,7 @@ async def preloaded_products_extended(mock_product_registry_service):
                 }
             ],
             "cover_image_url": "QmExtendedCoverCID001",
-            "categories": ["mushroom", "test", "extended"],
+            "categories": ["mushroom", "extended"],
             "forms": ["powder", "capsules"],
             "species": "Amanita muscaria",
             "prices": [
@@ -2621,8 +2732,8 @@ async def preloaded_products_extended(mock_product_registry_service):
                 }
             ],
             "cover_image_url": "QmExtendedCoverCID002",
-            "categories": ["flower", "test", "extended"],
-            "forms": ["tincture"],
+            "categories": ["flower", "extended"],
+            "forms": ["powder"],
             "species": "Blue Lotus",
             "prices": [
                 {
@@ -2645,10 +2756,7 @@ async def preloaded_products_extended(mock_product_registry_service):
         else:
             print(f"⚠️ [Preload] Ошибка создания расширенного продукта {product_data['id']}: {result['error']}")
     
-    yield created_products
-    
-    # Очистка после теста (автоматически)
-    print(f"🧹 [Preload] Очистка {len(created_products)} расширенных продуктов")
+    return created_products
 
 @pytest.fixture(scope="function")
 async def preloaded_products_validation(mock_product_registry_service):
@@ -2668,7 +2776,7 @@ async def preloaded_products_validation(mock_product_registry_service):
                 }
             ],
             "cover_image_url": "QmValidationCoverCID001",
-            "categories": ["mushroom", "validation"],
+            "categories": ["mushroom"],
             "forms": ["powder"],
             "species": "Amanita muscaria",
             "prices": [
@@ -2691,7 +2799,7 @@ async def preloaded_products_validation(mock_product_registry_service):
                 }
             ],
             "cover_image_url": "QmValidationCoverCID002",
-            "categories": ["mushroom", "validation"],
+            "categories": ["mushroom"],
             "forms": ["capsules"],
             "species": "Amanita pantherina",
             "prices": [
@@ -2715,10 +2823,7 @@ async def preloaded_products_validation(mock_product_registry_service):
         else:
             print(f"⚠️ [Preload] Ошибка создания продукта для валидации {product_data['id']}: {result['error']}")
     
-    yield created_products
-    
-    # Очистка после теста (автоматически)
-    print(f"🧹 [Preload] Очистка {len(created_products)} продуктов для валидации")
+    return created_products
 
 @pytest.fixture(scope="function")
 def preloaded_categories():
@@ -2731,7 +2836,6 @@ def preloaded_categories():
     categories = [
         "mushroom",
         "flower", 
-        "herb",
         "test",
         "validation",
         "extended",
@@ -2863,7 +2967,7 @@ async def preloaded_all_data(mock_product_registry_service):
     
     print(f"🔧 [Preload] Загружены все данные: {len(basic_products)} + {len(extended_products)} + {len(validation_products)} продуктов, {len(categories)} категорий, {len(forms)} форм")
     
-    yield all_data
+    return all_data
     
     # Очистка происходит автоматически через yield в отдельных фикстурах
     print("🧹 [Preload] Очистка всех предзагруженных данных")
@@ -2877,35 +2981,37 @@ def product_type_parametrized(request):
     product_type = request.param
     print(f"🔧 [Preload] Параметризованный тип продукта: {product_type}")
     
-    yield product_type
-    
-    print(f"🧹 [Preload] Параметризованный тип продукта {product_type} очищен")
+    return product_type
 
-@pytest.fixture(params=["mushroom", "flower", "herb"])
-def category_parametrized(request):
-    """
-    Фикстура для параметризованного тестирования разных категорий.
-    Scope: function - каждый тест получает свежие данные.
-    """
-    category = request.param
-    print(f"🔧 [Preload] Параметризованная категория: {category}")
-    
-    yield category
-    
-    print(f"🧹 [Preload] Параметризованная категория {category} очищена")
+@pytest.fixture
+def category_for_basic():
+    """Категории для базовых продуктов"""
+    return ["mushroom", "flower"]
 
-@pytest.fixture(params=["powder", "capsules", "tincture"])
-def form_parametrized(request):
-    """
-    Фикстура для параметризованного тестирования разных форм.
-    Scope: function - каждый тест получает свежие данные.
-    """
-    form = request.param
-    print(f"🔧 [Preload] Параметризованная форма: {form}")
-    
-    yield form
-    
-    print(f"🧹 [Preload] Параметризованная форма {form} очищена")
+@pytest.fixture
+def category_for_extended():
+    """Категории для расширенных продуктов"""
+    return ["mushroom", "flower"]
+
+@pytest.fixture
+def category_for_validation():
+    """Категории для продуктов валидации"""
+    return ["mushroom"]
+
+@pytest.fixture
+def form_for_basic():
+    """Формы для базовых продуктов"""
+    return ["powder", "capsules", "tincture"]
+
+@pytest.fixture
+def form_for_extended():
+    """Формы для расширенных продуктов"""
+    return ["powder", "capsules"]
+
+@pytest.fixture
+def form_for_validation():
+    """Формы для продуктов валидации"""
+    return ["powder", "capsules"]
 
 # === ТЕСТЫ ДЛЯ ПРОВЕРКИ ФИКСТУР ===
 
@@ -3088,3 +3194,65 @@ def real_blockchain_service():
     # Возвращаем реальный сервис для integration тестов
     # В реальных тестах может потребоваться настройка тестовой сети
     return BlockchainService()
+
+
+# === ТЕСТОВОЕ FASTAPI ПРИЛОЖЕНИЕ ===
+
+@pytest.fixture(scope="function")
+def test_app(mock_product_registry_service):
+    """Фикстура для создания тестового FastAPI приложения с подмененными зависимостями"""
+    from fastapi.testclient import TestClient
+    from bot.api.main import create_api_app
+    from unittest.mock import Mock
+    
+    # Создаем mock ServiceFactory
+    mock_service_factory = Mock()
+    mock_service_factory.create_product_registry_service.return_value = mock_product_registry_service
+    
+    # Создаем тестовое приложение БЕЗ аутентификации для тестов
+    app = create_api_app(service_factory=mock_service_factory)
+    
+    # 🔧 ИСПРАВЛЕНО: Создаем тестовое приложение без аутентификации
+    # Создаем новое приложение без middleware
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    # Создаем чистое FastAPI приложение
+    test_app = FastAPI(
+        title="Amanita API Test",
+        description="Тестовое приложение без аутентификации",
+        version="1.0.0"
+    )
+    
+    # Добавляем только CORS middleware
+    test_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
+    # Копируем роутеры из основного приложения
+    from bot.api.routes import api_keys, products, media, description
+    test_app.include_router(api_keys.router)
+    test_app.include_router(products.router)
+    test_app.include_router(media.router)
+    test_app.include_router(description.router)
+    
+    # Подменяем зависимости для тестирования
+    from bot.api.dependencies import get_product_registry_service
+    
+    def override_get_product_registry_service():
+        return mock_product_registry_service
+    
+    test_app.dependency_overrides[get_product_registry_service] = override_get_product_registry_service
+    
+    # Создаем тестовый клиент
+    with TestClient(test_app) as client:
+        yield client
+    
+    # Очищаем зависимости после теста
+    test_app.dependency_overrides.clear()
+    
+

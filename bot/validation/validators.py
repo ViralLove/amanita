@@ -49,7 +49,14 @@ class CIDValidator(ValidationRule[str]):
         Returns:
             ValidationResult: Результат валидации
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"🔍 CIDValidator.validate: начинаем валидацию CID")
+        logger.info(f"📋 Входное значение: '{value}' (тип: {type(value)})")
+        
         if not value:
+            logger.warning(f"⚠️ CID пустой, возвращаем ошибку")
             return ValidationResult.failure(
                 "CID не может быть пустым",
                 field_name="cid",
@@ -58,6 +65,7 @@ class CIDValidator(ValidationRule[str]):
             )
         
         if not isinstance(value, str):
+            logger.warning(f"⚠️ CID не является строкой, возвращаем ошибку")
             return ValidationResult.failure(
                 "CID должен быть строкой",
                 field_name="cid",
@@ -66,6 +74,7 @@ class CIDValidator(ValidationRule[str]):
             )
         
         if len(value) < self.min_length:
+            logger.warning(f"⚠️ CID слишком короткий: {len(value)} < {self.min_length}")
             return ValidationResult.failure(
                 f"CID должен содержать не менее {self.min_length} символов",
                 field_name="cid",
@@ -73,7 +82,9 @@ class CIDValidator(ValidationRule[str]):
                 error_code="CID_TOO_SHORT"
             )
         
+        logger.info(f"🔍 Проверяем префикс CID: '{value}' начинается с 'Qm'? {value.startswith('Qm')}")
         if not value.startswith('Qm'):
+            logger.warning(f"⚠️ CID не начинается с 'Qm': '{value}'")
             return ValidationResult.failure(
                 "CID должен начинаться с 'Qm'",
                 field_name="cid",
@@ -81,7 +92,9 @@ class CIDValidator(ValidationRule[str]):
                 error_code="INVALID_CID_PREFIX"
             )
         
+        logger.info(f"🔍 Проверяем паттерн CID: '{value}' соответствует паттерну? {bool(self.cid_pattern.match(value))}")
         if not self.cid_pattern.match(value):
+            logger.warning(f"⚠️ CID содержит недопустимые символы: '{value}'")
             return ValidationResult.failure(
                 "CID содержит недопустимые символы",
                 field_name="cid",
@@ -89,6 +102,7 @@ class CIDValidator(ValidationRule[str]):
                 error_code="INVALID_CID_CHARACTERS"
             )
         
+        logger.info(f"✅ CID '{value}' валидирован успешно!")
         return ValidationResult.success()
 
 
@@ -284,10 +298,11 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
     Валидатор для продуктов.
     
     Проверяет комплексную валидацию продукта:
-    - Обязательные поля
+    - Обязательные поля (business_id, title, cover_image_url, species, organic_components)
+    - Валидация business_id и blockchain_id
     - Валидация компонентов
     - Валидация цен
-    - Валидация изображений
+    - Валидация изображений (cover_image_url с поддержкой cover_image)
     """
     
     def __init__(self):
@@ -315,7 +330,7 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
             )
         
         # Проверяем обязательные поля
-        required_fields = ['id', 'title', 'organic_components']
+        required_fields = ['business_id', 'title', 'cover_image_url', 'species', 'organic_components']
         for field in required_fields:
             if field not in value:
                 return ValidationResult.failure(
@@ -325,34 +340,44 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
                     error_code="MISSING_REQUIRED_FIELD"
                 )
         
-        # Валидируем ID
-        product_id = value.get('id')
-        if not product_id:
+        # Валидируем business_id
+        business_id = value.get('business_id')
+        if not business_id:
             return ValidationResult.failure(
-                "ID продукта не может быть пустым",
-                field_name="id",
-                field_value=product_id,
-                error_code="MISSING_PRODUCT_ID"
+                "business_id продукта не может быть пустым",
+                field_name="business_id",
+                field_value=business_id,
+                error_code="MISSING_BUSINESS_ID"
             )
         
-        # ID может быть строкой (business ID) или числом (blockchain ID)
-        # Проверяем, что это не пустая строка
-        if isinstance(product_id, str) and not product_id.strip():
+        # business_id должен быть непустой строкой
+        if not isinstance(business_id, str) or not business_id.strip():
             return ValidationResult.failure(
-                "ID продукта не может быть пустой строкой",
-                field_name="id",
-                field_value=product_id,
-                error_code="EMPTY_PRODUCT_ID"
+                "business_id должен быть непустой строкой",
+                field_name="business_id",
+                field_value=business_id,
+                error_code="INVALID_BUSINESS_ID"
             )
         
-        # Если это число, проверяем, что оно положительное
-        if isinstance(product_id, (int, float)) and product_id <= 0:
-            return ValidationResult.failure(
-                "ID продукта должен быть положительным числом",
-                field_name="id",
-                field_value=product_id,
-                error_code="INVALID_PRODUCT_ID"
-            )
+        # Валидируем blockchain_id (если присутствует)
+        blockchain_id = value.get('blockchain_id')
+        if blockchain_id is not None:
+            if not isinstance(blockchain_id, (int, str)) or not blockchain_id:
+                return ValidationResult.failure(
+                    "blockchain_id должен быть положительным числом или непустой строкой",
+                    field_name="blockchain_id",
+                    field_value=blockchain_id,
+                    error_code="INVALID_BLOCKCHAIN_ID"
+                )
+            
+            # Если это число, проверяем, что оно положительное
+            if isinstance(blockchain_id, (int, float)) and blockchain_id <= 0:
+                return ValidationResult.failure(
+                    "blockchain_id должен быть положительным числом",
+                    field_name="blockchain_id",
+                    field_value=blockchain_id,
+                    error_code="INVALID_BLOCKCHAIN_ID_VALUE"
+                )
         
         # Валидируем заголовок
         title = value.get('title')
@@ -362,6 +387,16 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
                 field_name="title",
                 field_value=title,
                 error_code="EMPTY_TITLE"
+            )
+        
+        # Валидируем species
+        species = value.get('species')
+        if not species or not species.strip():
+            return ValidationResult.failure(
+                "Species продукта не может быть пустым",
+                field_name="species",
+                field_value=species,
+                error_code="EMPTY_SPECIES"
             )
         
         # Валидируем органические компоненты
@@ -380,12 +415,12 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
             if not component_result.is_valid:
                 return component_result
         
-        # Валидируем изображение (если есть)
-        cover_image = value.get('cover_image')
-        if cover_image:
-            image_result = self.cid_validator.validate(cover_image)
+        # Валидируем изображение (cover_image_url или cover_image для обратной совместимости)
+        cover_image_url = value.get('cover_image_url') or value.get('cover_image')
+        if cover_image_url:
+            image_result = self.cid_validator.validate(cover_image_url)
             if not image_result.is_valid:
-                image_result.field_name = "cover_image"
+                image_result.field_name = "cover_image_url"
                 return image_result
         
         # Валидируем цены (если есть)

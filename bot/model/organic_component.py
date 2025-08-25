@@ -26,11 +26,20 @@ class OrganicComponent:
         Raises:
             ValueError: Если валидация не прошла
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"🔍 OrganicComponent.__post_init__: начинаем валидацию")
+        logger.info(f"📋 Данные для валидации: biounit_id='{self.biounit_id}', description_cid='{self.description_cid}', proportion='{self.proportion}'")
+        
         # Получаем валидаторы из фабрики
+        logger.info("🔧 Получаем валидаторы из ValidationFactory...")
         cid_validator = ValidationFactory.get_cid_validator()
         proportion_validator = ValidationFactory.get_proportion_validator()
+        logger.info(f"✅ Валидаторы получены: CID={type(cid_validator).__name__}, Proportion={type(proportion_validator).__name__}")
         
         # Валидация biounit_id
+        logger.info(f"🔍 Валидируем biounit_id: '{self.biounit_id}'")
         if not self.biounit_id or not self.biounit_id.strip():
             raise ValueError("biounit_id не может быть пустым")
         
@@ -42,16 +51,26 @@ class OrganicComponent:
         # Проверка длины biounit_id (от 1 до 50 символов)
         if len(self.biounit_id) > 50:
             raise ValueError(f"biounit_id '{self.biounit_id}' слишком длинный. Максимальная длина: 50 символов")
+        logger.info(f"✅ biounit_id валидирован успешно")
         
         # Валидация description_cid с использованием единого валидатора
+        logger.info(f"🔍 Валидируем description_cid: '{self.description_cid}'")
+        logger.info(f"🔧 Вызываем cid_validator.validate('{self.description_cid}')...")
         cid_result = cid_validator.validate(self.description_cid)
+        logger.info(f"📋 Результат валидации CID: {cid_result}")
         if not cid_result.is_valid:
+            logger.error(f"❌ Валидация description_cid не прошла: {cid_result.error_message}")
             raise ValueError(f"description_cid: {cid_result.error_message}")
+        logger.info(f"✅ description_cid валидирован успешно")
         
         # Валидация proportion с использованием единого валидатора
+        logger.info(f"🔍 Валидируем proportion: '{self.proportion}'")
         proportion_result = proportion_validator.validate(self.proportion)
         if not proportion_result.is_valid:
             raise ValueError(f"proportion: {proportion_result.error_message}")
+        logger.info(f"✅ proportion валидирован успешно")
+        
+        logger.info(f"🎉 Все валидации прошли успешно!")
 
     # Устаревшие методы валидации удалены - теперь используется единая система валидации
 
@@ -144,6 +163,12 @@ class OrganicComponent:
         Raises:
             ValueError: Если отсутствуют обязательные поля или данные некорректны
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"🔍 OrganicComponent.from_dict: начинаем создание компонента")
+        logger.info(f"📋 Входные данные: {data}")
+        
         if not isinstance(data, dict):
             raise ValueError("Входные данные должны быть словарем")
         
@@ -152,12 +177,17 @@ class OrganicComponent:
         for field in required_fields:
             if field not in data:
                 raise ValueError(f"Отсутствует обязательное поле: {field}")
+            logger.info(f"  ✅ Поле '{field}' = '{data[field]}'")
         
-        return cls(
+        logger.info(f"🏗️ Создаем OrganicComponent объект...")
+        component = cls(
             biounit_id=str(data['biounit_id']).strip(),
             description_cid=str(data['description_cid']).strip(),
             proportion=str(data['proportion']).strip()
         )
+        logger.info(f"✅ OrganicComponent объект создан: biounit_id='{component.biounit_id}', description_cid='{component.description_cid}', proportion='{component.proportion}'")
+        
+        return component
 
     def to_dict(self) -> Dict:
         """
