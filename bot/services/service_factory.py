@@ -30,6 +30,8 @@ class ServiceFactory:
             account_service=account_service
         )
     
+
+    
     @classmethod
     def reset(cls):
         """Сброс синглтонов для тестирования"""

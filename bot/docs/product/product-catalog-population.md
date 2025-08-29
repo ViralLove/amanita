@@ -2,26 +2,27 @@
 
 1. **Подготовка изображений**
 ```bash
+➡️ Положить картинки в `bot/catalog/`
 # Загрузить все изображения в IPFS
 python3 bot/utility/upload_catalog_images.py
 ```
-- ✅ Положить картинки в `bot/catalog/`
-- ✅ Получим CID'ы в `catalog_images.json`
+✅ Получим CID'ы в `catalog_images.json`
 
 2. **Подготовка описаний биоединиц**
 ```bash
 # Загрузить описания в IPFS
+➡️ Подготовить organic_descriptions.json с описанием биоединиц (потом это будут связи с общим реестром)
 python3 bot/utility/upload_organic_descriptions.py
 ```
-- ✅ Заполнить `organic_descriptions.json`
-- ✅ Получим маппинг в `organic_cid_mapping.json`
+✅ Получим маппинг в `organic_cid_mapping.json`
 
 3. **Создание каталога**
 ```bash
+➡️ Заполнить `***_catalog.csv`, использовать buiunit_id и image_file позволяющие точно идентифицировать значения в маппингах описаний и изображений. Указать этот файл в Python скрипте который будет выполняться.
 # Конвертация CSV в JSON
 python3 bot/utility/catalog_csv2json.py
 ```
-- ✅ Заполнить `active_catalog.csv`, использовать buiunit_id и image_file позволяющие точно идентифицировать значения в маппингах описаний и изображений
+- ✅ Получим /catalog/active_catalog.json
 
 4. **Подготовка к загрузке в смарт-контракт**
 ```bash
@@ -38,8 +39,10 @@ python3 bot/utility/prepare_products_for_registry.py
 
 5. **Загрузка в смарт-контракт**
 ```bash
-# Подготовка и загрузка в блокчейн
+# Подготовка и загрузка каталога в блокчейн
 DEPLOY_ACTION=4 npx hardhat run scripts/deploy_full.js
+# Активация всех продуктов каталога
+DEPLOY_ACTION=41 npx hardhat run scripts/deploy_full.js
 ```
 
 

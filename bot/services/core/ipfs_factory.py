@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import os
 from bot.services.core.storage.pinata import SecurePinataUploader
 from bot.services.core.storage.ar_weave import ArWeaveUploader
+from bot.config import STORAGE_COMMUNICATION_TYPE
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ class IPFSFactory:
     def __init__(self):
         """Инициализирует фабрику с Pinata провайдером по умолчанию"""
         self.set_storage(STORAGE_TYPE)
-        logger.info("[IPFSFactory] Инициализирована фабрика IPFS")
+        logger.info(f"[IPFSFactory] Инициализирована фабрика IPFS с типом коммуникации: {STORAGE_COMMUNICATION_TYPE}")
 
     def get_storage(self):
         """Возвращает текущий провайдер хранилища"""

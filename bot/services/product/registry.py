@@ -1041,7 +1041,8 @@ class ProductRegistryService:
             self.logger.info(f"[ProductRegistry] 📋 Извлечены данные: ID={product_id}, CID={ipfs_cid}, Active={is_active}")
             self.logger.info(f"[ProductRegistry] 🔗 Загружаем метаданные из IPFS: {ipfs_cid}")
             
-            metadata = await self.storage_service.download_json(ipfs_cid)
+            # 🔧 ИСПРАВЛЕНИЕ: download_json теперь синхронный метод
+            metadata = self.storage_service.download_json(ipfs_cid)
             if not metadata:
                 self.logger.warning(f"[ProductRegistry] ⚠️ Не удалось получить метаданные для продукта {product_id}")
                 return None

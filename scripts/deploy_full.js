@@ -109,19 +109,20 @@ async function deployContract(contractName, constructorArgs = [], options = {}) 
  * 1 - деплой всех контрактов включая реестр с проставлением адресов в реестре
  * 2 - деплой только контрактов с проставлением новых адресов в реестре
  * 3 - деплой только инвайтов
- * 4 - деплой только каталога
+ * 4 - деплой только каталога (неактивные продукты)
+ * 40 - создание каталога с неактивными продуктами (аналогично action=4)
+ * 41 - активация существующих продуктов в каталоге
  */
 async function main(action) {
 
-  action=1;
   // Проверка корректности action
   if (action === undefined || action === null) {
-    throw new Error("Не указан параметр action. Используйте: node deploy_full.js <action> (0-4)");
+    throw new Error("Не указан параметр action. Используйте: node deploy_full.js <action> (0-4, 40-41)");
   }
 
   action = parseInt(action);
-  if (isNaN(action) || action < 0 || action > 4) {
-    throw new Error("Некорректное значение action. Допустимые значения: 0-4");
+  if (isNaN(action) || (action < 0 || action > 4) && (action < 40 || action > 41)) {
+    throw new Error("Некорректное значение action. Допустимые значения: 0-4, 40-41");
   }
 
   const deployer = deployerAccount.address;
@@ -180,7 +181,7 @@ async function main(action) {
     
     }
     
-    if (action === 3 || action === 4) {
+    if (action === 3 || action === 4 || action === 40 || action === 41) {
 
       inviteNFT = await loadContract("InviteNFT");
       console.log("☀️ Адрес InviteNFT:", inviteNFT.options.address);
@@ -190,8 +191,8 @@ async function main(action) {
       
     }
 
-    // Настройка ролей (только для действий 1, 2, 3)
-    if (action === 1 || action === 2 || action === 3 || action === 4) {
+    // Настройка ролей (только для действий 1, 2, 3, 4, 40, 41)
+    if (action === 1 || action === 2 || action === 3 || action === 4 || action === 40 || action === 41) {
       await setupSellerRole(inviteNFT);
     }
 
@@ -202,11 +203,18 @@ async function main(action) {
       console.log("✅ Инвайты сгенерированы и сохранены в bot/flowers/invites.txt");
     }
     
-    // Создание каталога
-    if (action === 4) {
-      console.log("\n🔷 Создаем каталог...");
+    // Создание каталога (неактивные продукты)
+    if (action === 4 || action === 40) {
+      console.log("\n🔷 Создаем каталог с неактивными продуктами...");
       await createCatalog(productRegistry);
-      console.log("✅ Каталог успешно загружен!");
+      console.log("✅ Каталог с неактивными продуктами успешно загружен!");
+    }
+    
+    // Активация существующих продуктов
+    if (action === 41) {
+      console.log("\n🔷 Активируем существующие продукты в каталоге...");
+      await activateCatalogProducts(productRegistry);
+      console.log("✅ Продукты в каталоге успешно активированы!");
     }
 
     // Выводим адреса контрактов только если они были задействованы
@@ -321,7 +329,9 @@ async function createCatalog(productRegistry) {
   if (!productRegistry) {
     throw new Error("ProductRegistry контракт не определен");
   }
-  // Загружаем АКТИВНЫЙ каталог
+  
+  console.log("\n🔷 Загружаем каталог с неактивными продуктами");
+  
   // Загружаем JSON-файл с продуктами
   const productsPath = path.join(__dirname, "..", "bot", "catalog", "product_registry_upload_data.json");
   const productsData = JSON.parse(fs.readFileSync(productsPath, "utf8"));
@@ -332,7 +342,7 @@ async function createCatalog(productRegistry) {
     console.log(`\n➕ Добавляем продукт: ${product.id}`);
     console.log("Product properties:");
     console.log("ipfsCID:", product.ipfsCID);
-    console.log("active:", product.active);
+    console.log("active: false (по умолчанию)");
     
     // Слушаем все события от контракта
     productRegistry.events.allEvents({
@@ -346,13 +356,15 @@ async function createCatalog(productRegistry) {
       }
     });
 
+    // Создаем продукт (по умолчанию неактивный)
     await productRegistry.methods.createProduct(
-      product.ipfsCID,
-      product.id
+      product.ipfsCID
     ).send({
       from: sellerAccount.address,
       gas: 1000000  // Увеличиваем лимит газа
     });
+    
+    console.log(`✅ Продукт ${product.id} создан (по умолчанию неактивный)`);
   }
 
   // Проверяем добавленные продукты
@@ -392,14 +404,89 @@ async function createCatalog(productRegistry) {
   
   if (activeIds.length !== products.length) {
     console.log("⚠️ Внимание! Количество активных продуктов отличается от количества продуктов продавца!");
+    console.log(`   Всего продуктов: ${products.length}, Активных: ${activeIds.length}`);
   }
 }
 
-// Получаем action из аргументов командной строки
+// Функция для активации существующих продуктов в каталоге
+async function activateCatalogProducts(productRegistry) {
+  if (!productRegistry) {
+    throw new Error("ProductRegistry контракт не определен");
+  }
+  
+  console.log("\n🔷 Активируем существующие продукты в каталоге...");
+  
+  // Получаем все продукты продавца
+  const products = await productRegistry.methods.getProductsBySellerFull().call({
+    from: sellerAccount.address
+  });
+  
+  console.log(`\n🔍 Найдено ${products.length} продуктов для активации`);
+  
+  if (products.length === 0) {
+    console.log("⚠️ Нет продуктов для активации. Сначала создайте каталог с action=4 или action=40");
+    return;
+  }
+  
+  let activatedCount = 0;
+  let alreadyActiveCount = 0;
+  
+  for (const product of products) {
+    console.log(`\n🔷 Проверяем продукт: ${product.id}`);
+    console.log("  IPFS CID:", product.ipfsCID);
+    console.log("  Текущий статус:", product.active ? "АКТИВЕН" : "НЕАКТИВЕН");
+    
+    if (product.active) {
+      console.log("  ✅ Продукт уже активен, пропускаем");
+      alreadyActiveCount++;
+      continue;
+    }
+    
+    try {
+      // Активируем продукт через activateProduct
+      await productRegistry.methods.activateProduct(
+        product.id
+      ).send({
+        from: sellerAccount.address,
+        gas: 200000
+      });
+      
+      console.log(`  ✅ Продукт ${product.id} успешно активирован`);
+      activatedCount++;
+      
+    } catch (error) {
+      console.error(`  ❌ Ошибка активации продукта ${product.id}:`, error.message);
+    }
+  }
+  
+  // Финальная статистика
+  console.log("\n📊 Результаты активации:");
+  console.log(`   Всего продуктов: ${products.length}`);
+  console.log(`   Уже активных: ${alreadyActiveCount}`);
+  console.log(`   Активировано: ${activatedCount}`);
+  console.log(`   Ошибок: ${products.length - alreadyActiveCount - activatedCount}`);
+  
+  // Проверяем финальное состояние
+  const finalProducts = await productRegistry.methods.getProductsBySellerFull().call({
+    from: sellerAccount.address
+  });
+  
+  const finalActiveCount = finalProducts.filter(p => p.active).length;
+  console.log(`\n🔍 Финальное состояние: ${finalActiveCount}/${finalProducts.length} продуктов активны`);
+}
+
+// Получаем action из аргументов командной строки или переменной окружения
 const action = process.argv[2] || process.env.DEPLOY_ACTION || '1';
 console.log("[deploy_full.js] action:", action);
 
-main(action)
+// Проверяем что action является числом
+if (isNaN(parseInt(action))) {
+  console.error("❌ Ошибка: action должен быть числом");
+  console.error("Допустимые значения: 0-4, 40-41");
+  process.exit(1);
+}
+
+main(parseInt(action))
   .then(() => process.exit(0))
   .catch((error) => {
     console.error("\n=== Ошибка при деплое ===");

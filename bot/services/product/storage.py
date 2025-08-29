@@ -2,7 +2,9 @@ from typing import Optional, Dict, Any
 import logging
 import aiohttp
 import re
+import asyncio
 from bot.services.core.ipfs_factory import IPFSFactory
+from bot.config import STORAGE_COMMUNICATION_TYPE
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,8 @@ class ProductStorageService:
             self.ipfs = storage_provider
             
         self.logger = logging.getLogger(__name__)
+        self.communication_type = STORAGE_COMMUNICATION_TYPE
+        self.logger.info(f"[ProductStorageService] Тип коммуникации: {self.communication_type}")
     
     def validate_ipfs_cid(self, cid: str) -> bool:
         """Проверяет валидность IPFS CID"""
@@ -34,24 +38,91 @@ class ProductStorageService:
             return False
         return bool(self.IPFS_CID_PATTERN.match(cid))
     
-    async def download_json(self, cid: str) -> Optional[Dict[str, Any]]:
-        """Загружает JSON из IPFS"""
+    def download_json(self, cid: str) -> Optional[Dict[str, Any]]:
+        """
+        Синхронный метод для загрузки JSON из IPFS.
+        Автоматически адаптируется к типу провайдера и режиму коммуникации.
+        """
         try:
             if not self.validate_ipfs_cid(cid):
                 self.logger.warning(f"Invalid CID format: {cid}")
                 return None
             
-            # Проверяем доступные методы у IPFS провайдера
-            if hasattr(self.ipfs, 'download_json_async'):
-                # Асинхронный метод доступен
-                return await self.ipfs.download_json_async(cid)
-            elif hasattr(self.ipfs, 'download_json'):
-                # Синхронный метод доступен - запускаем в executor
-                import asyncio
-                loop = asyncio.get_event_loop()
-                return await loop.run_in_executor(None, self.ipfs.download_json, cid)
+            self.logger.debug(f"[ProductStorageService] Загружаем JSON для CID: {cid}, тип коммуникации: {self.communication_type}")
+            
+            # 🔧 ИСПРАВЛЕНИЕ: Проверяем доступные методы у провайдера
+            has_async = hasattr(self.ipfs, 'download_json_async')
+            has_sync = hasattr(self.ipfs, 'download_json')
+            
+            self.logger.debug(f"[ProductStorageService] Провайдер {type(self.ipfs)}: async={has_async}, sync={has_sync}")
+            
+            # Выбираем стратегию на основе типа коммуникации и доступных методов
+            if self.communication_type == "sync":
+                # 🔧 СИНХРОННЫЙ РЕЖИМ: Прямой вызов для Pinata, моков
+                if has_sync:
+                    self.logger.debug(f"[ProductStorageService] Sync mode: прямой вызов download_json для CID: {cid}")
+                    result = self.ipfs.download_json(cid)
+                    self.logger.debug(f"[ProductStorageService] Sync mode: результат получен, тип: {type(result)}")
+                    return result
+                else:
+                    # Fallback для async провайдеров в sync режиме
+                    self.logger.debug(f"[ProductStorageService] Sync mode: fallback на async через asyncio.run для CID: {cid}")
+                    try:
+                        result = asyncio.run(self.ipfs.download_json_async(cid))
+                        self.logger.debug(f"[ProductStorageService] Sync mode fallback: результат получен, тип: {type(result)}")
+                        return result
+                    except Exception as e:
+                        self.logger.error(f"Sync mode fallback failed: {e}")
+                        return None
+                    
+            elif self.communication_type == "async":
+                # 🔧 АСИНХРОННЫЙ РЕЖИМ: Через asyncio.run для Arweave
+                if has_async:
+                    self.logger.debug(f"[ProductStorageService] Async mode: используем download_json_async через asyncio.run для CID: {cid}")
+                    try:
+                        result = asyncio.run(self.ipfs.download_json_async(cid))
+                        self.logger.debug(f"[ProductStorageService] Async mode: результат получен, тип: {type(result)}")
+                        return result
+                    except Exception as e:
+                        self.logger.error(f"Async mode failed: {e}")
+                        return None
+                elif has_sync:
+                    # Fallback: sync метод напрямую
+                    self.logger.debug(f"[ProductStorageService] Async mode: fallback на sync метод для CID: {cid}")
+                    result = self.ipfs.download_json(cid)
+                    self.logger.debug(f"[ProductStorageService] Async mode fallback: результат получен, тип: {type(result)}")
+                    return result
+                else:
+                    self.logger.error(f"IPFS провайдер не поддерживает download_json методы: {type(self.ipfs)}")
+                    return None
+                    
+            elif self.communication_type == "hybrid":
+                # 🔧 ГИБРИДНЫЙ РЕЖИМ: Сначала async через asyncio.run, потом sync
+                if has_async:
+                    self.logger.debug(f"[ProductStorageService] Hybrid mode: пробуем async метод через asyncio.run для CID: {cid}")
+                    try:
+                        result = asyncio.run(self.ipfs.download_json_async(cid))
+                        self.logger.debug(f"[ProductStorageService] Hybrid mode: результат получен, тип: {type(result)}")
+                        return result
+                    except Exception as e:
+                        self.logger.warning(f"Hybrid mode async failed, falling back to sync: {e}")
+                        if has_sync:
+                            result = self.ipfs.download_json(cid)
+                            self.logger.debug(f"[ProductStorageService] Hybrid mode fallback: результат получен, тип: {type(result)}")
+                            return result
+                        else:
+                            self.logger.error(f"Hybrid mode: no fallback available")
+                            return None
+                elif has_sync:
+                    self.logger.debug(f"[ProductStorageService] Hybrid mode: используем sync метод для CID: {cid}")
+                    result = self.ipfs.download_json(cid)
+                    self.logger.debug(f"[ProductStorageService] Hybrid mode: результат получен, тип: {type(result)}")
+                    return result
+                else:
+                    self.logger.error(f"IPFS провайдер не поддерживает download_json методы: {type(self.ipfs)}")
+                    return None
             else:
-                self.logger.error(f"IPFS провайдер не поддерживает download_json методы: {type(self.ipfs)}")
+                self.logger.error(f"Неизвестный тип коммуникации: {self.communication_type}")
                 return None
                 
         except Exception as e:

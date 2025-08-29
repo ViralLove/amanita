@@ -63,12 +63,6 @@ def get_product_registry_service(
     validation_service: ProductValidationService = Depends(get_product_validation_service),
 ) -> ProductRegistryService:
     """FastAPI dependency provider для ProductRegistryService"""
-    # Создаем account_service напрямую, чтобы избежать циклической зависимости
-    account_service = _get_account_service(blockchain_service)
-    
-    return _get_product_registry_service(
-        blockchain_service=blockchain_service,
-        storage_service=storage_service,
-        validation_service=validation_service,
-        account_service=account_service
-    ) 
+    # 🔧 ИСПРАВЛЕНО: Используем тот же синглтон, что и бот
+    from bot.services.product.registry_singleton import product_registry_service
+    return product_registry_service 

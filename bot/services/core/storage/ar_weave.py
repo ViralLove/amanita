@@ -4,7 +4,7 @@ import mimetypes
 import traceback
 import json
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 
 from dotenv import load_dotenv
 # from arweave import Wallet, Transaction  # Закомментировано из-за проблем с зависимостями
@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 # Импорт конфигурации
 from bot.config import SUPABASE_URL, SUPABASE_ANON_KEY, ARWEAVE_PRIVATE_KEY
 
-class ArWeaveUploader:
+from .base import BaseStorageProvider
+
+class ArWeaveUploader(BaseStorageProvider):
     def __init__(self):
         load_dotenv()
         
@@ -61,6 +63,20 @@ class ArWeaveUploader:
         logger.info(f"[ArWeave] Edge Function URL: {self.edge_function_url}")
         if not SUPABASE_ANON_KEY:
             logger.warning("[ArWeave] SUPABASE_ANON_KEY не установлен - Edge Functions недоступны")
+
+    def get_public_url(self, transaction_id: str) -> str:
+        """
+        Возвращает публичный URL для доступа к изображению в ArWeave.
+        Используется для отображения в Telegram и других публичных интерфейсах.
+        
+        Args:
+            transaction_id: ArWeave transaction ID файла
+            
+        Returns:
+            str: Полный публичный URL для доступа к файлу
+        """
+        # ArWeave использует прямой доступ через transaction ID
+        return f"https://arweave.net/{transaction_id}"
 
     def _call_edge_function(self, endpoint: str, data: Dict[str, Any], is_file: bool = False) -> Optional[str]:
         """
@@ -203,13 +219,24 @@ class ArWeaveUploader:
 
 
 
-    def upload_file(self, file_path: str) -> str:
+    def upload_file(self, file_path_or_data: Union[str, dict], file_name: Optional[str] = None) -> str:
         """
         Загружает файл (медиа или другой) в Arweave через Edge Function.
         Определяет Content-Type автоматически.
         Возвращает transaction ID или error строку при неудаче.
         """
         try:
+            # Обрабатываем разные типы входных данных
+            if isinstance(file_path_or_data, str):
+                file_path = file_path_or_data
+            elif isinstance(file_path_or_data, dict):
+                # Если передан словарь, извлекаем путь к файлу
+                file_path = file_path_or_data.get('file_path', '')
+                if not file_path:
+                    raise ValueError("Dictionary must contain 'file_path' key")
+            else:
+                raise TypeError("file_path_or_data must be string or dict")
+            
             if not os.path.isfile(file_path):
                 raise FileNotFoundError(f"File {file_path} does not exist.")
 

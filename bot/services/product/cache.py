@@ -62,13 +62,23 @@ class ProductCacheService:
         
         Args:
             data: Данные для валидации
-            data_type: Тип данных ('product', 'description', 'image')
+            data_type: Тип данных ('catalog', 'product', 'description', 'image')
             
         Returns:
             ValidationResult: Результат валидации
         """
         try:
-            if data_type == 'product':
+            if data_type == 'catalog':
+                # Валидируем структуру каталога
+                if isinstance(data, dict) and 'version' in data and 'products' in data:
+                    return ValidationResult.success()
+                else:
+                    return ValidationResult.failure(
+                        "Неверная структура каталога: отсутствуют поля 'version' или 'products'",
+                        field_name="catalog_structure",
+                        error_code="INVALID_CATALOG_STRUCTURE"
+                    )
+            elif data_type == 'product':
                 # Валидируем данные продукта
                 validator = ValidationFactory.get_product_validator()
                 return validator.validate(data)

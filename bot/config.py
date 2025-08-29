@@ -69,6 +69,13 @@ ARWEAVE_PRIVATE_KEY = os.getenv("ARWEAVE_PRIVATE_KEY")
 if not ARWEAVE_PRIVATE_KEY:
     logging.warning("ARWEAVE_PRIVATE_KEY не установлен в .env - ArWeave операции могут не работать")
 
+# Тип коммуникации с хранилищем (sync|async|hybrid)
+STORAGE_COMMUNICATION_TYPE = os.getenv("STORAGE_COMMUNICATION_TYPE", "sync")
+if STORAGE_COMMUNICATION_TYPE not in ["sync", "async", "hybrid"]:
+    logging.warning(f"STORAGE_COMMUNICATION_TYPE '{STORAGE_COMMUNICATION_TYPE}' не поддерживается, используем 'sync'")
+    STORAGE_COMMUNICATION_TYPE = "sync"
+logging.info(f"[CONFIG] STORAGE_COMMUNICATION_TYPE: {STORAGE_COMMUNICATION_TYPE}")
+
 # Адрес реестра контрактов
 AMANITA_REGISTRY_CONTRACT_ADDRESS = os.getenv("AMANITA_REGISTRY_CONTRACT_ADDRESS")
 if not AMANITA_REGISTRY_CONTRACT_ADDRESS:

@@ -265,7 +265,9 @@ class SecurePinataCache:
         self.cleanup_old_entries()
         self.save_cache()
 
-class SecurePinataUploader:
+from .base import BaseStorageProvider
+
+class SecurePinataUploader(BaseStorageProvider):
     """Улучшенная версия PinataUploader с дополнительными мерами безопасности"""
     
     # Константы для настройки запросов - УВЕЛИЧЕНЫ для решения rate limiting
@@ -653,6 +655,19 @@ class SecurePinataUploader:
         if cid.startswith("ipfs://"):
             cid = cid.replace("ipfs://", "")
         return f"{self.gateway_url}/{cid}"
+
+    def get_public_url(self, cid: str) -> str:
+        """
+        Возвращает публичный URL для доступа к изображению.
+        Используется для отображения в Telegram и других публичных интерфейсах.
+        
+        Args:
+            cid: IPFS CID файла
+            
+        Returns:
+            str: Полный публичный URL для доступа к файлу
+        """
+        return self.get_gateway_url(cid)
 
     def upload_files_batch(self, files: List[Tuple[str, str]], max_workers: Optional[int] = None) -> Dict[str, Optional[str]]:
         """

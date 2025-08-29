@@ -95,8 +95,7 @@ async def main():
         # === Фоновая загрузка каталога ===
         logger.info("Запуск фоновой загрузки каталога продуктов...")
         async def preload_catalog():
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, product_registry_service.get_all_products)
+            await product_registry_service.get_all_products()
             logger.info("Фоновая загрузка каталога завершена!")
         asyncio.create_task(preload_catalog())
         logger.info("Фоновая задача по загрузке каталога запущена")

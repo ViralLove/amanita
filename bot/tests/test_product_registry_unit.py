@@ -966,7 +966,7 @@ async def test_create_product_idempotency():
     
     mock_storage = Mock()
     mock_storage.upload_json = AsyncMock(return_value="QmNewMetadataCID123")
-    mock_storage.download_json = AsyncMock(return_value={
+    mock_storage.download_json = Mock(return_value={
         "business_id": "test_product",
         "title": "Test Product",
         "description_cid": "QmDescriptionCID",
@@ -1039,7 +1039,7 @@ async def test_create_product_success_simple():
     
     mock_storage = Mock()
     mock_storage.upload_json = AsyncMock(return_value="QmMockJson123")
-    mock_storage.download_json = AsyncMock(return_value={
+    mock_storage.download_json = Mock(return_value={
         "business_id": "test_product",
         "title": "Test Product",
         "cover_image_url": "QmValidImageCID123",
@@ -1123,7 +1123,7 @@ async def test_get_all_products_success():
     ])
     
     mock_storage = Mock()
-    mock_storage.download_json = AsyncMock(return_value={
+    mock_storage.download_json = Mock(return_value={
         "business_id": "test_product",
         "title": "Test Product",
         "cover_image_url": "QmValidImageCID123",
@@ -1171,7 +1171,7 @@ async def test_get_all_products_cache_hit():
     mock_blockchain.get_all_products = Mock(return_value=[])
     
     mock_storage = Mock()
-    mock_storage.download_json = AsyncMock(return_value={
+    mock_storage.download_json = Mock(return_value={
         "business_id": "test_product",
         "title": "Test Product",
         "cover_image_url": "QmValidImageCID123",
@@ -1271,7 +1271,7 @@ async def test_get_all_products_blockchain_error():
     mock_blockchain.get_all_products = Mock(return_value=[])
     
     mock_storage = Mock()
-    mock_storage.download_json = AsyncMock(return_value={
+    mock_storage.download_json = Mock(return_value={
         "business_id": "test_product",
         "title": "Test Product",
         "cover_image_url": "QmValidImageCID123",
@@ -1395,7 +1395,7 @@ async def test_get_product_metadata_error():
     mock_blockchain.get_product = Mock(return_value=(1, "0x123", "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG", True))
     
     mock_storage = Mock()
-    mock_storage.download_json = AsyncMock(side_effect=Exception("IPFS download failed"))
+    mock_storage.download_json = Mock(side_effect=Exception("IPFS download failed"))
     
     mock_validation = Mock()
     mock_account = Mock()
@@ -2043,7 +2043,7 @@ async def test_deserialize_product_success():
     registry_service.assembler = mock_assembler
     
     # Настраиваем мок storage_service для возврата метаданных
-    mock_storage.download_json = AsyncMock(return_value={
+    mock_storage.download_json = Mock(return_value={
         "business_id": "test-product",
         "title": "Test Product",
         "description_cid": "QmDescCID123",
@@ -2128,7 +2128,7 @@ async def test_deserialize_product_metadata_error():
     )
     
     # Настраиваем мок storage_service для возврата None (ошибка)
-    mock_storage.download_json = AsyncMock(return_value=None)
+    mock_storage.download_json = Mock(return_value=None)
     
     # Тестовые данные продукта
     product_data = (1, "0x123456789", "QmTestCID123", True)
@@ -2915,7 +2915,7 @@ async def test_create_product_duplicate_id_prevention():
     mock_blockchain.get_product_id_from_tx = AsyncMock(return_value=42)
     
     mock_storage = Mock()
-    mock_storage.download_json = AsyncMock(return_value={
+    mock_storage.download_json = Mock(return_value={
         "business_id": "test_product",
         "title": "Test Product",
         "description_cid": "QmDescriptionCID",
