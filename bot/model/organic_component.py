@@ -2,6 +2,7 @@ from typing import Dict, Optional
 from dataclasses import dataclass
 import re
 from bot.validation import ValidationFactory, ValidationResult
+from .component_description import ComponentDescription
 
 
 @dataclass
@@ -13,10 +14,12 @@ class OrganicComponent:
         biounit_id (str): Уникальный идентификатор биологической единицы
         description_cid (str): CID описания биоединицы в IPFS
         proportion (str): Пропорция компонента (например, "50%", "100g", "30ml")
+        description (Optional[ComponentDescription]): Расширенное описание компонента
     """
     biounit_id: str
     description_cid: str
     proportion: str
+    description: Optional[ComponentDescription] = None
 
     def __post_init__(self):
         """
@@ -30,7 +33,7 @@ class OrganicComponent:
         logger = logging.getLogger(__name__)
         
         logger.info(f"🔍 OrganicComponent.__post_init__: начинаем валидацию")
-        logger.info(f"📋 Данные для валидации: biounit_id='{self.biounit_id}', description_cid='{self.description_cid}', proportion='{self.proportion}'")
+        logger.info(f"📋 Данные для валидации: biounit_id='{self.biounit_id}', description_cid='{self.description_cid}', proportion='{self.proportion}', description={self.description is not None}")
         
         # Получаем валидаторы из фабрики
         logger.info("🔧 Получаем валидаторы из ValidationFactory...")
@@ -69,6 +72,15 @@ class OrganicComponent:
         if not proportion_result.is_valid:
             raise ValueError(f"proportion: {proportion_result.error_message}")
         logger.info(f"✅ proportion валидирован успешно")
+        
+        # 🔧 ВАЛИДАЦИЯ DESCRIPTION: Проверяем новое поле description
+        if self.description is not None:
+            logger.info(f"🔍 Валидируем description: {type(self.description).__name__}")
+            if not isinstance(self.description, ComponentDescription):
+                raise ValueError(f"description должен быть объектом ComponentDescription, получен: {type(self.description).__name__}")
+            logger.info(f"✅ description валидирован успешно")
+        else:
+            logger.info(f"📋 description отсутствует (None) - это нормально для базовых компонентов")
         
         logger.info(f"🎉 Все валидации прошли успешно!")
 
@@ -179,13 +191,53 @@ class OrganicComponent:
                 raise ValueError(f"Отсутствует обязательное поле: {field}")
             logger.info(f"  ✅ Поле '{field}' = '{data[field]}'")
         
+        # 🔧 СОЗДАНИЕ COMPONENTDESCRIPTION: Проверяем наличие поля description
+        description = None
+        
+        if 'description' in data and data['description'] is not None:
+            logger.info(f"🔍 Найдено поле 'description': {type(data['description'])}")
+            
+            if isinstance(data['description'], ComponentDescription):
+                # Уже готовый ComponentDescription объект
+                description = data['description']
+                logger.info(f"✅ Используем готовый ComponentDescription объект")
+            elif isinstance(data['description'], dict):
+                # Словарь с данными описания
+                try:
+                    description = ComponentDescription.from_dict(data['description'])
+                    logger.info(f"✅ ComponentDescription создан из словаря")
+                except Exception as e:
+                    logger.warning(f"⚠️ Не удалось создать ComponentDescription из словаря: {e}")
+                    description = None
+            else:
+                logger.warning(f"⚠️ Поле 'description' имеет неожиданный тип: {type(data['description'])}")
+                description = None
+        else:
+            # 🔧 ОБРАТНАЯ СОВМЕСТИМОСТЬ: Проверяем старые поля описания
+            description_fields = ['generic_description', 'effects', 'shamanic', 'warnings', 'dosage_instructions', 'features']
+            has_description_data = any(field in data for field in description_fields)
+            
+            if has_description_data:
+                logger.info(f"🔍 Найдены старые поля описания: {[field for field in description_fields if field in data]}")
+                try:
+                    # Создаем ComponentDescription из доступных полей
+                    description_data = {field: data[field] for field in description_fields if field in data}
+                    description = ComponentDescription.from_dict(description_data)
+                    logger.info(f"✅ ComponentDescription создан из старых полей (обратная совместимость)")
+                except Exception as e:
+                    logger.warning(f"⚠️ Не удалось создать ComponentDescription из старых полей: {e}")
+                    description = None
+            else:
+                logger.info(f"📋 Поля описания не найдены, description остается None")
+        
         logger.info(f"🏗️ Создаем OrganicComponent объект...")
         component = cls(
             biounit_id=str(data['biounit_id']).strip(),
             description_cid=str(data['description_cid']).strip(),
-            proportion=str(data['proportion']).strip()
+            proportion=str(data['proportion']).strip(),
+            description=description  # 🔧 НОВОЕ ПОЛЕ: Передаем созданное описание
         )
-        logger.info(f"✅ OrganicComponent объект создан: biounit_id='{component.biounit_id}', description_cid='{component.description_cid}', proportion='{component.proportion}'")
+        logger.info(f"✅ OrganicComponent объект создан: biounit_id='{component.biounit_id}', description_cid='{component.description_cid}', proportion='{component.proportion}', description={component.description is not None}")
         
         return component
 
@@ -196,15 +248,23 @@ class OrganicComponent:
         Returns:
             Dict: Словарь с данными компонента
         """
-        return {
+        result = {
             "biounit_id": self.biounit_id,
             "description_cid": self.description_cid,
             "proportion": self.proportion
         }
+        
+        # 🔧 СЕРИАЛИЗАЦИЯ ОПИСАНИЯ: Добавляем description если оно есть
+        if self.description is not None:
+            description_dict = self.description.to_dict()
+            result.update(description_dict)
+        
+        return result
 
     def __repr__(self) -> str:
         """Строковое представление объекта"""
-        return f"OrganicComponent(biounit_id='{self.biounit_id}', proportion='{self.proportion}')"
+        description_info = f", description={self.description is not None}" if self.description is not None else ""
+        return f"OrganicComponent(biounit_id='{self.biounit_id}', proportion='{self.proportion}'{description_info})"
 
     def __eq__(self, other) -> bool:
         """Сравнение объектов по содержимому"""
@@ -214,9 +274,10 @@ class OrganicComponent:
         return (
             self.biounit_id == other.biounit_id and
             self.description_cid == other.description_cid and
-            self.proportion == other.proportion
+            self.proportion == other.proportion and
+            self.description == other.description
         )
 
     def __hash__(self) -> int:
         """Хеш объекта для использования в множествах"""
-        return hash((self.biounit_id, self.description_cid, self.proportion))
+        return hash((self.biounit_id, self.description_cid, self.proportion, self.description))
