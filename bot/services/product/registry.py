@@ -78,7 +78,7 @@ class ProductRegistryService:
         self.metadata_service = ProductMetadataService(self.storage_service)
         
         # Инициализируем ProductAssembler для централизованной сборки продуктов
-        self.assembler = assembler or ProductAssembler()
+        self.assembler = assembler or ProductAssembler(storage_service=self.storage_service)
         
         # Инициализируем AccountService
         if account_service is None:

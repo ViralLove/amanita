@@ -53,9 +53,10 @@ class BaseStorageProvider(ABC):
     def is_valid_identifier(self, identifier: str) -> bool:
         """
         Проверяет валидность идентификатора для текущего типа хранилища.
+        Поддерживает IPFS CID v0, CID v1 и ArWeave transaction ID.
         
         Args:
-            identifier: Идентификатор файла
+            identifier: Идентификатор файла (CID или transaction ID)
             
         Returns:
             bool: True если идентификатор валиден
@@ -63,5 +64,25 @@ class BaseStorageProvider(ABC):
         if not identifier:
             return False
         
-        # Базовая проверка - должен быть непустой строкой
-        return isinstance(identifier, str) and len(identifier) > 0
+        # Базовая проверка - должен быть строкой
+        if not isinstance(identifier, str):
+            return False
+        
+        # IPFS CID v0 (начинается с Qm, 46 символов)
+        if identifier.startswith("Qm"):
+            return len(identifier) >= 46
+        
+        # IPFS CID v1 (начинается с bafy, длиннее 46 символов)
+        if identifier.startswith("bafy"):
+            return len(identifier) > 46
+        
+        # IPFS CID v1 другие префиксы (baf, bag, bah, bai, baj)
+        if identifier.startswith(("baf", "bag", "bah", "bai", "baj")):
+            return len(identifier) > 30
+        
+        # ArWeave transaction ID (43 символа, Base64)
+        if len(identifier) == 43 and all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=' for c in identifier):
+            return True
+        
+        # Если не соответствует ни одному формату
+        return False
