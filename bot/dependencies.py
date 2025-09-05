@@ -11,6 +11,10 @@ from bot.services.product.registry import ProductRegistryService
 from bot.services.product.validation import ProductValidationService
 from bot.services.product.assembler import ProductAssembler
 from bot.services.core.ipfs_factory import IPFSFactory
+from bot.services.application.catalog import CatalogService, ProductService, ImageService
+from bot.model.user_settings import UserSettings
+# Импорт будет добавлен позже для избежания циклических зависимостей
+# from bot.handlers.dependencies import get_product_formatter_service
 
 
 def get_ipfs_storage():
@@ -40,7 +44,8 @@ def get_product_validation_service() -> ProductValidationService:
 
 def get_product_assembler() -> ProductAssembler:
     """Dependency provider для ProductAssembler"""
-    return ProductAssembler()
+    storage_service = get_ipfs_storage()
+    return ProductAssembler(storage_service=storage_service)
 
 
 def get_ipfs_factory() -> IPFSFactory:
@@ -91,4 +96,47 @@ def get_product_registry_service(
         validation_service=validation_service,
         account_service=account_service,
         assembler=assembler
-    ) 
+    )
+
+
+def get_catalog_service(
+    image_service: ImageService = None,
+    formatter_service = None
+) -> CatalogService:
+    """Dependency provider для CatalogService с зависимостями"""
+    if image_service is None:
+        image_service = get_image_service()
+    # formatter_service будет добавлен позже
+    return CatalogService(image_service=image_service)
+
+
+def get_product_service(
+    image_service: ImageService = None,
+    formatter_service = None
+) -> ProductService:
+    """Dependency provider для ProductService с зависимостями"""
+    if image_service is None:
+        image_service = get_image_service()
+    # formatter_service будет добавлен позже
+    return ProductService(image_service=image_service)
+
+
+def get_image_service() -> ImageService:
+    """Dependency provider для ImageService"""
+    return ImageService()
+
+
+def get_user_settings() -> UserSettings:
+    """Dependency provider для UserSettings (singleton)"""
+    return UserSettings()
+
+
+def get_storage_service():
+    """Dependency provider для IPFS storage service"""
+    return IPFSFactory().get_storage()
+
+
+def get_formatter_service():
+    """Dependency provider для ProductFormatterService"""
+    # Будет реализовано позже для избежания циклических зависимостей
+    return None 
