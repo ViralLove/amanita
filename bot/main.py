@@ -114,10 +114,15 @@ async def main():
         
         # Настройка uvicorn сервера для API
         logger.info("Настройка uvicorn сервера...")
+        
+        # Получаем порт из переменной окружения Railway
+        port = int(os.environ.get("PORT", 8000))
+        logger.info(f"Используется порт: {port}")
+        
         config = uvicorn.Config(
             api_app,
             host="0.0.0.0",
-            port=8000,
+            port=port,
             log_level="info",
             access_log=False  # Отключаем access log, так как у нас есть свое логирование
         )
