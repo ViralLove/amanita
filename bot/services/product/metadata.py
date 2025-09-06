@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 import logging
-from bot.validation import ValidationFactory, ValidationResult
+from validation import ValidationFactory, ValidationResult
 
 logger = logging.getLogger(__name__)
 

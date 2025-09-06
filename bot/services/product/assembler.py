@@ -9,9 +9,9 @@ ProductRegistryService и ProductMetadataService, предоставляя ед�
 from typing import Dict, Any, Optional, Tuple
 import logging
 import json
-from bot.model.product import Product
-from bot.validation import ValidationFactory, ValidationResult
-from bot.model.component_description import ComponentDescription
+from model.product import Product
+from validation import ValidationFactory, ValidationResult
+from model.component_description import ComponentDescription
 
 
 class ProductAssembler:

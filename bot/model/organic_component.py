@@ -1,7 +1,7 @@
 from typing import Dict, Optional
 from dataclasses import dataclass
 import re
-from bot.validation import ValidationFactory, ValidationResult
+from validation import ValidationFactory, ValidationResult
 from .component_description import ComponentDescription
 
 

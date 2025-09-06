@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Импорт конфигурации
-from bot.config import SUPABASE_URL, SUPABASE_ANON_KEY, ARWEAVE_PRIVATE_KEY
+from config import SUPABASE_URL, SUPABASE_ANON_KEY, ARWEAVE_PRIVATE_KEY
 
 from .base import BaseStorageProvider
 

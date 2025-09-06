@@ -3,9 +3,9 @@ from datetime import datetime, timedelta
 import logging
 import json
 import traceback
-from bot.model.product import Description, DosageInstruction
-from bot.services.core.ipfs_factory import IPFSFactory
-from bot.validation import ValidationFactory, ValidationResult
+from model.product import Description, DosageInstruction
+from services.core.ipfs_factory import IPFSFactory
+from validation import ValidationFactory, ValidationResult
 
 logger = logging.getLogger(__name__)
 

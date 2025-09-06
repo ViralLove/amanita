@@ -3,8 +3,8 @@ import logging
 import aiohttp
 import re
 import asyncio
-from bot.services.core.ipfs_factory import IPFSFactory
-from bot.config import STORAGE_COMMUNICATION_TYPE
+from services.core.ipfs_factory import IPFSFactory
+from config import STORAGE_COMMUNICATION_TYPE
 
 logger = logging.getLogger(__name__)
 

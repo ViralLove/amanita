@@ -4,7 +4,7 @@ from decimal import Decimal
 from dataclasses import dataclass
 from .organic_component import OrganicComponent
 from .dosage_instruction import DosageInstruction
-from bot.validation import ValidationFactory, ValidationResult
+from validation import ValidationFactory, ValidationResult
 
 
 

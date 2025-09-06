@@ -1,12 +1,12 @@
-from bot.services.core.blockchain import BlockchainService
+from services.core.blockchain import BlockchainService
 from datetime import datetime, timedelta
-from bot.model.product import Product, PriceInfo, Description
+from model.product import Product, PriceInfo, Description
 import logging
 from typing import Optional, List, Dict, Union, Tuple, Any
 import dotenv
 import os
 from web3 import Account
-from bot.services.core.ipfs_factory import IPFSFactory
+from services.core.ipfs_factory import IPFSFactory
 import traceback
 import re
 from functools import lru_cache
@@ -14,14 +14,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import asyncio
 import aiohttp
 import json
-from bot.services.product.metadata import ProductMetadataService
-from bot.services.product.cache import ProductCacheService
-from bot.services.product.storage import ProductStorageService
-from bot.services.product.validation import ProductValidationService
-from bot.services.product.assembler import ProductAssembler
-from bot.validation.exceptions import ValidationError
-from bot.services.core.account import AccountService
-from bot.services.product.exceptions import InvalidProductIdError, ProductNotFoundError
+from services.product.metadata import ProductMetadataService
+from services.product.cache import ProductCacheService
+from services.product.storage import ProductStorageService
+from services.product.validation import ProductValidationService
+from services.product.assembler import ProductAssembler
+from validation.exceptions import ValidationError
+from services.core.account import AccountService
+from services.product.exceptions import InvalidProductIdError, ProductNotFoundError
 
 dotenv.load_dotenv()
 logger = logging.getLogger(__name__)
