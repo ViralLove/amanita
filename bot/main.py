@@ -9,19 +9,19 @@ from aiogram.client.bot import DefaultBotProperties
 import logging
 import sys
 import uvicorn
-from bot.handlers.onboarding_fsm import router as onboarding_router
-from bot.handlers.webapp_common import router as webapp_router
-from bot.handlers.menu import router as menu_router
-from bot.handlers.seller_product_creation_fsm import router as product_creation_router
-from bot.handlers.seller_menu import router as seller_router
-from bot.handlers.catalog import router as catalog_router
-from bot.services.product.registry_singleton import product_registry_service
-from bot.services.service_factory import ServiceFactory
-from bot.api.main import create_api_app
-from bot.api.config import APIConfig
+from handlers.onboarding_fsm import router as onboarding_router
+from handlers.webapp_common import router as webapp_router
+from handlers.menu import router as menu_router
+from handlers.seller_product_creation_fsm import router as product_creation_router
+from handlers.seller_menu import router as seller_router
+from handlers.catalog import router as catalog_router
+from services.product.registry_singleton import product_registry_service
+from services.service_factory import ServiceFactory
+from api.main import create_api_app
+from api.config import APIConfig
 import sentry_sdk
-from bot.utils.sentry_init import init_sentry
-from bot.utils.logging_setup import setup_logging
+from utils.sentry_init import init_sentry
+from utils.logging_setup import setup_logging
 
 init_sentry()
 logger = setup_logging(
