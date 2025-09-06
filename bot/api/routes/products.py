@@ -4,15 +4,15 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import List, Dict, Any
-from bot.api.dependencies import get_product_registry_service
-from bot.services.product.registry import ProductRegistryService
-from bot.api.models.product import (
+from api.dependencies import get_product_registry_service
+from services.product.registry import ProductRegistryService
+from api.models.product import (
     ProductUploadIn, ProductUploadRequest, ProductResponse, ProductsUploadResponse,
     ProductUpdateIn, ProductStatusUpdate
 )
-from bot.api.exceptions.validation import ProductValidationError, UnifiedValidationError
-from bot.api.converters import ConverterFactory
-from bot.api.models.common import EthereumAddress
+from api.exceptions.validation import ProductValidationError, UnifiedValidationError
+from api.converters import ConverterFactory
+from api.models.common import EthereumAddress
 import logging
 
 logger = logging.getLogger(__name__)

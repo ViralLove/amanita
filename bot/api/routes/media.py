@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
-from bot.services.product.storage import ProductStorageService
+from services.product.storage import ProductStorageService
 import logging
 import os
 

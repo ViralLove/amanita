@@ -1,7 +1,7 @@
 from typing import Dict, Optional, List
 from dataclasses import dataclass
 from .dosage_instruction import DosageInstruction
-from ..validation import ValidationFactory, ValidationResult
+from validation import ValidationFactory, ValidationResult
 
 
 @dataclass

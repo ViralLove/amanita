@@ -1,3 +1,3 @@
-from bot.services.product.registry import ProductRegistryService
+from services.product.registry import ProductRegistryService
  
 product_registry_service = ProductRegistryService() 

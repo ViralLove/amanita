@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, status
 from fastapi.responses import JSONResponse
-from bot.services.product.storage import ProductStorageService
+from services.product.storage import ProductStorageService
 import logging
 
 logger = logging.getLogger(__name__)

@@ -9,21 +9,21 @@ import json
 from datetime import datetime
 from typing import Optional
 from logging.handlers import RotatingFileHandler
-from bot.api.config import APIConfig
-from bot.api.middleware.auth import HMACMiddleware
+from api.config import APIConfig
+from api.middleware.auth import HMACMiddleware
 from fastapi.exceptions import RequestValidationError, HTTPException
 from pydantic import ValidationError
-from bot.api import error_handlers
-from bot.api.models.health import HealthCheckResponse, HealthStatus, ServiceInfo, DetailedHealthCheckResponse, SystemUptime, ComponentInfo, ComponentStatus
-from bot.api.models.common import get_current_timestamp, generate_request_id, Timestamp, RequestId
-from bot.api.utils.health_utils import calculate_uptime, get_system_metrics, check_component_latency
-from bot.api.utils.health_utils import (
+from api import error_handlers
+from api.models.health import HealthCheckResponse, HealthStatus, ServiceInfo, DetailedHealthCheckResponse, SystemUptime, ComponentInfo, ComponentStatus
+from api.models.common import get_current_timestamp, generate_request_id, Timestamp, RequestId
+from api.utils.health_utils import calculate_uptime, get_system_metrics, check_component_latency
+from api.utils.health_utils import (
     check_api_component, check_service_factory_component, check_blockchain_component,
     check_database_component, check_external_apis_component
 )
-from bot.services.service_factory import ServiceFactory
-from bot.utils.sentry_init import init_sentry
-from bot.utils.logging_setup import setup_logging
+from services.service_factory import ServiceFactory
+from utils.sentry_init import init_sentry
+from utils.logging_setup import setup_logging
 
 init_sentry()
 logger = setup_logging(
@@ -266,7 +266,7 @@ def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Opti
         }
     
     # Подключаем роутеры
-    from bot.api.routes import api_keys, products, media, description
+    from api.routes import api_keys, products, media, description
     app.include_router(api_keys.router)
     app.include_router(products.router)
     app.include_router(media.router)

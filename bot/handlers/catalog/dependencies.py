@@ -3,7 +3,7 @@ Dependency providers для обработчиков каталога.
 Использует общие providers из bot/dependencies.py.
 """
 
-from bot.dependencies import (
+from dependencies import (
     get_catalog_service,
     get_product_service,
     get_image_service

@@ -7,9 +7,9 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Optional, Any
 from aiogram.types import CallbackQuery
-from bot.services.common.localization import Localization
-from bot.model.user_settings import UserSettings
-from bot.dependencies import get_user_settings
+from services.common.localization import Localization
+from model.user_settings import UserSettings
+from dependencies import get_user_settings
 
 logger = logging.getLogger(__name__)
 

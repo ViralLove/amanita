@@ -7,8 +7,8 @@
 import logging
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
-from bot.services.application.catalog.catalog_service import CatalogService
-from bot.dependencies import get_catalog_service
+from services.application.catalog.catalog_service import CatalogService
+from dependencies import get_catalog_service
 from .base_handler import BaseCatalogHandler
 from .mixins import ErrorHandlerMixin, LocalizationMixin, ProgressMixin, ValidationMixin
 

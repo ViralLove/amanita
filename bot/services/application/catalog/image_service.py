@@ -9,9 +9,9 @@ import aiohttp
 import os
 from typing import Any, Optional
 from aiogram.types import CallbackQuery, FSInputFile
-from bot.services.common.localization import Localization
-from bot.services.core.ipfs_factory import IPFSFactory
-from bot.keyboards.common import get_product_keyboard, get_product_details_keyboard_with_scroll
+from services.common.localization import Localization
+from services.core.ipfs_factory import IPFSFactory
+from keyboards.common import get_product_keyboard, get_product_details_keyboard_with_scroll
 
 logger = logging.getLogger(__name__)
 

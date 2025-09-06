@@ -6,8 +6,8 @@
 import logging
 from typing import Optional, Dict, Any
 from aiogram.types import CallbackQuery, Message
-from bot.services.common.localization import Localization
-from bot.services.application.catalog.progress_service import ProgressService
+from services.common.localization import Localization
+from services.application.catalog.progress_service import ProgressService
 
 logger = logging.getLogger(__name__)
 

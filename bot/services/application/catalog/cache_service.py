@@ -7,7 +7,7 @@ import logging
 import time
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-from bot.services.product.cache import ProductCacheService
+from services.product.cache import ProductCacheService
 
 logger = logging.getLogger(__name__)
 

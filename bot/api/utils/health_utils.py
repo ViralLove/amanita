@@ -6,7 +6,7 @@ import psutil
 import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
-from bot.api.models.health import SystemUptime, ComponentInfo, ComponentStatus
+from api.models.health import SystemUptime, ComponentInfo, ComponentStatus
 
 
 def format_uptime(seconds: float) -> str:

@@ -9,7 +9,7 @@ from .product_handlers import router as product_router
 from .navigation_handlers import router as navigation_router
 
 # Инициализируем DI контейнер для каталога
-from bot.di_container import container
+from di_container import container
 container.configure_for_environment("development")
 
 # Создаем основной router для каталога

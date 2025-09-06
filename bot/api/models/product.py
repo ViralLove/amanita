@@ -14,12 +14,12 @@ Pydantic модели для продуктов с бизнес-валидаци
 
 from typing import List, Optional, Union, Dict, Any
 from pydantic import BaseModel, Field, field_validator, ConfigDict
-from bot.model.organic_component import OrganicComponent
+from model.organic_component import OrganicComponent
 
-from bot.api.exceptions.validation import (
+from api.exceptions.validation import (
     InvalidCIDError, InvalidProductFormError, EmptyCategoriesError
 )
-from bot.validation import CIDValidator, ProportionValidator, PriceValidator
+from validation import CIDValidator, ProportionValidator, PriceValidator
 
 # Единые валидаторы для API-уровня
 # Для IPFS CID применяем строгую минимальную длину 46 символов (v0 CID: 'Qm' + 44 base58)

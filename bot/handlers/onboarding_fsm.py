@@ -2,10 +2,10 @@ from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
 from aiogram.filters.command import Command
-from bot.fsm.onboarding_states import OnboardingStates
-from bot.services.common.localization import Localization
-from bot.model.user_settings import UserSettings
-from bot.services.core.blockchain import BlockchainService
+from fsm.onboarding_states import OnboardingStates
+from services.common.localization import Localization
+from model.user_settings import UserSettings
+from services.core.blockchain import BlockchainService
 import logging
 import re
 import os

@@ -6,7 +6,7 @@
 import logging
 from typing import Dict, Any, Optional, Callable
 from aiogram.types import CallbackQuery, Message
-from bot.services.common.localization import Localization
+from services.common.localization import Localization
 
 logger = logging.getLogger(__name__)
 

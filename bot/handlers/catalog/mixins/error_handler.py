@@ -6,8 +6,8 @@
 import logging
 from typing import Optional, Dict, Any
 from aiogram.types import CallbackQuery
-from bot.services.common.localization import Localization
-from bot.services.application.catalog.error_handling_service import ErrorHandlingService
+from services.common.localization import Localization
+from services.application.catalog.error_handling_service import ErrorHandlingService
 
 logger = logging.getLogger(__name__)
 

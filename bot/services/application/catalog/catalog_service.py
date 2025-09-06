@@ -6,8 +6,8 @@
 import logging
 from typing import List, Any
 from aiogram.types import CallbackQuery
-from bot.services.common.localization import Localization
-from bot.services.product.registry_singleton import product_registry_service
+from services.common.localization import Localization
+from services.product.registry_singleton import product_registry_service
 from .image_service import ImageService
 # Импорт будет добавлен в ItemY 5.2 при внедрении DI
 # from bot.handlers.dependencies import get_product_formatter_service
