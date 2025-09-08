@@ -10,7 +10,7 @@ from services.common.localization import Localization
 from services.product.registry_singleton import product_registry_service
 from .image_service import ImageService
 # Импорт будет добавлен в ItemY 5.2 при внедрении DI
-# from bot.handlers.dependencies import get_product_formatter_service
+# from handlers.dependencies import get_product_formatter_service
 
 logger = logging.getLogger(__name__)
 

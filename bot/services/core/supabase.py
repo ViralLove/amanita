@@ -1,7 +1,7 @@
 from supabase import create_client, Client
 from typing import Optional, List
 import os
-from bot.models.product import Product
+from model.product import Product
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")

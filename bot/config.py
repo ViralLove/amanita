@@ -6,11 +6,16 @@ import logging
 # Подробное логирование
 logging.basicConfig(level=logging.INFO)
 
-# Загружаем переменные окружения из .env файла
+# Загружаем переменные окружения из .env файла (только если не установлены в системе)
 env_path = os.path.join(os.path.dirname(__file__), '.env')
-load_dotenv(env_path)
+load_dotenv(env_path, override=False)  # override=False - не перезаписывать системные переменные
 logging.info(f"[CONFIG] Загружаем .env из: {env_path}")
 logging.info(f"[CONFIG] Файл существует: {os.path.exists(env_path)}")
+
+# Отладка переменных окружения
+logging.info(f"[CONFIG] BLOCKCHAIN_PROFILE из env: {os.getenv('BLOCKCHAIN_PROFILE', 'НЕ УСТАНОВЛЕН')}")
+logging.info(f"[CONFIG] WEB3_PROVIDER_URI из env: {os.getenv('WEB3_PROVIDER_URI', 'НЕ УСТАНОВЛЕН')}")
+logging.info(f"[CONFIG] Все переменные env: {list(os.environ.keys())}")
 
 # Базовые настройки
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -82,4 +87,6 @@ if not AMANITA_REGISTRY_CONTRACT_ADDRESS:
     raise ValueError("AMANITA_REGISTRY_CONTRACT_ADDRESS не установлен в .env")
 
 # Настройки путей
-ABI_BASE_DIR = os.getenv("ABI_BASE_DIR", os.path.join(os.path.dirname(os.path.dirname(__file__)), "artifacts", "contracts")) 
+# Корневая папка приложения (bot для локальной разработки, app для продакшена)
+APP_ROOT_DIR = os.getenv("APP_ROOT_DIR", "bot")
+ABI_BASE_DIR = os.getenv("ABI_BASE_DIR", f"{APP_ROOT_DIR}/artifacts/contracts") 

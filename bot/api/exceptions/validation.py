@@ -3,7 +3,7 @@
 """
 
 from typing import Any, Dict, Optional
-from bot.validation import ValidationError as CoreValidationError
+from validation import ValidationError as CoreValidationError
 
 
 class ProductValidationError(Exception):

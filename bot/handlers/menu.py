@@ -5,9 +5,9 @@
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from bot.services.common.localization import Localization
-from bot.model.user_settings import UserSettings
-from bot.config import WALLET_APP_URL
+from services.common.localization import Localization
+from model.user_settings import UserSettings
+from config import WALLET_APP_URL
 import logging
 import json
 import os

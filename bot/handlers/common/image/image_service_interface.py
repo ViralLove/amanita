@@ -6,7 +6,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Any
 from aiogram.types import InputMediaPhoto
-from bot.services.common.localization import Localization
+from services.common.localization import Localization
 
 
 class IImageService(ABC):

@@ -4,7 +4,7 @@ API-специфичный модуль зависимостей для FastAPI.
 """
 
 from fastapi import Depends
-from bot.dependencies import (
+from dependencies import (
     get_product_storage_service as _get_product_storage_service,
     get_blockchain_service as _get_blockchain_service,
     get_api_key_service as _get_api_key_service,
@@ -13,12 +13,12 @@ from bot.dependencies import (
     get_product_validation_service as _get_product_validation_service,
     get_ipfs_storage as _get_ipfs_storage,
 )
-from bot.services.product.storage import ProductStorageService
-from bot.services.core.blockchain import BlockchainService
-from bot.services.core.api_key import ApiKeyService
-from bot.services.core.account import AccountService
-from bot.services.product.registry import ProductRegistryService
-from bot.services.product.validation import ProductValidationService
+from services.product.storage import ProductStorageService
+from services.core.blockchain import BlockchainService
+from services.core.api_key import ApiKeyService
+from services.core.account import AccountService
+from services.product.registry import ProductRegistryService
+from services.product.validation import ProductValidationService
 
 
 def get_ipfs_storage():
@@ -64,5 +64,5 @@ def get_product_registry_service(
 ) -> ProductRegistryService:
     """FastAPI dependency provider для ProductRegistryService"""
     # 🔧 ИСПРАВЛЕНО: Используем тот же синглтон, что и бот
-    from bot.services.product.registry_singleton import product_registry_service
+    from services.product.registry_singleton import product_registry_service
     return product_registry_service 

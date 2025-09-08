@@ -7,11 +7,11 @@ import sys
 import os
 sys.path.append('.')
 
-from bot.services.core.blockchain import BlockchainService
-from bot.services.product.registry import ProductRegistryService
-from bot.services.product.validation import ProductValidationService
-from bot.services.core.account import AccountService
-from bot.services.core.ipfs_factory import IPFSFactory
+from services.core.blockchain import BlockchainService
+from services.product.registry import ProductRegistryService
+from services.product.validation import ProductValidationService
+from services.core.account import AccountService
+from services.core.ipfs_factory import IPFSFactory
 from dotenv import load_dotenv
 
 # Загружаем .env файл

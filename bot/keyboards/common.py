@@ -1,7 +1,7 @@
 # Общие кнопки для разных сценариев
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from bot.services.common.localization import Localization
+from services.common.localization import Localization
 
 def get_product_keyboard(product_id: str, loc: Localization) -> InlineKeyboardMarkup:
     """

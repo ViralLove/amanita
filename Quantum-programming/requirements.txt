@@ -1,0 +1,32 @@
+# SIRIUS-FELINE_BRANCH_PROTOCOL Dependencies
+# Python 3.8+ required
+
+# Core dependencies
+numpy>=1.21.0          # Математические вычисления и массивы
+scipy>=1.7.0           # Научные вычисления и квантовая механика
+matplotlib>=3.5.0      # Визуализация квантовых состояний
+
+# Quantum computing libraries
+qutip>=4.6.0           # Квантовые объекты и операции
+cirq>=1.0.0            # Google's quantum computing framework
+
+# Time and monitoring
+schedule>=1.1.0        # Планировщик задач для TICK/REVIEW циклов
+python-dateutil>=2.8.2 # Работа с датами и временем
+
+# Logging and monitoring
+structlog>=21.5.0      # Структурированное логирование
+colorama>=0.4.4        # Цветной вывод в терминале
+
+# Configuration and data
+pyyaml>=6.0            # Работа с YAML конфигурациями
+jsonschema>=4.0.0      # Валидация JSON схем
+
+# Testing
+pytest>=6.2.5          # Фреймворк для тестирования
+pytest-cov>=3.0.0      # Покрытие кода тестами
+
+# Development tools
+black>=21.12b0          # Форматирование кода
+flake8>=4.0.1          # Линтер для проверки стиля
+mypy>=0.910            # Статическая типизация

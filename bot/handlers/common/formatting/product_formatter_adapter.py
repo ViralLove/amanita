@@ -12,7 +12,7 @@ from .product_formatter import (
     format_details_ux as _format_details_ux,
     format_product_details_for_telegram as _format_product_details_for_telegram
 )
-from bot.services.common.localization import Localization
+from services.common.localization import Localization
 from typing import Dict, Any
 
 

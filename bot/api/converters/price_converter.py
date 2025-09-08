@@ -9,9 +9,9 @@
 from typing import Dict, Any, Optional, Union
 from decimal import Decimal
 from .base import BaseConverter
-from bot.api.models.product import PriceModel
-from bot.model.product import PriceInfo
-from bot.validation import ValidationFactory, ValidationResult
+from api.models.product import PriceModel
+from model.product import PriceInfo
+from validation import ValidationFactory, ValidationResult
 
 
 class PriceConverter(BaseConverter[PriceModel, PriceInfo]):

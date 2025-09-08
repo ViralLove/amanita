@@ -1,5 +1,5 @@
 # Core Telegram Bot Framework
-aiogram>=3.0.0
+aiogram>=3.0.0 
 
 # Web3 and Blockchain
 web3>=6.0.0
@@ -10,6 +10,7 @@ fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
 starlette>=0.27.0
+python-multipart>=0.0.6
 
 # Environment and Configuration
 python-dotenv>=1.0.0

@@ -9,13 +9,13 @@ import argparse
 import traceback
 
 # Импортируем фасадные методы
-from bot.utility.upload_catalog_images import process_catalog_images
-from bot.utility.upload_organic_descriptions import process_organic_descriptions
-from bot.utility.catalog_csv2json import process_catalog_conversion
-from bot.utility.prepare_products_for_registry import process_registry_preparation
-from bot.services.product.registry import ProductRegistryService
-from bot.services.core.blockchain import BlockchainService
-from bot.services.service_factory import ServiceFactory
+from utility.upload_catalog_images import process_catalog_images
+from utility.upload_organic_descriptions import process_organic_descriptions
+from utility.catalog_csv2json import process_catalog_conversion
+from utility.prepare_products_for_registry import process_registry_preparation
+from services.product.registry import ProductRegistryService
+from services.core.blockchain import BlockchainService
+from services.service_factory import ServiceFactory
 
 # Настройка логирования
 logger = logging.getLogger(__name__)

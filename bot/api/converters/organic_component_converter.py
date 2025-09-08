@@ -8,9 +8,9 @@
 
 from typing import Dict, Any
 from .base import BaseConverter
-from bot.api.models.product import OrganicComponentAPI
-from bot.model.organic_component import OrganicComponent
-from bot.validation import ValidationFactory, ValidationResult
+from api.models.product import OrganicComponentAPI
+from model.organic_component import OrganicComponent
+from validation import ValidationFactory, ValidationResult
 
 
 class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicComponent]):

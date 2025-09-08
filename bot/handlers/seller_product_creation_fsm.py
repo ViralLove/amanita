@@ -1,13 +1,13 @@
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
-from bot.fsm.product_creation_states import ProductCreationStates
-from bot.services.common.localization import Localization
-from bot.model.user_settings import UserSettings
-from bot.services.core.blockchain import BlockchainService
-from bot.services.core.storage.ar_weave import ArWeaveUploader
-from bot.services.product.registry_singleton import product_registry_service
-from bot.handlers.menu import get_main_menu_keyboard
+from fsm.product_creation_states import ProductCreationStates
+from services.common.localization import Localization
+from model.user_settings import UserSettings
+from services.core.blockchain import BlockchainService
+from services.core.storage.ar_weave import ArWeaveUploader
+from services.product.registry_singleton import product_registry_service
+from handlers.menu import get_main_menu_keyboard
 import logging
 import os
 
@@ -15,9 +15,21 @@ router = Router()
 logger = logging.getLogger(__name__)
 user_settings = UserSettings()
 
-# Инициализируем зависимости
-blockchain_service = BlockchainService()
-arweave_uploader = ArWeaveUploader()
+# Инициализируем зависимости (ленивая инициализация)
+blockchain_service = None
+arweave_uploader = None
+
+def get_blockchain_service():
+    global blockchain_service
+    if blockchain_service is None:
+        blockchain_service = BlockchainService()
+    return blockchain_service
+
+def get_arweave_uploader():
+    global arweave_uploader
+    if arweave_uploader is None:
+        arweave_uploader = ArWeaveUploader()
+    return arweave_uploader
 
 @router.message(F.text == "/create_product")
 async def start_product_creation(message: types.Message, state: FSMContext):

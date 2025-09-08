@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from typing import Dict
-from bot.services.core.ipfs_factory import IPFSFactory
+from services.core.ipfs_factory import IPFSFactory
 import traceback
 import argparse
 import sys

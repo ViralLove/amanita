@@ -9,7 +9,7 @@ import logging
 from dotenv import load_dotenv
 
 #from services.ar_weave import ArWeaveUploader
-from bot.services.core.ipfs_factory import IPFSFactory
+from services.core.ipfs_factory import IPFSFactory
 
 # Настройка логирования
 logger = logging.getLogger(__name__)

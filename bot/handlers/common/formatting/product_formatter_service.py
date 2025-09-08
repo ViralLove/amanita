@@ -5,7 +5,7 @@
 
 import logging
 from typing import Dict, Any, Optional, List
-from bot.services.common.localization import Localization
+from services.common.localization import Localization
 from .product_formatter_interface import IProductFormatter
 from .product_formatter_config import ProductFormatterConfig
 from .section_tracker import SectionTracker, SectionTypes

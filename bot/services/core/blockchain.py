@@ -8,34 +8,28 @@ from eth_account import Account
 import logging
 from typing import Optional, Any, List, Dict, Union
 import asyncio
-from config import (
-    SELLER_PRIVATE_KEY,
-    ACTIVE_PROFILE,
-    RPC_URL,
-    ABI_BASE_DIR,
-    AMANITA_REGISTRY_CONTRACT_ADDRESS
-)
+try:
+    # Попытка импорта для запуска из корня проекта
+    from config import (
+        SELLER_PRIVATE_KEY,
+        RPC_URL,
+        ABI_BASE_DIR,
+        AMANITA_REGISTRY_CONTRACT_ADDRESS
+    )
+except ImportError:
+    # Fallback для запуска из папки bot
+    from config import (
+        SELLER_PRIVATE_KEY,
+        RPC_URL,
+        ABI_BASE_DIR,
+        AMANITA_REGISTRY_CONTRACT_ADDRESS
+    )
 
 load_dotenv(dotenv_path="bot/.env")
 logger = logging.getLogger(__name__)
 
-PROFILES = {
-    "localhost": {
-        "RPC": "http://127.0.0.1:8545"
-    },
-    "mainnet": {
-        "RPC": "https://polygon-mainnet.infura.io/v3/YOUR_INFURA_KEY"
-    },
-    "amoy": {
-        "RPC": "https://rpc-amoy.polygon.technology"
-    }
-}
-
-# Список контрактов без адресов, так как теперь они будут получены из реестра
-CONTRACTS = {
-    "InviteNFT": {},
-    "ProductRegistry": {}
-}
+# Удалены неиспользуемые словари PROFILES и CONTRACTS
+# RPC конфигурация теперь управляется через переменные окружения в config.py
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -51,6 +45,44 @@ def load_abi(contract_name):
     print(f"[ABI] Проверка путей для {contract_name}:")
     print(f"  - Hardhat: {hh_path} {'✅' if os.path.exists(hh_path) else '❌'}")
     print(f"  - Flat:    {flat_path} {'✅' if os.path.exists(flat_path) else '❌'}")
+    
+    # Подробное логирование для диагностики
+    print(f"[ABI] ABI_BASE_DIR: {ABI_BASE_DIR}")
+    print(f"[ABI] Текущая рабочая директория: {os.getcwd()}")
+    print(f"[ABI] Содержимое ABI_BASE_DIR:")
+    try:
+        if os.path.exists(ABI_BASE_DIR):
+            for item in os.listdir(ABI_BASE_DIR):
+                item_path = os.path.join(ABI_BASE_DIR, item)
+                print(f"    - {item} ({'dir' if os.path.isdir(item_path) else 'file'})")
+        else:
+            print(f"    - Директория {ABI_BASE_DIR} не существует!")
+    except Exception as e:
+        print(f"    - Ошибка при чтении директории: {e}")
+    
+    # Проверяем существование файлов
+    print(f"[ABI] Проверка существования файлов:")
+    print(f"    - {hh_path} существует: {os.path.exists(hh_path)}")
+    print(f"    - {flat_path} существует: {os.path.exists(flat_path)}")
+    
+    # Если файлы не найдены, ищем альтернативные пути
+    if not os.path.exists(hh_path) and not os.path.exists(flat_path):
+        print(f"[ABI] Файлы не найдены, ищем альтернативные пути...")
+        try:
+            # Ищем в корне проекта
+            root_path = os.path.join(os.getcwd(), "artifacts", "contracts", f"{contract_name}.json")
+            print(f"    - Корень проекта: {root_path} {'✅' if os.path.exists(root_path) else '❌'}")
+            
+            # Ищем в текущей директории
+            current_path = os.path.join(os.getcwd(), f"{contract_name}.json")
+            print(f"    - Текущая директория: {current_path} {'✅' if os.path.exists(current_path) else '❌'}")
+            
+            # Ищем в /app
+            app_path = os.path.join("/app", "artifacts", "contracts", f"{contract_name}.json")
+            print(f"    - /app: {app_path} {'✅' if os.path.exists(app_path) else '❌'}")
+            
+        except Exception as e:
+            print(f"    - Ошибка при поиске альтернативных путей: {e}")
 
     if os.path.exists(hh_path):
         abi_path = hh_path
@@ -106,7 +138,7 @@ class BlockchainService:
             self.seller_key = SELLER_PRIVATE_KEY
             self.seller_account = Account.from_key(SELLER_PRIVATE_KEY)
             
-            logger.info(f"[Web3] Активный профиль: {ACTIVE_PROFILE}, RPC: {RPC_URL}")
+            logger.info(f"[Web3] RPC: {RPC_URL}")
             
             self._initialized = True
     
@@ -118,24 +150,66 @@ class BlockchainService:
     def _init_web3(self) -> Web3:
         """Инициализирует подключение к Web3"""
         try:
-            # Создаем провайдер
-            if ACTIVE_PROFILE == "localhost":
-                provider = Web3.HTTPProvider(RPC_URL)
+            print(f"[Web3] === НАЧАЛО ИНИЦИАЛИЗАЦИИ WEB3 ===")
+            print(f"[Web3] Подключение к RPC: {RPC_URL}")
+            print(f"[Web3] Текущая рабочая директория: {os.getcwd()}")
+            print(f"[Web3] ABI_BASE_DIR: {ABI_BASE_DIR}")
+            
+            print(f"[Web3] Содержимое /app:")
+            try:
+                for item in os.listdir("/app"):
+                    item_path = os.path.join("/app", item)
+                    print(f"    - {item} ({'dir' if os.path.isdir(item_path) else 'file'})")
+            except Exception as e:
+                print(f"    - Ошибка при чтении /app: {e}")
+            
+            # Дополнительная диагностика папки artifacts
+            print(f"[Web3] === ДИАГНОСТИКА ARTIFACTS ===")
+            artifacts_path = "/app/artifacts"
+            print(f"[Web3] Проверяем: {artifacts_path}")
+            print(f"[Web3] Существует: {os.path.exists(artifacts_path)}")
+            
+            if os.path.exists(artifacts_path):
+                print(f"[Web3] Содержимое {artifacts_path}:")
+                try:
+                    for item in os.listdir(artifacts_path):
+                        item_path = os.path.join(artifacts_path, item)
+                        print(f"    - {item} ({'dir' if os.path.isdir(item_path) else 'file'})")
+                        
+                        # Если это папка, проверяем её содержимое
+                        if os.path.isdir(item_path):
+                            try:
+                                sub_items = os.listdir(item_path)
+                                print(f"      └─ содержимое: {sub_items[:5]}{'...' if len(sub_items) > 5 else ''}")
+                            except Exception as e:
+                                print(f"      └─ ошибка чтения: {e}")
+                except Exception as e:
+                    print(f"    - Ошибка при чтении {artifacts_path}: {e}")
             else:
-                provider = Web3.HTTPProvider(RPC_URL, request_kwargs={"timeout": 60})
+                print(f"[Web3] Папка {artifacts_path} не существует!")
+            
+            # Создаем провайдер с timeout для всех внешних RPC
+            provider = Web3.HTTPProvider(RPC_URL, request_kwargs={"timeout": 60})
+            print(f"[Web3] Создан провайдер с timeout=60")
             
             # Инициализируем Web3
             web3 = Web3(provider)
+            print(f"[Web3] Web3 объект создан")
             
             # Проверяем подключение
-            if not web3.is_connected():
+            print(f"[Web3] Проверяем подключение...")
+            is_connected = web3.is_connected()
+            print(f"[Web3] is_connected() = {is_connected}")
+            
+            if not is_connected:
                 raise Exception("Failed to connect to Web3")
                 
-            logger.info(f"[Web3] Успешное подключение к {ACTIVE_PROFILE}")
+            print(f"[Web3] Успешное подключение к {RPC_URL}")
             return web3
             
         except Exception as e:
-            logger.error(f"[Web3] Ошибка подключения к {ACTIVE_PROFILE}: {e}")
+            print(f"[Web3] Ошибка подключения к {RPC_URL}: {e}")
+            print(f"[Web3] Тип ошибки: {type(e).__name__}")
             raise
 
     def _log(self, msg, error=False):

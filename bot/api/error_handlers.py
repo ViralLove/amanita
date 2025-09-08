@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 import logging
 
-from bot.api.models.errors import (
+from api.models.errors import (
     ValidationErrorResponse,
     UnifiedValidationErrorResponse,
     AuthenticationErrorResponse,
@@ -17,7 +17,7 @@ from bot.api.models.errors import (
     RateLimitErrorResponse,
     ErrorDetail
 )
-from bot.api.models.common import get_current_timestamp, generate_request_id, Timestamp
+from api.models.common import get_current_timestamp, generate_request_id, Timestamp
 
 logger = logging.getLogger("amanita.api.errors")
 
@@ -72,7 +72,7 @@ async def pydantic_validation_error_handler(request: Request, exc: ValidationErr
 # 422: Кастомные исключения валидации продуктов
 async def product_validation_exception_handler(request: Request, exc: Exception):
     """Обработчик для кастомных исключений валидации продуктов"""
-    from bot.api.exceptions.validation import ProductValidationError, UnifiedValidationError
+    from api.exceptions.validation import ProductValidationError, UnifiedValidationError
     
     if isinstance(exc, UnifiedValidationError):
         logger.warning(f"422 Unified validation error: {exc.message} | field={exc.field} | path={request.url.path}")

@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 
 from .blockchain import BlockchainService
-from bot.config import AMANITA_API_KEY, AMANITA_API_SECRET
+from config import AMANITA_API_KEY, AMANITA_API_SECRET
 
 logger = logging.getLogger(__name__)
 

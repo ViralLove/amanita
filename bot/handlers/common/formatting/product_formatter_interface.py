@@ -5,7 +5,7 @@
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List
-from bot.services.common.localization import Localization
+from services.common.localization import Localization
 
 
 class IProductFormatter(ABC):

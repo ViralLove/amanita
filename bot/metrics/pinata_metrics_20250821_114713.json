@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-08-21T11:47:13.668309",
+  "average_upload_time": 0.0,
+  "error_counts": {
+    "http_429": 1
+  },
+  "cache_hit_ratio": 0.0,
+  "total_uploads": 0,
+  "cache_hits": 0,
+  "cache_misses": 0
+}

@@ -16,7 +16,7 @@ from dataclasses import replace
 from urllib.parse import urlparse
 
 from aiogram.types import InputMediaPhoto, FSInputFile
-from bot.services.common.localization import Localization
+from services.common.localization import Localization
 from .image_service_interface import IImageService
 from .image_service_config import ImageServiceConfig
 from .session_manager import SessionManager

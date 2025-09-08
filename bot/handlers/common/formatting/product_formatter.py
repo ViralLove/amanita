@@ -3,7 +3,7 @@
 """
 
 from typing import Dict, Any
-from bot.services.common.localization import Localization
+from services.common.localization import Localization
 from .section_tracker import SectionTracker, SectionTypes
 
 def format_product_for_telegram(product, loc: Localization) -> Dict[str, str]:

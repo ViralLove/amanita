@@ -20,7 +20,7 @@ from ..exceptions.auth import (
     InvalidAPIKeyError
 )
 from ..config import APIConfig
-from bot.services.core.api_key import ApiKeyService
+from services.core.api_key import ApiKeyService
 
 logger = logging.getLogger("amanita_api.auth")
 

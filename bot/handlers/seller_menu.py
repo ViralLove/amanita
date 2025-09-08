@@ -2,9 +2,9 @@ from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters.command import Command
-from bot.services.common.localization import Localization
-from bot.model.user_settings import UserSettings
-from bot.services.core.blockchain import BlockchainService
+from services.common.localization import Localization
+from model.user_settings import UserSettings
+from services.core.blockchain import BlockchainService
 import logging
 
 router = Router()

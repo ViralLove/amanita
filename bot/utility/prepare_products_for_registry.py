@@ -9,7 +9,7 @@ import logging
 # Добавляем путь к модулям бота
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from bot.services.core.ipfs_factory import IPFSFactory
+from services.core.ipfs_factory import IPFSFactory
 
 # Настройка логирования
 logger = logging.getLogger(__name__)

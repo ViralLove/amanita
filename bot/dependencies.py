@@ -3,18 +3,18 @@
 Содержит dependency providers для всех внешних сервисов.
 """
 
-from bot.services.product.storage import ProductStorageService
-from bot.services.core.blockchain import BlockchainService
-from bot.services.core.api_key import ApiKeyService
-from bot.services.core.account import AccountService
-from bot.services.product.registry import ProductRegistryService
-from bot.services.product.validation import ProductValidationService
-from bot.services.product.assembler import ProductAssembler
-from bot.services.core.ipfs_factory import IPFSFactory
-from bot.services.application.catalog import CatalogService, ProductService, ImageService
-from bot.model.user_settings import UserSettings
+from services.product.storage import ProductStorageService
+from services.core.blockchain import BlockchainService
+from services.core.api_key import ApiKeyService
+from services.core.account import AccountService
+from services.product.registry import ProductRegistryService
+from services.product.validation import ProductValidationService
+from services.product.assembler import ProductAssembler
+from services.core.ipfs_factory import IPFSFactory
+from services.application.catalog import CatalogService, ProductService, ImageService
+from model.user_settings import UserSettings
 # Импорт будет добавлен позже для избежания циклических зависимостей
-# from bot.handlers.dependencies import get_product_formatter_service
+# from handlers.dependencies import get_product_formatter_service
 
 
 def get_ipfs_storage():

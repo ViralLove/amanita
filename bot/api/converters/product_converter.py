@@ -11,12 +11,12 @@
 """
 
 from typing import Dict, Any, Optional, List
-from bot.api.models.product import ProductUploadIn, OrganicComponentAPI, PriceModel
-from bot.model.product import Product, OrganicComponent, PriceInfo
-from bot.api.converters.base import BaseConverter
-from bot.api.converters.organic_component_converter import OrganicComponentConverter
-from bot.api.converters.price_converter import PriceConverter
-from bot.validation import ValidationFactory, ValidationResult
+from api.models.product import ProductUploadIn, OrganicComponentAPI, PriceModel
+from model.product import Product, OrganicComponent, PriceInfo
+from api.converters.base import BaseConverter
+from api.converters.organic_component_converter import OrganicComponentConverter
+from api.converters.price_converter import PriceConverter
+from validation import ValidationFactory, ValidationResult
 
 class ProductConverter(BaseConverter[ProductUploadIn, Product]):
     """

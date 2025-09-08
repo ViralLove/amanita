@@ -1,0 +1,21 @@
+Metadata-Version: 2.1
+Name: arweave-python-client
+Version: 1.0.19
+Summary: Client interface for sending transactions on the Arweave permaweb
+Home-page: https://github.com/MikeHibbert/arweave-python-client
+Download-URL: https://github.com/MikeHibbert/arweave-python-client
+Author: Mike Hibbert
+Author-email: mike@hibbertitsolutions.co.uk
+Keywords: arweave,crypto
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+License-File: LICENSE
+Requires-Dist: arrow
+Requires-Dist: python-jose
+Requires-Dist: pynacl
+Requires-Dist: pycryptodome
+Requires-Dist: cryptography
+Requires-Dist: requests
+Requires-Dist: psutil
+

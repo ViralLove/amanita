@@ -12,7 +12,7 @@
 - ValidationFactory: Фабрика для создания валидаторов
 
 Использование:
-    from bot.validation import ValidationFactory
+    from validation import ValidationFactory
     
     validator = ValidationFactory.get_product_validator()
     result = validator.validate(product_data)
