@@ -229,6 +229,7 @@ event Superliked(uint256 indexed tokenId, address indexed bySeller, uint8 newTot
 ### Внешние контракты
 - **IInviteGraph** - граф инвайтов для проверки социальных связей
 - **IAmanitaRegistry** - проверка ролей продавцов
+- **LoveEmissionEngine** - эмиссия токенов на основе суперлайков
 
 ### Интерфейсы
 ```solidity
@@ -241,6 +242,34 @@ interface IAmanitaRegistry {
     function hasSellerRole(address user) external view returns (bool);
 }
 ```
+
+### Связь с LoveEmissionEngine
+
+LoveDoPostNFT тесно интегрирован с **LoveEmissionEngine** для эмиссии токенов:
+
+#### Эмиссия токенов
+- **Суперлайки** - основа для эмиссии $AMANITA и $AGOV токенов
+- **Социальные связи** - проверка через граф инвайтов
+- **Репутация** - количество постов влияет на активацию governance токенов
+
+#### Интерфейс для эмиссии
+```solidity
+// LoveEmissionEngine использует эти методы:
+function addSuperlike(uint256 tokenId) external returns (bool);
+function getPost(uint256 tokenId) external view returns (
+    address author,
+    address sellerTo, 
+    address linkedSeller,
+    uint8 superlikes
+);
+function getLoveDoCount(address seller) external view returns (uint8);
+```
+
+#### Экономическая модель
+- **1 суперлайк** = 1 ether $AMANITA + 1 ether $AGOV
+- **$AMANITA** - клеймятся сразу после накопления
+- **$AGOV** - активируются при достижении 8+ постов
+- **Социальная проверка** - эмиссия только от участников одного круга
 
 ## Использование
 
