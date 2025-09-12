@@ -76,6 +76,9 @@ contract ProductRegistry {
     /// @notice Событие: обновлена версия каталога продавца
     event CatalogUpdated(address indexed seller, uint256 newVersion);
 
+    /// @notice Событие: каталог продавца полностью очищен
+    event CatalogCleared(address indexed seller, uint256 productsCleared);
+
     // --------------------------------
     // ------- Модификаторы ----------
     // --------------------------------
@@ -364,6 +367,113 @@ contract ProductRegistry {
             sellerProducts[i] = products[sellerProductIds[i]];
         }
         return sellerProducts;
+    }
+
+    // --------------------------------
+    // ------- Вспомогательные функции -
+    // --------------------------------
+
+    /**
+    * @notice Удалить продукт из списка активных продуктов (внутренняя функция).
+    * @dev
+    * - Использует swap-and-pop алгоритм для эффективного удаления.
+    * - O(n) поиск + O(1) удаление.
+    * - Приватная функция для внутреннего использования.
+    * @param productId ID продукта для удаления
+    */
+    function _removeFromActiveProducts(uint256 productId) private {
+        uint256 len = activeProductIds.length;
+        for (uint256 i = 0; i < len; i++) {
+            if (activeProductIds[i] == productId) {
+                // Swap-and-pop: меняем местами с последним элементом и удаляем
+                activeProductIds[i] = activeProductIds[len - 1];
+                activeProductIds.pop();
+                break;
+            }
+        }
+    }
+
+    /**
+    * @notice Проверить, существует ли каталог у продавца (внутренняя функция).
+    * @dev
+    * - Проверяет наличие продуктов в индексе продавца.
+    * - Возвращает true, если каталог не пуст.
+    * - Используется для валидации перед операциями очистки.
+    * @param seller Адрес продавца для проверки
+    * @return bool True, если каталог существует и не пуст
+    */
+    function _hasCatalog(address seller) private view returns (bool) {
+        return productsBySeller[seller].length > 0;
+    }
+
+    // --------------------------------
+    // ------- Методы очистки ---------
+    // --------------------------------
+
+    /**
+    * @notice Полностью очистить каталог продавца.
+    * @dev
+    * - Удаляет все продукты продавца из всех индексов.
+    * - Очищает activeProductIds для активных продуктов.
+    * - Удаляет все записи из products mapping.
+    * - Очищает productsBySeller индекс.
+    * - Обновляет версию каталога.
+    * - Эмитирует события для отслеживания.
+    * 
+    * Требования безопасности:
+    * - Только продавец может очистить свой каталог.
+    * - Продавец должен быть активирован в InviteNFT.
+    * 
+    * Газ-эффективность:
+    * - O(n) для удаления из activeProductIds.
+    * - O(1) для очистки индексов.
+    * - Минимальные storage операции.
+    * 
+    * @param seller Адрес продавца, каталог которого нужно очистить
+    */
+    function clearSellerCatalog(address seller) external {
+        // 1. Проверка доступа - только продавец может очистить свой каталог
+        require(inviteNFT.isSeller(msg.sender), "Not a seller");
+        require(seller == msg.sender, "Can only clear own catalog");
+        require(seller != address(0), "Invalid seller address");
+        
+        // 2. Проверка существования каталога
+        require(_hasCatalog(seller), "Catalog is already empty");
+        
+        // 3. Получение списка продуктов продавца
+        uint256[] memory sellerProducts = productsBySeller[seller];
+        uint256 productCount = sellerProducts.length;
+        
+        // 4. Очистка активных продуктов из общего списка
+        // Защита от переполнения: проверяем разумный лимит продуктов
+        require(productCount <= 10000, "Catalog too large for single operation");
+        
+        for (uint256 i = 0; i < productCount; i++) {
+            uint256 productId = sellerProducts[i];
+            Product storage product = products[productId];
+            
+            // Дополнительная проверка существования продукта
+            require(product.id != 0, "Product does not exist");
+            require(product.seller == seller, "Product ownership mismatch");
+            
+            // Удаляем из списка активных, если продукт активен
+            if (product.active) {
+                _removeFromActiveProducts(productId);
+            }
+            
+            // Удаляем продукт из основного хранилища
+            delete products[productId];
+        }
+        
+        // 5. Очистка индекса продавца
+        delete productsBySeller[seller];
+        
+        // 6. Обновление версии каталога
+        catalogVersion[seller] += 1;
+        
+        // 7. Эмиссия событий
+        emit CatalogCleared(seller, productCount);
+        emit CatalogUpdated(seller, catalogVersion[seller]);
     }
 
 }
