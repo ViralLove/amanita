@@ -9,6 +9,9 @@ contract InviteNFT is ERC721, AccessControl {
 
     // Роль продавца для доступа к минтингу инвайтов
     bytes32 public constant SELLER_ROLE = keccak256("SELLER_ROLE");
+    
+    // Роль активатора для активации пользователей и назначения ролей
+    bytes32 public constant ACTIVATOR_ROLE = keccak256("ACTIVATOR_ROLE");
 
     // Маппинг: inviteCode (уникальный строковый код) => tokenId (NFT инвайта)
     // Позволяет быстро найти NFT по коду, который вводит пользователь
@@ -64,9 +67,48 @@ contract InviteNFT is ERC721, AccessControl {
     // Маппинг: user (адрес) => количество заминченных инвайтов для этого пользователя
     mapping(address => uint256) public userInviteCount;
 
+    // === ОТСЛЕЖИВАНИЕ ОТВЕТСТВЕННОСТИ ===
+    // Маппинг: кто активировал пользователя
+    mapping(address => address) public userActivator;
+    
+    // Маппинг: кто назначил роль SELLER_ROLE
+    mapping(address => address) public sellerNominator;
+    
+    // Маппинг: кого активировал данный активатор
+    mapping(address => address[]) public activatedBy;
+    
+    // Маппинг: кого назначил селлером данный номинатор
+    mapping(address => address[]) public nominatedSellers;
+
+    // === СИСТЕМА САНКЦИЙ ===
+    // Маппинг: счетчик нарушений для каждого пользователя
+    mapping(address => uint256) public violationCount;
+    
+    // Маппинг: до какого времени заблокирован пользователь
+    mapping(address => uint256) public suspensionUntil;
+    
+    // Маппинг: нарушения активированных пользователей (для активатора)
+    mapping(address => uint256) public activationViolations;
+    
+    // Маппинг: нарушения назначенных селлеров (для номинатора)
+    mapping(address => uint256) public nominationViolations;
+
     event InviteActivated(address indexed user, string inviteCode, uint256 tokenId, uint256 timestamp);
     event BatchInvitesMinted(address indexed to, uint256[] tokenIds, string[] inviteCodes, uint256 expiry);
     event InviteTransferred(uint256 indexed tokenId, address from, address to, uint256 timestamp);
+    
+    // === НОВЫЕ СОБЫТИЯ ДЛЯ РАЗДЕЛЕННЫХ ПРОЦЕССОВ ===
+    event UserActivated(address indexed activator, address indexed user, string inviteCode, uint256 tokenId, uint256 timestamp);
+    event SellerRoleGranted(address indexed nominator, address indexed seller, uint256 timestamp);
+    event UserSuspended(address indexed user, uint256 duration, string reason, uint256 timestamp);
+    event ActivatorWarning(address indexed activator, string message);
+    event ActivatorSuspended(address indexed activator, uint256 duration, string reason);
+    event NominatorWarning(address indexed nominator, string message);
+    event NominatorSuspended(address indexed nominator, uint256 duration, string reason);
+    
+    // === ДИФФЕРЕНЦИРОВАННЫЕ СОБЫТИЯ ДЛЯ МОНИТОРИНГА КРУГОВ ===
+    event FirstCircleActivation(address indexed activator, address indexed user, string inviteCode, uint256 tokenId, uint256 timestamp);
+    event CircleActivation(address indexed activator, address indexed user, string inviteCode, uint256 tokenId, uint256 timestamp);
 
     constructor() ERC721("Amanita Invite", "AINV") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -75,46 +117,53 @@ contract InviteNFT is ERC721, AccessControl {
     /**
      * @dev Внутренняя проверка валидности инвайта по inviteCode и адресу пользователя
      * @param inviteCode inviteCode (строка)
+     * @param user адрес пользователя для активации
      * @return success true если инвайт валиден, false иначе
-     * @return reason строка с причиной невалидности ("not_found", "already_used", "expired", "user_already_activated")
+     * @return reason строка с причиной невалидности ("not_found", "already_used", "expired", "user_already_activated", "invite_not_from_activator")
      *
      * Критерии приёмки:
      * - inviteCode существует
      * - invite не использован
      * - invite не истёк
+     * - Пользователь не активирован ранее
+     * - Инвайт принадлежит активатору (кроме DEFAULT_ADMIN_ROLE)
      * - Возвращает (true, "") если всё валидно, иначе (false, причина)
      * - Только internal view
      */
-    function _validateInviteCode(string memory inviteCode) internal view returns (bool, string memory) {
-        // 1. Получить tokenId по inviteCode
+    function _validateInviteCode(string memory inviteCode, address user) internal view returns (bool, string memory) {
+        // 1. Проверка, что пользователь не активирован ранее
+        if (usedInviteByUser[user] != 0) {
+            return (false, "user_already_activated");
+        }
+        
+        // 2. Получить tokenId по inviteCode
         uint256 tokenId = inviteCodeToTokenId[inviteCode];
-        // 2. Проверка существования инвайта
         if (tokenId == 0) {
             return (false, "not_found");
         }
-        // 3. Проверка, был ли инвайт уже использован
+        
+        // 3. КРИТИЧЕСКОЕ: Проверка принадлежности инвайта активатору
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+            if (inviteMinter[tokenId] != msg.sender) {
+                return (false, "invite_not_from_activator");
+            }
+        }
+        
+        // 4. Проверка, был ли инвайт уже использован
         if (isInviteUsed[tokenId]) {
             return (false, "already_used");
         }
-        // 4. Проверка срока действия (если не бессрочный)
+        
+        // 5. Проверка срока действия (если не бессрочный)
         uint256 expiry = inviteExpiry[tokenId];
         if (expiry != 0 && expiry < block.timestamp) {
             return (false, "expired");
         }
-        // 5. Все проверки пройдены — инвайт валиден
+        
+        // 6. Все проверки пройдены — инвайт валиден
         return (true, "");
     }
 
-    function _validateInviteCode(string memory inviteCode, address user) internal view returns (bool, string memory) {
-        if (usedInviteByUser[user] != 0) {
-            return (false, "user_already_activated");
-        }
-        (bool valid, string memory reason) = _validateInviteCode(inviteCode);
-        if (!valid) {
-            return (false, reason);
-        }
-        return (true, "");
-    }
 
     /**
      * @dev Проверка валидности инвайта по inviteCode и адресу пользователя
@@ -123,8 +172,8 @@ contract InviteNFT is ERC721, AccessControl {
      * @return reason строка с причиной невалидности ("not_found", "already_used", "expired", "user_already_activated")
      * 
      */
-    function validateInviteCode(string memory inviteCode) public view returns (bool, string memory) {
-        return _validateInviteCode(inviteCode);
+    function validateInviteCode(string memory inviteCode, address user) public view returns (bool, string memory) {
+        return _validateInviteCode(inviteCode, user);
     }
 
     /**
@@ -204,6 +253,179 @@ contract InviteNFT is ERC721, AccessControl {
      */
     function getInviteCodeByTokenId(uint256 tokenId) public view returns (string memory) {
         return tokenIdToInviteCode[tokenId];
+    }
+
+    /**
+     * @dev Активация пользователя (отдельно от назначения роли)
+     * @param inviteCode код инвайта, который активируется
+     * @param user адрес пользователя, который активирует инвайт
+     * @param newInviteCodes массив новых inviteCode для раздачи друзьям
+     * @param expiry срок действия новых инвайтов (timestamp, 0 если бессрочные)
+     */
+    function activateUser(
+        string memory inviteCode,
+        address user,
+        string[] memory newInviteCodes,
+        uint256 expiry
+    ) external onlyRole(ACTIVATOR_ROLE) {
+        require(usedInviteByUser[user] == 0, "User already activated invite");
+        
+        // КРИТИЧЕСКОЕ: Проверка лимита круга активатора
+        require(activatedBy[msg.sender].length < 12, "Circle limit reached (max 12 members)");
+        
+        // Валидация инвайт-кода
+        (bool valid, string memory reason) = _validateInviteCode(inviteCode, user);
+        require(valid, reason);
+        
+        uint256 tokenId = inviteCodeToTokenId[inviteCode];
+        
+        // Проверка уникальности новых инвайт-кодов
+        _validateNewInviteCodes(newInviteCodes);
+        
+        // Отметить инвайт как использованный
+        isInviteUsed[tokenId] = true;
+        usedInviteByUser[user] = tokenId;
+        inviteTransferHistory[tokenId].push(user);
+        totalInvitesUsed += 1;
+        
+        // Записать кто активировал пользователя
+        userActivator[user] = msg.sender;
+        activatedBy[msg.sender].push(user);
+        
+        // Добавить пользователя в список активированных
+        activatedUsers.push(user);
+        
+        // Дифференцированные события для мониторинга кругов
+        if (hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+            // Это деплоер - активация первого круга
+            emit FirstCircleActivation(msg.sender, user, inviteCode, tokenId, block.timestamp);
+        } else {
+            // Это селлер - активация в своем круге
+            emit CircleActivation(msg.sender, user, inviteCode, tokenId, block.timestamp);
+        }
+        
+        // Общее событие активации (для обратной совместимости)
+        emit UserActivated(msg.sender, user, inviteCode, tokenId, block.timestamp);
+        
+        // Минт новых инвайтов
+        require(newInviteCodes.length == 12, "Must mint exactly 12 invites");
+        uint256[] memory tokenIds = new uint256[](12);
+        for (uint256 i = 0; i < 12; i++) {
+            tokenIds[i] = _mintInvite(newInviteCodes[i], user, expiry);
+        }
+        totalInvitesMinted += 12;
+        userInviteCount[user] += 12;
+        
+        emit BatchInvitesMinted(msg.sender, tokenIds, newInviteCodes, expiry);
+    }
+
+    /**
+     * @dev Назначение роли SELLER_ROLE пользователю
+     * @param user адрес пользователя для назначения роли
+     */
+    function grantSellerRole(address user) external {
+        require(isUserActivated(user), "User must be activated first");
+        require(hasRole(ACTIVATOR_ROLE, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Not authorized to grant seller role");
+        
+        // Проверяем иерархическую спираль
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+            require(userActivator[user] == msg.sender, "Can only nominate users you activated");
+        }
+        
+        _grantRole(SELLER_ROLE, user);
+        
+        // Записать кто назначил селлером
+        sellerNominator[user] = msg.sender;
+        nominatedSellers[msg.sender].push(user);
+        
+        emit SellerRoleGranted(msg.sender, user, block.timestamp);
+    }
+
+    /**
+     * @dev Валидация уникальности новых инвайт-кодов
+     * @param newInviteCodes массив новых инвайт-кодов для проверки
+     */
+    function _validateNewInviteCodes(string[] memory newInviteCodes) internal view {
+        uint256 len = newInviteCodes.length;
+        for (uint256 i = 0; i < len; i++) {
+            for (uint256 j = i + 1; j < len; j++) {
+                require(keccak256(bytes(newInviteCodes[i])) != keccak256(bytes(newInviteCodes[j])), "Duplicate newInviteCode in batch");
+            }
+        }
+        for (uint256 i = 0; i < len; i++) {
+            require(inviteCodeToTokenId[newInviteCodes[i]] == 0, "New invite code already exists");
+        }
+    }
+
+    /**
+     * @dev Применение санкций к пользователю с каскадными эффектами
+     * @param user адрес пользователя для приостановки
+     * @param duration длительность приостановки в секундах
+     * @param reason причина приостановки
+     */
+    function suspendUser(address user, uint256 duration, string memory reason) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(isUserActivated(user), "User must be activated");
+        
+        suspensionUntil[user] = block.timestamp + duration;
+        violationCount[user]++;
+        
+        emit UserSuspended(user, duration, reason, block.timestamp);
+        
+        // Каскадные санкции для активатора
+        address activator = userActivator[user];
+        if (activator != address(0)) {
+            _applyActivatorSanctions(activator, violationCount[user]);
+        }
+        
+        // Если это селлер, санкции для номинатора
+        if (hasRole(SELLER_ROLE, user)) {
+            address nominator = sellerNominator[user];
+            if (nominator != address(0)) {
+                _applyNominatorSanctions(nominator, violationCount[user]);
+            }
+        }
+    }
+
+    /**
+     * @dev Внутренняя функция применения санкций к активатору
+     * @param activator адрес активатора
+     * @param violationLevel уровень нарушения
+     */
+    function _applyActivatorSanctions(address activator, uint256 violationLevel) internal {
+        activationViolations[activator]++;
+        
+        if (activationViolations[activator] == 1) {
+            // Первое нарушение - предупреждение
+            emit ActivatorWarning(activator, "First violation from activated user");
+        } else if (activationViolations[activator] == 2) {
+            // Второе нарушение - временная приостановка
+            _revokeRole(ACTIVATOR_ROLE, activator);
+            emit ActivatorSuspended(activator, 7 days, "Second violation");
+        } else if (activationViolations[activator] >= 3) {
+            // Третье нарушение - долгосрочная приостановка
+            _revokeRole(ACTIVATOR_ROLE, activator);
+            emit ActivatorSuspended(activator, 30 days, "Third violation");
+        }
+    }
+
+    /**
+     * @dev Внутренняя функция применения санкций к номинатору
+     * @param nominator адрес номинатора
+     * @param violationLevel уровень нарушения
+     */
+    function _applyNominatorSanctions(address nominator, uint256 violationLevel) internal {
+        nominationViolations[nominator]++;
+        
+        if (nominationViolations[nominator] == 1) {
+            // Первое нарушение - предупреждение
+            emit NominatorWarning(nominator, "First violation from nominated seller");
+        } else if (nominationViolations[nominator] == 2) {
+            // Второе нарушение - временная приостановка права назначать
+            emit NominatorSuspended(nominator, 7 days, "Second violation");
+        } else if (nominationViolations[nominator] >= 3) {
+            // Третье нарушение - долгосрочная приостановка
+            emit NominatorSuspended(nominator, 30 days, "Third violation");
+        }
     }
 
     /**
@@ -423,6 +645,40 @@ contract InviteNFT is ERC721, AccessControl {
      */
     function removeSeller(address seller) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _revokeRole(SELLER_ROLE, seller);
+    }
+
+    // === ФУНКЦИИ УПРАВЛЕНИЯ КРУГАМИ ===
+
+    /**
+     * @dev Получить список участников круга активатора
+     * @param activator адрес активатора
+     * @return members массив адресов участников круга
+     */
+    function getCircleMembers(address activator) external view returns (address[] memory) {
+        return activatedBy[activator];
+    }
+
+    /**
+     * @dev Получить размер круга активатора
+     * @param activator адрес активатора
+     * @return size количество участников в круге
+     */
+    function getCircleSize(address activator) external view returns (uint256) {
+        return activatedBy[activator].length;
+    }
+
+    /**
+     * @dev Проверить принадлежность инвайта активатору
+     * @param inviteCode код инвайта
+     * @param activator адрес активатора
+     * @return isOwned true если инвайт принадлежит активатору
+     */
+    function isInviteFromActivator(string memory inviteCode, address activator) external view returns (bool) {
+        uint256 tokenId = inviteCodeToTokenId[inviteCode];
+        if (tokenId == 0) {
+            return false;
+        }
+        return inviteMinter[tokenId] == activator;
     }
 
     function supportsInterface(bytes4 interfaceId) public view override(ERC721, AccessControl) returns (bool) {
