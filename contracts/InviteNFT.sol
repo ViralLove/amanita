@@ -3,8 +3,9 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./IERC5192.sol";
 
-contract InviteNFT is ERC721, AccessControl {
+contract InviteNFT is ERC721, AccessControl, IERC5192 {
     uint256 private _tokenIdCounter;
 
     // Роль продавца для доступа к минтингу инвайтов
@@ -93,6 +94,66 @@ contract InviteNFT is ERC721, AccessControl {
     // Маппинг: нарушения назначенных селлеров (для номинатора)
     mapping(address => uint256) public nominationViolations;
 
+    // === СИСТЕМА ВОССТАНОВЛЕНИЯ ДОСТУПА ===
+    // Маппинг: пользователь => список доверенных лиц
+    mapping(address => address[]) public trustedGuardians;
+    
+    // Маппинг: пользователь => доверенное лицо => статус одобрения
+    mapping(address => mapping(address => bool)) public guardianApproval;
+    
+    // Маппинг: пользователь => количество доверенных лиц
+    mapping(address => uint256) public guardianCount;
+    
+    // Маппинг: пользователь => временный ключ доступа
+    mapping(address => address) public temporaryAccessKey;
+    
+    // Маппинг: временный ключ => срок действия
+    mapping(address => uint256) public temporaryKeyExpiry;
+    
+    // Маппинг: пользователь => статус восстановления
+    mapping(address => bool) public isRecoveryInProgress;
+    
+    // Маппинг: пользователь => время последнего восстановления
+    mapping(address => uint256) public lastRecoveryTime;
+
+    // === ИНТЕГРАЦИЯ С DID (DECENTRALIZED IDENTIFIERS) ===
+    // Маппинг: пользователь => DID идентификатор
+    mapping(address => string) public userDID;
+    
+    // Маппинг: DID => адрес пользователя (обратный поиск)
+    mapping(string => address) public didToAddress;
+    
+    // Маппинг: пользователь => репутационный счет
+    mapping(address => uint256) public reputationScore;
+    
+    // Маппинг: пользователь => уровень верификации
+    mapping(address => uint8) public verificationLevel; // 0-5
+    
+    // Маппинг: пользователь => время последней верификации
+    mapping(address => uint256) public lastVerificationTime;
+    
+    // Маппинг: пользователь => количество успешных операций
+    mapping(address => uint256) public successfulOperations;
+    
+    // Маппинг: пользователь => количество неудачных операций
+    mapping(address => uint256) public failedOperations;
+
+    // === РАСШИРЕННЫЕ МЕТАДАННЫЕ SBT ===
+    // Маппинг: tokenId => версия SBT
+    mapping(uint256 => uint256) public sbtVersion;
+    
+    // Маппинг: tokenId => тип SBT
+    mapping(uint256 => string) public sbtType;
+    
+    // Маппинг: tokenId => дополнительные атрибуты
+    mapping(uint256 => string) public sbtAttributes;
+    
+    // Базовая версия SBT
+    uint256 public constant SBT_BASE_VERSION = 1;
+    
+    // Текущая версия SBT контракта
+    uint256 public constant SBT_CONTRACT_VERSION = 2;
+
     event InviteActivated(address indexed user, string inviteCode, uint256 tokenId, uint256 timestamp);
     event BatchInvitesMinted(address indexed to, uint256[] tokenIds, string[] inviteCodes, uint256 expiry);
     event InviteTransferred(uint256 indexed tokenId, address from, address to, uint256 timestamp);
@@ -109,6 +170,25 @@ contract InviteNFT is ERC721, AccessControl {
     // === ДИФФЕРЕНЦИРОВАННЫЕ СОБЫТИЯ ДЛЯ МОНИТОРИНГА КРУГОВ ===
     event FirstCircleActivation(address indexed activator, address indexed user, string inviteCode, uint256 tokenId, uint256 timestamp);
     event CircleActivation(address indexed activator, address indexed user, string inviteCode, uint256 tokenId, uint256 timestamp);
+    
+    // === СОБЫТИЯ СИСТЕМЫ ВОССТАНОВЛЕНИЯ ДОСТУПА ===
+    event GuardianAdded(address indexed user, address indexed guardian, uint256 timestamp);
+    event GuardianRemoved(address indexed user, address indexed guardian, uint256 timestamp);
+    event RecoveryInitiated(address indexed user, address indexed guardian, uint256 timestamp);
+    event RecoveryCompleted(address indexed user, address indexed newAddress, uint256 timestamp);
+    event TemporaryKeyCreated(address indexed user, address indexed tempKey, uint256 expiry, uint256 timestamp);
+    event TemporaryKeyExpired(address indexed user, address indexed tempKey, uint256 timestamp);
+    
+    // === СОБЫТИЯ DID ИНТЕГРАЦИИ ===
+    event DIDLinked(address indexed user, string did, uint256 timestamp);
+    event DIDUnlinked(address indexed user, string did, uint256 timestamp);
+    event IdentityVerified(address indexed user, uint8 verificationLevel, uint256 timestamp);
+    event ReputationUpdated(address indexed user, uint256 newScore, uint256 timestamp);
+    event OperationRecorded(address indexed user, bool success, uint256 timestamp);
+    
+    // === СОБЫТИЯ SBT МЕТАДАННЫХ ===
+    event SBTMetadataUpdated(uint256 indexed tokenId, string sbtType, string attributes, uint256 timestamp);
+    event SBTVersionUpdated(uint256 indexed tokenId, uint256 newVersion, uint256 timestamp);
 
     constructor() ERC721("Amanita Invite", "AINV") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -681,9 +761,6 @@ contract InviteNFT is ERC721, AccessControl {
         return inviteMinter[tokenId] == activator;
     }
 
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721, AccessControl) returns (bool) {
-        return super.supportsInterface(interfaceId);
-    }
 
     function _update(address to, uint256 tokenId, address auth) internal virtual override returns (address) {
         address from = _ownerOf(tokenId);
@@ -696,5 +773,549 @@ contract InviteNFT is ERC721, AccessControl {
 
     function isSeller(address user) public view returns (bool) {
         return hasRole(SELLER_ROLE, user);
+    }
+
+    // === SBT-СОВМЕСТИМОСТЬ: БЛОКИРОВКА ФУНКЦИЙ ОДОБРЕНИЯ ===
+    
+    /**
+     * @dev SBT токены не могут быть одобрены для делегирования управления
+     * @param to адрес, которому пытаются дать одобрение
+     * @param tokenId идентификатор токена
+     */
+    function approve(address to, uint256 tokenId) public virtual override {
+        revert("InviteNFT: SBT tokens cannot be approved");
+    }
+
+    /**
+     * @dev SBT токены не могут быть одобрены для глобального управления
+     * @param operator адрес оператора
+     * @param approved статус одобрения
+     */
+    function setApprovalForAll(address operator, bool approved) public virtual override {
+        revert("InviteNFT: SBT tokens cannot be approved");
+    }
+
+    /**
+     * @dev SBT токены не имеют одобренных операторов
+     * @param tokenId идентификатор токена
+     * @return address(0) всегда, так как SBT не могут быть одобрены
+     */
+    function getApproved(uint256 tokenId) public view virtual override returns (address) {
+        return address(0);
+    }
+
+    /**
+     * @dev SBT токены не имеют глобальных одобрений
+     * @param owner владелец токена
+     * @param operator оператор
+     * @return false всегда, так как SBT не могут быть одобрены
+     */
+    function isApprovedForAll(address owner, address operator) public view virtual override returns (bool) {
+        return false;
+    }
+
+    // === EIP-5192 SBT СТАНДАРТ ===
+    
+    /**
+     * @dev Проверяет, заблокирован ли токен (всегда true для SBT)
+     * @param tokenId идентификатор токена для проверки
+     * @return true всегда, так как все токены InviteNFT являются SBT
+     */
+    function locked(uint256 tokenId) external view override returns (bool) {
+        // Проверяем, что токен существует
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        return true; // Все токены InviteNFT заблокированы как SBT
+    }
+
+    /**
+     * @dev Обновленная функция поддержки интерфейсов с EIP-5192
+     * @param interfaceId идентификатор интерфейса для проверки
+     * @return true если контракт поддерживает интерфейс
+     */
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721, AccessControl) returns (bool) {
+        return interfaceId == type(IERC5192).interfaceId || super.supportsInterface(interfaceId);
+    }
+
+    // === СИСТЕМА ВОССТАНОВЛЕНИЯ ДОСТУПА ===
+    
+    /**
+     * @dev Добавить доверенное лицо для восстановления доступа
+     * @param guardian адрес доверенного лица
+     */
+    function addTrustedGuardian(address guardian) external {
+        require(guardian != address(0), "Guardian cannot be zero address");
+        require(guardian != msg.sender, "Cannot be your own guardian");
+        require(guardianCount[msg.sender] < 5, "Maximum 5 guardians allowed");
+        require(!guardianApproval[msg.sender][guardian], "Guardian already added");
+        
+        trustedGuardians[msg.sender].push(guardian);
+        guardianApproval[msg.sender][guardian] = true;
+        guardianCount[msg.sender]++;
+        
+        emit GuardianAdded(msg.sender, guardian, block.timestamp);
+    }
+
+    /**
+     * @dev Удалить доверенное лицо
+     * @param guardian адрес доверенного лица
+     */
+    function removeTrustedGuardian(address guardian) external {
+        require(guardianApproval[msg.sender][guardian], "Guardian not found");
+        
+        // Удаляем из массива
+        address[] storage guardians = trustedGuardians[msg.sender];
+        for (uint256 i = 0; i < guardians.length; i++) {
+            if (guardians[i] == guardian) {
+                guardians[i] = guardians[guardians.length - 1];
+                guardians.pop();
+                break;
+            }
+        }
+        
+        guardianApproval[msg.sender][guardian] = false;
+        guardianCount[msg.sender]--;
+        
+        emit GuardianRemoved(msg.sender, guardian, block.timestamp);
+    }
+
+    /**
+     * @dev Инициировать процесс восстановления доступа
+     * @param user адрес пользователя, для которого инициируется восстановление
+     */
+    function initiateRecovery(address user) external {
+        require(guardianApproval[user][msg.sender], "Not authorized guardian");
+        require(!isRecoveryInProgress[user], "Recovery already in progress");
+        require(block.timestamp - lastRecoveryTime[user] > 7 days, "Recovery cooldown active");
+        
+        isRecoveryInProgress[user] = true;
+        lastRecoveryTime[user] = block.timestamp;
+        
+        emit RecoveryInitiated(user, msg.sender, block.timestamp);
+    }
+
+    /**
+     * @dev Завершить восстановление доступа (только доверенные лица)
+     * @param user адрес пользователя
+     * @param newAddress новый адрес пользователя
+     */
+    function completeRecovery(address user, address newAddress) external {
+        require(guardianApproval[user][msg.sender], "Not authorized guardian");
+        require(isRecoveryInProgress[user], "No recovery in progress");
+        require(newAddress != address(0), "New address cannot be zero");
+        require(newAddress != user, "New address must be different");
+        
+        // Переносим все токены на новый адрес
+        uint256[] memory userTokens = userInvites[user];
+        for (uint256 i = 0; i < userTokens.length; i++) {
+            uint256 tokenId = userTokens[i];
+            if (_ownerOf(tokenId) == user) {
+                _transfer(user, newAddress, tokenId);
+            }
+        }
+        
+        // Обновляем маппинги
+        userInvites[newAddress] = userTokens;
+        usedInviteByUser[newAddress] = usedInviteByUser[user];
+        
+        // Очищаем старые данные
+        delete userInvites[user];
+        delete usedInviteByUser[user];
+        isRecoveryInProgress[user] = false;
+        
+        emit RecoveryCompleted(user, newAddress, block.timestamp);
+    }
+
+    /**
+     * @dev Создать временный ключ доступа
+     * @param tempKey адрес временного ключа
+     * @param duration длительность действия в секундах
+     */
+    function createTemporaryKey(address tempKey, uint256 duration) external {
+        require(tempKey != address(0), "Temporary key cannot be zero");
+        require(duration <= 30 days, "Duration too long");
+        require(temporaryAccessKey[msg.sender] == address(0), "Temporary key already exists");
+        
+        temporaryAccessKey[msg.sender] = tempKey;
+        temporaryKeyExpiry[tempKey] = block.timestamp + duration;
+        
+        emit TemporaryKeyCreated(msg.sender, tempKey, block.timestamp + duration, block.timestamp);
+    }
+
+    /**
+     * @dev Использовать временный ключ для операций
+     * @param user адрес пользователя
+     */
+    modifier onlyTemporaryKey(address user) {
+        require(
+            msg.sender == user || 
+            (temporaryAccessKey[user] == msg.sender && block.timestamp < temporaryKeyExpiry[msg.sender]),
+            "Not authorized or temporary key expired"
+        );
+        _;
+    }
+
+    /**
+     * @dev Отозвать временный ключ
+     */
+    function revokeTemporaryKey() external {
+        address tempKey = temporaryAccessKey[msg.sender];
+        require(tempKey != address(0), "No temporary key to revoke");
+        
+        emit TemporaryKeyExpired(msg.sender, tempKey, block.timestamp);
+        
+        delete temporaryAccessKey[msg.sender];
+        delete temporaryKeyExpiry[tempKey];
+    }
+
+    /**
+     * @dev Получить список доверенных лиц пользователя
+     * @param user адрес пользователя
+     * @return массив адресов доверенных лиц
+     */
+    function getTrustedGuardians(address user) external view returns (address[] memory) {
+        return trustedGuardians[user];
+    }
+
+    /**
+     * @dev Проверить, является ли адрес доверенным лицом
+     * @param user адрес пользователя
+     * @param guardian адрес для проверки
+     * @return true если является доверенным лицом
+     */
+    function isTrustedGuardian(address user, address guardian) external view returns (bool) {
+        return guardianApproval[user][guardian];
+    }
+
+    // === DID ИНТЕГРАЦИЯ И РЕПУТАЦИОННАЯ СИСТЕМА ===
+    
+    /**
+     * @dev Связать DID с адресом пользователя
+     * @param did децентрализованный идентификатор
+     */
+    function linkDID(string memory did) external {
+        require(bytes(did).length > 0, "DID cannot be empty");
+        require(didToAddress[did] == address(0), "DID already linked");
+        require(bytes(userDID[msg.sender]).length == 0, "User already has DID linked");
+        
+        userDID[msg.sender] = did;
+        didToAddress[did] = msg.sender;
+        
+        // Инициализируем репутацию
+        reputationScore[msg.sender] = 100; // Базовый счет
+        verificationLevel[msg.sender] = 1; // Базовый уровень
+        lastVerificationTime[msg.sender] = block.timestamp;
+        
+        emit DIDLinked(msg.sender, did, block.timestamp);
+    }
+
+    /**
+     * @dev Отвязать DID от адреса пользователя
+     */
+    function unlinkDID() external {
+        string memory did = userDID[msg.sender];
+        require(bytes(did).length > 0, "No DID linked");
+        
+        delete userDID[msg.sender];
+        delete didToAddress[did];
+        
+        emit DIDUnlinked(msg.sender, did, block.timestamp);
+    }
+
+    /**
+     * @dev Обновить уровень верификации (только админ)
+     * @param user адрес пользователя
+     * @param level новый уровень верификации (0-5)
+     */
+    function updateVerificationLevel(address user, uint8 level) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(level <= 5, "Invalid verification level");
+        require(bytes(userDID[user]).length > 0, "User has no DID linked");
+        
+        verificationLevel[user] = level;
+        lastVerificationTime[user] = block.timestamp;
+        
+        // Обновляем репутацию на основе уровня верификации
+        reputationScore[user] = 100 + (level * 20);
+        
+        emit IdentityVerified(user, level, block.timestamp);
+        emit ReputationUpdated(user, reputationScore[user], block.timestamp);
+    }
+
+    /**
+     * @dev Записать успешную операцию
+     * @param user адрес пользователя
+     */
+    function recordSuccessfulOperation(address user) internal {
+        successfulOperations[user]++;
+        
+        // Увеличиваем репутацию за успешные операции
+        if (reputationScore[user] < 1000) {
+            reputationScore[user] += 1;
+        }
+        
+        emit OperationRecorded(user, true, block.timestamp);
+        emit ReputationUpdated(user, reputationScore[user], block.timestamp);
+    }
+
+    /**
+     * @dev Записать неудачную операцию
+     * @param user адрес пользователя
+     */
+    function recordFailedOperation(address user) internal {
+        failedOperations[user]++;
+        
+        // Уменьшаем репутацию за неудачные операции
+        if (reputationScore[user] > 50) {
+            reputationScore[user] -= 2;
+        }
+        
+        emit OperationRecorded(user, false, block.timestamp);
+        emit ReputationUpdated(user, reputationScore[user], block.timestamp);
+    }
+
+    /**
+     * @dev Получить репутационный профиль пользователя
+     * @param user адрес пользователя
+     * @return did DID пользователя
+     * @return reputation репутационный счет
+     * @return userVerificationLevel уровень верификации
+     * @return successfulOps количество успешных операций
+     * @return failedOps количество неудачных операций
+     */
+    function getReputationProfile(address user) external view returns (
+        string memory did,
+        uint256 reputation,
+        uint8 userVerificationLevel,
+        uint256 successfulOps,
+        uint256 failedOps
+    ) {
+        return (
+            userDID[user],
+            reputationScore[user],
+            verificationLevel[user],
+            successfulOperations[user],
+            failedOperations[user]
+        );
+    }
+
+    /**
+     * @dev Проверить, связан ли адрес с DID
+     * @param user адрес пользователя
+     * @return true если DID связан
+     */
+    function hasDIDLinked(address user) external view returns (bool) {
+        return bytes(userDID[user]).length > 0;
+    }
+
+    /**
+     * @dev Получить адрес по DID
+     * @param did децентрализованный идентификатор
+     * @return адрес пользователя
+     */
+    function getAddressByDID(string memory did) external view returns (address) {
+        return didToAddress[did];
+    }
+
+    /**
+     * @dev Проверить репутацию пользователя
+     * @param user адрес пользователя
+     * @return true если репутация достаточна для операций
+     */
+    function hasGoodReputation(address user) external view returns (bool) {
+        return reputationScore[user] >= 50 && verificationLevel[user] >= 1;
+    }
+
+    // === РАСШИРЕННЫЕ МЕТАДАННЫЕ SBT ===
+    
+    /**
+     * @dev Переопределенная функция tokenURI для SBT метаданных
+     * @param tokenId идентификатор токена
+     * @return URI метаданных токена
+     */
+    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        
+        // Упрощенные метаданные для избежания "Stack too deep"
+        string memory name = string(abi.encodePacked("Amanita Invite SBT #", _toString(tokenId)));
+        string memory description = "Soulbound Token for Amanita Ecosystem Invite System";
+        string memory image = string(abi.encodePacked("https://amanita.ecosystem/sbt/", _toString(tokenId), ".png"));
+        
+        string memory json = string(abi.encodePacked(
+            '{"name":"', name, '",',
+            '"description":"', description, '",',
+            '"image":"', image, '",',
+            '"attributes":[',
+            '{"trait_type":"Token Type","value":"Soulbound Token"},',
+            '{"trait_type":"SBT Version","value":"', _toString(sbtVersion[tokenId]), '"}',
+            ']}'
+        ));
+        
+        return string(abi.encodePacked("data:application/json;base64,", _base64Encode(bytes(json))));
+    }
+
+    /**
+     * @dev Получить расширенные метаданные SBT
+     * @param tokenId идентификатор токена
+     * @return tokenSbtType тип SBT
+     * @return version версия SBT
+     * @return attributes дополнительные атрибуты
+     * @return isLocked заблокирован ли токен
+     */
+    function getSBTMetadata(uint256 tokenId) external view returns (
+        string memory tokenSbtType,
+        uint256 version,
+        string memory attributes,
+        bool isLocked
+    ) {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        
+        return (
+            sbtType[tokenId],
+            sbtVersion[tokenId],
+            sbtAttributes[tokenId],
+            true // Все SBT токены заблокированы
+        );
+    }
+
+    /**
+     * @dev Обновить метаданные SBT (только владелец)
+     * @param tokenId идентификатор токена
+     * @param newSbtType новый тип SBT
+     * @param newAttributes новые атрибуты
+     */
+    function updateSBTMetadata(uint256 tokenId, string memory newSbtType, string memory newAttributes) external {
+        require(_ownerOf(tokenId) == msg.sender, "Not token owner");
+        
+        sbtType[tokenId] = newSbtType;
+        sbtAttributes[tokenId] = newAttributes;
+        
+        emit SBTMetadataUpdated(tokenId, newSbtType, newAttributes, block.timestamp);
+    }
+
+    /**
+     * @dev Обновить версию SBT (только админ)
+     * @param tokenId идентификатор токена
+     * @param newVersion новая версия
+     */
+    function updateSBTVersion(uint256 tokenId, uint256 newVersion) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        require(newVersion > sbtVersion[tokenId], "Version must be higher");
+        
+        sbtVersion[tokenId] = newVersion;
+        
+        emit SBTVersionUpdated(tokenId, newVersion, block.timestamp);
+    }
+
+    /**
+     * @dev Получить версию SBT токена
+     * @param tokenId идентификатор токена
+     * @return версия SBT
+     */
+    function getSBTVersion(uint256 tokenId) external view returns (uint256) {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        return sbtVersion[tokenId];
+    }
+
+    /**
+     * @dev Проверить, является ли токен SBT
+     * @param tokenId идентификатор токена
+     * @return true если токен является SBT
+     */
+    function isSBT(uint256 tokenId) external view returns (bool) {
+        return _ownerOf(tokenId) != address(0);
+    }
+
+    // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ МЕТАДАННЫХ ===
+    
+    /**
+     * @dev Конвертировать uint256 в строку
+     */
+    function _toString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "0";
+        }
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
+    }
+
+    /**
+     * @dev Конвертировать адрес в hex строку
+     */
+    function _toHexString(address addr) internal pure returns (string memory) {
+        return _toHexString(abi.encodePacked(addr));
+    }
+
+    /**
+     * @dev Конвертировать bytes в hex строку
+     */
+    function _toHexString(bytes memory data) internal pure returns (string memory) {
+        bytes memory alphabet = "0123456789abcdef";
+        bytes memory str = new bytes(2 + data.length * 2);
+        str[0] = "0";
+        str[1] = "x";
+        for (uint256 i = 0; i < data.length; i++) {
+            str[2 + i * 2] = alphabet[uint256(uint8(data[i] >> 4))];
+            str[3 + i * 2] = alphabet[uint256(uint8(data[i] & 0x0f))];
+        }
+        return string(str);
+    }
+
+    /**
+     * @dev Base64 кодирование
+     */
+    function _base64Encode(bytes memory data) internal pure returns (string memory) {
+        if (data.length == 0) return "";
+        
+        string memory table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        
+        uint256 encodedLen = 4 * ((data.length + 2) / 3);
+        
+        string memory result = new string(encodedLen + 32);
+        
+        assembly {
+            let tablePtr := add(table, 1)
+            let resultPtr := add(result, 32)
+            
+            for {
+                let i := 0
+            } lt(i, mload(data)) {
+                i := add(i, 3)
+            } {
+                let input := and(mload(add(data, add(32, i))), 0xffffff)
+                
+                let out := mload(add(tablePtr, and(shr(18, input), 0x3F)))
+                out := shl(8, out)
+                out := add(out, and(mload(add(tablePtr, and(shr(12, input), 0x3F))), 0xFF))
+                out := shl(8, out)
+                out := add(out, and(mload(add(tablePtr, and(shr(6, input), 0x3F))), 0xFF))
+                out := shl(8, out)
+                out := add(out, and(mload(add(tablePtr, and(input, 0x3F))), 0xFF))
+                out := shl(224, out)
+                
+                mstore(resultPtr, out)
+                
+                resultPtr := add(resultPtr, 4)
+            }
+            
+            switch mod(mload(data), 3)
+            case 1 {
+                mstore(sub(resultPtr, 2), shl(240, 0x3d3d))
+            }
+            case 2 {
+                mstore(sub(resultPtr, 1), shl(248, 0x3d))
+            }
+        }
+        
+        return result;
     }
 } 
