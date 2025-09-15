@@ -231,6 +231,7 @@ contract SpiralEngine is ERC721, AccessControl {
      */
     function suspendUser(address user, uint256 duration, string memory reason) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(user != address(0), "SpiralEngine: invalid user address");
+        require(usedInviteByUser[user] > 0, "SpiralEngine: user not activated");
         require(duration > 0, "SpiralEngine: invalid duration");
         
         suspensionUntil[user] = block.timestamp + duration;

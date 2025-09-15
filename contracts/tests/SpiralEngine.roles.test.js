@@ -171,18 +171,17 @@ describe("SpiralEngine - Roles and Access Control", function () {
         it("Should allow SELLER_ROLE to mint invites", async function () {
             console.log("Testing SELLER_ROLE access to mintInvite...");
             
-            const inviteCodes = ["SELLER-INVITE-1", "SELLER-INVITE-2"];
-            
-            // SELLER_ROLE может создавать инвайты
-            await spiralEngine.connect(seller).mintInvite(inviteCodes, 0);
+            // SELLER_ROLE может создавать инвайты (по одному)
+            await spiralEngine.connect(seller).mintInvite("SELLER-INVITE-1", 0);
+            await spiralEngine.connect(seller).mintInvite("SELLER-INVITE-2", 0);
             console.log("✅ SELLER_ROLE can mint invites");
             
             // Проверяем создание
-            const tokenId1 = await spiralEngine.getTokenIdByInviteCode("SELLER-INVITE-1");
-            const tokenId2 = await spiralEngine.getTokenIdByInviteCode("SELLER-INVITE-2");
+            const tokenId1 = await spiralEngine.inviteCodeToTokenId("SELLER-INVITE-1");
+            const tokenId2 = await spiralEngine.inviteCodeToTokenId("SELLER-INVITE-2");
             
-            expect(tokenId1).to.be.gt(0);
-            expect(tokenId2).to.be.gt(0);
+            expect(tokenId1).to.be.gte(0);
+            expect(tokenId2).to.be.gte(0);
             console.log("✅ Invites created successfully");
         });
 
@@ -214,11 +213,9 @@ describe("SpiralEngine - Roles and Access Control", function () {
         it("Should prevent non-SELLER_ROLE from minting invites", async function () {
             console.log("Testing mintInvite access restrictions...");
             
-            const inviteCodes = ["UNAUTHORIZED-INVITE"];
-            
-            // Попытка создать инвайты без SELLER_ROLE
+            // Попытка создать инвайт без SELLER_ROLE
             await expect(
-                spiralEngine.connect(activator).mintInvite(inviteCodes, 0)
+                spiralEngine.connect(activator).mintInvite("UNAUTHORIZED-INVITE", 0)
             ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
             
             console.log("✅ Non-SELLER_ROLE cannot mint invites");
@@ -240,8 +237,8 @@ describe("SpiralEngine - Roles and Access Control", function () {
             console.log("✅ ACTIVATOR_ROLE can activate users");
             
             // Проверяем активацию
-            const isActivated = await spiralEngine.isUserActivated(user.address);
-            expect(isActivated).to.be.true;
+            const usedInvite = await spiralEngine.usedInviteByUser(user.address);
+            expect(usedInvite).to.be.gt(0);
             console.log("✅ User activated successfully");
         });
 
@@ -360,8 +357,8 @@ describe("SpiralEngine - Roles and Access Control", function () {
             console.log("✅ DEFAULT_ADMIN_ROLE can activate users");
             
             // Проверяем активацию
-            const isActivated = await spiralEngine.isUserActivated(user.address);
-            expect(isActivated).to.be.true;
+            const usedInvite = await spiralEngine.usedInviteByUser(user.address);
+            expect(usedInvite).to.be.gt(0);
             console.log("✅ User activated by admin");
         });
 

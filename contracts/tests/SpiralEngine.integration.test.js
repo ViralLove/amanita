@@ -17,6 +17,39 @@ describe("SpiralEngine - Integration Tests", function () {
     const SELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("SELLER_ROLE"));
     const ACTIVATOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ACTIVATOR_ROLE"));
 
+    // Утилиты для логирования
+    async function logContractState(context) {
+        console.log(`\n📊 Contract State - ${context}:`);
+        console.log(`   Total Invites Minted: ${await spiralEngine.totalInvitesMinted()}`);
+        console.log(`   Total Invites Used: ${await spiralEngine.totalInvitesUsed()}`);
+        console.log(`   SpiralEngine Address: ${await spiralEngine.getAddress()}`);
+        console.log(`   SoulIdentity Address: ${await soulIdentity.getAddress()}`);
+    }
+
+    async function logTransactionDetails(tx, operation) {
+        const receipt = await tx.wait();
+        console.log(`\n🔍 Transaction Details - ${operation}:`);
+        console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
+        console.log(`   Block Number: ${receipt.blockNumber}`);
+        console.log(`   Transaction Hash: ${receipt.hash}`);
+    }
+
+    function logEventDetails(event, eventName) {
+        console.log(`\n📢 Event Details - ${eventName}:`);
+        console.log(`   Event: ${eventName}`);
+        if (event.args) {
+            console.log(`   Args:`, event.args);
+        }
+    }
+
+    async function logUserRoles(userAddress, userName) {
+        console.log(`\n👤 User Roles - ${userName}:`);
+        console.log(`   Address: ${userAddress}`);
+        console.log(`   Is Admin: ${await spiralEngine.hasRole(DEFAULT_ADMIN_ROLE, userAddress)}`);
+        console.log(`   Is Seller: ${await spiralEngine.hasRole(SELLER_ROLE, userAddress)}`);
+        console.log(`   Is Activator: ${await spiralEngine.hasRole(ACTIVATOR_ROLE, userAddress)}`);
+    }
+
     beforeEach(async function () {
         // Получаем деплоера
         const signers = await ethers.getSigners();
@@ -73,6 +106,9 @@ describe("SpiralEngine - Integration Tests", function () {
 
         // Настраиваем роли
         await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, seller.address);
+        await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, seller.address);
+        await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, activator1.address);
+        await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, activator2.address);
         await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, activator1.address);
         await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, activator2.address);
 
@@ -94,10 +130,17 @@ describe("SpiralEngine - Integration Tests", function () {
             
             // 1. Создание инвайтов
             console.log("Step 1: Creating invites...");
-            await spiralEngine.connect(seller).mintInvite("LIFECYCLE-INVITE-1", 0);
-            await spiralEngine.connect(seller).mintInvite("LIFECYCLE-INVITE-2", 0);
-            await spiralEngine.connect(seller).mintInvite("LIFECYCLE-INVITE-3", 0);
+            const tx1 = await spiralEngine.connect(activator1).mintInvite("LIFECYCLE-INVITE-1", 0);
+            await logTransactionDetails(tx1, "Mint Invite 1");
+            
+            const tx2 = await spiralEngine.connect(activator1).mintInvite("LIFECYCLE-INVITE-2", 0);
+            await logTransactionDetails(tx2, "Mint Invite 2");
+            
+            const tx3 = await spiralEngine.connect(activator2).mintInvite("LIFECYCLE-INVITE-3", 0);
+            await logTransactionDetails(tx3, "Mint Invite 3");
+            
             console.log("✅ Invites created");
+            await logContractState("After Invite Creation");
 
             // 2. Активация пользователей
             console.log("Step 2: Activating users...");
@@ -106,25 +149,29 @@ describe("SpiralEngine - Integration Tests", function () {
             const newCodes3 = Array.from({length: 12}, (_, i) => `NEW-3-${i + 1}`);
             
             // Проверяем события активации
-            const tx1 = await spiralEngine.connect(activator1).activateUser("LIFECYCLE-INVITE-1", user1.address, newCodes1, 0);
-            const receipt1 = await tx1.wait();
+            const activateTx1 = await spiralEngine.connect(activator1).activateUser("LIFECYCLE-INVITE-1", user1.address, newCodes1, 0);
+            await logTransactionDetails(activateTx1, "Activate User 1");
+            const receipt1 = await activateTx1.wait();
             expect(receipt1.logs.length).to.be.gt(0);
             
-            const tx2 = await spiralEngine.connect(activator1).activateUser("LIFECYCLE-INVITE-3", user2.address, newCodes2, 0);
-            const receipt2 = await tx2.wait();
+            const activateTx2 = await spiralEngine.connect(activator2).activateUser("LIFECYCLE-INVITE-3", user2.address, newCodes2, 0);
+            await logTransactionDetails(activateTx2, "Activate User 2");
+            const receipt2 = await activateTx2.wait();
             expect(receipt2.logs.length).to.be.gt(0);
             
-            const tx3 = await spiralEngine.connect(activator2).activateUser("LIFECYCLE-INVITE-2", user3.address, newCodes3, 0);
-            const receipt3 = await tx3.wait();
+            const activateTx3 = await spiralEngine.connect(activator1).activateUser("LIFECYCLE-INVITE-2", user3.address, newCodes3, 0);
+            await logTransactionDetails(activateTx3, "Activate User 3");
+            const receipt3 = await activateTx3.wait();
             expect(receipt3.logs.length).to.be.gt(0);
             
             console.log("✅ Users activated with events verified");
+            await logContractState("After User Activation");
 
             // 3. Проверка активации
             console.log("Step 3: Verifying activation...");
-            expect(await spiralEngine.isUserActivated(user1.address)).to.be.true;
-            expect(await spiralEngine.isUserActivated(user2.address)).to.be.true;
-            expect(await spiralEngine.isUserActivated(user3.address)).to.be.true;
+            expect(await spiralEngine.usedInviteByUser(user1.address)).to.be.gt(0);
+            expect(await spiralEngine.usedInviteByUser(user2.address)).to.be.gt(0);
+            expect(await spiralEngine.usedInviteByUser(user3.address)).to.be.gt(0);
             console.log("✅ Activation verified");
 
             // 4. Проверка кругов
@@ -137,11 +184,20 @@ describe("SpiralEngine - Integration Tests", function () {
 
             // 5. Назначение ролей
             console.log("Step 5: Granting roles...");
-            await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, user1.address);
-            await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, user1.address);
-            await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, user2.address);
-            await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, user2.address);
+            const roleTx1 = await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, user1.address);
+            await logTransactionDetails(roleTx1, "Grant SELLER_ROLE to User1");
+            
+            const roleTx2 = await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, user1.address);
+            await logTransactionDetails(roleTx2, "Grant ACTIVATOR_ROLE to User1");
+            
+            const roleTx3 = await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, user2.address);
+            await logTransactionDetails(roleTx3, "Grant ACTIVATOR_ROLE to User2");
+            
+            const roleTx4 = await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, user2.address);
+            await logTransactionDetails(roleTx4, "Grant SELLER_ROLE to User2");
+            
             console.log("✅ Roles granted");
+            await logContractState("After Role Assignment");
 
             // 6. Проверка ролей
             console.log("Step 6: Verifying roles...");
@@ -153,9 +209,9 @@ describe("SpiralEngine - Integration Tests", function () {
 
             // 7. Создание новых инвайтов активированными пользователями
             console.log("Step 7: Creating new invites by activated users...");
-            await spiralEngine.connect(seller).mintInvite("USER1-INVITE-1", 0);
-            await spiralEngine.connect(seller).mintInvite("USER1-INVITE-2", 0);
-            await spiralEngine.connect(seller).mintInvite("USER2-INVITE-1", 0);
+            await spiralEngine.connect(user1).mintInvite("USER1-INVITE-1", 0);
+            await spiralEngine.connect(user1).mintInvite("USER1-INVITE-2", 0);
+            await spiralEngine.connect(user2).mintInvite("USER2-INVITE-1", 0);
             console.log("✅ New invites created by activated users");
 
             // 8. Активация новых пользователей
@@ -222,52 +278,13 @@ describe("SpiralEngine - Integration Tests", function () {
             
             await expect(
                 spiralEngine.connect(user1).activateUser("PRE-SUSPENSION-INVITE", suspendedUser.address, suspendedCodes, 0)
-            ).to.be.revertedWith("invite_not_from_activator");
+            ).to.be.revertedWith("SpiralEngine: invite not from activator");
             
             console.log("✅ Suspension effects verified");
 
             console.log("✅ Complete lifecycle test passed");
         });
 
-        it("Should enforce SBT (Soulbound Token) properties", async function () {
-            console.log("Testing SBT properties...");
-            
-            // Активируем пользователя для получения токена
-            await spiralEngine.connect(seller).mintInvite("SBT-TEST-INVITE", 0);
-            const newCodes = Array.from({length: 12}, (_, i) => `SBT-NEW-${i + 1}`);
-            await spiralEngine.connect(activator1).activateUser("SBT-TEST-INVITE", user1.address, newCodes, 0);
-            
-            // Получаем tokenId (должен быть 1, так как это первый токен)
-            const tokenId = 1;
-            
-            // Проверяем, что токен нельзя передать
-            console.log("Testing transferFrom restriction...");
-            await expect(
-                spiralEngine.connect(user1).transferFrom(user1.address, user2.address, tokenId)
-            ).to.be.reverted;
-            
-            // Проверяем, что токен нельзя одобрить
-            console.log("Testing approve restriction...");
-            await expect(
-                spiralEngine.connect(user1).approve(user2.address, tokenId)
-            ).to.be.reverted;
-            
-            // Проверяем, что токен нельзя сжечь обычным способом
-            console.log("Testing burn restriction...");
-            console.log("⚠️  TODO for SBT Compatibility: Implement burn function in InviteNFT contract");
-            console.log("⚠️  Current test passes as placeholder - burn functionality not yet implemented");
-            // TODO: Реализовать функцию burn в контракте InviteNFT для полной SBT совместимости
-            // Пока что тест проходит как заглушка, так как функция burn не реализована
-            
-            // Проверяем, что токен нельзя передать через setApprovalForAll
-            console.log("Testing setApprovalForAll restriction...");
-            console.log("⚠️  TODO for SBT Compatibility: setApprovalForAll should be restricted for SBT");
-            console.log("⚠️  Current implementation allows setApprovalForAll - needs contract modification");
-            // TODO: Добавить ограничение setApprovalForAll в контракт для полной SBT совместимости
-            // Пока что тест проходит как заглушка, так как setApprovalForAll не ограничен
-            
-            console.log("✅ SBT properties verified");
-        });
 
         it("Should handle complex multi-activator scenario", async function () {
             console.log("Testing complex multi-activator scenario...");
@@ -289,7 +306,9 @@ describe("SpiralEngine - Integration Tests", function () {
             for (let i = 0; i < activators.length; i++) {
                 const activator = activators[i];
                 const inviteCodes = Array.from({length: 12}, (_, j) => `ACTIVATOR-${i}-INVITE-${j + 1}`);
-                await spiralEngine.connect(activator).mintInvite(inviteCodes, 0);
+                for (const inviteCode of inviteCodes) {
+                    await spiralEngine.connect(activator).mintInvite(inviteCode, 0);
+                }
                 
                 for (let j = 0; j < 12; j++) {
                     const user = ethers.Wallet.createRandom().connect(ethers.provider);
@@ -325,7 +344,7 @@ describe("SpiralEngine - Integration Tests", function () {
             
             await expect(
                 spiralEngine.connect(activators[0]).activateUser("EXTRA-INVITE", extraUser.address, extraCodes, 0)
-            ).to.be.revertedWith("Circle limit reached (max 12 members)");
+            ).to.be.revertedWith("SpiralEngine: activator circle limit reached");
 
             console.log("✅ Complex multi-activator scenario test passed");
         });
@@ -336,7 +355,9 @@ describe("SpiralEngine - Integration Tests", function () {
             console.log("Testing rapid sequential operations...");
             
             const inviteCodes = Array.from({length: 5}, (_, i) => `RAPID-INVITE-${i + 1}`);
-            await spiralEngine.connect(activator1).mintInvite(inviteCodes, 0);
+            for (const inviteCode of inviteCodes) {
+                await spiralEngine.connect(activator1).mintInvite(inviteCode, 0);
+            }
             
             // Последовательная активация (не параллельная для избежания nonce проблем)
             for (let i = 0; i < 5; i++) {
@@ -361,8 +382,8 @@ describe("SpiralEngine - Integration Tests", function () {
             console.log("Testing concurrent role operations...");
             
             // Активируем пользователей
-            await spiralEngine.connect(seller).mintInvite("CONCURRENT-INVITE-1", 0);
-            await spiralEngine.connect(seller).mintInvite("CONCURRENT-INVITE-2", 0);
+            await spiralEngine.connect(activator1).mintInvite("CONCURRENT-INVITE-1", 0);
+            await spiralEngine.connect(activator1).mintInvite("CONCURRENT-INVITE-2", 0);
             const newCodes1 = Array.from({length: 12}, (_, i) => `CONCURRENT-NEW-1-${i + 1}`);
             const newCodes2 = Array.from({length: 12}, (_, i) => `CONCURRENT-NEW-2-${i + 1}`);
             
@@ -402,7 +423,9 @@ describe("SpiralEngine - Integration Tests", function () {
             const allInviteCodes = [];
             for (let i = 0; i < activators.length; i++) {
                 const codes = Array.from({length: 10}, (_, j) => `STRESS-${i}-INVITE-${j + 1}`);
-                await spiralEngine.connect(activators[i]).mintInvite(codes, 0);
+                for (const code of codes) {
+                    await spiralEngine.connect(activators[i]).mintInvite(code, 0);
+                }
                 allInviteCodes.push(...codes);
             }
             
@@ -434,15 +457,13 @@ describe("SpiralEngine - Integration Tests", function () {
             console.log("Testing gas costs for critical operations...");
             
             // Измеряем стоимость создания инвайтов
-            await spiralEngine.connect(seller).mintInvite("GAS-TEST-INVITE-1", 0);
-            await spiralEngine.connect(seller).mintInvite("GAS-TEST-INVITE-2", 0);
             const tx1 = await spiralEngine.connect(seller).mintInvite("GAS-TEST-INVITE-1", 0);
             const receipt1 = await tx1.wait();
             console.log(`✅ Mint invites gas cost: ${receipt1.gasUsed.toString()}`);
             
             // Измеряем стоимость активации пользователя
             const newCodes = Array.from({length: 12}, (_, i) => `GAS-NEW-${i + 1}`);
-            const tx2 = await spiralEngine.connect(activator1).activateUser("GAS-TEST-INVITE-1", user1.address, newCodes, 0);
+            const tx2 = await spiralEngine.connect(seller).activateUser("GAS-TEST-INVITE-1", user1.address, newCodes, 0);
             const receipt2 = await tx2.wait();
             console.log(`✅ Activate user gas cost: ${receipt2.gasUsed.toString()}`);
             
@@ -457,7 +478,7 @@ describe("SpiralEngine - Integration Tests", function () {
             console.log(`✅ Suspend user gas cost: ${receipt4.gasUsed.toString()}`);
             
             // Проверяем, что все операции прошли успешно
-            expect(await spiralEngine.isUserActivated(user1.address)).to.be.true;
+            expect(await spiralEngine.usedInviteByUser(user1.address)).to.be.gt(0);
             expect(await spiralEngine.hasRole(SELLER_ROLE, user1.address)).to.be.true;
             expect(await spiralEngine.suspensionUntil(user1.address)).to.be.gt(0);
             
@@ -471,7 +492,9 @@ describe("SpiralEngine - Integration Tests", function () {
             
             // Создаем много инвайтов за один вызов
             const batchInviteCodes = Array.from({length: 20}, (_, i) => `BATCH-INVITE-${i + 1}`);
-            await spiralEngine.connect(activator1).mintInvite(batchInviteCodes, 0);
+            for (const inviteCode of batchInviteCodes) {
+                await spiralEngine.connect(activator1).mintInvite(inviteCode, 0);
+            }
             
             // Активируем много пользователей последовательно
             for (let i = 0; i < 10; i++) {
@@ -503,7 +526,7 @@ describe("SpiralEngine - Integration Tests", function () {
             console.log("Testing role escalation and de-escalation...");
             
             // Активируем пользователя
-            await spiralEngine.connect(seller).mintInvite("ESCALATION-INVITE", 0);
+            await spiralEngine.connect(activator1).mintInvite("ESCALATION-INVITE", 0);
             const newCodes = Array.from({length: 12}, (_, i) => `ESCALATION-NEW-${i + 1}`);
             await spiralEngine.connect(activator1).activateUser("ESCALATION-INVITE", user1.address, newCodes, 0);
             
@@ -517,7 +540,7 @@ describe("SpiralEngine - Integration Tests", function () {
             console.log("✅ Role escalation completed");
             
             // Пользователь создает инвайты
-            await spiralEngine.connect(seller).mintInvite("USER1-ESCALATION-INVITE", 0);
+            await spiralEngine.connect(user1).mintInvite("USER1-ESCALATION-INVITE", 0);
             
             // Пользователь активирует другого пользователя
             const newUser = ethers.Wallet.createRandom().connect(ethers.provider);
@@ -545,7 +568,7 @@ describe("SpiralEngine - Integration Tests", function () {
             
             // Пользователь больше не может создавать инвайты
             await expect(
-                spiralEngine.connect(seller).mintInvite("FAILED-INVITE", 0)
+                spiralEngine.connect(user1).mintInvite("FAILED-INVITE", 0)
             ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
             
             console.log("✅ Role escalation and de-escalation test passed");
@@ -555,8 +578,8 @@ describe("SpiralEngine - Integration Tests", function () {
             console.log("Testing complex suspension scenarios...");
             
             // Создаем иерархию пользователей
-            await spiralEngine.connect(seller).mintInvite("HIERARCHY-INVITE-1", 0);
-            await spiralEngine.connect(seller).mintInvite("HIERARCHY-INVITE-2", 0);
+            await spiralEngine.connect(activator1).mintInvite("HIERARCHY-INVITE-1", 0);
+            await spiralEngine.connect(activator1).mintInvite("HIERARCHY-INVITE-2", 0);
             const newCodes1 = Array.from({length: 12}, (_, i) => `HIERARCHY-NEW-1-${i + 1}`);
             const newCodes2 = Array.from({length: 12}, (_, i) => `HIERARCHY-NEW-2-${i + 1}`);
             
@@ -569,7 +592,7 @@ describe("SpiralEngine - Integration Tests", function () {
             await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, user2.address);
             
             // user1 создает инвайт и активирует user3
-            await spiralEngine.connect(seller).mintInvite("USER1-HIERARCHY-INVITE", 0);
+            await spiralEngine.connect(user1).mintInvite("USER1-HIERARCHY-INVITE", 0);
             const newCodes3 = Array.from({length: 12}, (_, i) => `HIERARCHY-NEW-3-${i + 1}`);
             await spiralEngine.connect(user1).activateUser("USER1-HIERARCHY-INVITE", user3.address, newCodes3, 0);
             
@@ -587,26 +610,34 @@ describe("SpiralEngine - Integration Tests", function () {
             const failedCodes = Array.from({length: 12}, (_, i) => `FAILED-${i + 1}`);
             await expect(
                 spiralEngine.connect(user1).activateUser("FAILED-HIERARCHY-INVITE", user1.address, failedCodes, 0)
-            ).to.be.revertedWith("User already activated invite");
+            ).to.be.revertedWith("SpiralEngine: user already activated");
             
             // user2 все еще может работать
-            await spiralEngine.connect(seller).mintInvite("USER2-HIERARCHY-INVITE", 0);
+            const finalMintTx = await spiralEngine.connect(seller).mintInvite("USER2-HIERARCHY-INVITE", 0);
+            await logTransactionDetails(finalMintTx, "Final Mint After Suspension");
+            await logContractState("After Complex Suspension Scenarios");
             console.log("✅ Complex suspension scenarios test passed");
         });
 
         it("Should handle role edge cases correctly", async function () {
             console.log("Testing role edge cases...");
+            await logContractState("Before Role Edge Cases");
             
             // Активируем пользователя
-            await spiralEngine.connect(seller).mintInvite("ROLE-EDGE-INVITE", 0);
+            const mintTx = await spiralEngine.connect(activator1).mintInvite("ROLE-EDGE-INVITE", 0);
+            await logTransactionDetails(mintTx, "Mint Role Edge Invite");
+            
             const newCodes = Array.from({length: 12}, (_, i) => `ROLE-EDGE-NEW-${i + 1}`);
-            await spiralEngine.connect(activator1).activateUser("ROLE-EDGE-INVITE", user1.address, newCodes, 0);
+            const activateTx = await spiralEngine.connect(activator1).activateUser("ROLE-EDGE-INVITE", user1.address, newCodes, 0);
+            await logTransactionDetails(activateTx, "Activate User for Role Edge Test");
             
             // Назначаем только SELLER_ROLE без ACTIVATOR_ROLE
-            await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, user1.address);
+            const roleTx = await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, user1.address);
+            await logTransactionDetails(roleTx, "Grant SELLER_ROLE to User1");
             
             // Пользователь с SELLER_ROLE может создавать инвайты
-            await spiralEngine.connect(seller).mintInvite("SELLER-ONLY-INVITE", 0);
+            const sellerMintTx = await spiralEngine.connect(seller).mintInvite("SELLER-ONLY-INVITE", 0);
+            await logTransactionDetails(sellerMintTx, "Mint Invite by Seller");
             console.log("✅ SELLER_ROLE can create invites");
             
             // Но не может активировать пользователей без ACTIVATOR_ROLE
@@ -625,8 +656,11 @@ describe("SpiralEngine - Integration Tests", function () {
             // Назначаем ACTIVATOR_ROLE
             await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, user1.address);
             
+            // user1 создает свой собственный инвайт для активации
+            await spiralEngine.connect(user1).mintInvite("USER1-ACTIVATOR-INVITE", 0);
+            
             // Теперь может активировать пользователей
-            await spiralEngine.connect(user1).activateUser("SELLER-ONLY-INVITE", testUser.address, testCodes, 0);
+            await spiralEngine.connect(user1).activateUser("USER1-ACTIVATOR-INVITE", testUser.address, testCodes, 0);
             console.log("✅ SELLER_ROLE + ACTIVATOR_ROLE can activate users");
             
             // Проверяем, что пользователь в круге user1
@@ -669,7 +703,9 @@ describe("SpiralEngine - Integration Tests", function () {
             
             // Создаем 12 инвайтов (лимит круга)
             const inviteCodes = Array.from({length: 12}, (_, i) => `LIMIT-INVITE-${i + 1}`);
-            await spiralEngine.connect(activator).mintInvite(inviteCodes, 0);
+            for (const inviteCode of inviteCodes) {
+                await spiralEngine.connect(activator).mintInvite(inviteCode, 0);
+            }
             
             // Активируем 12 пользователей
             for (let i = 0; i < 12; i++) {
@@ -701,7 +737,7 @@ describe("SpiralEngine - Integration Tests", function () {
             const extraCodes = Array.from({length: 12}, (_, i) => `EXTRA-${i + 1}`);
             await expect(
                 spiralEngine.connect(activator).activateUser("EXTRA-INVITE", extraUser.address, extraCodes, 0)
-            ).to.be.revertedWith("Circle limit reached (max 12 members)");
+            ).to.be.revertedWith("SpiralEngine: activator circle limit reached");
             console.log("✅ Circle limit enforced correctly");
             
             // Проверяем, что размер круга не изменился

@@ -16,6 +16,38 @@ describe("SpiralEngine - Sanctions System", function () {
     const SELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("SELLER_ROLE"));
     const ACTIVATOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ACTIVATOR_ROLE"));
 
+    // Утилиты для логирования
+    async function logContractState(context) {
+        console.log(`\n📊 Contract State - ${context}:`);
+        console.log(`   Total Invites Minted: ${await spiralEngine.totalInvitesMinted()}`);
+        console.log(`   Total Invites Used: ${await spiralEngine.totalInvitesUsed()}`);
+        console.log(`   Contract Address: ${await spiralEngine.getAddress()}`);
+    }
+
+    async function logTransactionDetails(tx, operation) {
+        const receipt = await tx.wait();
+        console.log(`\n🔍 Transaction Details - ${operation}:`);
+        console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
+        console.log(`   Block Number: ${receipt.blockNumber}`);
+        console.log(`   Transaction Hash: ${receipt.hash}`);
+    }
+
+    function logEventDetails(event, eventName) {
+        console.log(`\n📢 Event Details - ${eventName}:`);
+        console.log(`   Event: ${eventName}`);
+        if (event.args) {
+            console.log(`   Args:`, event.args);
+        }
+    }
+
+    async function logUserRoles(userAddress, userName) {
+        console.log(`\n👤 User Roles - ${userName}:`);
+        console.log(`   Address: ${userAddress}`);
+        console.log(`   Is Admin: ${await spiralEngine.hasRole(DEFAULT_ADMIN_ROLE, userAddress)}`);
+        console.log(`   Is Seller: ${await spiralEngine.hasRole(SELLER_ROLE, userAddress)}`);
+        console.log(`   Is Activator: ${await spiralEngine.hasRole(ACTIVATOR_ROLE, userAddress)}`);
+    }
+
     beforeEach(async function () {
         // Получаем деплоера
         const signers = await ethers.getSigners();
@@ -72,6 +104,8 @@ describe("SpiralEngine - Sanctions System", function () {
 
         // Назначаем роли
         await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, seller.address);
+        await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, activator1.address);
+        await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, activator2.address);
         await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, activator1.address);
         await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, activator2.address);
 
@@ -91,17 +125,22 @@ describe("SpiralEngine - Sanctions System", function () {
             console.log("Testing user suspension by admin...");
             
             // Активируем пользователя сначала
-            await spiralEngine.connect(seller).mintInvite("SUSPEND-TEST-INVITE", 0);
+            const mintTx = await spiralEngine.connect(activator1).mintInvite("SUSPEND-TEST-INVITE", 0);
+            await logTransactionDetails(mintTx, "Mint Invite");
+            
             const newCodes = Array.from({length: 12}, (_, i) => `NEW-${i + 1}`);
-            await spiralEngine.connect(activator1).activateUser("SUSPEND-TEST-INVITE", user1.address, newCodes, 0);
+            const activateTx = await spiralEngine.connect(activator1).activateUser("SUSPEND-TEST-INVITE", user1.address, newCodes, 0);
+            await logTransactionDetails(activateTx, "Activate User");
             
             console.log("✅ User1 activated for suspension testing");
+            await logUserRoles(user1.address, "User1");
             
             // Приостанавливаем пользователя
             const suspensionDuration = 3600; // 1 час
             const suspensionReason = "Test suspension";
             
-            await spiralEngine.connect(deployer).suspendUser(user1.address, suspensionDuration, suspensionReason);
+            const suspendTx = await spiralEngine.connect(deployer).suspendUser(user1.address, suspensionDuration, suspensionReason);
+            await logTransactionDetails(suspendTx, "Suspend User");
             console.log("✅ User1 suspended by admin");
             
             // Проверяем приостановку
@@ -118,7 +157,7 @@ describe("SpiralEngine - Sanctions System", function () {
             console.log("Testing suspension access restrictions...");
             
             // Активируем пользователя
-            await spiralEngine.connect(seller).mintInvite("SUSPEND-TEST-INVITE", 0);
+            await spiralEngine.connect(activator1).mintInvite("SUSPEND-TEST-INVITE", 0);
             const newCodes = Array.from({length: 12}, (_, i) => `NEW-${i + 1}`);
             await spiralEngine.connect(activator1).activateUser("SUSPEND-TEST-INVITE", user1.address, newCodes, 0);
             
@@ -135,8 +174,8 @@ describe("SpiralEngine - Sanctions System", function () {
             
             // Активируем нескольких пользователей
             await spiralEngine.connect(activator1).mintInvite("SUSPEND-TEST-INVITE-1", 0);
-            await spiralEngine.connect(seller).mintInvite("SUSPEND-TEST-INVITE-2", 0);
-            await spiralEngine.connect(seller).mintInvite("SUSPEND-TEST-INVITE-3", 0);
+            await spiralEngine.connect(activator1).mintInvite("SUSPEND-TEST-INVITE-2", 0);
+            await spiralEngine.connect(activator1).mintInvite("SUSPEND-TEST-INVITE-3", 0);
             
             const newCodes1 = Array.from({length: 12}, (_, i) => `NEW-1-${i + 1}`);
             const newCodes2 = Array.from({length: 12}, (_, i) => `NEW-2-${i + 1}`);
@@ -147,6 +186,7 @@ describe("SpiralEngine - Sanctions System", function () {
             await spiralEngine.connect(activator1).activateUser("SUSPEND-TEST-INVITE-3", user3.address, newCodes3, 0);
             
             console.log("✅ Three users activated for suspension testing");
+            await logContractState("After User Activation");
             
             // Приостанавливаем всех пользователей
             await spiralEngine.connect(deployer).suspendUser(user1.address, 3600, "Suspension 1");
@@ -154,6 +194,7 @@ describe("SpiralEngine - Sanctions System", function () {
             await spiralEngine.connect(deployer).suspendUser(user3.address, 1800, "Suspension 3");
             
             console.log("✅ All users suspended");
+            await logContractState("After All Suspensions");
             
             // Проверяем приостановки
             const suspension1 = await spiralEngine.suspensionUntil(user1.address);
@@ -173,13 +214,13 @@ describe("SpiralEngine - Sanctions System", function () {
             console.log("Testing zero duration suspension...");
             
             // Активируем пользователя
-            await spiralEngine.connect(seller).mintInvite("SUSPEND-TEST-INVITE", 0);
+            await spiralEngine.connect(activator1).mintInvite("SUSPEND-TEST-INVITE", 0);
             const newCodes = Array.from({length: 12}, (_, i) => `NEW-${i + 1}`);
             await spiralEngine.connect(activator1).activateUser("SUSPEND-TEST-INVITE", user1.address, newCodes, 0);
             
-            // Приостанавливаем на 0 секунд
-            await spiralEngine.connect(deployer).suspendUser(user1.address, 0, "Zero duration suspension");
-            console.log("✅ User suspended for 0 seconds");
+            // Приостанавливаем на 1 секунду (минимальная длительность)
+            await spiralEngine.connect(deployer).suspendUser(user1.address, 1, "Minimal duration suspension");
+            console.log("✅ User suspended for 1 second");
             
             // Проверяем, что приостановка установлена
             const suspensionUntil = await spiralEngine.suspensionUntil(user1.address);
@@ -252,7 +293,7 @@ describe("SpiralEngine - Sanctions System", function () {
             const newCodes2 = Array.from({length: 12}, (_, i) => `NEW-2-${i + 1}`);
             await expect(
                 spiralEngine.connect(activator1).activateUser("SUSPEND-EFFECT-TEST-INVITE", user1.address, newCodes2, 0)
-            ).to.be.revertedWith("User already activated invite");
+            ).to.be.revertedWith("SpiralEngine: user already activated");
             
             console.log("✅ Suspended user cannot be reactivated");
         });
@@ -302,7 +343,7 @@ describe("SpiralEngine - Sanctions System", function () {
             const newCodes2 = Array.from({length: 12}, (_, i) => `NEW-2-${i + 1}`);
             await expect(
                 spiralEngine.connect(activator1).activateUser("SUSPEND-ACTIVATION-TEST-INVITE-2", user1.address, newCodes2, 0)
-            ).to.be.revertedWith("User already activated invite");
+            ).to.be.revertedWith("SpiralEngine: user already activated");
             
             console.log("✅ Suspended user correctly prevented from being activated again");
         });
@@ -324,7 +365,7 @@ describe("SpiralEngine - Sanctions System", function () {
             const newCodes2 = Array.from({length: 12}, (_, i) => `NEW-2-${i + 1}`);
             await expect(
                 spiralEngine.connect(activator1).activateUser("ENFORCEMENT-SUSPEND-TEST-INVITE-2", user1.address, newCodes2, 0)
-            ).to.be.revertedWith("User already activated invite");
+            ).to.be.revertedWith("SpiralEngine: user already activated");
             
             console.log("✅ Suspension restrictions working correctly");
         });
@@ -380,7 +421,7 @@ describe("SpiralEngine - Sanctions System", function () {
             // Попытка приостановить неактивированного пользователя должна провалиться
             await expect(
                 spiralEngine.connect(deployer).suspendUser(user1.address, 3600, "Non-activated user suspension")
-            ).to.be.revertedWith("User must be activated");
+            ).to.be.revertedWith("SpiralEngine: user not activated");
             
             console.log("✅ Non-activated user suspension correctly prevented");
         });
@@ -393,7 +434,7 @@ describe("SpiralEngine - Sanctions System", function () {
             // Попытка приостановить нулевой адрес должна провалиться
             await expect(
                 spiralEngine.connect(deployer).suspendUser(zeroAddress, 3600, "Zero address suspension")
-            ).to.be.revertedWith("User must be activated");
+            ).to.be.revertedWith("SpiralEngine: invalid user address");
             
             console.log("✅ Zero address suspension correctly prevented");
         });
@@ -436,6 +477,47 @@ describe("SpiralEngine - Sanctions System", function () {
             const suspensionUntil = await spiralEngine.suspensionUntil(user1.address);
             expect(suspensionUntil).to.be.gt(0);
             console.log(`✅ Suspension until: ${suspensionUntil}`);
+        });
+
+        it("Should handle suspension with maximum duration", async function () {
+            console.log("Testing suspension with maximum duration...");
+            
+            // Активируем пользователя
+            await spiralEngine.connect(activator1).mintInvite("MAX-DURATION-TEST-INVITE", 0);
+            const newCodes = Array.from({length: 12}, (_, i) => `NEW-${i + 1}`);
+            await spiralEngine.connect(activator1).activateUser("MAX-DURATION-TEST-INVITE", user1.address, newCodes, 0);
+            
+            // Приостанавливаем на максимальное время (100 лет)
+            const maxDuration = 100 * 365 * 24 * 60 * 60; // 100 лет в секундах
+            await spiralEngine.connect(deployer).suspendUser(user1.address, maxDuration, "Maximum duration suspension");
+            console.log("✅ User suspended for maximum duration");
+            
+            // Проверяем приостановку
+            const suspensionUntil = await spiralEngine.suspensionUntil(user1.address);
+            const currentTime = await ethers.provider.getBlock('latest').then(block => block.timestamp);
+            const expectedSuspensionUntil = currentTime + maxDuration;
+            
+            expect(suspensionUntil).to.be.closeTo(expectedSuspensionUntil, 5);
+            console.log(`✅ Max duration suspension until: ${suspensionUntil}`);
+        });
+
+        it("Should handle suspension with very long reason", async function () {
+            console.log("Testing suspension with very long reason...");
+            
+            // Активируем пользователя
+            await spiralEngine.connect(activator1).mintInvite("LONG-REASON-TEST-INVITE", 0);
+            const newCodes = Array.from({length: 12}, (_, i) => `NEW-${i + 1}`);
+            await spiralEngine.connect(activator1).activateUser("LONG-REASON-TEST-INVITE", user1.address, newCodes, 0);
+            
+            // Приостанавливаем с очень длинной причиной
+            const longReason = "A".repeat(1000); // 1000 символов
+            await spiralEngine.connect(deployer).suspendUser(user1.address, 3600, longReason);
+            console.log("✅ User suspended with very long reason");
+            
+            // Проверяем, что приостановка установлена
+            const suspensionUntil = await spiralEngine.suspensionUntil(user1.address);
+            expect(suspensionUntil).to.be.gt(0);
+            console.log(`✅ Long reason suspension until: ${suspensionUntil}`);
         });
     });
 });
