@@ -17,6 +17,42 @@ describe("SpiralEngine - Circle Management", function () {
     const SELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("SELLER_ROLE"));
     const ACTIVATOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ACTIVATOR_ROLE"));
 
+    // Утилиты логирования
+    async function logContractState(context) {
+        console.log(`\n📊 Contract State - ${context}:`);
+        console.log(`   Total Invites Minted: ${await spiralEngine.totalInvitesMinted()}`);
+        console.log(`   Total Invites Used: ${await spiralEngine.totalInvitesUsed()}`);
+        console.log(`   Contract Address: ${await spiralEngine.getAddress()}`);
+    }
+
+    async function logTransactionDetails(tx, operation) {
+        const receipt = await tx.wait();
+        console.log(`\n🔍 Transaction Details - ${operation}:`);
+        console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
+        console.log(`   Gas Price: ${receipt.gasPrice?.toString() || 'N/A'}`);
+        console.log(`   Block Number: ${receipt.blockNumber}`);
+        console.log(`   Transaction Hash: ${receipt.hash}`);
+    }
+
+    function logEventDetails(event, eventName) {
+        console.log(`\n📢 Event Details - ${eventName}:`);
+        console.log(`   Event: ${eventName}`);
+        if (event.args) {
+            Object.keys(event.args).forEach(key => {
+                if (key !== 'length') {
+                    console.log(`   ${key}: ${event.args[key]}`);
+                }
+            });
+        }
+    }
+
+    async function logUserRoles(userAddress, userName) {
+        console.log(`\n👤 User Roles - ${userName} (${userAddress}):`);
+        console.log(`   DEFAULT_ADMIN_ROLE: ${await spiralEngine.hasRole(DEFAULT_ADMIN_ROLE, userAddress)}`);
+        console.log(`   SELLER_ROLE: ${await spiralEngine.hasRole(SELLER_ROLE, userAddress)}`);
+        console.log(`   ACTIVATOR_ROLE: ${await spiralEngine.hasRole(ACTIVATOR_ROLE, userAddress)}`);
+    }
+
     beforeEach(async function () {
         // Получаем деплоера
         const signers = await ethers.getSigners();
@@ -73,6 +109,8 @@ describe("SpiralEngine - Circle Management", function () {
 
         // Назначаем роли
         await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, seller.address);
+        await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, activator1.address); // activator1 может создавать инвайты
+        await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, activator2.address); // activator2 может создавать инвайты
         await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, activator1.address);
         await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, activator2.address);
 
@@ -92,14 +130,21 @@ describe("SpiralEngine - Circle Management", function () {
         it("Should create circle with single member", async function () {
             console.log("Testing single member circle creation...");
             
+            await logContractState("Before minting invite");
+            await logUserRoles(activator1.address, "Activator1");
+            
             // Создаем инвайт для активатора
-            await spiralEngine.connect(seller).mintInvite("CIRCLE-TEST-INVITE-1", 0);
+            const mintTx = await spiralEngine.connect(activator1).mintInvite("CIRCLE-TEST-INVITE-1", 0);
+            await logTransactionDetails(mintTx, "Mint Invite");
             
             const newCodes = Array.from({length: 12}, (_, i) => `NEW-${i + 1}`);
             
             // Активируем пользователя
-            await spiralEngine.connect(activator1).activateUser("CIRCLE-TEST-INVITE-1", user1.address, newCodes, 0);
+            const activateTx = await spiralEngine.connect(activator1).activateUser("CIRCLE-TEST-INVITE-1", user1.address, newCodes, 0);
+            await logTransactionDetails(activateTx, "Activate User");
             console.log("✅ User1 activated by activator1");
+            
+            await logContractState("After activation");
             
             // Проверяем размер круга
             const circleSize = await spiralEngine.getCircleSize(activator1.address);
@@ -122,9 +167,9 @@ describe("SpiralEngine - Circle Management", function () {
             console.log("Testing multiple member circle creation...");
             
             // Создаем инвайты для активатора
-            await spiralEngine.connect(seller).mintInvite("CIRCLE-TEST-INVITE-1", 0);
-            await spiralEngine.connect(seller).mintInvite("CIRCLE-TEST-INVITE-2", 0);
-            await spiralEngine.connect(seller).mintInvite("CIRCLE-TEST-INVITE-3", 0);
+            await spiralEngine.connect(activator1).mintInvite("CIRCLE-TEST-INVITE-1", 0);
+            await spiralEngine.connect(activator1).mintInvite("CIRCLE-TEST-INVITE-2", 0);
+            await spiralEngine.connect(activator1).mintInvite("CIRCLE-TEST-INVITE-3", 0);
             
             // Активируем трех пользователей
             const newCodes1 = Array.from({length: 12}, (_, i) => `NEW-1-${i + 1}`);
@@ -155,10 +200,10 @@ describe("SpiralEngine - Circle Management", function () {
             console.log("Testing multiple independent circles...");
             
             // Создаем инвайты для обоих активаторов
-            await spiralEngine.connect(seller).mintInvite("CIRCLE-1-INVITE-1", 0);
-            await spiralEngine.connect(seller).mintInvite("CIRCLE-1-INVITE-2", 0);
-            await spiralEngine.connect(seller).mintInvite("CIRCLE-2-INVITE-1", 0);
-            await spiralEngine.connect(seller).mintInvite("CIRCLE-2-INVITE-2", 0);
+            await spiralEngine.connect(activator1).mintInvite("CIRCLE-1-INVITE-1", 0);
+            await spiralEngine.connect(activator1).mintInvite("CIRCLE-1-INVITE-2", 0);
+            await spiralEngine.connect(activator2).mintInvite("CIRCLE-2-INVITE-1", 0);
+            await spiralEngine.connect(activator2).mintInvite("CIRCLE-2-INVITE-2", 0);
             
             // Активируем пользователей в разных кругах
             const newCodes1 = Array.from({length: 12}, (_, i) => `NEW-1-${i + 1}`);
@@ -198,10 +243,14 @@ describe("SpiralEngine - Circle Management", function () {
         it("Should enforce 12 member circle limit", async function () {
             console.log("Testing 12 member circle limit...");
             
+            await logContractState("Before creating invites");
+            
             // Создаем 13 инвайтов для тестирования лимита
             for (let i = 1; i <= 13; i++) {
-                await spiralEngine.connect(seller).mintInvite(`LIMIT-TEST-INVITE-${i}`, 0);
+                await spiralEngine.connect(activator1).mintInvite(`LIMIT-TEST-INVITE-${i}`, 0);
             }
+            
+            await logContractState("After creating 13 invites");
             
             // Активируем 12 пользователей (должно пройти)
             for (let i = 0; i < 12; i++) {
@@ -216,6 +265,8 @@ describe("SpiralEngine - Circle Management", function () {
             }
             
             console.log("✅ 12 users activated successfully");
+            
+            await logContractState("After activating 12 users");
             
             // Проверяем размер круга
             const circleSize = await spiralEngine.getCircleSize(activator1.address);
@@ -233,7 +284,7 @@ describe("SpiralEngine - Circle Management", function () {
             
             await expect(
                 spiralEngine.connect(activator1).activateUser("LIMIT-TEST-INVITE-13", user13.address, newCodes13, 0)
-            ).to.be.revertedWith("Circle limit reached (max 12 members)");
+            ).to.be.revertedWith("SpiralEngine: activator circle limit reached");
             
             console.log("✅ 13th user activation correctly rejected");
         });
@@ -242,7 +293,7 @@ describe("SpiralEngine - Circle Management", function () {
             console.log("Testing circle limit enforcement in activateUser function...");
             
             for (let i = 1; i <= 13; i++) {
-                await spiralEngine.connect(seller).mintInvite(`ENFORCEMENT-TEST-INVITE-${i}`, 0);
+                await spiralEngine.connect(activator1).mintInvite(`ENFORCEMENT-TEST-INVITE-${i}`, 0);
             }
             
             // Активируем 12 пользователей
@@ -272,7 +323,7 @@ describe("SpiralEngine - Circle Management", function () {
             const newCodes13 = Array.from({length: 12}, (_, i) => `NEW-13-${i + 1}`);
             await expect(
                 spiralEngine.connect(activator1).activateUser("ENFORCEMENT-TEST-INVITE-13", user13.address, newCodes13, 0)
-            ).to.be.revertedWith("Circle limit reached (max 12 members)");
+            ).to.be.revertedWith("SpiralEngine: activator circle limit reached");
             
             console.log("✅ Circle limit enforcement working correctly");
         });
@@ -282,8 +333,8 @@ describe("SpiralEngine - Circle Management", function () {
             
             // Создаем инвайты для обоих активаторов
             for (let i = 1; i <= 12; i++) {
-                await spiralEngine.connect(seller).mintInvite(`FULL-CIRCLE-1-INVITE-${i}`, 0);
-                await spiralEngine.connect(seller).mintInvite(`FULL-CIRCLE-2-INVITE-${i}`, 0);
+                await spiralEngine.connect(activator1).mintInvite(`FULL-CIRCLE-1-INVITE-${i}`, 0);
+                await spiralEngine.connect(activator2).mintInvite(`FULL-CIRCLE-2-INVITE-${i}`, 0);
             }
             
             // Заполняем первый круг
@@ -327,8 +378,8 @@ describe("SpiralEngine - Circle Management", function () {
             console.log("Testing activator relationships...");
             
             // Создаем инвайты
-            await spiralEngine.connect(seller).mintInvite("HIERARCHY-TEST-INVITE-1", 0);
-            await spiralEngine.connect(seller).mintInvite("HIERARCHY-TEST-INVITE-2", 0);
+            await spiralEngine.connect(activator1).mintInvite("HIERARCHY-TEST-INVITE-1", 0);
+            await spiralEngine.connect(activator2).mintInvite("HIERARCHY-TEST-INVITE-2", 0);
             
             const newCodes1 = Array.from({length: 12}, (_, i) => `NEW-1-${i + 1}`);
             const newCodes2 = Array.from({length: 12}, (_, i) => `NEW-2-${i + 1}`);
@@ -364,7 +415,7 @@ describe("SpiralEngine - Circle Management", function () {
             console.log("Testing cross-circle activation prevention...");
             
             // Создаем инвайт для первого активатора
-            await spiralEngine.connect(seller).mintInvite("CROSS-CIRCLE-INVITE", 0);
+            await spiralEngine.connect(activator1).mintInvite("CROSS-CIRCLE-INVITE", 0);
             
             // Активируем пользователя первым активатором
             const newCodes = Array.from({length: 12}, (_, i) => `NEW-${i + 1}`);
@@ -377,7 +428,7 @@ describe("SpiralEngine - Circle Management", function () {
             
             await expect(
                 spiralEngine.connect(activator2).activateUser("CROSS-CIRCLE-INVITE", user1.address, newCodes2, 0)
-            ).to.be.revertedWith("User already activated invite");
+            ).to.be.revertedWith("SpiralEngine: user already activated");
             
             console.log("✅ Cross-circle activation correctly prevented");
         });
@@ -388,9 +439,9 @@ describe("SpiralEngine - Circle Management", function () {
             console.log("Testing circle statistics...");
             
             // Создаем инвайты
-            await spiralEngine.connect(seller).mintInvite("STATS-TEST-INVITE-1", 0);
-            await spiralEngine.connect(seller).mintInvite("STATS-TEST-INVITE-2", 0);
-            await spiralEngine.connect(seller).mintInvite("STATS-TEST-INVITE-3", 0);
+            await spiralEngine.connect(activator1).mintInvite("STATS-TEST-INVITE-1", 0);
+            await spiralEngine.connect(activator1).mintInvite("STATS-TEST-INVITE-2", 0);
+            await spiralEngine.connect(activator2).mintInvite("STATS-TEST-INVITE-3", 0);
             
             // Активируем пользователей
             const newCodes1 = Array.from({length: 12}, (_, i) => `NEW-1-${i + 1}`);
@@ -468,9 +519,12 @@ describe("SpiralEngine - Circle Management", function () {
             // Создаем инвайт для seller
             await spiralEngine.connect(seller).mintInvite("OWNERSHIP-TEST-INVITE", 0);
             
+            // Получаем tokenId для инвайта
+            const tokenId = await spiralEngine.inviteCodeToTokenId("OWNERSHIP-TEST-INVITE");
+            
             // Проверяем принадлежность инвайта
-            const isFromActivator1 = await spiralEngine.isInviteFromActivator("OWNERSHIP-TEST-INVITE", activator1.address);
-            const isFromActivator2 = await spiralEngine.isInviteFromActivator("OWNERSHIP-TEST-INVITE", activator2.address);
+            const isFromActivator1 = await spiralEngine.isInviteFromActivator(tokenId, activator1.address);
+            const isFromActivator2 = await spiralEngine.isInviteFromActivator(tokenId, activator2.address);
             
             expect(isFromActivator1).to.be.false; // Инвайт создан seller, не activator1
             expect(isFromActivator2).to.be.false; // Инвайт создан seller, не activator2
@@ -478,11 +532,14 @@ describe("SpiralEngine - Circle Management", function () {
             console.log(`✅ Invite from activator2: ${isFromActivator2}`);
             
             // Создаем инвайт для активатора
-            await spiralEngine.connect(seller).mintInvite("OWNERSHIP-TEST-INVITE-2", 0);
+            await spiralEngine.connect(activator1).mintInvite("OWNERSHIP-TEST-INVITE-2", 0);
+            
+            // Получаем tokenId для нового инвайта
+            const tokenId2 = await spiralEngine.inviteCodeToTokenId("OWNERSHIP-TEST-INVITE-2");
             
             // Проверяем принадлежность нового инвайта
-            const isFromActivator1New = await spiralEngine.isInviteFromActivator("OWNERSHIP-TEST-INVITE-2", activator1.address);
-            const isFromActivator2New = await spiralEngine.isInviteFromActivator("OWNERSHIP-TEST-INVITE-2", activator2.address);
+            const isFromActivator1New = await spiralEngine.isInviteFromActivator(tokenId2, activator1.address);
+            const isFromActivator2New = await spiralEngine.isInviteFromActivator(tokenId2, activator2.address);
             
             expect(isFromActivator1New).to.be.true; // Инвайт создан activator1
             expect(isFromActivator2New).to.be.false; // Инвайт не создан activator2
@@ -493,15 +550,15 @@ describe("SpiralEngine - Circle Management", function () {
         it("Should handle invalid invite codes in circle operations", async function () {
             console.log("Testing invalid invite codes in circle operations...");
             
-            // Проверяем несуществующий инвайт
-            const isFromActivator1 = await spiralEngine.isInviteFromActivator("NON-EXISTENT-INVITE", activator1.address);
+            // Проверяем несуществующий инвайт (tokenId = 0 для несуществующего)
+            const isFromActivator1 = await spiralEngine.isInviteFromActivator(0, activator1.address);
             expect(isFromActivator1).to.be.false;
             console.log(`✅ Non-existent invite from activator1: ${isFromActivator1}`);
             
-            // Проверяем пустую строку
-            const isEmptyFromActivator1 = await spiralEngine.isInviteFromActivator("", activator1.address);
+            // Проверяем несуществующий tokenId
+            const isEmptyFromActivator1 = await spiralEngine.isInviteFromActivator(999999, activator1.address);
             expect(isEmptyFromActivator1).to.be.false;
-            console.log(`✅ Empty invite from activator1: ${isEmptyFromActivator1}`);
+            console.log(`✅ Non-existent tokenId from activator1: ${isEmptyFromActivator1}`);
         });
     });
 });
