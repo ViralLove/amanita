@@ -25,6 +25,9 @@ contract SpiralEngine is ERC721, AccessControl {
     
     // Маппинг: inviteCode (уникальный строковый код) => tokenId (NFT инвайта)
     mapping(string => uint256) public inviteCodeToTokenId;
+    
+    // Маппинг: inviteCode => существует ли код (для корректной проверки дублирования)
+    mapping(string => bool) public inviteCodeExists;
 
     // Маппинг: tokenId (NFT инвайта) => inviteCode (уникальный строковый код)
     mapping(uint256 => string) public tokenIdToInviteCode;
@@ -125,12 +128,13 @@ contract SpiralEngine is ERC721, AccessControl {
      */
     function mintInvite(string memory inviteCode, uint256 expiry) public onlyRole(SELLER_ROLE) returns (uint256) {
         require(bytes(inviteCode).length > 0, "SpiralEngine: empty invite code");
-        require(inviteCodeToTokenId[inviteCode] == 0, "SpiralEngine: invite code already exists");
+        require(!inviteCodeExists[inviteCode], "SpiralEngine: invite code already exists");
         
         uint256 tokenId = _tokenIdCounter++;
         _mint(msg.sender, tokenId);
         
         inviteCodeToTokenId[inviteCode] = tokenId;
+        inviteCodeExists[inviteCode] = true;
         tokenIdToInviteCode[tokenId] = inviteCode;
         inviteExpiry[tokenId] = expiry;
         inviteCreatedAt[tokenId] = block.timestamp;
@@ -169,7 +173,7 @@ contract SpiralEngine is ERC721, AccessControl {
         
         // Используем инвайт
         isInviteUsed[tokenId] = true;
-        usedInviteByUser[user] = tokenId;
+        usedInviteByUser[user] = tokenId + 1; // +1 чтобы избежать конфликта с tokenId = 0
         totalInvitesUsed++;
         
         // Записываем активатора
@@ -180,12 +184,13 @@ contract SpiralEngine is ERC721, AccessControl {
         // Создаем новые инвайты для пользователя
         for (uint256 i = 0; i < newInviteCodes.length; i++) {
             require(bytes(newInviteCodes[i]).length > 0, "SpiralEngine: empty invite code");
-            require(inviteCodeToTokenId[newInviteCodes[i]] == 0, "SpiralEngine: invite code already exists");
+            require(!inviteCodeExists[newInviteCodes[i]], "SpiralEngine: invite code already exists");
             
             uint256 newTokenId = _tokenIdCounter++;
             _mint(user, newTokenId);
             
             inviteCodeToTokenId[newInviteCodes[i]] = newTokenId;
+            inviteCodeExists[newInviteCodes[i]] = true;
             tokenIdToInviteCode[newTokenId] = newInviteCodes[i];
             inviteExpiry[newTokenId] = expiry;
             inviteCreatedAt[newTokenId] = block.timestamp;
@@ -251,8 +256,8 @@ contract SpiralEngine is ERC721, AccessControl {
      * @return tokenId идентификатор токена
      */
     function _validateInviteCode(string memory inviteCode, address activator) internal view returns (uint256) {
+        require(inviteCodeExists[inviteCode], "SpiralEngine: invite code not found");
         uint256 tokenId = inviteCodeToTokenId[inviteCode];
-        require(tokenId > 0, "SpiralEngine: invite code not found");
         require(inviteMinter[tokenId] == activator, "SpiralEngine: invite not from activator");
         return tokenId;
     }

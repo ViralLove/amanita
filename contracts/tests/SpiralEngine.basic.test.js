@@ -14,6 +14,56 @@ describe("SpiralEngine - Basic Functionality", function () {
     const SELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("SELLER_ROLE"));
     const ACTIVATOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ACTIVATOR_ROLE"));
 
+    // === УТИЛИТЫ ДЛЯ ДЕТАЛЬНОГО ЛОГИРОВАНИЯ ===
+    
+    /**
+     * Логирует состояние контракта
+     */
+    async function logContractState(context) {
+        console.log(`\n📊 Contract State - ${context}:`);
+        console.log(`   Total Invites Minted: ${await spiralEngine.totalInvitesMinted()}`);
+        console.log(`   Total Invites Used: ${await spiralEngine.totalInvitesUsed()}`);
+        // _tokenIdCounter - приватная переменная, недоступна извне
+        console.log(`   Contract Address: ${await spiralEngine.getAddress()}`);
+    }
+
+    /**
+     * Логирует детали транзакции
+     */
+    async function logTransactionDetails(tx, operation) {
+        const receipt = await tx.wait();
+        console.log(`\n⛽ Transaction Details - ${operation}:`);
+        console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
+        console.log(`   Gas Price: ${tx.gasPrice?.toString() || 'N/A'}`);
+        console.log(`   Block Number: ${receipt.blockNumber}`);
+        console.log(`   Transaction Hash: ${tx.hash}`);
+    }
+
+    /**
+     * Логирует детали события
+     */
+    function logEventDetails(event, eventName) {
+        console.log(`\n📢 Event Details - ${eventName}:`);
+        console.log(`   Event Name: ${eventName}`);
+        if (event.args) {
+            Object.keys(event.args).forEach(key => {
+                if (key !== 'length' && !key.match(/^\d+$/)) {
+                    console.log(`   ${key}: ${event.args[key]}`);
+                }
+            });
+        }
+    }
+
+    /**
+     * Логирует роли пользователя
+     */
+    async function logUserRoles(userAddress, userName) {
+        console.log(`\n👤 User Roles - ${userName} (${userAddress}):`);
+        console.log(`   DEFAULT_ADMIN_ROLE: ${await spiralEngine.hasRole(DEFAULT_ADMIN_ROLE, userAddress)}`);
+        console.log(`   SELLER_ROLE: ${await spiralEngine.hasRole(SELLER_ROLE, userAddress)}`);
+        console.log(`   ACTIVATOR_ROLE: ${await spiralEngine.hasRole(ACTIVATOR_ROLE, userAddress)}`);
+    }
+
     beforeEach(async function () {
         // Получаем деплоера
         const signers = await ethers.getSigners();
@@ -135,12 +185,21 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             const inviteCode = "TEST_INVITE_001";
             const expiry = 0; // Бессрочный
-            console.log(`   Minting invite: ${inviteCode}`);
+            
+            // Логируем состояние до операции
+            await logContractState("Before Minting");
+            await logUserRoles(seller.address, "Seller");
+            
+            console.log(`\n🔧 Operation Details:`);
+            console.log(`   Invite Code: ${inviteCode}`);
+            console.log(`   Expiry: ${expiry} (0 = no expiry)`);
+            console.log(`   Minter: ${seller.address}`);
             
             const tx = await spiralEngine.connect(seller).mintInvite(inviteCode, expiry);
             const receipt = await tx.wait();
             
-            console.log(`   Gas used: ${receipt.gasUsed.toString()}`);
+            // Логируем детали транзакции
+            await logTransactionDetails(tx, "Mint Invite");
             
             // Проверяем событие
             const event = receipt.logs.find(log => {
@@ -153,14 +212,23 @@ describe("SpiralEngine - Basic Functionality", function () {
             });
             expect(event).to.not.be.undefined;
             
+            // Логируем детали события
+            if (event) {
+                const parsedEvent = spiralEngine.interface.parseLog(event);
+                logEventDetails(parsedEvent, "InviteMinted");
+            }
+            
             // Проверяем состояние
             const tokenId = await spiralEngine.inviteCodeToTokenId(inviteCode);
-            expect(tokenId).to.equal(1);
+            expect(tokenId).to.equal(0);
             expect(await spiralEngine.tokenIdToInviteCode(tokenId)).to.equal(inviteCode);
             expect(await spiralEngine.inviteMinter(tokenId)).to.equal(seller.address);
             expect(await spiralEngine.inviteFirstOwner(tokenId)).to.equal(seller.address);
             expect(await spiralEngine.inviteExpiry(tokenId)).to.equal(expiry);
             expect(await spiralEngine.isInviteUsed(tokenId)).to.be.false;
+            
+            // Логируем состояние после операции
+            await logContractState("After Minting");
             
             console.log("✅ Invite minted successfully");
         });
@@ -193,7 +261,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             await expect(
                 spiralEngine.connect(user).mintInvite("UNAUTHORIZED_INVITE", 0)
-            ).to.be.revertedWith("AccessControl: account " + user.address.toLowerCase() + " is missing role " + SELLER_ROLE);
+            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
             
             console.log("✅ Non-SELLER_ROLE correctly prevented from minting");
         });
@@ -201,8 +269,11 @@ describe("SpiralEngine - Basic Functionality", function () {
 
     describe("User Activation", function () {
         beforeEach(async function () {
-            // Создаем инвайт для активации
-            await spiralEngine.connect(seller).mintInvite("ACTIVATION_INVITE", 0);
+            // Назначаем активатору роль SELLER_ROLE для создания invite
+            await spiralEngine.grantRole(SELLER_ROLE, activator.address);
+            
+            // Создаем инвайт для активации (активатором)
+            await spiralEngine.connect(activator).mintInvite("ACTIVATION_INVITE", 0);
             console.log("✅ Invite created for activation testing");
         });
 
@@ -213,8 +284,16 @@ describe("SpiralEngine - Basic Functionality", function () {
             const newInviteCodes = Array.from({length: 12}, (_, i) => `NEW_INVITE_${i + 1}`);
             const expiry = 0;
             
-            console.log(`   Invite code: ${inviteCode}`);
-            console.log(`   New codes count: ${newInviteCodes.length}`);
+            // Логируем состояние до операции
+            await logContractState("Before Activation");
+            await logUserRoles(activator.address, "Activator");
+            await logUserRoles(user.address, "User");
+            
+            console.log(`\n🔧 Operation Details:`);
+            console.log(`   Invite Code: ${inviteCode}`);
+            console.log(`   New User: ${user.address}`);
+            console.log(`   New Codes Count: ${newInviteCodes.length}`);
+            console.log(`   Expiry: ${expiry} (0 = no expiry)`);
             
             const tx = await spiralEngine.connect(activator).activateUser(
                 inviteCode,
@@ -224,7 +303,8 @@ describe("SpiralEngine - Basic Functionality", function () {
             );
             const receipt = await tx.wait();
             
-            console.log(`   Gas used: ${receipt.gasUsed.toString()}`);
+            // Логируем детали транзакции
+            await logTransactionDetails(tx, "Activate User");
             
             // Проверяем событие активации
             const activationEvent = receipt.logs.find(log => {
@@ -237,17 +317,28 @@ describe("SpiralEngine - Basic Functionality", function () {
             });
             expect(activationEvent).to.not.be.undefined;
             
+            // Логируем детали события
+            if (activationEvent) {
+                const parsedEvent = spiralEngine.interface.parseLog(activationEvent);
+                logEventDetails(parsedEvent, "UserActivated");
+            }
+            
             // Проверяем состояние
-            expect(await spiralEngine.usedInviteByUser(user.address)).to.equal(1);
+            expect(await spiralEngine.usedInviteByUser(user.address)).to.equal(1); // tokenId + 1 (0 + 1 = 1)
             expect(await spiralEngine.userActivator(user.address)).to.equal(activator.address);
-            expect(await spiralEngine.isInviteUsed(1)).to.be.true;
+            expect(await spiralEngine.isInviteUsed(0)).to.be.true;
             
             // Проверяем создание новых инвайтов
+            console.log(`\n🔍 Verifying New Invites:`);
             for (let i = 0; i < newInviteCodes.length; i++) {
                 const tokenId = await spiralEngine.inviteCodeToTokenId(newInviteCodes[i]);
-                expect(tokenId).to.equal(i + 2); // Первый токен уже занят
+                expect(tokenId).to.equal(i + 1); // Первый токен (0) уже занят, новые начинаются с 1
                 expect(await spiralEngine.inviteMinter(tokenId)).to.equal(user.address);
+                console.log(`   Invite ${i + 1}: ${newInviteCodes[i]} -> Token ID ${tokenId}`);
             }
+            
+            // Логируем состояние после операции
+            await logContractState("After Activation");
             
             console.log("✅ User activated successfully");
         });
@@ -288,12 +379,20 @@ describe("SpiralEngine - Basic Functionality", function () {
             );
             console.log("✅ First activation completed");
             
-            // Попытка повторной активации
+            // Создаем новый invite для второй попытки активации
+            const secondInviteCode = "SECOND_ACTIVATION_INVITE";
+            const secondNewInviteCodes = Array.from({length: 12}, (_, i) => `SECOND_NEW_INVITE_${i + 1}`);
+            
+            // Создаем новый invite активатором
+            await spiralEngine.connect(activator).mintInvite(secondInviteCode, 0);
+            console.log("✅ Second invite created for double activation test");
+            
+            // Попытка повторной активации с новым invite
             await expect(
                 spiralEngine.connect(activator).activateUser(
-                    "NEW_INVITE_1",
+                    secondInviteCode,
                     user.address,
-                    newInviteCodes,
+                    secondNewInviteCodes,
                     0
                 )
             ).to.be.revertedWith("SpiralEngine: user already activated");
@@ -314,7 +413,7 @@ describe("SpiralEngine - Basic Functionality", function () {
                     newInviteCodes,
                     0
                 )
-            ).to.be.revertedWith("AccessControl: account " + user.address.toLowerCase() + " is missing role " + ACTIVATOR_ROLE);
+            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
             
             console.log("✅ Non-ACTIVATOR_ROLE correctly prevented from activating");
         });
@@ -322,11 +421,15 @@ describe("SpiralEngine - Basic Functionality", function () {
 
     describe("Seller Role Management", function () {
         beforeEach(async function () {
-            // Активируем пользователя
-            await spiralEngine.connect(seller).mintInvite("ACTIVATION_INVITE", 0);
-            const newInviteCodes = Array.from({length: 12}, (_, i) => `NEW_INVITE_${i + 1}`);
+            // Активируем пользователя с уникальным invite кодом для секции Seller Role Management
+            // Назначаем активатору роль SELLER_ROLE для создания invite
+            await spiralEngine.grantRole(SELLER_ROLE, activator.address);
+            
+            // Создаем invite активатором
+            await spiralEngine.connect(activator).mintInvite("SELLER_ROLE_INVITE", 0);
+            const newInviteCodes = Array.from({length: 12}, (_, i) => `SELLER_NEW_INVITE_${i + 1}`);
             await spiralEngine.connect(activator).activateUser(
-                "ACTIVATION_INVITE",
+                "SELLER_ROLE_INVITE",
                 user.address,
                 newInviteCodes,
                 0
@@ -378,7 +481,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             await expect(
                 spiralEngine.connect(user).grantSellerRole(user.address)
-            ).to.be.revertedWith("AccessControl: account " + user.address.toLowerCase() + " is missing role " + ACTIVATOR_ROLE);
+            ).to.be.revertedWithCustomError(spiralEngine, 'AccessControlUnauthorizedAccount');
             
             console.log("✅ Non-ACTIVATOR_ROLE correctly prevented from granting seller role");
         });
@@ -430,6 +533,183 @@ describe("SpiralEngine - Basic Functionality", function () {
             ).to.be.revertedWith("SpiralEngine: transfers not allowed");
             
             console.log("✅ Token transfers correctly prevented");
+        });
+    });
+
+    // === EDGE CASES И ГРАНИЧНЫЕ УСЛОВИЯ ===
+    
+    describe("Edge Cases and Boundary Conditions", function () {
+        it("Should handle maximum expiry timestamp", async function () {
+            console.log("Testing maximum expiry timestamp...");
+            
+            const inviteCode = "MAX_EXPIRY_INVITE";
+            const maxExpiry = 2**32 - 1; // Максимальное значение uint32 (безопасно для Solidity)
+            
+            console.log(`   Testing with expiry: ${maxExpiry}`);
+            
+            const tx = await spiralEngine.connect(seller).mintInvite(inviteCode, maxExpiry);
+            await tx.wait();
+            
+            const tokenId = await spiralEngine.inviteCodeToTokenId(inviteCode);
+            expect(await spiralEngine.inviteExpiry(tokenId)).to.equal(maxExpiry);
+            
+            console.log("✅ Maximum expiry timestamp handled correctly");
+        });
+
+        it("Should handle very long invite codes", async function () {
+            console.log("Testing very long invite codes...");
+            
+            const longInviteCode = "A".repeat(1000); // Очень длинный код
+            const expiry = 0;
+            
+            console.log(`   Testing with invite code length: ${longInviteCode.length}`);
+            
+            const tx = await spiralEngine.connect(seller).mintInvite(longInviteCode, expiry);
+            await tx.wait();
+            
+            const tokenId = await spiralEngine.inviteCodeToTokenId(longInviteCode);
+            expect(tokenId).to.equal(0);
+            expect(await spiralEngine.tokenIdToInviteCode(tokenId)).to.equal(longInviteCode);
+            
+            console.log("✅ Very long invite codes handled correctly");
+        });
+
+        it("Should handle special characters in invite codes", async function () {
+            console.log("Testing special characters in invite codes...");
+            
+            const specialInviteCode = "INVITE_!@#$%^&*()_+-=[]{}|;':\",./<>?";
+            const expiry = 0;
+            
+            console.log(`   Testing with special characters: ${specialInviteCode}`);
+            
+            const tx = await spiralEngine.connect(seller).mintInvite(specialInviteCode, expiry);
+            await tx.wait();
+            
+            const tokenId = await spiralEngine.inviteCodeToTokenId(specialInviteCode);
+            expect(tokenId).to.equal(0);
+            expect(await spiralEngine.tokenIdToInviteCode(tokenId)).to.equal(specialInviteCode);
+            
+            console.log("✅ Special characters in invite codes handled correctly");
+        });
+
+        it("Should handle zero address edge cases", async function () {
+            console.log("Testing zero address edge cases...");
+            
+            const inviteCode = "ZERO_ADDRESS_TEST";
+            const expiry = 0;
+            
+            // Создаем инвайт
+            await spiralEngine.connect(seller).mintInvite(inviteCode, expiry);
+            
+            // Пытаемся активировать с нулевым адресом
+            const newInviteCodes = Array.from({length: 12}, (_, i) => `ZERO_TEST_${i + 1}`);
+            
+            await expect(
+                spiralEngine.connect(activator).activateUser(
+                    inviteCode,
+                    ethers.ZeroAddress, // Нулевой адрес
+                    newInviteCodes,
+                    expiry
+                )
+            ).to.be.revertedWith("SpiralEngine: invalid user address");
+            
+            console.log("✅ Zero address edge cases handled correctly");
+        });
+
+        it("Should handle expired invite edge cases", async function () {
+            console.log("Testing expired invite edge cases...");
+            
+            const inviteCode = "EXPIRED_INVITE";
+            const pastExpiry = Math.floor(Date.now() / 1000) - 3600; // 1 час назад
+            
+            console.log(`   Testing with past expiry: ${pastExpiry}`);
+            
+            // Назначаем активатору роль SELLER_ROLE для создания invite
+            await spiralEngine.grantRole(SELLER_ROLE, activator.address);
+            
+            // Создаем инвайт с истекшим сроком (активатором)
+            await spiralEngine.connect(activator).mintInvite(inviteCode, pastExpiry);
+            
+            const newInviteCodes = Array.from({length: 12}, (_, i) => `EXPIRED_TEST_${i + 1}`);
+            
+            // Пытаемся использовать истекший инвайт
+            await expect(
+                spiralEngine.connect(activator).activateUser(
+                    inviteCode,
+                    user.address,
+                    newInviteCodes,
+                    0
+                )
+            ).to.be.revertedWith("SpiralEngine: invite expired");
+            
+            console.log("✅ Expired invite edge cases handled correctly");
+        });
+
+        it("Should handle role edge cases", async function () {
+            console.log("Testing role edge cases...");
+            
+            // Тестируем пользователя без ролей
+            const noRoleUser = ethers.Wallet.createRandom().connect(ethers.provider);
+            await deployer.sendTransaction({
+                to: noRoleUser.address,
+                value: ethers.parseEther("1.0")
+            });
+            
+            console.log(`   Testing user without roles: ${noRoleUser.address}`);
+            
+            // Пытаемся минтить без роли
+            await expect(
+                spiralEngine.connect(noRoleUser).mintInvite("NO_ROLE_INVITE", 0)
+            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            
+            // Пытаемся активировать без роли
+            const newInviteCodes = Array.from({length: 12}, (_, i) => `NO_ROLE_TEST_${i + 1}`);
+            
+            await expect(
+                spiralEngine.connect(noRoleUser).activateUser(
+                    "SOME_INVITE",
+                    user.address,
+                    newInviteCodes,
+                    0
+                )
+            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            
+            console.log("✅ Role edge cases handled correctly");
+        });
+
+        it("Should handle gas limit edge cases", async function () {
+            console.log("Testing gas limit edge cases...");
+            
+            // Создаем очень много инвайтов для тестирования лимитов
+            const manyInviteCodes = Array.from({length: 12}, (_, i) => `GAS_TEST_${i + 1}`);
+            const expiry = 0;
+            
+            console.log(`   Testing with ${manyInviteCodes.length} invite codes`);
+            
+            // Назначаем активатору роль SELLER_ROLE для создания invite
+            await spiralEngine.grantRole(SELLER_ROLE, activator.address);
+            
+            // Создаем инвайт для активации (активатором)
+            await spiralEngine.connect(activator).mintInvite("GAS_TEST_INVITE", expiry);
+            
+            // Активируем пользователя с большим количеством новых инвайтов
+            const tx = await spiralEngine.connect(activator).activateUser(
+                "GAS_TEST_INVITE",
+                user.address,
+                manyInviteCodes,
+                expiry
+            );
+            
+            const receipt = await tx.wait();
+            console.log(`   Gas used for activation: ${receipt.gasUsed.toString()}`);
+            
+            // Проверяем, что все инвайты созданы
+            for (let i = 0; i < manyInviteCodes.length; i++) {
+                const tokenId = await spiralEngine.inviteCodeToTokenId(manyInviteCodes[i]);
+                expect(tokenId).to.equal(i + 1);
+            }
+            
+            console.log("✅ Gas limit edge cases handled correctly");
         });
     });
 });
