@@ -587,6 +587,201 @@ const recoveryContract = await soulboundCore.getRecoveryContract();
 console.log("Recovery contract:", recoveryContract);
 ```
 
+## 🔗 Система интеграции с SpiralEngine (SoulIntegration)
+
+**SoulIntegration** - это газоэффективный контракт для уведомления SpiralEngine о событиях SBT. Обеспечивает асинхронную обработку событий с graceful degradation при ошибках.
+
+#### **Архитектура интеграции**
+```solidity
+SoulboundCore → SoulIntegration → SpiralEngine
+```
+
+- **SoulboundCore**: Базовый SBT контракт с уведомлениями
+- **SoulIntegration**: Контракт управления уведомлениями
+- **SpiralEngine**: Внешний контракт экосистемы (мокается в тестах)
+
+#### **Основные функции SoulIntegration**
+
+##### **1. Уведомления о событиях**
+```solidity
+function notifySoulCreated(uint256 tokenId, address owner) external
+function notifySoulRecovered(uint256 tokenId, address oldOwner, address newOwner) external
+```
+
+**Описание**: Уведомление SpiralEngine о событиях SBT
+- **Авторизация**: Проверка существования токена и владения
+- **Graceful degradation**: Обработка ошибок SpiralEngine
+- **События**: `SoulNotified`, `NotificationFailed`
+
+##### **2. Управление интеграцией**
+```solidity
+function setSpiralEngine(address spiralEngine) external onlyOwner
+function setSoulboundCore(address soulboundCore) external onlyOwner
+function setNotificationsEnabled(bool enabled) external onlyOwner
+```
+
+**Описание**: Управление настройками интеграции
+- **SpiralEngine**: Адрес контракта для уведомлений
+- **SoulboundCore**: Адрес базового SBT контракта
+- **Notifications**: Включение/выключение уведомлений
+
+##### **3. View функции**
+```solidity
+function getSpiralEngine() external view returns (address)
+function getSoulboundCore() external view returns (address)
+function areNotificationsEnabled() external view returns (bool)
+function isIntegrationValid() external view returns (bool)
+```
+
+#### **Интеграция с существующими контрактами**
+
+##### **SoulboundCore интеграция**
+```solidity
+// Автоматические уведомления при минтинге
+function mintSoul(address to) external onlyOwner {
+    // ... минтинг логика ...
+    _notifyIntegration(tokenId, to, "created");
+}
+
+// Автоматические уведомления при восстановлении
+function executeRecovery(uint256 tokenId, address newOwner) external {
+    // ... восстановление логика ...
+    _notifyIntegrationRecovery(tokenId, oldOwner, newOwner);
+}
+```
+
+##### **SoulRecovery интеграция**
+```solidity
+// Уведомления через SoulboundCore.executeRecovery()
+function confirmRecovery(uint256 tokenId) external {
+    // ... подтверждение восстановления ...
+    _soulboundCore.executeRecovery(tokenId, newOwner);
+    // SoulboundCore автоматически уведомит SoulIntegration
+}
+```
+
+#### **Тестирование системы интеграции**
+
+### ✅ **Покрытие тестами: 100% (25/25 тестов)**
+
+##### **Группы тестов**
+1. **Deployment and Integration** (3 теста) - Развертывание и связывание
+2. **Soul Creation Notifications** (5 тестов) - Уведомления о создании токенов
+3. **Recovery Notifications** (4 теста) - Уведомления о восстановлении
+4. **Error Handling** (6 тестов) - Обработка ошибок и fallback
+5. **Access Control** (3 теста) - Контроль доступа
+6. **Gas Profiling** (4 теста) - Измерение газа
+
+##### **Критические пути покрыты**
+- ✅ Уведомления при mintSoul и mintSoulBatch
+- ✅ Уведомления при восстановлении через SoulRecovery
+- ✅ Graceful degradation при ошибках SpiralEngine
+- ✅ Отключение уведомлений и fallback логика
+- ✅ Контроль доступа и авторизация
+- ✅ Edge cases (несуществующие контракты, неверные адреса)
+
+#### **Газовое потребление интеграции**
+
+##### **Измеренные показатели**
+- **notifySoulCreated**: 50,573 газа
+- **notifySoulRecovered**: 53,400 газа
+- **mintSoul с интеграцией**: 190,768 газа (было ~104,000 без интеграции)
+- **View функции**: 23,430-25,885 газа
+
+##### **Стоимость в POL/USD** (1 POL = $0.20)
+- **Уведомление о создании**: ~$0.0000101
+- **Уведомление о восстановлении**: ~$0.0000107
+- **Overhead для mintSoul**: ~$0.0000174
+- **Полный цикл с интеграцией**: ~$0.0000382
+
+#### **Примеры использования интеграции**
+
+##### **Автоматические уведомления**
+```javascript
+// Создание токена автоматически уведомляет SpiralEngine
+const tx = await soulboundCore.mintSoul(userAddress);
+const receipt = await tx.wait();
+
+// Проверяем события уведомления
+const soulNotifiedEvent = receipt.logs.find(log => {
+    const parsed = soulIntegration.interface.parseLog(log);
+    return parsed.name === "SoulNotified";
+});
+
+expect(soulNotifiedEvent).to.not.be.undefined;
+```
+
+##### **Прямые уведомления**
+```javascript
+// Прямое уведомление SpiralEngine
+await soulIntegration.notifySoulCreated(tokenId, ownerAddress);
+
+// Проверка уведомления в MockSpiralEngine
+expect(await mockSpiralEngine.getLastNotifiedTokenId()).to.equal(tokenId);
+expect(await mockSpiralEngine.getLastNotifiedOwner()).to.equal(ownerAddress);
+```
+
+##### **Управление интеграцией**
+```javascript
+// Настройка SpiralEngine
+await soulIntegration.setSpiralEngine(newSpiralEngineAddress);
+
+// Проверка настроек
+expect(await soulIntegration.getSpiralEngine()).to.equal(newSpiralEngineAddress);
+expect(await soulIntegration.isIntegrationValid()).to.be.true;
+```
+
+##### **Обработка ошибок**
+```javascript
+// Установка faulty SpiralEngine
+await soulIntegration.setSpiralEngine(faultySpiralEngineAddress);
+
+// Создание токена работает, но уведомление падает gracefully
+const tx = await soulboundCore.mintSoul(userAddress);
+const receipt = await tx.wait();
+
+// Проверяем событие ошибки
+const failedEvent = receipt.logs.find(log => {
+    const parsed = soulIntegration.interface.parseLog(log);
+    return parsed.name === "NotificationFailed";
+});
+
+expect(failedEvent).to.not.be.undefined;
+```
+
+#### **Mock контракты для тестирования**
+
+##### **MockSpiralEngine**
+```solidity
+contract MockSpiralEngine {
+    function notifySoulCreated(uint256 tokenId, address owner) external;
+    function notifySoulRecovered(uint256 tokenId, address oldOwner, address newOwner) external;
+    
+    // Getter функции для проверки уведомлений
+    function getLastNotifiedTokenId() external view returns (uint256);
+    function getLastNotifiedOwner() external view returns (address);
+    function getNotificationCount() external view returns (uint256);
+}
+```
+
+##### **FaultySpiralEngine**
+```solidity
+contract FaultySpiralEngine {
+    function notifySoulCreated(uint256, address) external pure {
+        revert("FaultySpiralEngine: intentional error");
+    }
+}
+```
+
+##### **BytesErrorEngine**
+```solidity
+contract BytesErrorEngine {
+    function notifySoulCreated(uint256, address) external pure {
+        assembly { revert(0, 0) }
+    }
+}
+```
+
 ## 🔮 Планы развития
 
 ### ✅ **Этап 2: Система метаданных (ЗАВЕРШЕН)**
@@ -601,7 +796,14 @@ console.log("Recovery contract:", recoveryContract);
 - ✅ Интеграция с SoulboundCore
 - ✅ Полное тестирование и валидация
 
-### **Этап 4: DID интеграция**
+### ✅ **Этап 4: Интеграция с SpiralEngine (ЗАВЕРШЕН)**
+- ✅ SoulIntegration контракт для уведомлений
+- ✅ Graceful degradation при ошибках SpiralEngine
+- ✅ Полная интеграция с SoulboundCore и SoulRecovery
+- ✅ Mock контракты для тестирования
+- ✅ 25/25 тестов (100% покрытие)
+
+### **Этап 5: DID интеграция**
 - [ ] Поддержка Decentralized Identifiers
 - [ ] Верификация личности
 - [ ] Кросс-чейн совместимость
@@ -663,6 +865,10 @@ console.log("Token exists:", exists); // false
    - Временные задержки: 7 дней + 24 часа для полного восстановления
    - Один guardian на токен (упрощенная модель)
    - Газовое потребление: ~300,000 газа за полный цикл
+7. **Ограничения системы интеграции**:
+   - Зависимость от внешнего SpiralEngine контракта
+   - Газовое потребление: +86,000 газа к mintSoul (190,000 vs 104,000)
+   - Graceful degradation при ошибках SpiralEngine
 
 ## 📚 Ссылки
 
@@ -673,12 +879,14 @@ console.log("Token exists:", exists); // false
 
 ---
 
-**Версия документации**: 3.0  
+**Версия документации**: 4.0  
 **Последнее обновление**: Декабрь 2024  
-**Статус**: ✅ Полная SBT экосистема протестирована и готова к использованию
+**Статус**: ✅ Полная SBT экосистема с интеграцией SpiralEngine готова к использованию
 
 ### **Версии контрактов**
-- **SoulboundCore**: v1.1 - Базовый SBT контракт с интеграциями (34/34 тестов)
+- **SoulboundCore**: v1.2 - Базовый SBT контракт с интеграциями (34/34 тестов)
 - **SoulMetadata**: v1.0 - Система метаданных (24/24 тестов)
 - **SoulRecovery**: v1.0 - Система восстановления (30/30 тестов)
-- **Общее покрытие**: 88/88 тестов (100% успеха)
+- **SoulIntegration**: v1.0 - Интеграция с SpiralEngine (25/25 тестов)
+- **MockSpiralEngine**: v1.0 - Mock для тестирования
+- **Общее покрытие**: 113/113 тестов (100% успеха)

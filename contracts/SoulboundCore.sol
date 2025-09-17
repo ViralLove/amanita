@@ -23,6 +23,14 @@ interface ISoulRecovery {
 }
 
 /**
+ * @dev Интерфейс для контракта интеграции
+ */
+interface ISoulIntegration {
+    function notifySoulCreated(uint256 tokenId, address owner) external;
+    function notifySoulRecovered(uint256 tokenId, address oldOwner, address newOwner) external;
+}
+
+/**
  * @title SoulboundCore
  * @author Zeya888 (https://zeya888.me)
  * @dev Минимальная, газоэффективная реализация Soulbound Token согласно EIP-5192
@@ -63,6 +71,9 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
     
     // Адрес контракта восстановления (опционально)
     address private _recoveryContract;
+    
+    // Адрес контракта интеграции (опционально)
+    address private _integrationContract;
     
     // === КОНСТРУКТОР ===
     
@@ -196,6 +207,9 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
         emit SoulMinted(to, tokenId);
         emit Locked(tokenId);
         
+        // Уведомление интеграционного контракта (опционально)
+        _notifyIntegration(tokenId, to, "created");
+        
         return tokenId;
     }
     
@@ -217,6 +231,9 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
             
             emit SoulMinted(to, tokenId);
             emit Locked(tokenId);
+            
+            // Уведомление интеграционного контракта (опционально)
+            _notifyIntegration(tokenId, to, "created");
             
             tokenIds[i] = tokenId;
         }
@@ -303,6 +320,22 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
     }
     
     /**
+     * @dev Установить адрес контракта интеграции (только владелец)
+     * @param integrationContract адрес контракта интеграции
+     */
+    function setIntegrationContract(address integrationContract) external onlyOwner {
+        _integrationContract = integrationContract;
+    }
+    
+    /**
+     * @dev Получить адрес контракта интеграции
+     * @return адрес контракта интеграции
+     */
+    function getIntegrationContract() external view returns (address) {
+        return _integrationContract;
+    }
+    
+    /**
      * @dev Выполнить восстановление токена (только recovery контракт)
      * @param tokenId идентификатор токена
      * @param newOwner новый владелец
@@ -327,6 +360,9 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
         _owners[tokenId] = newOwner;
         
         emit Transfer(oldOwner, newOwner, tokenId);
+        
+        // Уведомление интеграционного контракта о восстановлении (опционально)
+        _notifyIntegrationRecovery(tokenId, oldOwner, newOwner);
     }
     
     // === INTERNAL FUNCTIONS ===
@@ -422,6 +458,37 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
             }
         } else {
             return true;
+        }
+    }
+    
+    /**
+     * @dev Внутренняя функция для уведомления интеграционного контракта
+     * @param tokenId идентификатор токена
+     * @param owner владелец токена
+     */
+    function _notifyIntegration(uint256 tokenId, address owner, string memory /* eventType */) internal {
+        if (_integrationContract != address(0)) {
+            try ISoulIntegration(_integrationContract).notifySoulCreated(tokenId, owner) {
+                // Успешное уведомление, ничего не делаем
+            } catch {
+                // Graceful degradation - игнорируем ошибки интеграции
+            }
+        }
+    }
+    
+    /**
+     * @dev Внутренняя функция для уведомления о восстановлении
+     * @param tokenId идентификатор токена
+     * @param oldOwner предыдущий владелец
+     * @param newOwner новый владелец
+     */
+    function _notifyIntegrationRecovery(uint256 tokenId, address oldOwner, address newOwner) internal {
+        if (_integrationContract != address(0)) {
+            try ISoulIntegration(_integrationContract).notifySoulRecovered(tokenId, oldOwner, newOwner) {
+                // Успешное уведомление, ничего не делаем
+            } catch {
+                // Graceful degradation - игнорируем ошибки интеграции
+            }
         }
     }
 }
