@@ -85,6 +85,9 @@ function getNextTokenId() external view returns (uint256)
 function exists(uint256 tokenId) external view returns (bool)
 function setMetadataContract(address metadataContract) external onlyOwner
 function getMetadataContract() external view returns (address)
+function setRecoveryContract(address recoveryContract) external onlyOwner
+function getRecoveryContract() external view returns (address)
+function executeRecovery(uint256 tokenId, address newOwner) external
 ```
 
 **Описание**: Получение информации о токенах и контракте
@@ -92,7 +95,8 @@ function getMetadataContract() external view returns (address)
 - **Балансы**: Количество токенов у пользователя
 - **Владельцы**: Кто владеет конкретным токеном
 - **Статистика**: Общее количество, следующий ID
-- **Интеграция**: Управление контрактом метаданных
+- **Интеграция**: Управление контрактами метаданных и восстановления
+- **Восстановление**: Выполнение восстановления токенов
 
 ## 🧪 Тестирование
 
@@ -404,6 +408,185 @@ const metadataContract = await soulboundCore.getMetadataContract();
 console.log("Metadata contract:", metadataContract);
 ```
 
+## 🛡️ Система восстановления (SoulRecovery)
+
+**SoulRecovery** - это безопасная система восстановления доступа к SoulboundCore токенам через доверенных guardian'ов. Обеспечивает возможность восстановления потерянного доступа с временными задержками для безопасности.
+
+#### **Архитектура восстановления**
+```solidity
+SoulboundCore → ISoulRecovery → SoulRecovery
+```
+
+- **SoulboundCore**: Базовый SBT контракт с executeRecovery() функцией
+- **SoulRecovery**: Контракт управления процессом восстановления
+- **ISoulRecovery**: Интерфейс для cross-contract взаимодействия
+
+#### **Основные функции SoulRecovery**
+
+##### **1. Управление Guardian'ами**
+```solidity
+function setGuardian(uint256 tokenId, address guardian) external
+function removeGuardian(uint256 tokenId) external
+```
+
+**Описание**: Управление доверенными лицами для восстановления
+- **Авторизация**: Только владелец токена
+- **Ограничения**: Guardian не может быть владельцем или zero address
+- **События**: `GuardianSet`
+
+##### **2. Процесс восстановления**
+```solidity
+function initiateRecovery(uint256 tokenId, address newOwner) external
+function confirmRecovery(uint256 tokenId) external
+function cancelRecovery(uint256 tokenId) external
+```
+
+**Описание**: Трехэтапный процесс восстановления
+- **Инициация**: Guardian запускает процесс (после 7 дней)
+- **Подтверждение**: Guardian подтверждает (после 24 часов)
+- **Отмена**: Владелец может отменить в любой момент
+- **События**: `RecoveryInitiated`, `RecoveryCompleted`, `RecoveryCancelled`
+
+##### **3. View функции**
+```solidity
+function getGuardianInfo(uint256 tokenId) external view returns (GuardianInfo memory)
+function getGuardian(uint256 tokenId) external view returns (address)
+function hasActiveGuardian(uint256 tokenId) external view returns (bool)
+function getRecoveryInfo(uint256 tokenId) external view returns (RecoveryInfo memory)
+function isRecoveryActive(uint256 tokenId) external view returns (bool)
+function canConfirmRecovery(uint256 tokenId) external view returns (bool)
+function getRecoveryTimeLeft(uint256 tokenId) external view returns (uint256)
+```
+
+#### **Структуры данных**
+
+##### **GuardianInfo**
+```solidity
+struct GuardianInfo {
+    address guardian;           // Адрес guardian'а
+    uint256 setTimestamp;      // Время установки
+    bool isActive;             // Активен ли guardian
+}
+```
+
+##### **RecoveryInfo**
+```solidity
+struct RecoveryInfo {
+    address newOwner;          // Новый владелец
+    address guardian;          // Guardian, инициировавший восстановление
+    uint256 initiatedAt;       // Время инициации
+    bool isActive;             // Активен ли процесс
+}
+```
+
+#### **Временные задержки безопасности**
+- **GUARDIAN_DELAY**: 7 дней после установки guardian'а
+- **RECOVERY_DELAY**: 24 часа между инициацией и подтверждением
+
+#### **Интеграция с SoulboundCore**
+
+SoulboundCore поддерживает восстановление через специальную функцию:
+
+```solidity
+function executeRecovery(uint256 tokenId, address newOwner) external
+function setRecoveryContract(address recoveryContract) external onlyOwner
+function getRecoveryContract() external view returns (address)
+```
+
+**Безопасность**: Только подключенный recovery контракт может выполнять восстановление
+
+#### **Тестирование системы восстановления**
+
+### ✅ **Покрытие тестами: 100% (30/30 тестов)**
+
+##### **Группы тестов**
+1. **Deployment and Integration** (2 теста) - Развертывание и связывание
+2. **Guardian Management** (4 теста) - Управление guardian'ами
+3. **Recovery Process** (8 тестов) - Процесс восстановления с временными задержками
+4. **Access Control** (3 теста) - Контроль доступа
+5. **Edge Cases** (8 тестов) - Граничные случаи и валидация
+6. **Gas Profiling** (4 теста) - Измерение газа
+7. **Integration with SoulboundCore** (1 тест) - Интеграция
+
+##### **Критические пути покрыты**
+- ✅ Установка и удаление guardian'ов
+- ✅ Полный процесс восстановления с временными задержками
+- ✅ Контроль доступа и авторизация
+- ✅ Временная валидация (timestamp'ы, границы задержек)
+- ✅ Интеграция с SoulboundCore
+- ✅ Edge cases (несуществующие токены, замена guardian'ов)
+
+#### **Газовое потребление восстановления**
+
+##### **Измеренные показатели**
+- **setGuardian**: 98,906 газа
+- **initiateRecovery**: 127,953 газа
+- **confirmRecovery**: 73,281 газа (включает executeRecovery)
+- **View функции**: 23,883-30,216 газа
+
+##### **Стоимость в POL/USD** (1 POL = $0.20)
+- **Установка guardian'а**: ~$0.0000198
+- **Инициация восстановления**: ~$0.0000256
+- **Подтверждение восстановления**: ~$0.0000146
+- **Полный цикл восстановления**: ~$0.0000600
+
+#### **Примеры использования восстановления**
+
+##### **Установка Guardian'а**
+```javascript
+// Установка доверенного лица
+await soulRecovery.connect(tokenOwner).setGuardian(tokenId, guardianAddress);
+
+// Проверка установки
+const guardian = await soulRecovery.getGuardian(tokenId);
+console.log("Guardian:", guardian); // guardianAddress
+
+const hasGuardian = await soulRecovery.hasActiveGuardian(tokenId);
+console.log("Has guardian:", hasGuardian); // true
+```
+
+##### **Процесс восстановления**
+```javascript
+// 1. Инициация восстановления (после 7 дней с установки guardian'а)
+await soulRecovery.connect(guardian).initiateRecovery(tokenId, newOwnerAddress);
+
+// Проверка статуса
+const isActive = await soulRecovery.isRecoveryActive(tokenId);
+console.log("Recovery active:", isActive); // true
+
+// 2. Ожидание 24 часов...
+
+// Проверка готовности к подтверждению
+const canConfirm = await soulRecovery.canConfirmRecovery(tokenId);
+console.log("Can confirm:", canConfirm); // true
+
+// 3. Подтверждение восстановления
+await soulRecovery.connect(guardian).confirmRecovery(tokenId);
+
+// Проверка смены владельца
+const newOwner = await soulboundCore.ownerOf(tokenId);
+console.log("New owner:", newOwner); // newOwnerAddress
+```
+
+##### **Отмена восстановления**
+```javascript
+// Владелец может отменить восстановление в любой момент
+await soulRecovery.connect(tokenOwner).cancelRecovery(tokenId);
+
+const isActive = await soulRecovery.isRecoveryActive(tokenId);
+console.log("Recovery active:", isActive); // false
+```
+
+##### **Управление интеграцией**
+```javascript
+// Подключение контракта восстановления
+await soulboundCore.setRecoveryContract(soulRecoveryAddress);
+
+// Проверка подключения
+const recoveryContract = await soulboundCore.getRecoveryContract();
+console.log("Recovery contract:", recoveryContract);
+```
+
 ## 🔮 Планы развития
 
 ### ✅ **Этап 2: Система метаданных (ЗАВЕРШЕН)**
@@ -412,11 +595,17 @@ console.log("Metadata contract:", metadataContract);
 - ✅ Пакетные операции для оптимизации газа
 - ✅ Fallback логика и error handling
 
-### **Этап 3: DID интеграция**
+### ✅ **Этап 3: Система восстановления (ЗАВЕРШЕН)**
+- ✅ Guardian'ы для восстановления доступа
+- ✅ Временные задержки для безопасности
+- ✅ Интеграция с SoulboundCore
+- ✅ Полное тестирование и валидация
+
+### **Этап 4: DID интеграция**
 - [ ] Поддержка Decentralized Identifiers
 - [ ] Верификация личности
 - [ ] Кросс-чейн совместимость
-- [ ] Восстановление доступа
+- [ ] Расширенное восстановление
 
 ### **Этап 4: DAO функции**
 - [ ] Голосование на основе SBT
@@ -465,11 +654,15 @@ console.log("Token exists:", exists); // false
 1. ✅ **URI метаданные**: ~~Возвращает пустую строку~~ → **РЕШЕНО**: Полная интеграция с SoulMetadata
 2. **Газовое потребление**: 103,995 газа на минтинг SoulboundCore (выше целевых 50,000)
 3. ✅ **Метаданные**: ~~Статические~~ → **РЕШЕНО**: Динамические с версионированием и IPFS
-4. **Восстановление**: Нет механизма восстановления потерянных токенов (планируется в Этапе 3)
-5. **Новые ограничения системы метаданных**:
+4. ✅ **Восстановление**: ~~Нет механизма восстановления~~ → **РЕШЕНО**: Полная система с guardian'ами
+5. **Ограничения системы метаданных**:
    - Инициализация метаданных: 216,853 газа (высокое потребление из-за storage)
    - Максимум 50 токенов в пакетной операции
    - Необходимость отдельного контракта для метаданных
+6. **Ограничения системы восстановления**:
+   - Временные задержки: 7 дней + 24 часа для полного восстановления
+   - Один guardian на токен (упрощенная модель)
+   - Газовое потребление: ~300,000 газа за полный цикл
 
 ## 📚 Ссылки
 
@@ -480,11 +673,12 @@ console.log("Token exists:", exists); // false
 
 ---
 
-**Версия документации**: 2.0  
+**Версия документации**: 3.0  
 **Последнее обновление**: Декабрь 2024  
-**Статус**: ✅ SoulboundCore + SoulMetadata протестированы и готовы к использованию
+**Статус**: ✅ Полная SBT экосистема протестирована и готова к использованию
 
 ### **Версии контрактов**
-- **SoulboundCore**: v1.0 - Базовый SBT контракт (34/34 тестов)
+- **SoulboundCore**: v1.1 - Базовый SBT контракт с интеграциями (34/34 тестов)
 - **SoulMetadata**: v1.0 - Система метаданных (24/24 тестов)
-- **Общее покрытие**: 58/58 тестов (100% успеха)
+- **SoulRecovery**: v1.0 - Система восстановления (30/30 тестов)
+- **Общее покрытие**: 88/88 тестов (100% успеха)

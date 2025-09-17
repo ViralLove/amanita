@@ -16,6 +16,13 @@ interface ISoulMetadata {
 }
 
 /**
+ * @dev Интерфейс для контракта восстановления
+ */
+interface ISoulRecovery {
+    function canConfirmRecovery(uint256 tokenId) external view returns (bool);
+}
+
+/**
  * @title SoulboundCore
  * @author Zeya888 (https://zeya888.me)
  * @dev Минимальная, газоэффективная реализация Soulbound Token согласно EIP-5192
@@ -53,6 +60,9 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
     
     // Адрес контракта метаданных (опционально)
     address private _metadataContract;
+    
+    // Адрес контракта восстановления (опционально)
+    address private _recoveryContract;
     
     // === КОНСТРУКТОР ===
     
@@ -274,6 +284,49 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
      */
     function getMetadataContract() external view returns (address) {
         return _metadataContract;
+    }
+    
+    /**
+     * @dev Установить адрес контракта восстановления (только владелец)
+     * @param recoveryContract адрес контракта восстановления
+     */
+    function setRecoveryContract(address recoveryContract) external onlyOwner {
+        _recoveryContract = recoveryContract;
+    }
+    
+    /**
+     * @dev Получить адрес контракта восстановления
+     * @return адрес контракта восстановления
+     */
+    function getRecoveryContract() external view returns (address) {
+        return _recoveryContract;
+    }
+    
+    /**
+     * @dev Выполнить восстановление токена (только recovery контракт)
+     * @param tokenId идентификатор токена
+     * @param newOwner новый владелец
+     */
+    function executeRecovery(uint256 tokenId, address newOwner) external {
+        require(msg.sender == _recoveryContract, "SoulboundCore: not recovery contract");
+        require(_recoveryContract != address(0), "SoulboundCore: no recovery contract");
+        require(_owners[tokenId] != address(0), "ERC721: invalid token ID");
+        require(newOwner != address(0), "SoulboundCore: invalid new owner");
+        
+        // Проверяем, что recovery контракт подтверждает возможность восстановления
+        require(
+            ISoulRecovery(_recoveryContract).canConfirmRecovery(tokenId),
+            "SoulboundCore: recovery not confirmed"
+        );
+        
+        address oldOwner = _owners[tokenId];
+        
+        // Обновляем владение
+        _balances[oldOwner] -= 1;
+        _balances[newOwner] += 1;
+        _owners[tokenId] = newOwner;
+        
+        emit Transfer(oldOwner, newOwner, tokenId);
     }
     
     // === INTERNAL FUNCTIONS ===
