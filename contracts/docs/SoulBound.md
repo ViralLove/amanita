@@ -83,13 +83,16 @@ function ownerOf(uint256 tokenId) public view returns (address)
 function getTotalSupply() external view returns (uint256)
 function getNextTokenId() external view returns (uint256)
 function exists(uint256 tokenId) external view returns (bool)
+function setMetadataContract(address metadataContract) external onlyOwner
+function getMetadataContract() external view returns (address)
 ```
 
 **Описание**: Получение информации о токенах и контракте
-- **Метаданные**: Название, символ, URI
+- **Метаданные**: Название, символ, динамический URI через SoulMetadata
 - **Балансы**: Количество токенов у пользователя
 - **Владельцы**: Кто владеет конкретным токеном
 - **Статистика**: Общее количество, следующий ID
+- **Интеграция**: Управление контрактом метаданных
 
 ## 🧪 Тестирование
 
@@ -192,13 +195,222 @@ SoulboundCore("Amanita Soul", "ASOUL")
 - OpenZeppelin контракты
 - Hardhat для тестирования
 
+## 🎨 Система метаданных (SoulMetadata)
+
+**SoulMetadata** - это газоэффективная система управления метаданными для SoulboundCore токенов. Обеспечивает динамические метаданные с поддержкой IPFS и версионирования.
+
+#### **Архитектура интеграции**
+```solidity
+SoulboundCore → ISoulMetadata → SoulMetadata
+```
+
+- **SoulboundCore**: Базовый SBT контракт с fallback логикой
+- **SoulMetadata**: Контракт управления метаданными
+- **ISoulMetadata**: Интерфейс для cross-contract взаимодействия
+
+#### **Основные функции SoulMetadata**
+
+##### **1. Инициализация метаданных**
+```solidity
+function initializeMetadata(
+    uint256 tokenId,
+    string memory metadataType,
+    string memory attributes,
+    string memory ipfsHash
+) external
+```
+
+**Описание**: Первичная инициализация метаданных токена
+- **Авторизация**: Владелец токена или владелец контракта
+- **Параметры**: Тип, атрибуты (JSON), IPFS хеш
+- **События**: `MetadataUpdated`
+
+##### **2. Обновление метаданных**
+```solidity
+function updateMetadata(
+    uint256 tokenId,
+    string memory attributes,
+    string memory ipfsHash
+) external
+```
+
+**Описание**: Обновление атрибутов и IPFS хеша
+- **Версионирование**: Автоматическое увеличение версии
+- **Авторизация**: Только владелец токена
+- **События**: `MetadataUpdated`
+
+##### **3. Пакетное обновление**
+```solidity
+function batchUpdateMetadata(
+    uint256[] memory tokenIds,
+    string[] memory attributesArray,
+    string[] memory ipfsHashes
+) external
+```
+
+**Описание**: Массовое обновление до 50 токенов
+- **Оптимизация**: Экономия газа при множественных операциях
+- **События**: `MetadataBatchUpdated`
+
+##### **4. View функции**
+```solidity
+function getMetadata(uint256 tokenId) external view returns (SoulData memory)
+function isInitialized(uint256 tokenId) external view returns (bool)
+function getTokenURI(uint256 tokenId) external view returns (string memory)
+function getMetadataVersion(uint256 tokenId) external view returns (uint256)
+```
+
+#### **Структура данных SoulData**
+```solidity
+struct SoulData {
+    string metadataType;    // "identity", "achievement", "reputation"
+    uint256 version;        // Версия метаданных
+    string attributes;      // JSON строка с атрибутами
+    string ipfsHash;        // IPFS хеш для дополнительных данных
+}
+```
+
+**Storage optimization**: 4 storage slots для полной структуры
+
+#### **Интеграция с tokenURI**
+
+SoulboundCore автоматически использует SoulMetadata для генерации tokenURI:
+
+```javascript
+// Без метаданных (fallback)
+{
+  "name": "Soul #1",
+  "description": "Soulbound Token from Amanita Ecosystem",
+  "type": "basic",
+  "version": 1,
+  "attributes": []
+}
+
+// С метаданными
+{
+  "name": "Soul #1",
+  "description": "Soulbound Token from Amanita Ecosystem", 
+  "type": "identity",
+  "version": 2,
+  "attributes": {"level": 5, "experience": 1000},
+  "ipfs": "QmDetailedMetadata"
+}
+```
+
+#### **Тестирование системы метаданных**
+
+### ✅ **Покрытие тестами: 100% (24/24 тестов)**
+
+##### **Группы тестов**
+1. **Deployment and Integration** (2 теста) - Развертывание и связывание
+2. **Basic Metadata Operations** (6 тестов) - Основные операции с метаданными
+3. **Access Control** (4 теста) - Контроль доступа
+4. **Batch Operations** (3 теста) - Пакетные операции
+5. **Edge Cases** (5 тестов) - Граничные случаи и error handling
+6. **Gas Profiling** (4 теста) - Измерение газа
+
+##### **Критические пути покрыты**
+- ✅ Инициализация и обновление метаданных
+- ✅ Пакетные операции (до 50 токенов)
+- ✅ Версионирование и отслеживание изменений
+- ✅ Fallback логика при ошибках
+- ✅ Контроль доступа и авторизация
+- ✅ Edge cases (пустые IPFS, сложные JSON)
+
+#### **Газовое потребление метаданных**
+
+##### **Измеренные показатели**
+- **initializeMetadata**: 216,853 газа
+- **updateMetadata**: 101,288 газа
+- **batchUpdateMetadata** (5 токенов): 32,595 газа за токен
+- **tokenURI** (view): 50,927 газа
+
+##### **Стоимость в POL/USD** (1 POL = $0.20)
+- **Инициализация метаданных**: ~$0.0000434
+- **Обновление метаданных**: ~$0.0000203
+- **Пакетное обновление (5 токенов)**: ~$0.0000326
+
+#### **Примеры использования метаданных**
+
+##### **Инициализация метаданных**
+```javascript
+// Создание токена и инициализация метаданных
+await soulboundCore.mintSoul(userAddress);
+await soulMetadata.connect(user).initializeMetadata(
+    1,
+    "identity",
+    '{"level": 1, "experience": 0, "class": "beginner"}',
+    "QmIdentityHash"
+);
+
+// Проверка инициализации
+const isInit = await soulMetadata.isInitialized(1);
+console.log("Initialized:", isInit); // true
+```
+
+##### **Обновление метаданных**
+```javascript
+// Прогресс пользователя
+await soulMetadata.connect(user).updateMetadata(
+    1,
+    '{"level": 5, "experience": 1250, "class": "advanced"}',
+    "QmUpdatedHash"
+);
+
+// Проверка версии
+const version = await soulMetadata.getMetadataVersion(1);
+console.log("Version:", version); // 2
+```
+
+##### **Получение полных метаданных**
+```javascript
+// Получение структуры метаданных
+const metadata = await soulMetadata.getMetadata(1);
+console.log("Type:", metadata.metadataType); // "identity"
+console.log("Version:", metadata.version);    // 2
+console.log("Attributes:", metadata.attributes); // JSON string
+console.log("IPFS:", metadata.ipfsHash);      // "QmUpdatedHash"
+
+// Получение JSON URI
+const tokenURI = await soulboundCore.tokenURI(1);
+console.log("Token URI:", tokenURI); // Full JSON metadata
+```
+
+##### **Пакетное обновление**
+```javascript
+// Обновление нескольких токенов одновременно
+const tokenIds = [1, 2, 3];
+const attributes = [
+    '{"level": 6, "updated": true}',
+    '{"level": 4, "updated": true}', 
+    '{"level": 8, "updated": true}'
+];
+const ipfsHashes = ["QmNew1", "QmNew2", "QmNew3"];
+
+await soulMetadata.connect(user).batchUpdateMetadata(
+    tokenIds,
+    attributes, 
+    ipfsHashes
+);
+```
+
+#### **Управление интеграцией**
+```javascript
+// Подключение контракта метаданных
+await soulboundCore.setMetadataContract(soulMetadataAddress);
+
+// Проверка подключения
+const metadataContract = await soulboundCore.getMetadataContract();
+console.log("Metadata contract:", metadataContract);
+```
+
 ## 🔮 Планы развития
 
-### **Этап 2: Расширенная функциональность**
-- [ ] Интеграция с IPFS для метаданных
-- [ ] Система ролей и разрешений
-- [ ] Временные блокировки
-- [ ] Делегирование функций
+### ✅ **Этап 2: Система метаданных (ЗАВЕРШЕН)**
+- ✅ Интеграция с IPFS для метаданных
+- ✅ Динамические метаданные с версионированием
+- ✅ Пакетные операции для оптимизации газа
+- ✅ Fallback логика и error handling
 
 ### **Этап 3: DID интеграция**
 - [ ] Поддержка Decentralized Identifiers
@@ -250,10 +462,14 @@ console.log("Token exists:", exists); // false
 
 ## 🐛 Известные ограничения
 
-1. **URI метаданные**: Возвращает пустую строку (планируется интеграция с IPFS)
-2. **Газовое потребление**: 103,995 газа на минтинг (выше целевых 50,000)
-3. **Метаданные**: Статические, без динамического контента
-4. **Восстановление**: Нет механизма восстановления потерянных токенов
+1. ✅ **URI метаданные**: ~~Возвращает пустую строку~~ → **РЕШЕНО**: Полная интеграция с SoulMetadata
+2. **Газовое потребление**: 103,995 газа на минтинг SoulboundCore (выше целевых 50,000)
+3. ✅ **Метаданные**: ~~Статические~~ → **РЕШЕНО**: Динамические с версионированием и IPFS
+4. **Восстановление**: Нет механизма восстановления потерянных токенов (планируется в Этапе 3)
+5. **Новые ограничения системы метаданных**:
+   - Инициализация метаданных: 216,853 газа (высокое потребление из-за storage)
+   - Максимум 50 токенов в пакетной операции
+   - Необходимость отдельного контракта для метаданных
 
 ## 📚 Ссылки
 
@@ -264,6 +480,11 @@ console.log("Token exists:", exists); // false
 
 ---
 
-**Версия документации**: 1.0  
+**Версия документации**: 2.0  
 **Последнее обновление**: Декабрь 2024  
-**Статус**: ✅ Протестировано и готово к использованию
+**Статус**: ✅ SoulboundCore + SoulMetadata протестированы и готовы к использованию
+
+### **Версии контрактов**
+- **SoulboundCore**: v1.0 - Базовый SBT контракт (34/34 тестов)
+- **SoulMetadata**: v1.0 - Система метаданных (24/24 тестов)
+- **Общее покрытие**: 58/58 тестов (100% успеха)

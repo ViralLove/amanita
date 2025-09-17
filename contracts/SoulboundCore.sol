@@ -9,6 +9,13 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./IERC5192.sol";
 
 /**
+ * @dev Интерфейс для контракта метаданных
+ */
+interface ISoulMetadata {
+    function getTokenURI(uint256 tokenId) external view returns (string memory);
+}
+
+/**
  * @title SoulboundCore
  * @author Zeya888 (https://zeya888.me)
  * @dev Минимальная, газоэффективная реализация Soulbound Token согласно EIP-5192
@@ -44,6 +51,9 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
     // Mapping от адреса к количеству токенов
     mapping(address => uint256) private _balances;
     
+    // Адрес контракта метаданных (опционально)
+    address private _metadataContract;
+    
     // === КОНСТРУКТОР ===
     
     constructor(string memory name_, string memory symbol_) Ownable(msg.sender) {
@@ -61,8 +71,25 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
         return _symbol;
     }
     
-    function tokenURI(uint256 /* tokenId */) public view override returns (string memory) {
-        return "";
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        require(_owners[tokenId] != address(0), "ERC721: invalid token ID");
+        
+        // Если контракт метаданных установлен, используем его
+        if (_metadataContract != address(0)) {
+            try ISoulMetadata(_metadataContract).getTokenURI(tokenId) returns (string memory uri) {
+                // Если метаданные пустые, используем базовые
+                if (bytes(uri).length > 0) {
+                    return uri;
+                }
+                return _getDefaultTokenURI(tokenId);
+            } catch {
+                // Fallback к базовым метаданным при ошибке
+                return _getDefaultTokenURI(tokenId);
+            }
+        }
+        
+        // Базовые метаданные без внешнего контракта
+        return _getDefaultTokenURI(tokenId);
     }
     
     function balanceOf(address owner) public view override returns (uint256) {
@@ -231,6 +258,24 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
         return _owners[tokenId] != address(0);
     }
     
+    // === METADATA MANAGEMENT ===
+    
+    /**
+     * @dev Установить адрес контракта метаданных (только владелец)
+     * @param metadataContract адрес контракта метаданных
+     */
+    function setMetadataContract(address metadataContract) external onlyOwner {
+        _metadataContract = metadataContract;
+    }
+    
+    /**
+     * @dev Получить адрес контракта метаданных
+     * @return адрес контракта метаданных
+     */
+    function getMetadataContract() external view returns (address) {
+        return _metadataContract;
+    }
+    
     // === INTERNAL FUNCTIONS ===
     
     function _requireOwned(uint256 tokenId) internal view returns (address) {
@@ -267,6 +312,46 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
     
     function _isAuthorized(address owner, address spender, uint256 tokenId) internal view returns (bool) {
         return (spender == owner || isApprovedForAll(owner, spender) || getApproved(tokenId) == spender);
+    }
+    
+    /**
+     * @dev Генерация базовых метаданных для токена
+     * @param tokenId идентификатор токена
+     * @return JSON строка с базовыми метаданными
+     */
+    function _getDefaultTokenURI(uint256 tokenId) internal view returns (string memory) {
+        return string(abi.encodePacked(
+            '{"name": "Soul #', _toString(tokenId), 
+            '", "description": "Soulbound Token from Amanita Ecosystem",',
+            '"type": "basic",',
+            '"version": 1,',
+            '"attributes": []',
+            '}'
+        ));
+    }
+    
+    /**
+     * @dev Преобразование uint256 в string
+     * @param value число для преобразования
+     * @return строковое представление числа
+     */
+    function _toString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "0";
+        }
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
     }
     
     function _checkOnERC721Received(address from, address to, uint256 tokenId, bytes memory data) internal returns (bool) {
