@@ -89,11 +89,33 @@ describe("SpiralEngine - Integration Tests", function () {
             value: ethers.parseEther("1.0")
         });
 
-        // Деплоим контракт SoulIdentity
-        console.log("🔷 Deploying SoulIdentity contract...");
+        // Деплоим SBT экосистему
+        console.log("🔷 Deploying SBT ecosystem...");
+        
+        // 1. SoulboundCore
+        const SoulboundCore = await ethers.getContractFactory("SoulboundCore");
+        const soulboundCore = await SoulboundCore.connect(deployer).deploy("Amanita Soul", "ASOUL");
+        await soulboundCore.waitForDeployment();
+        console.log(`   SoulboundCore: ${await soulboundCore.getAddress()}`);
+        
+        // 2. SoulMetadata
+        const SoulMetadata = await ethers.getContractFactory("SoulMetadata");
+        const soulMetadata = await SoulMetadata.connect(deployer).deploy(await soulboundCore.getAddress());
+        await soulMetadata.waitForDeployment();
+        console.log(`   SoulMetadata: ${await soulMetadata.getAddress()}`);
+        
+        // Подключаем SoulMetadata к SoulboundCore
+        await soulboundCore.connect(deployer).setMetadataContract(await soulMetadata.getAddress());
+        
+        // 3. SoulIdentity (мост)
+        console.log("🔷 Deploying SoulIdentity bridge...");
         const SoulIdentity = await ethers.getContractFactory("SoulIdentity");
-        soulIdentity = await SoulIdentity.connect(deployer).deploy();
+        soulIdentity = await SoulIdentity.connect(deployer).deploy(
+            await soulboundCore.getAddress(),
+            await soulMetadata.getAddress()
+        );
         await soulIdentity.waitForDeployment();
+        console.log(`   SoulIdentity: ${await soulIdentity.getAddress()}`);
 
         // Деплоим контракт SpiralEngine
         console.log("🔷 Deploying SpiralEngine contract...");
@@ -103,6 +125,10 @@ describe("SpiralEngine - Integration Tests", function () {
 
         // Устанавливаем ссылку на SoulIdentity
         await spiralEngine.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
+        
+        // Назначаем роль SPIRAL_ENGINE_ROLE для SoulIdentity
+        const SPIRAL_ENGINE_ROLE = await soulIdentity.SPIRAL_ENGINE_ROLE();
+        await soulIdentity.connect(deployer).grantRole(SPIRAL_ENGINE_ROLE, await spiralEngine.getAddress());
 
         // Настраиваем роли
         await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, seller.address);

@@ -10,9 +10,9 @@ pragma solidity ^0.8.20;
  * - Другие пользователи могут читать товары.
  * - Все запросы читаемые (view), минимальный газ.
  */
-interface IInviteNFT {
-    function isUserActivated(address user) external view returns (bool);
-    function isSeller(address user) external view returns (bool);
+interface ISpiralEngine {
+    function usedInviteByUser(address user) external view returns (uint256);
+    function hasRole(bytes32 role, address account) external view returns (bool);
 }
 
 contract ProductRegistry {
@@ -24,14 +24,14 @@ contract ProductRegistry {
         bool active;         // Активен ли товар
     }
 
-    /// @notice InviteNFT для проверки активации пользователя
-    IInviteNFT public inviteNFT;
+    /// @notice SpiralEngine для проверки активации пользователя
+    ISpiralEngine public spiralEngine;
 
     /// @notice Конструктор
-    /// @param _inviteNFT адрес контракта InviteNFT
-    constructor(address _inviteNFT) {
-        require(_inviteNFT != address(0), "Invalid InviteNFT address");
-        inviteNFT = IInviteNFT(_inviteNFT);
+    /// @param _spiralEngine адрес контракта SpiralEngine
+    constructor(address _spiralEngine) {
+        require(_spiralEngine != address(0), "Invalid SpiralEngine address");
+        spiralEngine = ISpiralEngine(_spiralEngine);
     }
 
     // Версия каталога продавца
@@ -84,10 +84,10 @@ contract ProductRegistry {
     // --------------------------------
 
     /**
-     * @dev Проверка, что msg.sender — активированный пользователь (InviteNFT).
+     * @dev Проверка, что msg.sender — активированный пользователь (SpiralEngine).
      */
     modifier onlyActivatedUser() {
-        require(inviteNFT.isUserActivated(msg.sender), "Not activated in InviteNFT");
+        require(spiralEngine.usedInviteByUser(msg.sender) > 0, "Not activated in SpiralEngine");
         _;
     }
 
@@ -107,7 +107,7 @@ contract ProductRegistry {
     /**
     * @notice Создать новый товар.
     * @dev
-    * - Проверяет, что пользователь активирован (InviteNFT).
+     * - Проверяет, что пользователь активирован (SpiralEngine).
     * - Проверяет, что CID не пустой и цена > 0.
     * - Генерирует уникальный productId.
     * - Сохраняет товар в маппинг продуктов.
@@ -422,7 +422,7 @@ contract ProductRegistry {
     * 
     * Требования безопасности:
     * - Только продавец может очистить свой каталог.
-    * - Продавец должен быть активирован в InviteNFT.
+     * - Продавец должен быть активирован в SpiralEngine.
     * 
     * Газ-эффективность:
     * - O(n) для удаления из activeProductIds.

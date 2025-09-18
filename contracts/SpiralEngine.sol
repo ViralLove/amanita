@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/ISoulIdentity.sol";
+import "./IERC5192.sol";
 
 /**
  * @title SpiralEngine
@@ -12,7 +13,7 @@ import "./interfaces/ISoulIdentity.sol";
  * @notice Управляет инвайтами, активацией пользователей и назначением ролей в спиральной системе
  * @notice SBT функциональность делегируется в SoulIdentity контракт
  */
-contract SpiralEngine is ERC721, AccessControl {
+contract SpiralEngine is ERC721, AccessControl, IERC5192 {
     uint256 private _tokenIdCounter;
 
     // Роль продавца для доступа к минтингу инвайтов
@@ -368,11 +369,36 @@ contract SpiralEngine is ERC721, AccessControl {
 
     // === ПЕРЕОПРЕДЕЛЕНИЕ ФУНКЦИЙ ERC721 ===
     
+    // === SBT (SOULBOUND TOKEN) МИНИМАЛЬНАЯ ПОДДЕРЖКА ===
+    
+    /**
+     * @dev Блокировка approve - SBT токены не могут быть approved
+     */
+    function approve(address /* to */, uint256 /* tokenId */) public pure override {
+        revert("SpiralEngine: approvals not allowed");
+    }
+    
+    /**
+     * @dev Блокировка setApprovalForAll - SBT токены не могут быть approved
+     */
+    function setApprovalForAll(address /* operator */, bool /* approved */) public pure override {
+        revert("SpiralEngine: approvals not allowed");
+    }
+    
+    /**
+     * @dev Проверка заблокированности токена (EIP-5192)
+     * Делегируется в SoulIdentity контракт
+     */
+    function locked(uint256 tokenId) external view override returns (bool) {
+        require(address(soulIdentity) != address(0), "SpiralEngine: soul identity not set");
+        return soulIdentity.locked(tokenId);
+    }
+
     /**
      * @dev Поддержка интерфейсов
      */
     function supportsInterface(bytes4 interfaceId) public view override(ERC721, AccessControl) returns (bool) {
-        return super.supportsInterface(interfaceId);
+        return interfaceId == type(IERC5192).interfaceId || super.supportsInterface(interfaceId);
     }
 
     /**

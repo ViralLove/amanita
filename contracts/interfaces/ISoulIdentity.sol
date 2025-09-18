@@ -320,6 +320,74 @@ interface ISoulIdentity is IERC5192 {
         address[] memory guardians
     );
 
+    // === EXTERNAL IDENTITY MANAGEMENT ===
+    
+    /**
+     * @dev Структура для внешних идентичностей
+     */
+    struct ExternalIdentity {
+        string identityType;    // "did:spiral", "did:polygon", "did:ethr"
+        string identityValue;   // фактическое значение DID
+        bool verified;          // статус верификации
+        uint256 createdAt;      // время создания
+        address verifiedBy;     // кто верифицировал (0x0 для legacy)
+    }
+    
+    /**
+     * @dev Событие при связывании внешней идентичности
+     * @param user пользователь, связавший идентичность
+     * @param identityType тип идентичности
+     * @param identityValue значение идентичности
+     * @param verified статус верификации
+     * @param timestamp время связывания
+     */
+    event ExternalIdentityLinked(
+        address indexed user,
+        string identityType,
+        string identityValue,
+        bool verified,
+        uint256 timestamp
+    );
+    
+    /**
+     * @dev Связать внешнюю идентичность с адресом
+     * @param user адрес пользователя
+     * @param identityType тип идентичности ("did:spiral", "did:polygon")
+     * @param identityValue значение идентичности
+     * @param verified статус верификации
+     */
+    function linkExternalIdentity(
+        address user,
+        string memory identityType,
+        string memory identityValue,
+        bool verified
+    ) external;
+    
+    /**
+     * @dev Получить основную идентичность пользователя
+     * @param user адрес пользователя
+     * @return identity структура основной идентичности
+     */
+    function getPrimaryIdentity(address user) 
+        external view returns (ExternalIdentity memory identity);
+    
+    /**
+     * @dev Получить все идентичности пользователя
+     * @param user адрес пользователя
+     * @return identities массив всех идентичностей
+     */
+    function getAllIdentities(address user) 
+        external view returns (ExternalIdentity[] memory identities);
+    
+    /**
+     * @dev Проверить наличие идентичности определенного типа
+     * @param user адрес пользователя
+     * @param identityType тип идентичности
+     * @return hasIdentity есть ли идентичность данного типа
+     */
+    function hasIdentityType(address user, string memory identityType) 
+        external view returns (bool hasIdentity);
+
     // === ОБНОВЛЕНИЕ SOUL СТАТУСА ===
     
     /**
@@ -337,7 +405,7 @@ interface ISoulIdentity is IERC5192 {
     function updateSoulReputation(address user, int256 change) external;
     
     /**
-     * @dev Связать идентичность души с DID
+     * @dev Связать идентичность души с DID (DEPRECATED - используйте linkExternalIdentity)
      * @param did DID идентификатор
      */
     function linkSoulIdentity(string memory did) external;

@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./LoveDoPostNFT.sol";
 import "./AmanitaToken.sol";
 import "./AmanitaGovToken.sol";
-import "./InviteNFT.sol";
+import "./SpiralEngine.sol";
 
 /**
  * @title LoveEmissionEngine

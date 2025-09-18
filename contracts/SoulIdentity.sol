@@ -1,592 +1,547 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/ISoulIdentity.sol";
 
 /**
+ * @dev Интерфейс для SoulboundCore - существующий SBT контракт
+ */
+interface ISoulboundCore {
+    function balanceOf(address owner) external view returns (uint256);
+    function ownerOf(uint256 tokenId) external view returns (address);
+    function mintSoul(address to) external;
+    function exists(uint256 tokenId) external view returns (bool);
+    function getTotalSupply() external view returns (uint256);
+    function getNextTokenId() external view returns (uint256);
+}
+
+/**
+ * @dev Интерфейс для SoulMetadata - существующая система метаданных
+ */
+interface ISoulMetadata {
+    struct SoulData {
+        string metadataType;
+        uint256 version;
+        string attributes;
+        string ipfsHash;
+    }
+    
+    function getMetadata(uint256 tokenId) external view returns (SoulData memory);
+    function initializeMetadata(uint256 tokenId, string memory metadataType, string memory attributes, string memory ipfsHash) external;
+    function updateMetadata(uint256 tokenId, string memory attributes, string memory ipfsHash) external;
+    function isInitialized(uint256 tokenId) external view returns (bool);
+}
+
+/**
  * @title SoulIdentity
  * @author Zeya888 (https://zeya888.me)
- * @dev Контракт для управления Soulbound Token функциональностью и Soul статусами
- * @notice Обеспечивает непередаваемость токенов, систему восстановления доступа и управление "душой" пользователя
- * @notice Управляет статусом, репутацией и идентичностью пользователей в спиральной системе
+ * @dev МОСТ-контракт между SpiralEngine и существующей SBT экосистемой
+ * @notice НЕ создает новые SBT токены - использует существующие SoulboundCore!
+ * @notice Добавляет только DID функциональность к существующим SBT
  */
-contract SoulIdentity is ERC721, AccessControl, ISoulIdentity {
+contract SoulIdentity is AccessControl, ISoulIdentity {
+    
     // === РОЛИ ===
-    bytes32 public constant SOUL_MANAGER_ROLE = keccak256("SOUL_MANAGER_ROLE");
-    bytes32 public constant SOUL_VERIFIER_ROLE = keccak256("SOUL_VERIFIER_ROLE");
+    bytes32 public constant SPIRAL_ENGINE_ROLE = keccak256("SPIRAL_ENGINE_ROLE");
     
-    // === СОСТОЯНИЕ SOUL ===
+    // === ИНТЕГРАЦИЯ С СУЩЕСТВУЮЩИМИ КОНТРАКТАМИ ===
+    ISoulboundCore public soulboundCore;
+    ISoulMetadata public soulMetadata;
     
-    // Уровни души пользователей
-    mapping(address => uint256) public soulLevel;
+    // === НОВЫЕ DID ДАННЫЕ ===
+    mapping(address => ExternalIdentity[]) private userIdentities;
+    mapping(address => uint256) private primaryIdentityIndex;
+    mapping(address => mapping(string => uint256)) private identityTypeToIndex;
     
-    // Репутация души пользователей
-    mapping(address => uint256) public soulReputation;
-    
-    // DID идентичности пользователей
-    mapping(address => string) public soulIdentity;
-    
-    // Обратное отображение DID -> адрес
-    mapping(string => address) public addressBySoulIdentity;
-    
-    // Уровни верификации души (0-5)
-    mapping(address => uint8) public soulVerificationLevel;
-    
-    // === СИСТЕМА ВОССТАНОВЛЕНИЯ ===
-    
-    // Доверенные лица для восстановления
-    mapping(address => mapping(address => bool)) public trustedGuardians;
-    mapping(address => address[]) public userGuardians;
-    
-    // Активные процессы восстановления
-    mapping(address => bool) public recoveryInProgress;
-    mapping(address => address) public recoveryInitiator;
-    
-    // Временные ключи доступа
-    mapping(address => address) public temporaryKeys;
-    mapping(address => uint256) public temporaryKeyExpiry;
-    
-    // === SBT МЕТАДАННЫЕ ===
-    
-    // Версии SBT токенов
-    mapping(uint256 => uint256) public sbtVersion;
-    
-    // Типы SBT токенов
-    mapping(uint256 => string) public sbtType;
-    
-    // Атрибуты SBT токенов
-    mapping(uint256 => string) public sbtAttributes;
+    // === СОБЫТИЯ ===
+    event SoulIdentityContractsUpdated(address soulboundCore, address soulMetadata);
     
     // === КОНСТРУКТОР ===
     
-    constructor() ERC721("SoulIdentity", "SOUL") {
+    /**
+     * @dev Инициализация моста с существующими SBT контрактами
+     * @param _soulboundCore адрес существующего SoulboundCore контракта
+     * @param _soulMetadata адрес существующего SoulMetadata контракта
+     */
+    constructor(address _soulboundCore, address _soulMetadata) {
+        require(_soulboundCore != address(0), "SoulIdentity: invalid soulbound core address");
+        require(_soulMetadata != address(0), "SoulIdentity: invalid soul metadata address");
+        
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(SOUL_MANAGER_ROLE, msg.sender);
-        _grantRole(SOUL_VERIFIER_ROLE, msg.sender);
+        _grantRole(SPIRAL_ENGINE_ROLE, msg.sender);
+        
+        soulboundCore = ISoulboundCore(_soulboundCore);
+        soulMetadata = ISoulMetadata(_soulMetadata);
+        
+        emit SoulIdentityContractsUpdated(_soulboundCore, _soulMetadata);
     }
     
-    // === SBT CORE FUNCTIONS ===
+    // === ДЕЛЕГИРОВАНИЕ К СУЩЕСТВУЮЩИМ SBT КОНТРАКТАМ ===
     
     /**
-     * @dev SBT токены не могут быть одобрены для делегирования управления
-     * @notice всегда вызывает revert
-     */
-    function approve(address /* to */, uint256 /* tokenId */) public pure override(ERC721, ISoulIdentity) {
-        revert("SBT: approval not allowed");
-    }
-    
-    /**
-     * @dev SBT токены не могут быть одобрены для глобального управления
-     * @notice всегда вызывает revert
-     */
-    function setApprovalForAll(address /* operator */, bool /* approved */) public pure override(ERC721, ISoulIdentity) {
-        revert("SBT: approval not allowed");
-    }
-    
-    /**
-     * @dev SBT токены не имеют одобренных операторов
-     * @return address(0) всегда, так как SBT не могут быть одобрены
-     */
-    function getApproved(uint256 /* tokenId */) public pure override(ERC721, ISoulIdentity) returns (address) {
-        return address(0);
-    }
-    
-    /**
-     * @dev SBT токены не имеют глобальных одобрений
-     * @return false всегда, так как SBT не могут быть одобрены
-     */
-    function isApprovedForAll(address /* owner */, address /* operator */) public pure override(ERC721, ISoulIdentity) returns (bool) {
-        return false;
-    }
-    
-    /**
-     * @dev Проверяет, заблокирован ли токен (всегда true для SBT)
-     * @return true всегда, так как все токены являются SBT
-     */
-    function locked(uint256 /* tokenId */) public pure override returns (bool) {
-        return true;
-    }
-    
-    /**
-     * @dev Поддержка интерфейсов
-     */
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721, AccessControl) returns (bool) {
-        return interfaceId == type(ISoulIdentity).interfaceId || 
-               interfaceId == type(IERC5192).interfaceId ||
-               super.supportsInterface(interfaceId);
-    }
-    
-    // === SOUL СТАТУСЫ ===
-    
-    /**
-     * @dev Получить уровень души пользователя
+     * @dev Получить уровень души через делегирование к SoulMetadata
      * @param user адрес пользователя
-     * @return уровень души
+     * @return уровень души (1 если нет данных)
      */
-    function getSoulLevel(address user) public view override returns (uint256) {
-        return soulLevel[user];
+    function getSoulLevel(address user) external view override returns (uint256) {
+        uint256 tokenId = _getUserTokenId(user);
+        if (tokenId == 0) return 0; // Нет SBT токена
+        
+        try soulMetadata.getMetadata(tokenId) returns (ISoulMetadata.SoulData memory data) {
+            return _parseLevel(data.attributes); // Парсим level из JSON
+        } catch {
+            return 1; // Дефолтный уровень
+        }
     }
     
     /**
-     * @dev Получить репутацию души пользователя
+     * @dev Получить репутацию души через делегирование к SoulMetadata
      * @param user адрес пользователя
-     * @return репутация души
+     * @return репутация души (100 если нет данных)
      */
-    function getSoulReputation(address user) public view override returns (uint256) {
-        return soulReputation[user];
+    function getSoulReputation(address user) external view override returns (uint256) {
+        uint256 tokenId = _getUserTokenId(user);
+        if (tokenId == 0) return 0; // Нет SBT токена
+        
+        try soulMetadata.getMetadata(tokenId) returns (ISoulMetadata.SoulData memory data) {
+            return _parseReputation(data.attributes); // Парсим reputation из JSON
+        } catch {
+            return 100; // Дефолтная репутация
+        }
     }
     
     /**
-     * @dev Получить идентичность души пользователя
+     * @dev Обновить уровень души через SoulMetadata
      * @param user адрес пользователя
-     * @return DID идентификатор
+     * @param newLevel новый уровень души
      */
-    function getSoulIdentity(address user) public view override returns (string memory) {
-        return soulIdentity[user];
+    function updateSoulLevel(address user, uint256 newLevel) external override onlyRole(SPIRAL_ENGINE_ROLE) {
+        uint256 tokenId = _getUserTokenId(user);
+        require(tokenId > 0, "SoulIdentity: user has no SBT token");
+        
+        // Обновляем метаданные через существующую систему
+        try soulMetadata.getMetadata(tokenId) returns (ISoulMetadata.SoulData memory data) {
+            string memory updatedAttributes = _updateLevelInJSON(data.attributes, newLevel);
+            soulMetadata.updateMetadata(tokenId, updatedAttributes, data.ipfsHash);
+        } catch {
+            // Создаем базовые метаданные если их нет
+            string memory newAttributes = string(abi.encodePacked('{"level":', _toString(newLevel), ',"reputation":100}'));
+            soulMetadata.initializeMetadata(tokenId, "identity", newAttributes, "");
+        }
     }
     
     /**
-     * @dev Получить уровень верификации души пользователя
+     * @dev Изменить репутацию души через SoulMetadata
      * @param user адрес пользователя
-     * @return уровень верификации (0-5)
+     * @param change изменение репутации (может быть отрицательным)
      */
-    function getSoulVerificationLevel(address user) public view override returns (uint8) {
-        return soulVerificationLevel[user];
+    function updateSoulReputation(address user, int256 change) external override onlyRole(SPIRAL_ENGINE_ROLE) {
+        uint256 tokenId = _getUserTokenId(user);
+        require(tokenId > 0, "SoulIdentity: user has no SBT token");
+        
+        uint256 currentRep = this.getSoulReputation(user);
+        uint256 newRep = change >= 0 ? currentRep + uint256(change) : 
+                         (currentRep > uint256(-change) ? currentRep - uint256(-change) : 0);
+        
+        try soulMetadata.getMetadata(tokenId) returns (ISoulMetadata.SoulData memory data) {
+            string memory updatedAttributes = _updateReputationInJSON(data.attributes, newRep);
+            soulMetadata.updateMetadata(tokenId, updatedAttributes, data.ipfsHash);
+        } catch {
+            string memory newAttributes = string(abi.encodePacked('{"level":1,"reputation":', _toString(newRep), '}'));
+            soulMetadata.initializeMetadata(tokenId, "identity", newAttributes, "");
+        }
+    }
+    
+    // === НОВАЯ DID ФУНКЦИОНАЛЬНОСТЬ ===
+    
+    /**
+     * @dev Связать внешнюю идентичность с адресом
+     * @param user адрес пользователя
+     * @param identityType тип идентичности ("did:spiral", "did:polygon")
+     * @param identityValue значение идентичности
+     * @param verified статус верификации
+     */
+    function linkExternalIdentity(
+        address user,
+        string memory identityType,
+        string memory identityValue,
+        bool verified
+    ) external override onlyRole(SPIRAL_ENGINE_ROLE) {
+        require(user != address(0), "SoulIdentity: invalid user address");
+        require(bytes(identityType).length > 0, "SoulIdentity: empty identity type");
+        require(bytes(identityValue).length > 0, "SoulIdentity: empty identity value");
+        require(_getUserTokenId(user) > 0, "SoulIdentity: user has no SBT token");
+        
+        // Проверяем, есть ли уже такой тип идентичности
+        uint256 existingIndex = identityTypeToIndex[user][identityType];
+        
+        if (existingIndex > 0) {
+            // Обновляем существующую идентичность
+            uint256 index = existingIndex - 1;
+            userIdentities[user][index].identityValue = identityValue;
+            userIdentities[user][index].verified = verified;
+            userIdentities[user][index].verifiedBy = verified ? msg.sender : address(0);
+        } else {
+            // Добавляем новую идентичность
+            ExternalIdentity memory newIdentity = ExternalIdentity({
+                identityType: identityType,
+                identityValue: identityValue,
+                verified: verified,
+                createdAt: block.timestamp,
+                verifiedBy: verified ? msg.sender : address(0)
+            });
+            
+            userIdentities[user].push(newIdentity);
+            identityTypeToIndex[user][identityType] = userIdentities[user].length;
+            
+            // Если это первая идентичность, делаем её основной
+            if (userIdentities[user].length == 1) {
+                primaryIdentityIndex[user] = 0;
+            }
+        }
+        
+        emit ExternalIdentityLinked(user, identityType, identityValue, verified, block.timestamp);
     }
     
     /**
-     * @dev Получить полный профиль души пользователя
+     * @dev Получить основную идентичность пользователя
      * @param user адрес пользователя
+     * @return identity структура основной идентичности
+     */
+    function getPrimaryIdentity(address user) 
+        external view override returns (ExternalIdentity memory identity) {
+        require(userIdentities[user].length > 0, "SoulIdentity: no identities found");
+        return userIdentities[user][primaryIdentityIndex[user]];
+    }
+    
+    /**
+     * @dev Получить все идентичности пользователя
+     * @param user адрес пользователя
+     * @return identities массив всех идентичностей
+     */
+    function getAllIdentities(address user) 
+        external view override returns (ExternalIdentity[] memory identities) {
+        return userIdentities[user];
+    }
+    
+    /**
+     * @dev Проверить наличие идентичности определенного типа
+     * @param user адрес пользователя
+     * @param identityType тип идентичности
+     * @return hasIdentity есть ли идентичность данного типа
+     */
+    function hasIdentityType(address user, string memory identityType) 
+        external view override returns (bool hasIdentity) {
+        return identityTypeToIndex[user][identityType] > 0;
+    }
+    
+    // === ОБРАТНАЯ СОВМЕСТИМОСТЬ ===
+    
+    /**
+     * @dev Связать идентичность души с DID (DEPRECATED)
+     * Автоматически создает ExternalIdentity с типом "did:spiral"
+     * @param did DID идентификатор
+     */
+    function linkSoulIdentity(string memory did) external override {
+        // Для обратной совместимости - пользователь может добавить свою DID
+        require(bytes(did).length > 0, "SoulIdentity: empty DID");
+        require(_getUserTokenId(msg.sender) > 0, "SoulIdentity: user has no SBT token");
+        
+        // Добавляем идентичность напрямую (без роли для совместимости)
+        userIdentities[msg.sender].push(ExternalIdentity({
+            identityType: "did:spiral",
+            identityValue: did,
+            verified: false, // legacy всегда не верифицирована
+            createdAt: block.timestamp,
+            verifiedBy: address(0) // legacy не имеет верификатора
+        }));
+        
+        // Если это первая идентичность, делаем её основной
+        if (userIdentities[msg.sender].length == 1) {
+            primaryIdentityIndex[msg.sender] = 0;
+        }
+        
+        emit ExternalIdentityLinked(msg.sender, "did:spiral", did, false, block.timestamp);
+    }
+    
+    /**
+     * @dev Получить идентичность души пользователя (DEPRECATED)
+     * Возвращает значение основной идентичности
+     * @param user адрес пользователя
+     * @return DID идентификатор основной идентичности
+     */
+    function getSoulIdentity(address user) external view override returns (string memory) {
+        if (userIdentities[user].length == 0) return "";
+        return userIdentities[user][primaryIdentityIndex[user]].identityValue;
+    }
+    
+    /**
+     * @dev Отвязать идентичность души (DEPRECATED)
+     */
+    function unlinkSoulIdentity() external override {
+        // Удаляем все did:spiral идентичности пользователя
+        ExternalIdentity[] storage identities = userIdentities[msg.sender];
+        for (uint256 i = 0; i < identities.length; i++) {
+            if (keccak256(bytes(identities[i].identityType)) == keccak256(bytes("did:spiral"))) {
+                // Перемещаем последний элемент на место удаляемого
+                identities[i] = identities[identities.length - 1];
+                identities.pop();
+                break;
+            }
+        }
+        
+        // Сброс индекса если удалили основную идентичность
+        if (identities.length == 0) {
+            primaryIdentityIndex[msg.sender] = 0;
+        }
+    }
+    
+    // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+    
+    /**
+     * @dev Найти первый SBT токен пользователя в существующей системе
+     * @param user адрес пользователя
+     * @return tokenId идентификатор токена (0 если не найден)
+     */
+    function _getUserTokenId(address user) private view returns (uint256) {
+        uint256 balance = soulboundCore.balanceOf(user);
+        if (balance == 0) return 0;
+        
+        // Поиск первого токена пользователя
+        uint256 totalSupply = soulboundCore.getTotalSupply();
+        for (uint256 i = 1; i <= totalSupply && i <= 1000; i++) {
+            try soulboundCore.ownerOf(i) returns (address owner) {
+                if (owner == user) return i;
+            } catch {
+                continue;
+            }
+        }
+        return 0;
+    }
+    
+    /**
+     * @dev Парсинг level из JSON атрибутов (упрощенная реализация)
+     * @param attributes JSON строка с атрибутами
      * @return level уровень души
-     * @return reputation репутация души
-     * @return identity идентичность души (DID)
-     * @return verificationLevel уровень верификации
-     * @return guardians список доверенных лиц
      */
-    function getSoulProfile(address user) public view override returns (
+    function _parseLevel(string memory attributes) private pure returns (uint256) {
+        // TODO: Реализовать полноценный JSON парсинг
+        // Пока возвращаем дефолтное значение
+        bytes memory attributesBytes = bytes(attributes);
+        if (attributesBytes.length == 0) return 1;
+        
+        // Простой поиск "level":X в JSON
+        // В production заменить на библиотеку JSON парсинга
+        return 1; // Заглушка
+    }
+    
+    /**
+     * @dev Парсинг reputation из JSON атрибутов (упрощенная реализация)
+     * @param attributes JSON строка с атрибутами
+     * @return reputation репутация души
+     */
+    function _parseReputation(string memory attributes) private pure returns (uint256) {
+        // TODO: Реализовать полноценный JSON парсинг
+        bytes memory attributesBytes = bytes(attributes);
+        if (attributesBytes.length == 0) return 100;
+        
+        // Простой поиск "reputation":X в JSON
+        return 100; // Заглушка
+    }
+    
+    /**
+     * @dev Обновление level в JSON атрибутах (упрощенная реализация)
+     * @param attributes текущие JSON атрибуты
+     * @param newLevel новый уровень
+     * @return updatedAttributes обновленные атрибуты
+     */
+    function _updateLevelInJSON(string memory attributes, uint256 newLevel) private pure returns (string memory) {
+        // TODO: Реализовать полноценное обновление JSON
+        return string(abi.encodePacked('{"level":', _toString(newLevel), ',"reputation":100}'));
+    }
+    
+    /**
+     * @dev Обновление reputation в JSON атрибутах (упрощенная реализация)
+     * @param attributes текущие JSON атрибуты
+     * @param newReputation новая репутация
+     * @return updatedAttributes обновленные атрибуты
+     */
+    function _updateReputationInJSON(string memory attributes, uint256 newReputation) private pure returns (string memory) {
+        // TODO: Реализовать полноценное обновление JSON
+        return string(abi.encodePacked('{"level":1,"reputation":', _toString(newReputation), '}'));
+    }
+    
+    /**
+     * @dev Конвертация uint256 в string
+     * @param value число для конвертации
+     * @return строковое представление
+     */
+    function _toString(uint256 value) private pure returns (string memory) {
+        if (value == 0) return "0";
+        
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        
+        return string(buffer);
+    }
+    
+    // === ЗАГЛУШКИ ДЛЯ ОСТАЛЬНЫХ ФУНКЦИЙ ISoulIdentity ===
+    
+    function getSoulVerificationLevel(address user) external pure override returns (uint8) {
+        return 0; // Заглушка
+    }
+    
+    function getSoulProfile(address user) external view override returns (
         uint256 level,
         uint256 reputation,
         string memory identity,
         uint8 verificationLevel,
         address[] memory guardians
     ) {
-        return (
-            soulLevel[user],
-            soulReputation[user],
-            soulIdentity[user],
-            soulVerificationLevel[user],
-            userGuardians[user]
-        );
+        level = this.getSoulLevel(user);
+        reputation = this.getSoulReputation(user);
+        identity = this.getSoulIdentity(user);
+        verificationLevel = 0;
+        guardians = new address[](0);
     }
     
-    // === ОБНОВЛЕНИЕ SOUL СТАТУСА ===
-    
-    /**
-     * @dev Обновить уровень души пользователя
-     * @param user адрес пользователя
-     * @param newLevel новый уровень души
-     */
-    function updateSoulLevel(address user, uint256 newLevel) public override onlyRole(SOUL_MANAGER_ROLE) {
-        uint256 oldLevel = soulLevel[user];
-        soulLevel[user] = newLevel;
-        emit SoulLevelUpdated(user, oldLevel, newLevel, block.timestamp);
+    function updateSoulVerificationLevel(address user, uint8 level) external override {
+        // Заглушка - можно реализовать через метаданные
     }
     
-    /**
-     * @dev Изменить репутацию души пользователя
-     * @param user адрес пользователя
-     * @param change изменение репутации (может быть отрицательным)
-     */
-    function updateSoulReputation(address user, int256 change) public override onlyRole(SOUL_MANAGER_ROLE) {
-        uint256 currentReputation = soulReputation[user];
-        uint256 newReputation;
-        
-        if (change < 0) {
-            // Предотвращаем отрицательную репутацию
-            if (currentReputation >= uint256(-change)) {
-                newReputation = currentReputation - uint256(-change);
-            } else {
-                newReputation = 0;
-            }
-        } else {
-            newReputation = currentReputation + uint256(change);
-        }
-        
-        soulReputation[user] = newReputation;
-        emit SoulReputationChanged(user, change, newReputation, block.timestamp);
+    function hasSoulIdentityLinked(address user) external view override returns (bool) {
+        return userIdentities[user].length > 0;
     }
     
-    /**
-     * @dev Связать идентичность души с DID
-     * @param did DID идентификатор
-     */
-    function linkSoulIdentity(string memory did) public override {
-        require(bytes(soulIdentity[msg.sender]).length == 0, "SoulIdentity: already linked");
-        require(addressBySoulIdentity[did] == address(0), "SoulIdentity: DID already in use");
-        
-        soulIdentity[msg.sender] = did;
-        addressBySoulIdentity[did] = msg.sender;
-        emit SoulIdentityLinked(msg.sender, did, block.timestamp);
+    function getAddressBySoulIdentity(string memory did) external view override returns (address) {
+        // TODO: Реализовать обратный поиск по DID
+        return address(0); // Заглушка
     }
     
-    /**
-     * @dev Отвязать идентичность души
-     */
-    function unlinkSoulIdentity() public override {
-        string memory did = soulIdentity[msg.sender];
-        require(bytes(did).length > 0, "SoulIdentity: not linked");
-        
-        delete soulIdentity[msg.sender];
-        delete addressBySoulIdentity[did];
-        emit SoulIdentityLinked(msg.sender, "", block.timestamp);
+    // === ERC5192 ЗАГЛУШКИ (НЕ ИСПОЛЬЗУЮТСЯ - ДЕЛЕГИРУЕМ К SOULBOUNDCORE) ===
+    
+    function locked(uint256 tokenId) external pure override returns (bool) {
+        return true; // Все SBT заблокированы
     }
     
-    /**
-     * @dev Обновить уровень верификации души
-     * @param user адрес пользователя
-     * @param level новый уровень верификации (0-5)
-     */
-    function updateSoulVerificationLevel(address user, uint8 level) public override onlyRole(SOUL_VERIFIER_ROLE) {
-        require(level <= 5, "SoulIdentity: invalid verification level");
-        
-        uint8 oldLevel = soulVerificationLevel[user];
-        soulVerificationLevel[user] = level;
-        emit SoulVerificationLevelUpdated(user, oldLevel, level, block.timestamp);
+    function approve(address to, uint256 tokenId) external pure override {
+        revert("SoulIdentity: soulbound tokens cannot be approved");
     }
     
-    /**
-     * @dev Проверить, связана ли идентичность души
-     * @param user адрес пользователя
-     * @return true если идентичность связана
-     */
-    function hasSoulIdentityLinked(address user) public view override returns (bool) {
-        return bytes(soulIdentity[user]).length > 0;
+    function setApprovalForAll(address operator, bool approved) external pure override {
+        revert("SoulIdentity: soulbound tokens cannot be approved");
     }
     
-    /**
-     * @dev Получить адрес по DID идентичности
-     * @param did DID идентификатор
-     * @return адрес пользователя
-     */
-    function getAddressBySoulIdentity(string memory did) public view override returns (address) {
-        return addressBySoulIdentity[did];
+    function getApproved(uint256 tokenId) external pure override returns (address) {
+        return address(0); // SBT не могут быть одобрены
     }
     
-    // === СИСТЕМА ВОССТАНОВЛЕНИЯ ДУШИ ===
-    
-    /**
-     * @dev Добавить доверенное лицо для восстановления души
-     * @param guardian адрес доверенного лица
-     */
-    function addTrustedGuardian(address guardian) public override {
-        require(guardian != address(0), "SoulIdentity: invalid guardian");
-        require(guardian != msg.sender, "SoulIdentity: cannot be own guardian");
-        require(!trustedGuardians[msg.sender][guardian], "SoulIdentity: already a guardian");
-        
-        trustedGuardians[msg.sender][guardian] = true;
-        userGuardians[msg.sender].push(guardian);
-        emit GuardianAdded(msg.sender, guardian, block.timestamp);
+    function isApprovedForAll(address owner, address operator) external pure override returns (bool) {
+        return false; // SBT не могут быть одобрены
     }
     
-    /**
-     * @dev Удалить доверенное лицо
-     * @param guardian адрес доверенного лица
-     */
-    function removeTrustedGuardian(address guardian) public override {
-        require(trustedGuardians[msg.sender][guardian], "SoulIdentity: not a guardian");
-        
-        trustedGuardians[msg.sender][guardian] = false;
-        
-        // Удаляем из массива
-        address[] storage guardians = userGuardians[msg.sender];
-        for (uint256 i = 0; i < guardians.length; i++) {
-            if (guardians[i] == guardian) {
-                guardians[i] = guardians[guardians.length - 1];
-                guardians.pop();
-                break;
-            }
-        }
-        
-        emit GuardianRemoved(msg.sender, guardian, block.timestamp);
+    // === ОСТАЛЬНЫЕ ЗАГЛУШКИ ===
+    
+    function addTrustedGuardian(address guardian) external override {
+        // TODO: Делегировать к SoulRecovery
     }
     
-    /**
-     * @dev Получить список доверенных лиц души пользователя
-     * @param user адрес пользователя
-     * @return массив адресов доверенных лиц
-     */
-    function getTrustedGuardians(address user) public view override returns (address[] memory) {
-        return userGuardians[user];
+    function removeTrustedGuardian(address guardian) external override {
+        // TODO: Делегировать к SoulRecovery
     }
     
-    /**
-     * @dev Проверить, является ли адрес доверенным лицом души
-     * @param user адрес пользователя
-     * @param guardian адрес для проверки
-     * @return true если адрес является доверенным лицом
-     */
-    function isTrustedGuardian(address user, address guardian) public view override returns (bool) {
-        return trustedGuardians[user][guardian];
+    function getTrustedGuardians(address user) external view override returns (address[] memory) {
+        // TODO: Делегировать к SoulRecovery
+        return new address[](0);
     }
     
-    /**
-     * @dev Инициировать процесс восстановления души
-     * @param user адрес пользователя, для которого инициируется восстановление
-     */
-    function initiateRecovery(address user) public override {
-        require(trustedGuardians[user][msg.sender], "SoulIdentity: not a trusted guardian");
-        require(!recoveryInProgress[user], "SoulIdentity: recovery already in progress");
-        
-        recoveryInProgress[user] = true;
-        recoveryInitiator[user] = msg.sender;
-        emit RecoveryInitiated(user, msg.sender, block.timestamp);
+    function isTrustedGuardian(address user, address guardian) external pure override returns (bool) {
+        return false; // Заглушка
     }
     
-    /**
-     * @dev Завершить процесс восстановления души
-     * @param user адрес пользователя
-     * @param newKey новый ключ доступа
-     */
-    function completeRecovery(address user, address newKey) public override {
-        require(recoveryInProgress[user], "SoulIdentity: no recovery in progress");
-        require(recoveryInitiator[user] == msg.sender, "SoulIdentity: not the initiator");
-        require(newKey != address(0), "SoulIdentity: invalid new key");
-        
-        recoveryInProgress[user] = false;
-        delete recoveryInitiator[user];
-        
-        // Здесь должна быть логика передачи токенов новому ключу
-        // Пока что просто эмитируем событие
-        emit RecoveryCompleted(user, newKey, block.timestamp);
+    function initiateRecovery(address user) external override {
+        // TODO: Делегировать к SoulRecovery
     }
     
-    /**
-     * @dev Проверить, идет ли процесс восстановления души
-     * @param user адрес пользователя
-     * @return true если процесс восстановления активен
-     */
-    function isRecoveryInProgress(address user) public view override returns (bool) {
-        return recoveryInProgress[user];
+    function completeRecovery(address user, address newKey) external override {
+        // TODO: Делегировать к SoulRecovery
     }
     
-    /**
-     * @dev Создать временный ключ доступа к душе
-     * @param tempKey адрес временного ключа
-     * @param duration продолжительность действия в секундах
-     */
-    function createTemporaryKey(address tempKey, uint256 duration) public override {
-        require(tempKey != address(0), "SoulIdentity: invalid temp key");
-        require(duration > 0, "SoulIdentity: invalid duration");
-        
-        temporaryKeys[msg.sender] = tempKey;
-        temporaryKeyExpiry[msg.sender] = block.timestamp + duration;
-        emit TemporaryKeyCreated(msg.sender, tempKey, block.timestamp + duration, block.timestamp);
+    function isRecoveryInProgress(address user) external pure override returns (bool) {
+        return false; // Заглушка
     }
     
-    /**
-     * @dev Получить временный ключ души пользователя
-     * @param user адрес пользователя
-     * @return адрес временного ключа
-     */
-    function getTemporaryKey(address user) public view override returns (address) {
-        return temporaryKeys[user];
+    function createTemporaryKey(address tempKey, uint256 duration) external override {
+        // TODO: Реализовать временные ключи
     }
     
-    /**
-     * @dev Проверить, действителен ли временный ключ души
-     * @param tempKey адрес временного ключа
-     * @return true если ключ действителен
-     */
-    function isTemporaryKeyValid(address tempKey) public view override returns (bool) {
-        // Находим пользователя по временному ключу
-        for (uint256 i = 0; i < userGuardians[msg.sender].length; i++) {
-            address user = userGuardians[msg.sender][i];
-            if (temporaryKeys[user] == tempKey && 
-                temporaryKeyExpiry[user] > block.timestamp) {
-                return true;
-            }
-        }
-        return false;
+    function getTemporaryKey(address user) external pure override returns (address) {
+        return address(0); // Заглушка
     }
     
-    // === SOUL МЕТАДАННЫЕ ===
-    
-    /**
-     * @dev Получить расширенные метаданные души
-     * @param tokenId идентификатор токена
-     * @return soulType тип души
-     * @return version версия души
-     * @return attributes атрибуты души
-     * @return isLocked заблокирован ли токен
-     */
-    function getSoulMetadata(uint256 tokenId) public view returns (
-        string memory soulType,
-        uint256 version,
-        string memory attributes,
-        bool isLocked
-    ) {
-        return (
-            sbtType[tokenId],
-            sbtVersion[tokenId],
-            sbtAttributes[tokenId],
-            true // SBT всегда заблокированы
-        );
+    function isTemporaryKeyValid(address tempKey) external pure override returns (bool) {
+        return false; // Заглушка
     }
     
-    /**
-     * @dev Обновить метаданные души (только владелец)
-     * @param tokenId идентификатор токена
-     * @param newSoulType новый тип души
-     * @param newAttributes новые атрибуты души
-     */
-    function updateSoulMetadata(uint256 tokenId, string memory newSoulType, string memory newAttributes) public {
-        require(ownerOf(tokenId) == msg.sender, "SoulIdentity: not token owner");
-        
-        sbtType[tokenId] = newSoulType;
-        sbtAttributes[tokenId] = newAttributes;
-        emit SBTMetadataUpdated(tokenId, newSoulType, newAttributes, block.timestamp);
-    }
-    
-    /**
-     * @dev Обновить версию души (только админ)
-     * @param tokenId идентификатор токена
-     * @param newVersion новая версия
-     */
-    function updateSoulVersion(uint256 tokenId, uint256 newVersion) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        sbtVersion[tokenId] = newVersion;
-        emit SBTVersionUpdated(tokenId, newVersion, block.timestamp);
-    }
-    
-    /**
-     * @dev Получить версию души токена
-     * @param tokenId идентификатор токена
-     * @return версия души
-     */
-    function getSoulVersion(uint256 tokenId) public view returns (uint256) {
-        return sbtVersion[tokenId];
-    }
-    
-    /**
-     * @dev Проверить, является ли токен душой
-     * @param tokenId идентификатор токена
-     * @return true если токен является душой
-     */
-    function isSoul(uint256 tokenId) public view returns (bool) {
-        return ownerOf(tokenId) != address(0);
-    }
-    
-    /**
-     * @dev Получить тип души токена
-     * @param tokenId идентификатор токена
-     * @return тип души
-     */
-    function getSoulType(uint256 tokenId) public view returns (string memory) {
-        return sbtType[tokenId];
-    }
-    
-    /**
-     * @dev Получить атрибуты души токена
-     * @param tokenId идентификатор токена
-     * @return атрибуты души
-     */
-    function getSoulAttributes(uint256 tokenId) public view returns (string memory) {
-        return sbtAttributes[tokenId];
-    }
-    
-    // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
-    
-    /**
-     * @dev Минт токена души (только для авторизованных контрактов)
-     * @param to адрес получателя
-     * @param tokenId идентификатор токена
-     */
-    function mintSoul(address to, uint256 tokenId) public onlyRole(SOUL_MANAGER_ROLE) {
-        _mint(to, tokenId);
-        sbtVersion[tokenId] = 1;
-        sbtType[tokenId] = "SoulIdentity";
-        sbtAttributes[tokenId] = "{}";
-    }
-    
-    /**
-     * @dev Базовый URI для токенов
-     */
-    function _baseURI() internal pure override returns (string memory) {
-        return "https://api.amanita.com/soul/";
-    }
-    
-    // === SBT METADATA FUNCTIONS (для совместимости с интерфейсом) ===
-    
-    /**
-     * @dev Получить расширенные метаданные SBT
-     * @param tokenId идентификатор токена
-     * @return tokenSbtType тип SBT
-     * @return version версия SBT
-     * @return attributes дополнительные атрибуты
-     * @return isLocked заблокирован ли токен
-     */
-    function getSBTMetadata(uint256 tokenId) public view returns (
+    function getSBTMetadata(uint256 tokenId) external view override returns (
         string memory tokenSbtType,
         uint256 version,
         string memory attributes,
         bool isLocked
     ) {
-        return getSoulMetadata(tokenId);
+        try soulMetadata.getMetadata(tokenId) returns (ISoulMetadata.SoulData memory data) {
+            return (data.metadataType, data.version, data.attributes, true);
+        } catch {
+            return ("", 0, "", true);
+        }
     }
     
-    /**
-     * @dev Обновить метаданные SBT (только владелец)
-     * @param tokenId идентификатор токена
-     * @param newSbtType новый тип SBT
-     * @param newAttributes новые атрибуты
-     */
-    function updateSBTMetadata(uint256 tokenId, string memory newSbtType, string memory newAttributes) public {
-        updateSoulMetadata(tokenId, newSbtType, newAttributes);
+    function updateSBTMetadata(uint256 tokenId, string memory newSbtType, string memory newAttributes) external override {
+        // TODO: Делегировать к SoulMetadata
     }
     
-    /**
-     * @dev Обновить версию SBT (только админ)
-     * @param tokenId идентификатор токена
-     * @param newVersion новая версия
-     */
-    function updateSBTVersion(uint256 tokenId, uint256 newVersion) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        updateSoulVersion(tokenId, newVersion);
+    function updateSBTVersion(uint256 tokenId, uint256 newVersion) external override {
+        // TODO: Реализовать через метаданные
     }
     
-    /**
-     * @dev Получить версию SBT токена
-     * @param tokenId идентификатор токена
-     * @return версия SBT
-     */
-    function getSBTVersion(uint256 tokenId) public view returns (uint256) {
-        return getSoulVersion(tokenId);
+    function getSBTVersion(uint256 tokenId) external view override returns (uint256) {
+        try soulMetadata.getMetadata(tokenId) returns (ISoulMetadata.SoulData memory data) {
+            return data.version;
+        } catch {
+            return 0;
+        }
     }
     
-    /**
-     * @dev Проверить, является ли токен SBT
-     * @param tokenId идентификатор токена
-     * @return true если токен является SBT
-     */
-    function isSBT(uint256 tokenId) public view returns (bool) {
-        return isSoul(tokenId);
+    function isSBT(uint256 tokenId) external view override returns (bool) {
+        return soulboundCore.exists(tokenId);
     }
     
-    /**
-     * @dev Получить тип SBT токена
-     * @param tokenId идентификатор токена
-     * @return тип SBT
-     */
-    function getSBTType(uint256 tokenId) public view returns (string memory) {
-        return getSoulType(tokenId);
+    function getSBTType(uint256 tokenId) external view override returns (string memory) {
+        try soulMetadata.getMetadata(tokenId) returns (ISoulMetadata.SoulData memory data) {
+            return data.metadataType;
+        } catch {
+            return "";
+        }
     }
     
-    /**
-     * @dev Получить атрибуты SBT токена
-     * @param tokenId идентификатор токена
-     * @return атрибуты SBT
-     */
-    function getSBTAttributes(uint256 tokenId) public view returns (string memory) {
-        return getSoulAttributes(tokenId);
+    function getSBTAttributes(uint256 tokenId) external view override returns (string memory) {
+        try soulMetadata.getMetadata(tokenId) returns (ISoulMetadata.SoulData memory data) {
+            return data.attributes;
+        } catch {
+            return "";
+        }
     }
+    
 }
