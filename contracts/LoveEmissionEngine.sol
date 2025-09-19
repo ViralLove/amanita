@@ -4,13 +4,13 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./LoveDoPostNFT.sol";
-import "./AmanitaToken.sol";
+import "./Lovecoin.sol";
 import "./AmanitaGovToken.sol";
 import "./SpiralEngine.sol";
 
 /**
  * @title LoveEmissionEngine
- * @dev Контракт эмиссии для Loveconomy: минтит $AMANITA (утилити) и $AGOV (голос)
+ * @dev Контракт эмиссии для Loveconomy: минтит $LOVECOIN (утилити) и $LGOV (голос)
  * на основе суперлайков в LoveDoPostNFT.
  */
 contract LoveEmissionEngine is AccessControl {
@@ -18,38 +18,38 @@ contract LoveEmissionEngine is AccessControl {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     /// @notice Токены
-    IERC20 public immutable amanitaToken;
-    IAGovToken public immutable agovToken;
+    IERC20 public immutable lovecoin;
+    ILGovToken public immutable lgovToken;
     ILoveDoPostNFT public immutable loveDo;
     IInviteGraph public inviteGraph;
-    mapping(address => uint256) public amanitaAccrued;
+    mapping(address => uint256) public loveAccrued;
 
-    /// @notice Сколько накоплено AGOV, но не получено
-    mapping(address => uint256) public agovAccrued;
+    /// @notice Сколько накоплено LGOV, но не получено
+    mapping(address => uint256) public lgovAccrued;
 
     /// @notice Коэффициент эмиссии (на 1 суперлайк)
     uint256 public constant EMISSION_RATE = 1 ether;
 
     /// @notice События
-    event Emission(address indexed seller, uint256 amanitaAmount, uint256 agovAccrued);
-    event AGOVClaimed(address indexed seller, uint256 amount);
-    event ClaimedAMANITA(address indexed seller, uint256 amount);
-    event ClaimedAGOV(address indexed seller, uint256 amount);
+    event Emission(address indexed seller, uint256 lovecoinAmount, uint256 lgovAccrued);
+    event LGOVClaimed(address indexed seller, uint256 amount);
+    event ClaimedLOVECOIN(address indexed seller, uint256 amount);
+    event ClaimedLGOV(address indexed seller, uint256 amount);
 
-    mapping(address => bool) public agovClaimed;
+    mapping(address => bool) public lgovClaimed;
     uint8 public constant LOVE_DO_THRESHOLD = 8;
 
     constructor(
-        address _amanita,
-        address _agov,
+        address _lovecoin,
+        address _lgov,
         address _loveDo,
         address _inviteGraph,
         address _admin
     ) {
         require(_admin != address(0), "admin required");
 
-        amanitaToken = IERC20(_amanita);
-        agovToken = IAGovToken(_agov);
+        lovecoin = IERC20(_lovecoin);
+        lgovToken = ILGovToken(_lgov);
         loveDo = ILoveDoPostNFT(_loveDo);
         inviteGraph = IInviteGraph(_inviteGraph);
 
@@ -72,55 +72,55 @@ contract LoveEmissionEngine is AccessControl {
         require(success, "Superlike failed");
 
         // 2. Начислить накопленные токены
-        amanitaAccrued[sellerTo] += EMISSION_RATE;
-        agovAccrued[sellerTo] += EMISSION_RATE;
+        loveAccrued[sellerTo] += EMISSION_RATE;
+        lgovAccrued[sellerTo] += EMISSION_RATE;
 
-        emit Emission(sellerTo, EMISSION_RATE, agovAccrued[sellerTo]);
+        emit Emission(sellerTo, EMISSION_RATE, lgovAccrued[sellerTo]);
     }
 
     /**
-    * @notice Позволяет селлеру забрать накопленные $AMANITA (утилити токены)
+    * @notice Позволяет селлеру забрать накопленные $LOVECOIN (утилити токены)
     * @dev Вызывается вручную, чтобы избежать газовых затрат при каждом суперлайке
     */
-    function claimAMANITA() external {
-        uint256 amount = amanitaAccrued[msg.sender];
+    function claimLOVECOIN() external {
+        uint256 amount = loveAccrued[msg.sender];
         require(amount > 0, "LoveEmission: nothing to claim");
 
         // Обнуляем до трансфера — защита от reentrancy
-        amanitaAccrued[msg.sender] = 0;
+        loveAccrued[msg.sender] = 0;
 
-        bool success = amanitaToken.transfer(msg.sender, amount);
+        bool success = lovecoin.transfer(msg.sender, amount);
         require(success, "LoveEmission: transfer failed");
 
-        emit ClaimedAMANITA(msg.sender, amount);
+        emit ClaimedLOVECOIN(msg.sender, amount);
     }
 
     /**
-    * @notice Позволяет селлеру активировать $AGOV, если он заслужил репутацию (≥ 8 постов)
-    * @dev $AGOV становится "реальным" governance-токеном только после подтверждённой репутации
+    * @notice Позволяет селлеру активировать $LGOV, если он заслужил репутацию (≥ 8 постов)
+    * @dev $LGOV становится "реальным" governance-токеном только после подтверждённой репутации
     */
-    function claimAGOV() external {
-        require(!agovClaimed[msg.sender], "LoveEmission: already claimed");
+    function claimLGOV() external {
+        require(!lgovClaimed[msg.sender], "LoveEmission: already claimed");
 
         uint8 count = loveDo.getLoveDoCount(msg.sender);
         require(count >= LOVE_DO_THRESHOLD, "LoveEmission: not enough LoveDo posts");
 
-        uint256 amount = agovAccrued[msg.sender];
+        uint256 amount = lgovAccrued[msg.sender];
         require(amount > 0, "LoveEmission: nothing to mint");
 
-        agovAccrued[msg.sender] = 0;
-        agovClaimed[msg.sender] = true;
+        lgovAccrued[msg.sender] = 0;
+        lgovClaimed[msg.sender] = true;
 
-        agovToken.mint(msg.sender, amount);
+        lgovToken.mint(msg.sender, amount);
 
-        emit ClaimedAGOV(msg.sender, amount);
+        emit ClaimedLGOV(msg.sender, amount);
     }
 
     /**
     * @notice Возвращает текущее состояние репутации селлера
     * @param seller Адрес селлера, чью репутацию проверяем
-    * @return pending Количество накопленных, но ещё не активированных $AGOV
-    * @return active Баланс уже заминченных $AGOV
+    * @return pending Количество накопленных, но ещё не активированных $LGOV
+    * @return active Баланс уже заминченных $LGOV
     * @return loveDoCount Количество LoveDo постов в его пользу
     */
     function getReputationProgress(address seller) external view returns (
@@ -128,18 +128,18 @@ contract LoveEmissionEngine is AccessControl {
         uint256 active,
         uint8 loveDoCount
     ) {
-        // Накопленные, но ещё не активированные $AGOV
-        pending = agovAccrued[seller];
+        // Накопленные, но ещё не активированные $LGOV
+        pending = lgovAccrued[seller];
 
         // Если уже был claim, репутация активна
-        active = agovClaimed[seller] ? agovToken.balanceOf(seller) : 0;
+        active = lgovClaimed[seller] ? lgovToken.balanceOf(seller) : 0;
 
         // Количество LoveDo постов, направленных на этого селлера
         loveDoCount = loveDo.getLoveDoCount(seller);
     }
 }
 
-interface IAGovToken {
+interface ILGovToken {
     function mint(address to, uint256 amount) external;
     function balanceOf(address account) external view returns (uint256);
 }

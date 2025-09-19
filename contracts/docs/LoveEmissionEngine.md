@@ -2,24 +2,24 @@
 
 ## Обзор
 
-`LoveEmissionEngine` - это контракт эмиссии токенов в экосистеме Amanita, реализующий **Loveconomy** (экономику любви) через эмиссию $AMANITA (утилити) и $AGOV (governance) токенов на основе суперлайков в системе отзывов. Контракт обеспечивает справедливое распределение токенов с учетом социальных связей и репутации.
+`LoveEmissionEngine` - это контракт эмиссии токенов в экосистеме Amanita, реализующий **Loveconomy** (экономику любви) через эмиссию $LOVECOIN (утилити) и $LGOV (governance) токенов на основе суперлайков в системе отзывов. Контракт обеспечивает справедливое распределение токенов с учетом социальных связей и репутации.
 
 ## Архитектура
 
 ### Двухуровневая система токенов
-- **$AMANITA** - утилити токены, накапливаются и клеймятся сразу
-- **$AGOV** - governance токены, активируются только при достижении репутации
+- **$LOVECOIN** - утилити токены, накапливаются и клеймятся сразу
+- **$LGOV** - governance токены, активируются только при достижении репутации
 
 ### Система репутации
-- **Порог активации** - 8 LoveDo постов для активации $AGOV
+- **Порог активации** - 8 LoveDo постов для активации $LGOV
 - **Накопление** - токены накапливаются, но не активируются до достижения порога
-- **Одноразовая активация** - $AGOV можно активировать только один раз
+- **Одноразовая активация** - $LGOV можно активировать только один раз
 
 ### Интеграция с экосистемой
 - **LoveDoPostNFT** - источник данных о суперлайках и постах
 - **InviteGraph** - проверка социальных связей
-- **AmanitaToken** - утилити токены
-- **AmanitaGovToken** - governance токены
+- **Lovecoin** - утилити токены
+- **AmanitaGovToken** - governance токены (LGOV)
 
 ## Основные функции
 
@@ -42,8 +42,8 @@
 1. ✅ Получение данных о посте из LoveDoPostNFT
 2. ✅ Проверка социальных связей через граф инвайтов
 3. ✅ Постановка суперлайка в LoveDoPostNFT
-4. ✅ Накопление $AMANITA для продавца-получателя
-5. ✅ Накопление $AGOV для продавца-получателя
+4. ✅ Накопление $LOVECOIN для продавца-получателя
+5. ✅ Накопление $LGOV для продавца-получателя
 6. ✅ Эмиссия события Emission
 
 **Событие:**
@@ -53,46 +53,46 @@ event Emission(address indexed seller, uint256 amanitaAmount, uint256 agovAccrue
 
 ### Клейм утилити токенов
 
-#### `claimAMANITA()`
-Позволяет продавцу получить накопленные $AMANITA токены.
+#### `claimLOVECOIN()`
+Позволяет продавцу получить накопленные $LOVECOIN токены.
 
 **Требования:**
-- У продавца должны быть накопленные $AMANITA
+- У продавца должны быть накопленные $LOVECOIN
 - Вызывается вручную для экономии газа
 
 **Процесс клейма:**
 1. ✅ Проверка наличия накопленных токенов
 2. ✅ Обнуление баланса (защита от reentrancy)
 3. ✅ Перевод токенов на адрес продавца
-4. ✅ Эмиссия события ClaimedAMANITA
+4. ✅ Эмиссия события ClaimedLOVECOIN
 
 **Событие:**
 ```solidity
-event ClaimedAMANITA(address indexed seller, uint256 amount);
+event ClaimedLOVECOIN(address indexed seller, uint256 amount);
 ```
 
 ### Активация governance токенов
 
-#### `claimAGOV()`
-Активирует накопленные $AGOV токены при достижении репутации.
+#### `claimLGOV()`
+Активирует накопленные $LGOV токены при достижении репутации.
 
 **Требования:**
-- Продавец не должен был ранее активировать $AGOV
+- Продавец не должен был ранее активировать $LGOV
 - У продавца должно быть ≥ 8 LoveDo постов
-- Должны быть накопленные $AGOV токены
+- Должны быть накопленные $LGOV токены
 
 **Процесс активации:**
-1. ✅ Проверка, что $AGOV еще не активированы
+1. ✅ Проверка, что $LGOV еще не активированы
 2. ✅ Проверка количества LoveDo постов (≥ 8)
-3. ✅ Проверка наличия накопленных $AGOV
+3. ✅ Проверка наличия накопленных $LGOV
 4. ✅ Обнуление накопленного баланса
 5. ✅ Отметка об активации
-6. ✅ Минт $AGOV токенов
-7. ✅ Эмиссия события ClaimedAGOV
+6. ✅ Минт $LGOV токенов
+7. ✅ Эмиссия события ClaimedLGOV
 
 **Событие:**
 ```solidity
-event ClaimedAGOV(address indexed seller, uint256 amount);
+event ClaimedLGOV(address indexed seller, uint256 amount);
 ```
 
 ### Мониторинг репутации
@@ -101,15 +101,15 @@ event ClaimedAGOV(address indexed seller, uint256 amount);
 Возвращает текущее состояние репутации продавца.
 
 **Возвращает:**
-- `uint256 pending` - накопленные, но не активированные $AGOV
-- `uint256 active` - баланс уже заминченных $AGOV
+- `uint256 pending` - накопленные, но не активированные $LGOV
+- `uint256 active` - баланс уже заминченных $LGOV
 - `uint8 loveDoCount` - количество LoveDo постов
 
 **Использование:**
 ```javascript
 const [pending, active, loveDoCount] = await loveEmission.getReputationProgress(sellerAddress);
-console.log(`Накоплено: ${pending} $AGOV`);
-console.log(`Активировано: ${active} $AGOV`);
+console.log(`Накоплено: ${pending} $LGOV`);
+console.log(`Активировано: ${active} $LGOV`);
 console.log(`LoveDo постов: ${loveDoCount}`);
 ```
 
@@ -117,26 +117,26 @@ console.log(`LoveDo постов: ${loveDoCount}`);
 
 ### Основные маппинги
 ```solidity
-// Продавец => накопленные $AMANITA
+// Продавец => накопленные $LOVECOIN
 mapping(address => uint256) public amanitaAccrued;
 
-// Продавец => накопленные $AGOV
+// Продавец => накопленные $LGOV
 mapping(address => uint256) public agovAccrued;
 
-// Продавец => активировал ли $AGOV
+// Продавец => активировал ли $LGOV
 mapping(address => bool) public agovClaimed;
 ```
 
 ### Константы
 ```solidity
 uint256 public constant EMISSION_RATE = 1 ether;        // Эмиссия на суперлайк
-uint8 public constant LOVE_DO_THRESHOLD = 8;            // Порог для $AGOV
+uint8 public constant LOVE_DO_THRESHOLD = 8;            // Порог для $LGOV
 ```
 
 ### Внешние контракты
 ```solidity
-IERC20 public immutable amanitaToken;                   // $AMANITA токен
-IAGovToken public immutable agovToken;                  // $AGOV токен
+IERC20 public immutable lovecoin;                   // $LOVECOIN токен
+IAGovToken public immutable lgovToken;                  // $LGOV токен
 ILoveDoPostNFT public immutable loveDo;                 // LoveDoPostNFT
 IInviteGraph public inviteGraph;                        // Граф инвайтов
 ```
@@ -147,7 +147,7 @@ IInviteGraph public inviteGraph;                        // Граф инвайт
 ```solidity
 // Обнуляем до трансфера — защита от reentrancy
 amanitaAccrued[msg.sender] = 0;
-bool success = amanitaToken.transfer(msg.sender, amount);
+bool success = lovecoin.transfer(msg.sender, amount);
 ```
 
 ### Проверка социальных связей
@@ -172,8 +172,8 @@ agovClaimed[msg.sender] = true;
 ### Основные события
 ```solidity
 event Emission(address indexed seller, uint256 amanitaAmount, uint256 agovAccrued);
-event ClaimedAMANITA(address indexed seller, uint256 amount);
-event ClaimedAGOV(address indexed seller, uint256 amount);
+event ClaimedLOVECOIN(address indexed seller, uint256 amount);
+event ClaimedLGOV(address indexed seller, uint256 amount);
 ```
 
 ### События эмиссии
@@ -181,8 +181,8 @@ event ClaimedAGOV(address indexed seller, uint256 amount);
 - Индексация по продавцу-получателю
 
 ### События клейма
-- `ClaimedAMANITA` - $AMANITA получены
-- `ClaimedAGOV` - $AGOV активированы
+- `ClaimedLOVECOIN` - $LOVECOIN получены
+- `ClaimedLGOV` - $LGOV активированы
 
 ## Интеграция с LoveDoPostNFT
 
@@ -231,11 +231,11 @@ await loveEmission.emitForSuperlike(tokenId, liker);
 ```javascript
 const loveEmission = new ethers.Contract(address, abi, seller);
 
-// Получение $AMANITA
-await loveEmission.claimAMANITA();
+// Получение $LOVECOIN
+await loveEmission.claimLOVECOIN();
 
-// Активация $AGOV (требует ≥ 8 LoveDo постов)
-await loveEmission.claimAGOV();
+// Активация $LGOV (требует ≥ 8 LoveDo постов)
+await loveEmission.claimLGOV();
 ```
 
 ### Мониторинг
@@ -243,8 +243,8 @@ await loveEmission.claimAGOV();
 // Проверка прогресса репутации
 const [pending, active, loveDoCount] = await loveEmission.getReputationProgress(sellerAddress);
 
-console.log(`Накоплено $AGOV: ${ethers.utils.formatEther(pending)}`);
-console.log(`Активировано $AGOV: ${ethers.utils.formatEther(active)}`);
+console.log(`Накоплено $LGOV: ${ethers.utils.formatEther(pending)}`);
+console.log(`Активировано $LGOV: ${ethers.utils.formatEther(active)}`);
 console.log(`LoveDo постов: ${loveDoCount}`);
 ```
 
@@ -256,13 +256,13 @@ console.log(`LoveDo постов: ${loveDoCount}`);
 - **Социальные связи** - проверка через граф инвайтов
 
 ### Распределение токенов
-- **$AMANITA** - накапливаются и клеймятся сразу
-- **$AGOV** - накапливаются, но активируются только при репутации
+- **$LOVECOIN** - накапливаются и клеймятся сразу
+- **$LGOV** - накапливаются, но активируются только при репутации
 - **Коэффициент** - 1 ether на суперлайк для каждого токена
 
 ### Защита от злоупотреблений
 - Проверка социальных связей
-- Одноразовая активация $AGOV
+- Одноразовая активация $LGOV
 - Порог репутации для governance токенов
 
 ## Жизненный цикл токенов
@@ -272,50 +272,50 @@ console.log(`LoveDo постов: ${loveDoCount}`);
 graph LR
     A[Суперлайк] --> B[emitForSuperlike]
     B --> C[Проверка связей]
-    C --> D[Накопление $AMANITA]
-    D --> E[Накопление $AGOV]
+    C --> D[Накопление $LOVECOIN]
+    D --> E[Накопление $LGOV]
     E --> F[Событие Emission]
 ```
 
-### 2. Клейм $AMANITA
+### 2. Клейм $LOVECOIN
 ```mermaid
 graph LR
-    A[Продавец] --> B[claimAMANITA]
+    A[Продавец] --> B[claimLOVECOIN]
     B --> C[Проверка баланса]
     C --> D[Перевод токенов]
-    D --> E[Событие ClaimedAMANITA]
+    D --> E[Событие ClaimedLOVECOIN]
 ```
 
-### 3. Активация $AGOV
+### 3. Активация $LGOV
 ```mermaid
 graph LR
-    A[Продавец] --> B[claimAGOV]
+    A[Продавец] --> B[claimLGOV]
     B --> C[Проверка репутации]
-    C --> D[Минт $AGOV]
-    D --> E[Событие ClaimedAGOV]
+    C --> D[Минт $LGOV]
+    D --> E[Событие ClaimedLGOV]
 ```
 
 ## Мониторинг и аналитика
 
 ### Счетчики
-- `amanitaAccrued[seller]` - накопленные $AMANITA
-- `agovAccrued[seller]` - накопленные $AGOV
-- `agovClaimed[seller]` - статус активации $AGOV
+- `amanitaAccrued[seller]` - накопленные $LOVECOIN
+- `agovAccrued[seller]` - накопленные $LGOV
+- `agovClaimed[seller]` - статус активации $LGOV
 
 ### Прогресс репутации
 - Количество LoveDo постов
 - Накопленные vs активированные токены
-- Готовность к активации $AGOV
+- Готовность к активации $LGOV
 
 ## Ограничения и особенности
 
 ### Одноразовая активация
-- ✅ $AMANITA можно клеймить многократно
-- ❌ $AGOV можно активировать только один раз
-- 🔒 После активации $AGOV становятся "реальными" governance токенами
+- ✅ $LOVECOIN можно клеймить многократно
+- ❌ $LGOV можно активировать только один раз
+- 🔒 После активации $LGOV становятся "реальными" governance токенами
 
 ### Порог репутации
-- 📊 Требуется ≥ 8 LoveDo постов для активации $AGOV
+- 📊 Требуется ≥ 8 LoveDo постов для активации $LGOV
 - 🛡️ Защита от злоупотреблений governance токенами
 - ⚖️ Баланс между доступностью и качеством
 
