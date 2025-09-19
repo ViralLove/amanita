@@ -15,6 +15,9 @@ interface ISpiralEngine {
     function hasRole(bytes32 role, address account) external view returns (bool);
 }
 
+// Роль продавца в SpiralEngine
+bytes32 constant SELLER_ROLE = keccak256("SELLER_ROLE");
+
 contract ProductRegistry {
     /// @notice Структура товара
     struct Product {
@@ -341,7 +344,7 @@ contract ProductRegistry {
     *
     */
     function getMyCatalogVersion() external view returns (uint256) {
-        require(inviteNFT.isSeller(msg.sender), "Not a seller");
+        require(spiralEngine.hasRole(SELLER_ROLE, msg.sender), "Not a seller");
         return catalogVersion[msg.sender];
     }
 
@@ -359,7 +362,7 @@ contract ProductRegistry {
     * - Возвращает все товары продавца.
     */
     function getProductsBySellerFull() external view returns (Product[] memory) {
-        require(inviteNFT.isSeller(msg.sender), "Not a seller");
+        require(spiralEngine.hasRole(SELLER_ROLE, msg.sender), "Not a seller");
 
         uint256[] memory sellerProductIds = productsBySeller[msg.sender];
         Product[] memory sellerProducts = new Product[](sellerProductIds.length);
@@ -433,7 +436,7 @@ contract ProductRegistry {
     */
     function clearSellerCatalog(address seller) external {
         // 1. Проверка доступа - только продавец может очистить свой каталог
-        require(inviteNFT.isSeller(msg.sender), "Not a seller");
+        require(spiralEngine.hasRole(SELLER_ROLE, msg.sender), "Not a seller");
         require(seller == msg.sender, "Can only clear own catalog");
         require(seller != address(0), "Invalid seller address");
         

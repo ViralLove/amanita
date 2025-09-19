@@ -19,7 +19,13 @@ const SELLER_PRIVATE_KEY = process.env.SELLER_PRIVATE_KEY ?
   (process.env.SELLER_PRIVATE_KEY.startsWith('0x') ? process.env.SELLER_PRIVATE_KEY : `0x${process.env.SELLER_PRIVATE_KEY}`) : null;
 
 const AMANITA_REGISTRY_CONTRACT_ADDRESS = process.env.AMANITA_REGISTRY_CONTRACT_ADDRESS;
+const SPIRAL_ENGINE_CONTRACT_ADDRESS = process.env.SPIRAL_ENGINE_CONTRACT_ADDRESS;
+const PRODUCT_REGISTRY_CONTRACT_ADDRESS = process.env.PRODUCT_REGISTRY_CONTRACT_ADDRESS;
+const SOUL_IDENTITY_CONTRACT_ADDRESS = process.env.SOUL_IDENTITY_CONTRACT_ADDRESS;
 console.log("AMANITA_REGISTRY_CONTRACT_ADDRESS:", AMANITA_REGISTRY_CONTRACT_ADDRESS);
+console.log("SPIRAL_ENGINE_CONTRACT_ADDRESS:", SPIRAL_ENGINE_CONTRACT_ADDRESS);
+console.log("PRODUCT_REGISTRY_CONTRACT_ADDRESS:", PRODUCT_REGISTRY_CONTRACT_ADDRESS);
+console.log("SOUL_IDENTITY_CONTRACT_ADDRESS:", SOUL_IDENTITY_CONTRACT_ADDRESS);
 
 // RPC URL из конфига сети
 // Получаем RPC URL с учетом выбранной сети
@@ -54,9 +60,15 @@ if (SELLER_PRIVATE_KEY) {
 
 // Функция для загрузки артефакта контракта
 async function loadContract(contractName, contractAddress = null) {
-
+  // Сначала проверяем переменные окружения
   if (contractAddress == null) {
-    contractAddress = await amanitaRegistry.methods.getAddress(contractName).call();
+    if (contractName === 'AmanitaRegistry' && AMANITA_REGISTRY_CONTRACT_ADDRESS) {
+      contractAddress = AMANITA_REGISTRY_CONTRACT_ADDRESS;
+    } else if (contractName === 'SpiralEngine' && SPIRAL_ENGINE_CONTRACT_ADDRESS) {
+      contractAddress = SPIRAL_ENGINE_CONTRACT_ADDRESS;
+    } else if (amanitaRegistry) {
+      contractAddress = await amanitaRegistry.methods.getAddress(contractName).call();
+    }
   }
 
   const contractJSON = await loadContractArtifact(contractName);
@@ -255,128 +267,94 @@ async function main(action) {
 
   try {
     // Деплой или загрузка реестра
-    if (action === 0 || action === 1) {
+    if (action === 0) {
       console.log("\n🔷 Деплоим AmanitaRegistry...");
       amanitaRegistry = await deployContract("AmanitaRegistry");
       console.log("\n⭐️ ВАЖНО! Адрес реестра для .env:");
       console.log("AMANITA_REGISTRY_CONTRACT_ADDRESS=" + amanitaRegistry.options.address);
       console.log("⭐️ Скопируйте этот адрес в bot/.env\n");
     } else {
+      // Для action 888 просто загружаем реестр без регистрации
       console.log("\n🔷 Загружаем AmanitaRegistry...");
       amanitaRegistry = await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
-      
       console.log("☀️ Адрес реестра:", amanitaRegistry.options.address);
     }
 
     // Деплой или загрузка основных контрактов
     if (action === 1 || action === 2) {
-      // Деплой SpiralEngine
-      console.log("\n🔷 Деплоим SpiralEngine...");
-      spiralEngine = await deployContract("SpiralEngine");
+      // Деплой SpiralEngine с проверкой существования
+      console.log("\n🔷 Обрабатываем SpiralEngine...");
+      spiralEngine = await deploySingleContract("SpiralEngine");
 
-      // Регистрируем SpiralEngine в реестре
-      console.log("\n🔷 Регистрируем SpiralEngine в реестре...");
-      await amanitaRegistry.methods.setAddress("SpiralEngine", spiralEngine.options.address).send({
-        from: deployerAccount.address,
-        gas: 200000
-      });
-      console.log("✅ SpiralEngine успешно зарегистрирован в реестре:", spiralEngine.options.address);
-
-      // Деплой SBT экосистемы
-      console.log("\n🔷 Деплоим SBT экосистему...");
+      // Деплой SBT экосистемы с проверкой существования
+      console.log("\n🔷 Обрабатываем SBT экосистему...");
       
       // 1. SoulboundCore (базовый SBT)
-      console.log("\n🔷 Деплоим SoulboundCore...");
-      const soulboundCore = await deployContract("SoulboundCore", ["Amanita Soul", "ASOUL"]);
-      await amanitaRegistry.methods.setAddress("SoulboundCore", soulboundCore.options.address).send({
-        from: deployerAccount.address,
-        gas: 200000
-      });
-      console.log("✅ SoulboundCore зарегистрирован:", soulboundCore.options.address);
+      const soulboundCore = await deploySingleContract("SoulboundCore");
       
       // 2. SoulMetadata (метаданные)
-      console.log("\n🔷 Деплоим SoulMetadata...");
-      const soulMetadata = await deployContract("SoulMetadata", [soulboundCore.options.address]);
-      await amanitaRegistry.methods.setAddress("SoulMetadata", soulMetadata.options.address).send({
-        from: deployerAccount.address,
-        gas: 200000
-      });
-      console.log("✅ SoulMetadata зарегистрирован:", soulMetadata.options.address);
+      const soulMetadata = await deploySingleContract("SoulMetadata");
       
       // 3. SoulRecovery (восстановление)
-      console.log("\n🔷 Деплоим SoulRecovery...");
-      const soulRecovery = await deployContract("SoulRecovery", [soulboundCore.options.address]);
-      await amanitaRegistry.methods.setAddress("SoulRecovery", soulRecovery.options.address).send({
-        from: deployerAccount.address,
-        gas: 200000
-      });
-      console.log("✅ SoulRecovery зарегистрирован:", soulRecovery.options.address);
+      const soulRecovery = await deploySingleContract("SoulRecovery");
       
       // 4. SoulIntegration (интеграция)
-      console.log("\n🔷 Деплоим SoulIntegration...");
-      const soulIntegration = await deployContract("SoulIntegration", [spiralEngine.options.address, soulboundCore.options.address]);
-      await amanitaRegistry.methods.setAddress("SoulIntegration", soulIntegration.options.address).send({
-        from: deployerAccount.address,
-        gas: 200000
-      });
-      console.log("✅ SoulIntegration зарегистрирован:", soulIntegration.options.address);
+      const soulIntegration = await deploySingleContract("SoulIntegration");
       
       // 5. SoulIdentity (мост с DID)
-      console.log("\n🔷 Деплоим SoulIdentity...");
-      const soulIdentity = await deployContract("SoulIdentity", [
-        soulboundCore.options.address,
-        soulMetadata.options.address
-      ]);
-      await amanitaRegistry.methods.setAddress("SoulIdentity", soulIdentity.options.address).send({
-        from: deployerAccount.address,
-        gas: 200000
-      });
-      console.log("✅ SoulIdentity зарегистрирован:", soulIdentity.options.address);
+      const soulIdentity = await deploySingleContract("SoulIdentity");
       
       // 6. Настройка связей между SBT контрактами
       console.log("\n🔷 Настраиваем связи SBT экосистемы...");
       
+      // Получаем цену газа для настройки связей
+      const gasPrice = network === 'polygon' ? 
+        web3.utils.toWei('100', 'gwei') : // 100 Gwei для Polygon mainnet
+        await web3.eth.getGasPrice(); // Текущая цена для других сетей
+      
+      const gasLimit = network === 'polygon' ? 500000 : 300000; // Увеличиваем газ для mainnet
+      
       // Подключаем SoulMetadata к SoulboundCore
+      console.log("🔗 Подключаем SoulMetadata к SoulboundCore...");
       await soulboundCore.methods.setMetadataContract(soulMetadata.options.address).send({
         from: deployerAccount.address,
-        gas: 200000
+        gas: gasLimit,
+        gasPrice: gasPrice
       });
       console.log("✅ SoulMetadata подключен к SoulboundCore");
       
       // Подключаем SoulRecovery к SoulboundCore
+      console.log("🔗 Подключаем SoulRecovery к SoulboundCore...");
       await soulboundCore.methods.setRecoveryContract(soulRecovery.options.address).send({
         from: deployerAccount.address,
-        gas: 200000
+        gas: gasLimit,
+        gasPrice: gasPrice
       });
       console.log("✅ SoulRecovery подключен к SoulboundCore");
       
       // Подключаем SoulIntegration к SoulboundCore
+      console.log("🔗 Подключаем SoulIntegration к SoulboundCore...");
       await soulboundCore.methods.setIntegrationContract(soulIntegration.options.address).send({
         from: deployerAccount.address,
-        gas: 200000
+        gas: gasLimit,
+        gasPrice: gasPrice
       });
       console.log("✅ SoulIntegration подключен к SoulboundCore");
       
       // Подключаем SoulIdentity к SpiralEngine
+      console.log("🔗 Подключаем SoulIdentity к SpiralEngine...");
       await spiralEngine.methods.setSoulIdentity(soulIdentity.options.address).send({
         from: deployerAccount.address,
-        gas: 200000
+        gas: gasLimit,
+        gasPrice: gasPrice
       });
       console.log("✅ SoulIdentity подключен к SpiralEngine");
       
       console.log("\n✅ SBT экосистема полностью настроена!");
 
-      // Деплой ProductRegistry
-      console.log("\n🔷 Деплоим ProductRegistry...");
-      productRegistry = await deployContract("ProductRegistry", [spiralEngine.options.address]);
-
-      // Регистрируем ProductRegistry в реестре
-      console.log("\n🔷 Регистрируем ProductRegistry в реестре...");
-      await amanitaRegistry.methods.setAddress("ProductRegistry", productRegistry.options.address).send({
-        from: deployerAccount.address,
-        gas: 200000
-      });
-      console.log("✅ ProductRegistry успешно зарегистрирован в реестре:", productRegistry.options.address);
+      // Деплой ProductRegistry с проверкой существования
+      console.log("\n🔷 Обрабатываем ProductRegistry...");
+      productRegistry = await deploySingleContract("ProductRegistry");
       
       console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
       console.log("☀️ Адрес ProductRegistry:", productRegistry.options.address);
@@ -447,14 +425,24 @@ async function main(action) {
     // Создание каталога (неактивные продукты)
     if (action === 4 || action === 40) {
       console.log("\n🔷 Создаем каталог с неактивными продуктами...");
-      await createCatalog(productRegistry);
+      
+      // Проверяем права доступа селлера
+      const sellerAddr = sellerAccount ? sellerAccount.address : SELLER_ADDRESS;
+      await validateSellerAccess(sellerAddr, spiralEngine);
+      
+      await createCatalog(productRegistry, sellerAddr);
       console.log("✅ Каталог с неактивными продуктами успешно загружен!");
     }
     
     // Активация существующих продуктов
     if (action === 41) {
       console.log("\n🔷 Активируем существующие продукты в каталоге...");
-      await activateCatalogProducts(productRegistry);
+      
+      // Проверяем права доступа селлера
+      const sellerAddr = sellerAccount ? sellerAccount.address : SELLER_ADDRESS;
+      await validateSellerAccess(sellerAddr, spiralEngine);
+      
+      await activateCatalogProducts(productRegistry, sellerAddr);
       console.log("✅ Продукты в каталоге успешно активированы!");
     }
     
@@ -515,7 +503,7 @@ async function main(action) {
     if (action <= 2) {
       console.log("\n⭐️ ВАЖНО! Адреса контрактов для .env:");
       console.log("AMANITA_REGISTRY_CONTRACT_ADDRESS=" + amanitaRegistry.options.address);
-      if (spiralEngine) console.log("INVITE_NFT_CONTRACT_ADDRESS=" + spiralEngine.options.address);
+      if (spiralEngine) console.log("SPIRAL_ENGINE_CONTRACT_ADDRESS=" + spiralEngine.options.address);
       if (productRegistry) console.log("PRODUCT_REGISTRY_CONTRACT_ADDRESS=" + productRegistry.options.address);
       
       // Добавляем SBT адреса если они были задеплоены
@@ -668,7 +656,26 @@ async function registerContractInRegistry(contractName, contractInstance) {
     const amanitaRegistry = await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
     
     try {
-        console.log(`🔷 Регистрируем ${contractName} в AmanitaRegistry...`);
+        // Проверяем существующий адрес в реестре
+        let existingAddress;
+        try {
+            existingAddress = await amanitaRegistry.methods.getAddress(contractName).call();
+        } catch (error) {
+            existingAddress = null; // Контракт еще не зарегистрирован
+        }
+        
+        if (existingAddress && existingAddress !== '0x0000000000000000000000000000000000000000') {
+            if (existingAddress.toLowerCase() === contractInstance.options.address.toLowerCase()) {
+                console.log(`✅ Контракт ${contractName} уже зарегистрирован в реестре под тем же адресом: ${existingAddress}`);
+                return;
+            } else {
+                console.log(`🔄 Обновляем регистрацию ${contractName} в реестре:`);
+                console.log(`   Старый адрес: ${existingAddress}`);
+                console.log(`   Новый адрес:  ${contractInstance.options.address}`);
+            }
+        } else {
+            console.log(`🔷 Регистрируем ${contractName} в AmanitaRegistry...`);
+        }
         
         // Получаем баланс до транзакции
         const balanceBefore = await web3.eth.getBalance(deployerAccount.address);
@@ -681,7 +688,7 @@ async function registerContractInRegistry(contractName, contractInstance) {
         
         await amanitaRegistry.methods.setAddress(contractName, contractInstance.options.address).send({
             from: deployerAccount.address,
-            gas: network === 'polygon' ? 500000 : 200000, // Увеличиваем газ для Polygon
+            gas: network === 'polygon' ? 1000000 : 500000, // Увеличиваем газ для Polygon и других сетей
             gasPrice: gasPrice
         });
         
@@ -691,7 +698,12 @@ async function registerContractInRegistry(contractName, contractInstance) {
         
         console.log(`💰 Баланс после регистрации: ${web3.utils.fromWei(balanceAfter, 'ether')} MATIC`);
         console.log(`💸 Стоимость регистрации: ${cost} MATIC`);
-        console.log(`✅ Контракт ${contractName} зарегистрирован в реестре`);
+        
+        if (existingAddress && existingAddress !== '0x0000000000000000000000000000000000000000') {
+            console.log(`✅ Новая версия контракта ${contractName} (${contractInstance.options.address}) зарегистрирована в реестре под ключом "${contractName}"`);
+        } else {
+            console.log(`✅ Контракт ${contractName} зарегистрирован в реестре под ключом "${contractName}"`);
+        }
         
     } catch (error) {
         console.error(`❌ Ошибка при регистрации ${contractName} в реестре:`, error.message);
@@ -716,7 +728,7 @@ async function deploySingleContract(contractName) {
     
     if (contractInstance) {
         // Контракт уже существует, только регистрируем в реестре
-        console.log(`🔄 Используем существующий контракт ${contractName}`);
+        console.log(`🔄 Используем существующий контракт ${contractName} (${contractInstance.options.address})`);
         await registerContractInRegistry(contractName, contractInstance);
         return contractInstance;
     }
@@ -786,6 +798,7 @@ async function deploySingleContract(contractName) {
     // 6. Регистрация в реестре (кроме самого реестра)
     if (contractName !== 'AmanitaRegistry') {
         await registerContractInRegistry(contractName, contractInstance);
+        console.log(`📝 Контракт ${contractName} доступен в реестре под ключом "${contractName}"`);
     }
     
     // 7. Настройка ролей (если необходимо)
@@ -831,7 +844,7 @@ async function validateDeployerAccess(spiralEngine) {
 
 /**
  * Валидация инвайт-кода
- * @param {Object} spiralEngine - Контракт InviteNFT
+ * @param {Object} spiralEngine - Контракт SpiralEngine
  * @param {string} inviteCode - Инвайт-код для валидации
  */
 async function validateInviteCode(spiralEngine, inviteCode) {
@@ -858,7 +871,7 @@ async function validateInviteCode(spiralEngine, inviteCode) {
 
 /**
  * Назначение роли SELLER_ROLE продавцу
- * @param {Object} spiralEngine - Контракт InviteNFT
+ * @param {Object} spiralEngine - Контракт SpiralEngine
  * @param {string} sellerAddress - Адрес продавца
  */
 async function grantSellerRole(spiralEngine, sellerAddress) {
@@ -915,14 +928,14 @@ function generateNewInviteCodes(count) {
 /**
  * Валидация прав доступа продавца
  * @param {string} sellerAddress - Адрес продавца
- * @param {Object} spiralEngine - Контракт InviteNFT
+ * @param {Object} spiralEngine - Контракт SpiralEngine
  */
 async function validateSellerAccess(sellerAddress, spiralEngine) {
     console.log(`🔍 Проверяем права доступа для ${sellerAddress}...`);
     
     // Проверяем, что пользователь активирован
-    const isUserActivated = await spiralEngine.methods.isUserActivated(sellerAddress).call();
-    if (!isUserActivated) {
+    const usedInvite = await spiralEngine.methods.usedInviteByUser(sellerAddress).call();
+    if (usedInvite == 0) {
         throw new Error(`Пользователь ${sellerAddress} не активирован`);
     }
     
@@ -994,7 +1007,7 @@ async function validateClearingResult(productRegistry, sellerAddress, catalogBef
 
 /**
  * Валидация результата активации продавца
- * @param {Object} spiralEngine - Контракт InviteNFT
+ * @param {Object} spiralEngine - Контракт SpiralEngine
  * @param {string} sellerAddress - Адрес продавца
  * @param {string} inviteCode - Использованный инвайт-код
  * @param {string[]} newInviteCodes - Новые инвайт-коды
@@ -1016,8 +1029,8 @@ async function validateActivationResult(spiralEngine, sellerAddress, inviteCode,
     }
     
     // Проверяем, что пользователь действительно активирован
-    const isUserActivated = await spiralEngine.methods.isUserActivated(sellerAddress).call();
-    if (!isUserActivated) {
+    const usedInvite = await spiralEngine.methods.usedInviteByUser(sellerAddress).call();
+    if (usedInvite == 0) {
         throw new Error(`Пользователь ${sellerAddress} не был активирован`);
     }
     
@@ -1046,8 +1059,8 @@ async function activateSeller(inviteCode, sellerAddress) {
     console.log(`\n🎯 Активируем продавца: ${sellerAddress}`);
     console.log(`📋 Используем инвайт-код: ${inviteCode}`);
     
-    // 1. Загружаем контракт InviteNFT
-    const spiralEngine = await loadContract("InviteNFT");
+    // 1. Загружаем контракт SpiralEngine
+    const spiralEngine = await loadContract("SpiralEngine");
     
     // 2. Проверяем права деплоера (админа)
     await validateDeployerAccess(spiralEngine);
@@ -1056,8 +1069,8 @@ async function activateSeller(inviteCode, sellerAddress) {
     await validateInviteCode(spiralEngine, inviteCode);
     
     // 3.1. Проверяем, не активирован ли уже пользователь
-    const isAlreadyActivated = await spiralEngine.methods.isUserActivated(sellerAddress).call();
-    if (isAlreadyActivated) {
+    const usedInvite = await spiralEngine.methods.usedInviteByUser(sellerAddress).call();
+    if (usedInvite > 0) {
         console.log(`⚠️ Пользователь ${sellerAddress} уже активирован`);
         console.log(`🔍 Проверяем его инвайты...`);
         const userInvites = await spiralEngine.methods.getUserInvites(sellerAddress).call();
@@ -1156,7 +1169,7 @@ async function clearSellerCatalog(sellerAddress, sellerPrivateKey) {
     
     // 2. Загружаем контракты
     const productRegistry = await loadContract("ProductRegistry");
-    const spiralEngine = await loadContract("InviteNFT");
+    const spiralEngine = await loadContract("SpiralEngine");
     
     // 3. Проверяем права доступа
     await validateSellerAccess(sellerAddress, spiralEngine);
@@ -1181,14 +1194,15 @@ async function clearSellerCatalog(sellerAddress, sellerPrivateKey) {
  * @param {Object} contractInstance - Экземпляр контракта
  */
 async function setupContractRoles(contractName, contractInstance) {
-    if (contractName === 'InviteNFT') {
+    if (contractName === 'SpiralEngine') {
         await setupSellerRole(contractInstance);
     } else if (contractName === 'LoveEmissionEngine') {
         // Настройка роли EMITTER_ROLE
         const EMITTER_ROLE = web3.utils.keccak256("EMITTER_ROLE");
         await contractInstance.methods.grantRole(EMITTER_ROLE, deployerAccount.address).send({
             from: deployerAccount.address,
-            gas: 200000
+            gas: network === 'polygon' ? 500000 : 300000,
+            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
         });
         console.log(`✅ Роль EMITTER_ROLE назначена для ${contractName}`);
     }
@@ -1198,7 +1212,7 @@ async function setupContractRoles(contractName, contractInstance) {
 // Обновляем функцию setupSellerRole, чтобы она принимала контракт как параметр
 async function setupSellerRole(spiralEngine) {
   if (!spiralEngine) {
-    throw new Error("InviteNFT контракт не определен");
+    throw new Error("SpiralEngine контракт не определен");
   }
   
   // Используем sellerAccount если он есть, иначе создаем временный
@@ -1209,7 +1223,7 @@ async function setupSellerRole(spiralEngine) {
   
   let hasSellerRole = false;
   try {
-    // Назначаем роль SELLER_ROLE продавцу в InviteNFT
+    // Назначаем роль SELLER_ROLE продавцу в SpiralEngine
     console.log("\n🔷 Выясняем, имеет ли продавец роль SELLER_ROLE...");
     console.log("SELLER_ROLE:", SELLER_ROLE);
     console.log("sellerAccount.address:", sellerAddr);
@@ -1251,7 +1265,7 @@ async function setupSellerRole(spiralEngine) {
  */
 async function setupDeployerAsSeller(spiralEngine) {
   if (!spiralEngine) {
-    throw new Error("InviteNFT контракт не определен");
+    throw new Error("SpiralEngine контракт не определен");
   }
   
   console.log("\n🔷 Настраиваем деплоера как селлера для минта инвайтов...");
@@ -1279,7 +1293,7 @@ async function setupDeployerAsSeller(spiralEngine) {
 // Обновляем функцию creatingInvites, чтобы она принимала контракт как параметр
 async function creatingInvites(spiralEngine) {
   if (!spiralEngine) {
-    throw new Error("InviteNFT контракт не определен");
+    throw new Error("SpiralEngine контракт не определен");
   }
   
   // Определяем, кто минтит инвайты (деплоер с ролью SELLER_ROLE)
@@ -1414,9 +1428,12 @@ async function creatingInvitesForDeployer(spiralEngine) {
 }
 
 // Обновляем функцию createCatalog, чтобы она принимала контракт как параметр
-async function createCatalog(productRegistry) {
+async function createCatalog(productRegistry, sellerAddress) {
   if (!productRegistry) {
     throw new Error("ProductRegistry контракт не определен");
+  }
+  if (!sellerAddress) {
+    throw new Error("Адрес селлера не определен");
   }
   
   console.log("\n🔷 Загружаем каталог с неактивными продуктами");
@@ -1432,7 +1449,7 @@ async function createCatalog(productRegistry) {
     const gasEstimate = await productRegistry.methods.createProduct(
       productsData[0].ipfsCID
     ).estimateGas({
-      from: sellerAccount.address
+      from: sellerAddress
     });
     
     const gasPrice = await web3.eth.getGasPrice();
@@ -1462,9 +1479,9 @@ async function createCatalog(productRegistry) {
 
   // Проверяем баланс продавца
   console.log(`\n🔍 БАЛАНС ПРОДАВЦА:`);
-  const sellerBalance = await web3.eth.getBalance(sellerAccount.address);
+  const sellerBalance = await web3.eth.getBalance(sellerAddress);
   const sellerBalanceInEth = web3.utils.fromWei(sellerBalance, 'ether');
-  console.log(`💰 Адрес продавца: ${sellerAccount.address}`);
+  console.log(`💰 Адрес продавца: ${sellerAddress}`);
   console.log(`💵 Баланс продавца: ${sellerBalanceInEth} MATIC`);
 
   // Добавляем продукты в ProductRegistry
@@ -1493,11 +1510,11 @@ async function createCatalog(productRegistry) {
     await productRegistry.methods.createProduct(
       product.ipfsCID
     ).send({
-      from: sellerAccount.address,
+      from: sellerAddress,
       gas: 1000000,  // Увеличиваем лимит газа
       gasPrice: highGasPrice,
       type: 0, // Принудительно используем legacy транзакции
-      nonce: await web3.eth.getTransactionCount(sellerAccount.address)
+      nonce: await web3.eth.getTransactionCount(sellerAddress)
     });
     
     console.log(`✅ Продукт ${product.id} создан (по умолчанию неактивный)`);
@@ -1508,7 +1525,7 @@ async function createCatalog(productRegistry) {
   
   // Получаем все продукты продавца через getProductsBySellerFull
   const products = await productRegistry.methods.getProductsBySellerFull().call({
-    from: sellerAccount.address
+    from: sellerAddress
   });
   console.log(`\nНайдено продуктов: ${products.length}`);
   
@@ -1530,7 +1547,7 @@ async function createCatalog(productRegistry) {
 
   // Проверяем версию каталога продавца
   const catalogVersion = await productRegistry.methods.getMyCatalogVersion().call({
-    from: sellerAccount.address
+    from: sellerAddress
   });
   console.log(`\n📊 Текущая версия каталога продавца: ${catalogVersion}`);
 
@@ -1545,16 +1562,19 @@ async function createCatalog(productRegistry) {
 }
 
 // Функция для активации существующих продуктов в каталоге
-async function activateCatalogProducts(productRegistry) {
+async function activateCatalogProducts(productRegistry, sellerAddress) {
   if (!productRegistry) {
     throw new Error("ProductRegistry контракт не определен");
+  }
+  if (!sellerAddress) {
+    throw new Error("Адрес селлера не определен");
   }
   
   console.log("\n🔷 Активируем существующие продукты в каталоге...");
   
   // Получаем все продукты продавца
   const products = await productRegistry.methods.getProductsBySellerFull().call({
-    from: sellerAccount.address
+    from: sellerAddress
   });
   
   console.log(`\n🔍 Найдено ${products.length} продуктов для активации`);
@@ -1585,11 +1605,11 @@ async function activateCatalogProducts(productRegistry) {
       await productRegistry.methods.activateProduct(
         product.id
       ).send({
-        from: sellerAccount.address,
+        from: sellerAddress,
         gas: 200000,
         gasPrice: highGasPrice,
         type: 0, // Принудительно используем legacy транзакции
-        nonce: await web3.eth.getTransactionCount(sellerAccount.address)
+        nonce: await web3.eth.getTransactionCount(sellerAddress)
       });
       
       console.log(`  ✅ Продукт ${product.id} успешно активирован`);
@@ -1668,7 +1688,7 @@ async function createFirstSeller(inviteCode) {
   }
   
   // 2. Загружаем контракт
-  const spiralEngine = await loadContract("InviteNFT");
+  const spiralEngine = await loadContract("SpiralEngine");
   
   // 3. Используем переданный инвайт-код
   console.log(`📋 Используем инвайт-код: ${inviteCode}`);
@@ -1725,7 +1745,7 @@ async function activateUser(inviteCode, userAddress) {
   console.log(`📋 Используем инвайт-код: ${inviteCode}`);
   
   // 1. Загружаем контракт
-  const spiralEngine = await loadContract("InviteNFT");
+  const spiralEngine = await loadContract("SpiralEngine");
   
   // 2. Проверяем права активатора
   await validateActivatorAccess(spiralEngine);
@@ -1734,8 +1754,8 @@ async function activateUser(inviteCode, userAddress) {
   await validateInviteCode(spiralEngine, inviteCode);
   
   // 4. Проверяем, не активирован ли уже пользователь
-  const isAlreadyActivated = await spiralEngine.methods.isUserActivated(userAddress).call();
-  if (isAlreadyActivated) {
+  const usedInvite = await spiralEngine.methods.usedInviteByUser(userAddress).call();
+  if (usedInvite > 0) {
     console.log(`⚠️ Пользователь ${userAddress} уже активирован`);
     return;
   }
@@ -1770,11 +1790,11 @@ async function grantSellerRole(userAddress) {
   console.log(`\n🏪 Назначаем роль SELLER_ROLE пользователю: ${userAddress}`);
   
   // 1. Загружаем контракт
-  const spiralEngine = await loadContract("InviteNFT");
+  const spiralEngine = await loadContract("SpiralEngine");
   
   // 2. Проверяем, активирован ли пользователь
-  const isActivated = await spiralEngine.methods.isUserActivated(userAddress).call();
-  if (!isActivated) {
+  const usedInvite = await spiralEngine.methods.usedInviteByUser(userAddress).call();
+  if (usedInvite == 0) {
     throw new Error(`Пользователь ${userAddress} не активирован`);
   }
   
@@ -1846,7 +1866,7 @@ async function setupSoulIdentityFor888(soulIdentity, sellerAddress) {
     
     const mintTx = await soulboundCore.methods.mintSoul(sellerAddress).send({
       from: deployerAccount.address,
-      gas: 200000,
+      gas: network === 'polygon' ? 500000 : 300000,
       gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
     });
     
@@ -1957,8 +1977,8 @@ async function validateUserActivation(spiralEngine, userAddress, inviteCode, new
   console.log(`🔍 Проверяем результат активации...`);
   
   // Проверяем, что пользователь активирован
-  const isActivated = await spiralEngine.methods.isUserActivated(userAddress).call();
-  if (!isActivated) {
+  const usedInvite = await spiralEngine.methods.usedInviteByUser(userAddress).call();
+  if (usedInvite == 0) {
     throw new Error(`Пользователь ${userAddress} не был активирован`);
   }
   
@@ -2020,9 +2040,10 @@ async function validateAction888Inputs(deployerInvite, sellerAddress) {
 
 // Загрузка контрактов для Action 888
 async function loadContractsFor888() {
-    const spiralEngine = await loadContract("SpiralEngine");
-    const productRegistry = await loadContract("ProductRegistry");
-    const soulIdentity = await loadContract("SoulIdentity");
+    // Загружаем контракты напрямую через переменные окружения
+    const spiralEngine = await loadContract("SpiralEngine", SPIRAL_ENGINE_CONTRACT_ADDRESS);
+    const productRegistry = await loadContract("ProductRegistry", PRODUCT_REGISTRY_CONTRACT_ADDRESS);
+    const soulIdentity = await loadContract("SoulIdentity", SOUL_IDENTITY_CONTRACT_ADDRESS);
     
     console.log(`✅ Контракты загружены: SpiralEngine=${spiralEngine.options.address}, ProductRegistry=${productRegistry.options.address}, SoulIdentity=${soulIdentity.options.address}`);
     
@@ -2031,19 +2052,42 @@ async function loadContractsFor888() {
 
 // Валидация деплоер инвайта для селлера
 async function validateDeployerInviteForSeller(spiralEngine, deployerInvite) {
-    const inviteExists = await spiralEngine.methods.inviteCodeExists(deployerInvite).call();
-    if (!inviteExists) {
-        throw new Error(`Action 888: инвайт ${deployerInvite} не существует`);
+    try {
+        console.log(`🔍 Проверяем инвайт ${deployerInvite} в SpiralEngine ${spiralEngine.options.address}...`);
+        
+        // Проверяем, что методы существуют в ABI
+        console.log(`🔍 Доступные методы в SpiralEngine:`, Object.keys(spiralEngine.methods));
+        
+        // Пробуем вызвать метод с обработкой ошибок
+        let inviteExists;
+        try {
+            inviteExists = await spiralEngine.methods.inviteCodeExists(deployerInvite).call();
+            console.log(`🔍 inviteExists: ${inviteExists}`);
+        } catch (methodError) {
+            console.error(`❌ Ошибка при вызове inviteCodeExists:`, methodError.message);
+            throw new Error(`Метод inviteCodeExists не найден в SpiralEngine или ABI не соответствует`);
+        }
+        
+        if (!inviteExists) {
+            throw new Error(`Action 888: инвайт ${deployerInvite} не существует`);
+        }
+        
+        const tokenId = await spiralEngine.methods.inviteCodeToTokenId(deployerInvite).call();
+        console.log(`🔍 tokenId: ${tokenId}`);
+        
+        const isUsed = await spiralEngine.methods.isInviteUsed(tokenId).call();
+        console.log(`🔍 isUsed: ${isUsed}`);
+        
+        if (isUsed) {
+            throw new Error(`Action 888: инвайт ${deployerInvite} уже использован`);
+        }
+        
+        console.log(`✅ Деплоер инвайт ${deployerInvite} валиден для активации селлера (tokenId: ${tokenId})`);
+    } catch (error) {
+        console.error(`❌ Ошибка при валидации инвайта ${deployerInvite}:`, error.message);
+        console.error(`❌ Детали ошибки:`, error);
+        throw error;
     }
-    
-    const tokenId = await spiralEngine.methods.inviteCodeToTokenId(deployerInvite).call();
-    const isUsed = await spiralEngine.methods.isInviteUsed(tokenId).call();
-    
-    if (isUsed) {
-        throw new Error(`Action 888: инвайт ${deployerInvite} уже использован`);
-    }
-    
-    console.log(`✅ Деплоер инвайт ${deployerInvite} валиден для активации селлера (tokenId: ${tokenId})`);
 }
 
 // Активация селлера в SpiralEngine
@@ -2125,7 +2169,7 @@ async function grantSellerRoleToUser(spiralEngine, sellerAddress) {
     try {
         const grantTx = await spiralEngine.methods.grantSellerRole(sellerAddress).send({
             from: deployerAccount.address,
-            gas: 200000,
+            gas: network === 'polygon' ? 500000 : 300000,
             gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
         });
         console.log(`✅ Роль SELLER_ROLE назначена, tx: ${grantTx.transactionHash}`);
@@ -2143,6 +2187,42 @@ async function loadSellerCatalog(productRegistry, sellerAddress, catalogData) {
     }
     
     console.log(`🔷 Загружаем каталог для селлера ${sellerAddress}...`);
+    
+    // Очищаем существующий каталог продавца перед созданием нового
+    console.log(`🧹 Очищаем существующий каталог продавца...`);
+    try {
+        const clearTx = await productRegistry.methods.clearSellerCatalog(sellerAddress).send({
+            from: deployerAddress,
+            gas: networkName === 'polygon' ? 500000 : 300000,
+            gasPrice: networkName === 'polygon' ? web3.utils.toWei('100', 'gwei') : undefined
+        });
+        
+        console.log(`✅ Каталог очищен, tx: ${clearTx.transactionHash}`);
+        
+        // Ждем подтверждения и проверяем событие CatalogCleared
+        const receipt = await web3.eth.getTransactionReceipt(clearTx.transactionHash);
+        const catalogClearedEvent = receipt.logs.find(log => {
+            try {
+                const decoded = productRegistry.options.jsonInterface.find(iface => iface.name === 'CatalogCleared');
+                return decoded && web3.utils.hexToNumber(log.topics[1]) === web3.utils.toHex(sellerAddress);
+            } catch (e) {
+                return false;
+            }
+        });
+        
+        if (catalogClearedEvent) {
+            const productsCleared = web3.utils.hexToNumber(catalogClearedEvent.data);
+            console.log(`📊 Очищено продуктов: ${productsCleared}`);
+        }
+        
+    } catch (clearError) {
+        if (clearError.message.includes("Catalog is already empty")) {
+            console.log(`✅ Каталог уже пустой, продолжаем...`);
+        } else {
+            console.log(`⚠️ Ошибка при очистке каталога: ${clearError.message}`);
+            console.log(`⚠️ Продолжаем без очистки...`);
+        }
+    }
     
     // Создаем каталог (аналогично action=4)
     await createCatalog(productRegistry);
