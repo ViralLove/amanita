@@ -166,6 +166,9 @@ ENABLE_CACHING=true
 CACHE_TTL=300
 ENABLE_METRICS=true
 METRICS_INTERVAL=60
+
+# Catalog settings
+LOAD_CATALOG=true
 EOF
     echo "⚠️  ВНИМАНИЕ: Создан .env файл с тестовыми значениями!"
     echo "⚠️  Замените TELEGRAM_BOT_TOKEN на реальный токен от @BotFather"
