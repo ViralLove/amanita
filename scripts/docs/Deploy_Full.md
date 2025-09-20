@@ -273,17 +273,18 @@ npx hardhat run scripts/deploy_full.js --network localhost 41
 
 #### `888` - Полная инициализация селлера
 ```bash
-# Способ 1 - через переменную окружения
-DEPLOY_ACTION=888 npx hardhat run scripts/deploy_full.js --network localhost <deployerInvite> <sellerAddress> [catalogData]
+# Способ 1 - через переменные окружения (рекомендуется)
+DEPLOY_ACTION=888 DEPLOYER_INVITE=<deployerInvite> SELLER_ADDRESS=<sellerAddress> npx hardhat run scripts/deploy_full.js --network localhost
 
 # Способ 2 - через аргументы командной строки
 npx hardhat run scripts/deploy_full.js --network localhost 888 <deployerInvite> <sellerAddress> [catalogData]
 ```
 **Описание:** Полная инициализация селлера от активации до готовности к работе
 **Параметры:**
-- `deployerInvite`: инвайт код деплоера для активации селлера
-- `sellerAddress`: адрес селлера для инициализации
+- `deployerInvite`: инвайт код деплоера для активации селлера (обязательный)
+- `sellerAddress`: адрес селлера для инициализации (обязательный)
 - `catalogData`: путь к JSON файлу с каталогом (опционально)
+
 **Процесс:**
 1. Валидация входных параметров
 2. Загрузка контрактов (SpiralEngine, ProductRegistry, SoulIdentity)
@@ -293,6 +294,31 @@ npx hardhat run scripts/deploy_full.js --network localhost 888 <deployerInvite> 
 6. Создание SBT токена в SoulIdentity
 7. Загрузка каталога продуктов
 8. Генерация 12 инвайтов для селлера
+
+**Примеры использования:**
+```bash
+# Базовый пример с обязательными параметрами (способ 1 - через переменные окружения)
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-29NV-YTBS SELLER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8 npx hardhat run scripts/deploy_full.js --network localhost
+
+# С кастомным каталогом (способ 1 - через переменные окружения)
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-29NV-YTBS SELLER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8 CATALOG_DATA=/path/to/custom/catalog.json npx hardhat run scripts/deploy_full.js --network localhost
+
+# Через аргументы командной строки (способ 2)
+npx hardhat run scripts/deploy_full.js --network localhost 888 AMANITA-29NV-YTBS 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+```
+
+**Требования:**
+- Существующие контракты SpiralEngine, ProductRegistry, SoulIdentity
+- Валидный инвайт-код деплоера (полученный через action 777)
+- Адрес селлера с достаточным балансом для операций
+- Права деплоера для активации пользователей
+
+**Результат:**
+- Селлер активирован в SpiralEngine
+- Назначена роль SELLER_ROLE
+- Создан SBT токен в SoulIdentity
+- Загружен каталог продуктов
+- Сгенерированы 12 новых инвайтов для селлера
 
 ## Подробное описание действий
 
@@ -535,6 +561,31 @@ DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost Bytes
 # npx hardhat run scripts/deploy_full.js --network localhost 5 FaultySpiralEngine
 # npx hardhat run scripts/deploy_full.js --network localhost 5 BytesErrorEngine
 ```
+
+### Сценарий 6: Полная инициализация селлера (action 888)
+```bash
+# 1. Запуск локальной ноды
+npx hardhat node
+
+# 2. Полный деплой экосистемы (способ 1 - через переменную окружения)
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
+
+# 3. Генерация инвайтов для деплоера (способ 1 - через переменную окружения)
+DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
+
+# 4. Полная инициализация селлера (способ 1 - через переменные окружения)
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-29NV-YTBS SELLER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8 npx hardhat run scripts/deploy_full.js --network localhost
+
+# Альтернативно - через аргументы командной строки:
+# npx hardhat run scripts/deploy_full.js --network localhost 1
+# npx hardhat run scripts/deploy_full.js --network localhost 777
+# npx hardhat run scripts/deploy_full.js --network localhost 888 AMANITA-29NV-YTBS 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+```
+
+**Примечание:** 
+- Замените `AMANITA-29NV-YTBS` на реальный инвайт-код из файла `bot/flowers/deployer_invites_localhost.txt`
+- Замените `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` на реальный адрес селлера
+- Убедитесь, что селлер имеет достаточный баланс для операций
 
 ## Мониторинг и аналитика
 

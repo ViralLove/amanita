@@ -90,8 +90,22 @@ describe("SpiralEngine - Basic Functionality", function () {
 
         // Деплоим контракт SoulIdentity
         console.log("🔷 Deploying SoulIdentity contract...");
+        
+        // Сначала деплоим зависимости
+        const SoulboundCore = await ethers.getContractFactory("SoulboundCore");
+        const soulboundCore = await SoulboundCore.connect(deployer).deploy("SoulboundCore", "SBC");
+        await soulboundCore.waitForDeployment();
+        
+        const SoulMetadata = await ethers.getContractFactory("SoulMetadata");
+        const soulMetadata = await SoulMetadata.connect(deployer).deploy(await soulboundCore.getAddress());
+        await soulMetadata.waitForDeployment();
+        
+        // Теперь деплоим SoulIdentity с зависимостями
         const SoulIdentity = await ethers.getContractFactory("SoulIdentity");
-        soulIdentity = await SoulIdentity.connect(deployer).deploy();
+        soulIdentity = await SoulIdentity.connect(deployer).deploy(
+            await soulboundCore.getAddress(),
+            await soulMetadata.getAddress()
+        );
         await soulIdentity.waitForDeployment();
 
         // Деплоим контракт SpiralEngine

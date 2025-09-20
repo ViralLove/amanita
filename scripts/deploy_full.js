@@ -273,36 +273,64 @@ async function main(action) {
       console.log("\n⭐️ ВАЖНО! Адрес реестра для .env:");
       console.log("AMANITA_REGISTRY_CONTRACT_ADDRESS=" + amanitaRegistry.options.address);
       console.log("⭐️ Скопируйте этот адрес в bot/.env\n");
-    } else {
-      // Для action 888 просто загружаем реестр без регистрации
-      console.log("\n🔷 Загружаем AmanitaRegistry...");
-      amanitaRegistry = await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
-      console.log("☀️ Адрес реестра:", amanitaRegistry.options.address);
-    }
+    } else if (action === 1) {
+      // Для action 1 — умная логика загрузки реестра
+      console.log("\n🔷 Обрабатываем AmanitaRegistry...");
+      
+      if (AMANITA_REGISTRY_CONTRACT_ADDRESS && AMANITA_REGISTRY_CONTRACT_ADDRESS !== 'undefined') {
+        // Если адрес есть в .env - загружаем существующий
+        console.log("📋 Найден адрес реестра в .env, загружаем существующий...");
+        amanitaRegistry = await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
+        console.log("☀️ Адрес реестра:", amanitaRegistry.options.address);
+      } else {
+        // Если адреса нет - деплоим новый (чистый старт)
+        console.log("📋 Адрес реестра не найден в .env, деплоим новый...");
+        amanitaRegistry = await deployContract("AmanitaRegistry");
+        console.log("\n⭐️ ВАЖНО! Адрес реестра для .env:");
+        console.log("AMANITA_REGISTRY_CONTRACT_ADDRESS=" + amanitaRegistry.options.address);
+        console.log("⭐️ Скопируйте этот адрес в .env\n");
+      }
+     } else if (action === 888) {
+       // Для action 888 - инициализация селлера (критическое действие)
+       console.log("\n🔷 Загружаем AmanitaRegistry для инициализации селлера...");
+       if (!AMANITA_REGISTRY_CONTRACT_ADDRESS || AMANITA_REGISTRY_CONTRACT_ADDRESS === 'undefined') {
+         throw new Error("Адрес реестра не найден в .env. Сначала выполните action=1 для деплоя всей системы контрактов.");
+       }
+       amanitaRegistry = await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
+       console.log("☀️ Адрес реестра:", amanitaRegistry.options.address);
+     } else {
+       // В остальных случаях просто загружаем реестр из .env
+       console.log("\n🔷 Загружаем AmanitaRegistry...");
+       if (!AMANITA_REGISTRY_CONTRACT_ADDRESS || AMANITA_REGISTRY_CONTRACT_ADDRESS === 'undefined') {
+         throw new Error("Адрес реестра не найден в .env. Сначала выполните action=0 или action=1 для деплоя реестра.");
+       }
+       amanitaRegistry = await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
+       console.log("☀️ Адрес реестра:", amanitaRegistry.options.address);
+     }
 
     // Деплой или загрузка основных контрактов
     if (action === 1 || action === 2) {
       // Деплой SpiralEngine с проверкой существования
       console.log("\n🔷 Обрабатываем SpiralEngine...");
-      spiralEngine = await deploySingleContract("SpiralEngine");
+      spiralEngine = await deploySingleContract("SpiralEngine", amanitaRegistry);
 
       // Деплой SBT экосистемы с проверкой существования
       console.log("\n🔷 Обрабатываем SBT экосистему...");
       
       // 1. SoulboundCore (базовый SBT)
-      const soulboundCore = await deploySingleContract("SoulboundCore");
+      const soulboundCore = await deploySingleContract("SoulboundCore", amanitaRegistry);
       
       // 2. SoulMetadata (метаданные)
-      const soulMetadata = await deploySingleContract("SoulMetadata");
+      const soulMetadata = await deploySingleContract("SoulMetadata", amanitaRegistry);
       
       // 3. SoulRecovery (восстановление)
-      const soulRecovery = await deploySingleContract("SoulRecovery");
+      const soulRecovery = await deploySingleContract("SoulRecovery", amanitaRegistry);
       
       // 4. SoulIntegration (интеграция)
-      const soulIntegration = await deploySingleContract("SoulIntegration");
+      const soulIntegration = await deploySingleContract("SoulIntegration", amanitaRegistry);
       
       // 5. SoulIdentity (мост с DID)
-      const soulIdentity = await deploySingleContract("SoulIdentity");
+      const soulIdentity = await deploySingleContract("SoulIdentity", amanitaRegistry);
       
       // 6. Настройка связей между SBT контрактами
       console.log("\n🔷 Настраиваем связи SBT экосистемы...");
@@ -354,7 +382,7 @@ async function main(action) {
 
       // Деплой ProductRegistry с проверкой существования
       console.log("\n🔷 Обрабатываем ProductRegistry...");
-      productRegistry = await deploySingleContract("ProductRegistry");
+      productRegistry = await deploySingleContract("ProductRegistry", amanitaRegistry);
       
       console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
       console.log("☀️ Адрес ProductRegistry:", productRegistry.options.address);
@@ -450,7 +478,7 @@ async function main(action) {
     if (action === 5) {
       const contractName = args[1] || process.env.CONTRACT_NAME;
       console.log(`\n🔷 Обрабатываем контракт: ${contractName}`);
-      await deploySingleContract(contractName);
+      await deploySingleContract(contractName, amanitaRegistry);
       console.log(`✅ Контракт ${contractName} успешно обработан!`);
     }
 
@@ -652,8 +680,9 @@ async function checkExistingContract(contractName) {
  * @param {string} contractName - Название контракта
  * @param {Object} contractInstance - Экземпляр контракта
  */
-async function registerContractInRegistry(contractName, contractInstance) {
-    const amanitaRegistry = await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
+async function registerContractInRegistry(contractName, contractInstance, registryInstance = null) {
+    // Используем переданный экземпляр реестра или загружаем из .env
+    const amanitaRegistry = registryInstance || await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
     
     try {
         // Проверяем существующий адрес в реестре
@@ -715,7 +744,7 @@ async function registerContractInRegistry(contractName, contractInstance) {
  * Деплой конкретного контракта по имени
  * @param {string} contractName - Название контракта для деплоя
  */
-async function deploySingleContract(contractName) {
+async function deploySingleContract(contractName, registryInstance = null) {
     console.log(`\n🔷 Обрабатываем контракт: ${contractName}`);
     
     // 1. Валидация названия контракта
@@ -729,7 +758,7 @@ async function deploySingleContract(contractName) {
     if (contractInstance) {
         // Контракт уже существует, только регистрируем в реестре
         console.log(`🔄 Используем существующий контракт ${contractName} (${contractInstance.options.address})`);
-        await registerContractInRegistry(contractName, contractInstance);
+        await registerContractInRegistry(contractName, contractInstance, registryInstance);
         return contractInstance;
     }
     
@@ -741,7 +770,7 @@ async function deploySingleContract(contractName) {
     
     // 4. Проверка зависимостей
     for (const dep of contractInfo.dependencies) {
-        await ensureContractExists(dep);
+        await ensureContractExists(dep, registryInstance);
     }
     
     // 5. Деплой контракта
@@ -797,7 +826,7 @@ async function deploySingleContract(contractName) {
     
     // 6. Регистрация в реестре (кроме самого реестра)
     if (contractName !== 'AmanitaRegistry') {
-        await registerContractInRegistry(contractName, contractInstance);
+        await registerContractInRegistry(contractName, contractInstance, registryInstance);
         console.log(`📝 Контракт ${contractName} доступен в реестре под ключом "${contractName}"`);
     }
     
@@ -815,8 +844,8 @@ async function deploySingleContract(contractName) {
  * Проверка существования контракта в реестре
  * @param {string} contractName - Название контракта для проверки
  */
-async function ensureContractExists(contractName) {
-    const amanitaRegistry = await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
+async function ensureContractExists(contractName, registryInstance = null) {
+    const amanitaRegistry = registryInstance || await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
     const address = await amanitaRegistry.methods.getAddress(contractName).call();
     if (address === "0x0000000000000000000000000000000000000000") {
         throw new Error(`Зависимость ${contractName} не найдена в реестре. Сначала задеплойте этот контракт.`);
@@ -1225,9 +1254,25 @@ async function setupSellerRole(spiralEngine) {
   try {
     // Назначаем роль SELLER_ROLE продавцу в SpiralEngine
     console.log("\n🔷 Выясняем, имеет ли продавец роль SELLER_ROLE...");
+    
+    // Сначала проверим, что контракт вообще отвечает
+    console.log("🔍 Проверяем базовые методы контракта...");
+    try {
+      const name = await spiralEngine.methods.name().call();
+      console.log("✅ Контракт отвечает, name:", name);
+    } catch (e) {
+      console.log("❌ Контракт не отвечает на name():", e.message);
+      throw e;
+    }
+    
+    // Получаем SELLER_ROLE из контракта
+    console.log("🔍 Получаем SELLER_ROLE...");
+    const SELLER_ROLE = await spiralEngine.methods.SELLER_ROLE().call();
     console.log("SELLER_ROLE:", SELLER_ROLE);
     console.log("sellerAccount.address:", sellerAddr);
     console.log("spiralEngine address:", spiralEngine.options.address);
+    
+    console.log("🔍 Проверяем hasRole...");
     hasSellerRole = await spiralEngine.methods.hasRole(SELLER_ROLE, sellerAddr).call();
     console.log("hasSellerRole:", hasSellerRole);
   } catch (error) {
@@ -2017,7 +2062,7 @@ async function action888(deployerInvite, sellerAddress, catalogData = null) {
     await setupSoulIdentityFor888(contracts.soulIdentity, sellerAddress);
     
     // 7. Загрузка каталога продуктов
-    await loadSellerCatalog(contracts.productRegistry, sellerAddress, catalogData);
+    await loadSellerCatalog(contracts.productRegistry, sellerAddress, catalogData, deployerAccount.address);
     
     // 8. Генерация 12 инвайтов для селлера
     await generateInvitesForSeller(contracts.spiralEngine, sellerAddress);
@@ -2181,7 +2226,7 @@ async function grantSellerRoleToUser(spiralEngine, sellerAddress) {
 }
 
 // Загрузка каталога селлера
-async function loadSellerCatalog(productRegistry, sellerAddress, catalogData) {
+async function loadSellerCatalog(productRegistry, sellerAddress, catalogData, deployerAddress) {
     if (!catalogData) {
         catalogData = path.join(__dirname, "..", "bot", "catalog", "product_registry_upload_data.json");
     }
@@ -2225,10 +2270,10 @@ async function loadSellerCatalog(productRegistry, sellerAddress, catalogData) {
     }
     
     // Создаем каталог (аналогично action=4)
-    await createCatalog(productRegistry);
+    await createCatalog(productRegistry, sellerAddress);
     
     // Активируем продукты (аналогично action=41)
-    await activateCatalogProducts(productRegistry);
+    await activateCatalogProducts(productRegistry, sellerAddress);
     
     console.log(`✅ Каталог загружен и активирован для селлера ${sellerAddress}`);
 }
