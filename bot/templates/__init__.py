@@ -14,8 +14,10 @@ def get_text(key: str, lang: str = 'en') -> str:
         str: Найденный текст или ключ, если текст не найден
     """
     try:
+        # Используем APP_ROOT_DIR из переменных окружения для гибкости
+        from config import APP_ROOT_DIR
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
-        file_path = os.path.join(project_root, "bot", "templates", f"{lang}.json")
+        file_path = os.path.join(project_root, APP_ROOT_DIR, "templates", f"{lang}.json")
         print(f"[LOCALIZATION] file_path={file_path}")
         with open(file_path, 'r', encoding='utf-8') as f:
             translations = json.load(f)

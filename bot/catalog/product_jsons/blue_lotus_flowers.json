@@ -1,7 +1,13 @@
 {
-  "id": "blue_lotus_flowers",
+  "business_id": "blue_lotus_flowers",
   "title": "Blue Lotus",
-  "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+  "organic_components": [
+    {
+      "biounit_id": "blue-lotus",
+      "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+      "proportion": "100%"
+    }
+  ],
   "categories": [
     "plant",
     "mental health",
@@ -9,8 +15,10 @@
     "ADHD support",
     "mental force"
   ],
-  "cover_image": "QmT5RC6Q6MRRF3YoDcXmKamKntXT6oSvxk3G2aLDkPc17T",
-  "form": "flower",
+  "cover_image_url": "QmT5RC6Q6MRRF3YoDcXmKamKntXT6oSvxk3G2aLDkPc17T",
+  "forms": [
+    "flower"
+  ],
   "species": "Nymphaea caerulea (Blue Lotus)",
   "prices": [
     {

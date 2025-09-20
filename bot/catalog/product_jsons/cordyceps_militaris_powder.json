@@ -1,14 +1,22 @@
 {
-  "id": "cordyceps_militaris_powder",
+  "business_id": "cordyceps_militaris_powder",
   "title": "cordyceps_militaris",
-  "description_cid": "QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy",
+  "organic_components": [
+    {
+      "biounit_id": "cordyceps_militaris",
+      "description_cid": "QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy",
+      "proportion": "100%"
+    }
+  ],
   "categories": [
     "mushroom",
     "immune system",
     "vital force"
   ],
-  "cover_image": "",
-  "form": "powder",
+  "cover_image_url": "",
+  "forms": [
+    "powder"
+  ],
   "species": "Cordyceps militaris",
   "prices": [
     {

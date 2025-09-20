@@ -43,7 +43,7 @@ SELLER_PRIVATE_KEY=0x...                      # Приватный ключ се
 # Адреса контрактов
 PRODUCT_REGISTRY_CONTRACT_ADDRESS=0x...       # Адрес ProductRegistry
 INVITE_NFT_CONTRACT_ADDRESS=0x...             # Адрес InviteNFT
-AMANITA_REGISTRY_CONTRACT_ADDRESS=0x...       # Адрес AmanitaRegistry
+LOVECOIN_REGISTRY_CONTRACT_ADDRESS=0x...       # Адрес AmanitaRegistry
 
 # Сеть
 HARDHAT_NETWORK=localhost                     # Сеть для тестирования

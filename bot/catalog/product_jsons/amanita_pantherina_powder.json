@@ -1,7 +1,13 @@
 {
-  "id": "amanita_pantherina_powder",
+  "business_id": "amanita_pantherina_powder",
   "title": "Amanita — Powder",
-  "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+  "organic_components": [
+    {
+      "biounit_id": "amanita_muscaria",
+      "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+      "proportion": "100%"
+    }
+  ],
   "categories": [
     "mushroom",
     "mental health",
@@ -9,8 +15,10 @@
     "ADHD support",
     "mental force"
   ],
-  "cover_image": "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd",
-  "form": "powder",
+  "cover_image_url": "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd",
+  "forms": [
+    "powder"
+  ],
   "species": "Amanita muscaria",
   "prices": [
     {

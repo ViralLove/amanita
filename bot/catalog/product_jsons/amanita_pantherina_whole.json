@@ -1,7 +1,13 @@
 {
-  "id": "amanita_pantherina_whole",
+  "business_id": "amanita_pantherina_whole",
   "title": "Amanita — Pantera",
-  "description_cid": "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy",
+  "organic_components": [
+    {
+      "biounit_id": "amanita_pantherina",
+      "description_cid": "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy",
+      "proportion": "100%"
+    }
+  ],
   "categories": [
     "mushroom",
     "mental health",
@@ -9,8 +15,10 @@
     "ADHD support",
     "mental force"
   ],
-  "cover_image": "QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn",
-  "form": "unknown",
+  "cover_image_url": "QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn",
+  "forms": [
+    "unknown"
+  ],
   "species": "Amanita pantherina",
   "prices": [
     {

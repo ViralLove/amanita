@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 /**
  * @title LoveDoPostNFT
  * @dev NFT-контракт для LoveDo постов в системе Amanita. Позволяет пользователям создавать отзывы-признания
- * для продавцов, на которые продавцы могут ставить суперлайки. Каждый суперлайк становится основой для эмиссии $AMANITA_GOV.
+ * для продавцов, на которые продавцы могут ставить суперлайки. Каждый суперлайк становится основой для эмиссии $LOVECOIN и $LGOV.
  */
 contract LoveDoPostNFT is ERC721URIStorage, AccessControl {
     using EnumerableSet for EnumerableSet.UintSet;

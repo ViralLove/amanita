@@ -1,15 +1,23 @@
 {
-  "id": "aspen_bark_dried_strips",
+  "business_id": "aspen_bark_dried_strips",
   "title": "Kora Osiny",
-  "description_cid": "QmT1QMFRpSXHQPUv524EdthjxVUeZFgGM3c8FwVvrYbiXJ",
+  "organic_components": [
+    {
+      "biounit_id": "populus_tremula",
+      "description_cid": "QmT1QMFRpSXHQPUv524EdthjxVUeZFgGM3c8FwVvrYbiXJ",
+      "proportion": "100%"
+    }
+  ],
   "categories": [
     "plant",
     "antiparasite",
     "immune system",
     "vital force"
   ],
-  "cover_image": "QmZGLPHZxDJP4VRbZbR8CRBY2widf5wMqMvu3rowhJGvCT",
-  "form": "dried strips",
+  "cover_image_url": "QmZGLPHZxDJP4VRbZbR8CRBY2widf5wMqMvu3rowhJGvCT",
+  "forms": [
+    "dried strips"
+  ],
   "species": "Populus tremula (Aspen)",
   "prices": [
     {

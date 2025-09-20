@@ -1,7 +1,13 @@
 {
-  "id": "Lion's Mane mushroom — whole dried",
+  "business_id": "Lion's Mane mushroom — whole dried",
   "title": "Lions Main",
-  "description_cid": "QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1",
+  "organic_components": [
+    {
+      "biounit_id": "lions-mane",
+      "description_cid": "QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1",
+      "proportion": "100%"
+    }
+  ],
   "categories": [
     "mushroom",
     "mental health",
@@ -9,8 +15,10 @@
     "ADHD support",
     "mental force"
   ],
-  "cover_image": "QmXzbH3aeiyYyn5b4YSHe2kvNCQuUXtMngL91MeVjHH3vJ",
-  "form": "whole dried",
+  "cover_image_url": "QmXzbH3aeiyYyn5b4YSHe2kvNCQuUXtMngL91MeVjHH3vJ",
+  "forms": [
+    "whole dried"
+  ],
   "species": "Hericium erinaceus (Lion's Mane)",
   "prices": [
     {

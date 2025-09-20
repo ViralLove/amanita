@@ -1,15 +1,23 @@
 {
-  "id": "chanterelle_dried",
+  "business_id": "chanterelle_dried",
   "title": "Foxes",
-  "description_cid": "QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE",
+  "organic_components": [
+    {
+      "biounit_id": "cantharellus_cibarius",
+      "description_cid": "QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE",
+      "proportion": "100%"
+    }
+  ],
   "categories": [
     "mushroom",
     "antiparasite",
     "immune system",
     "vital force"
   ],
-  "cover_image": "QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa",
-  "form": "dried whole",
+  "cover_image_url": "QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa",
+  "forms": [
+    "dried whole"
+  ],
   "species": "Cantharellus cibarius (Chanterelle)",
   "prices": [
     {

@@ -1,7 +1,13 @@
 {
-  "id": "amanita1",
+  "business_id": "amanita1",
   "title": "Amanita muscaria — sliced caps and gills (1st grade)",
-  "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+  "organic_components": [
+    {
+      "biounit_id": "amanita_muscaria",
+      "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+      "proportion": "100%"
+    }
+  ],
   "categories": [
     "mushroom",
     "mental health",
@@ -9,8 +15,10 @@
     "ADHD support",
     "mental force"
   ],
-  "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
-  "form": "mixed slices",
+  "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+  "forms": [
+    "mixed slices"
+  ],
   "species": "Amanita muscaria",
   "prices": [
     {

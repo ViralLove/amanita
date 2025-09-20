@@ -1,14 +1,22 @@
 {
-  "id": "chaga_chunks",
+  "business_id": "chaga_chunks",
   "title": "Chaga",
-  "description_cid": "Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93",
+  "organic_components": [
+    {
+      "biounit_id": "inonotus_obliquus",
+      "description_cid": "Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93",
+      "proportion": "100%"
+    }
+  ],
   "categories": [
     "mushroom",
     "immune system",
     "vital force"
   ],
-  "cover_image": "QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c",
-  "form": "chunks",
+  "cover_image_url": "QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c",
+  "forms": [
+    "chunks"
+  ],
   "species": "Inonotus obliquus (Chaga)",
   "prices": [
     {

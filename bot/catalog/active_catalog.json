@@ -1,8 +1,14 @@
 [
   {
-    "id": "amanita1",
+    "business_id": "amanita1",
     "title": "Amanita muscaria — sliced caps and gills (1st grade)",
-    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "organic_components": [
+      {
+        "biounit_id": "amanita_muscaria",
+        "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "mental health",
@@ -10,8 +16,10 @@
       "ADHD support",
       "mental force"
     ],
-    "cover_image": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
-    "form": "mixed slices",
+    "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
+    "forms": [
+      "mixed slices"
+    ],
     "species": "Amanita muscaria",
     "prices": [
       {
@@ -23,9 +31,15 @@
     ]
   },
   {
-    "id": "amanita_closed_cups",
+    "business_id": "amanita_closed_cups",
     "title": "Amanita — Closed hat",
-    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "organic_components": [
+      {
+        "biounit_id": "amanita_muscaria",
+        "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "mental health",
@@ -33,8 +47,10 @@
       "ADHD support",
       "mental force"
     ],
-    "cover_image": "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1",
-    "form": "whole caps",
+    "cover_image_url": "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1",
+    "forms": [
+      "whole caps"
+    ],
     "species": "Amanita muscaria",
     "prices": [
       {
@@ -46,9 +62,15 @@
     ]
   },
   {
-    "id": "amanita_broken_closed_cups",
+    "business_id": "amanita_broken_closed_cups",
     "title": "Amanita — Collapsed hats",
-    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "organic_components": [
+      {
+        "biounit_id": "amanita_muscaria",
+        "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "mental health",
@@ -56,8 +78,10 @@
       "ADHD support",
       "mental force"
     ],
-    "cover_image": "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B",
-    "form": "broken caps",
+    "cover_image_url": "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B",
+    "forms": [
+      "broken caps"
+    ],
     "species": "Amanita muscaria",
     "prices": [
       {
@@ -69,9 +93,15 @@
     ]
   },
   {
-    "id": "amanita_lux",
+    "business_id": "amanita_lux",
     "title": "Amanita — LUX",
-    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "organic_components": [
+      {
+        "biounit_id": "amanita_muscaria",
+        "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "mental health",
@@ -79,8 +109,10 @@
       "ADHD support",
       "mental force"
     ],
-    "cover_image": "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz",
-    "form": "premium caps",
+    "cover_image_url": "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz",
+    "forms": [
+      "premium caps"
+    ],
     "species": "Amanita muscaria",
     "prices": [
       {
@@ -92,9 +124,15 @@
     ]
   },
   {
-    "id": "amanita_pantherina_whole",
+    "business_id": "amanita_pantherina_whole",
     "title": "Amanita — Pantera",
-    "description_cid": "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy",
+    "organic_components": [
+      {
+        "biounit_id": "amanita_pantherina",
+        "description_cid": "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "mental health",
@@ -102,8 +140,10 @@
       "ADHD support",
       "mental force"
     ],
-    "cover_image": "QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn",
-    "form": "unknown",
+    "cover_image_url": "QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn",
+    "forms": [
+      "unknown"
+    ],
     "species": "Amanita pantherina",
     "prices": [
       {
@@ -127,9 +167,15 @@
     ]
   },
   {
-    "id": "amanita_pantherina_powder",
+    "business_id": "amanita_pantherina_powder",
     "title": "Amanita — Powder",
-    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "organic_components": [
+      {
+        "biounit_id": "amanita_muscaria",
+        "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "mental health",
@@ -137,8 +183,10 @@
       "ADHD support",
       "mental force"
     ],
-    "cover_image": "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd",
-    "form": "powder",
+    "cover_image_url": "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd",
+    "forms": [
+      "powder"
+    ],
     "species": "Amanita muscaria",
     "prices": [
       {
@@ -150,9 +198,15 @@
     ]
   },
   {
-    "id": "amanita_tincture",
+    "business_id": "amanita_tincture",
     "title": "Amanita — Tinctura",
-    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+    "organic_components": [
+      {
+        "biounit_id": "amanita_muscaria",
+        "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "mental health",
@@ -160,8 +214,10 @@
       "ADHD support",
       "mental force"
     ],
-    "cover_image": "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa",
-    "form": "tincture",
+    "cover_image_url": "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa",
+    "forms": [
+      "tincture"
+    ],
     "species": "Amanita muscaria",
     "prices": [
       {
@@ -173,9 +229,15 @@
     ]
   },
   {
-    "id": "blue_lotus_tincture",
+    "business_id": "blue_lotus_tincture",
     "title": "Blue Lotus — Tinctura",
-    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+    "organic_components": [
+      {
+        "biounit_id": "blue-lotus",
+        "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "plant",
       "mental health",
@@ -183,8 +245,10 @@
       "ADHD support",
       "mental force"
     ],
-    "cover_image": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
-    "form": "tincture",
+    "cover_image_url": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW",
+    "forms": [
+      "tincture"
+    ],
     "species": "Nymphaea caerulea (Blue Lotus)",
     "prices": [
       {
@@ -196,9 +260,15 @@
     ]
   },
   {
-    "id": "blue_lotus_flowers",
+    "business_id": "blue_lotus_flowers",
     "title": "Blue Lotus",
-    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+    "organic_components": [
+      {
+        "biounit_id": "blue-lotus",
+        "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "plant",
       "mental health",
@@ -206,8 +276,10 @@
       "ADHD support",
       "mental force"
     ],
-    "cover_image": "QmT5RC6Q6MRRF3YoDcXmKamKntXT6oSvxk3G2aLDkPc17T",
-    "form": "flower",
+    "cover_image_url": "QmT5RC6Q6MRRF3YoDcXmKamKntXT6oSvxk3G2aLDkPc17T",
+    "forms": [
+      "flower"
+    ],
     "species": "Nymphaea caerulea (Blue Lotus)",
     "prices": [
       {
@@ -219,16 +291,24 @@
     ]
   },
   {
-    "id": "chaga_chunks",
+    "business_id": "chaga_chunks",
     "title": "Chaga",
-    "description_cid": "Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93",
+    "organic_components": [
+      {
+        "biounit_id": "inonotus_obliquus",
+        "description_cid": "Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "immune system",
       "vital force"
     ],
-    "cover_image": "QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c",
-    "form": "chunks",
+    "cover_image_url": "QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c",
+    "forms": [
+      "chunks"
+    ],
     "species": "Inonotus obliquus (Chaga)",
     "prices": [
       {
@@ -246,16 +326,24 @@
     ]
   },
   {
-    "id": "cordyceps_militaris_powder",
+    "business_id": "cordyceps_militaris_powder",
     "title": "cordyceps_militaris",
-    "description_cid": "QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy",
+    "organic_components": [
+      {
+        "biounit_id": "cordyceps_militaris",
+        "description_cid": "QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "immune system",
       "vital force"
     ],
-    "cover_image": "",
-    "form": "powder",
+    "cover_image_url": "",
+    "forms": [
+      "powder"
+    ],
     "species": "Cordyceps militaris",
     "prices": [
       {
@@ -267,16 +355,24 @@
     ]
   },
   {
-    "id": "cordyceps_militaris_dried_bodies",
+    "business_id": "cordyceps_militaris_dried_bodies",
     "title": "cordyceps_militaris_powder",
-    "description_cid": "QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy",
+    "organic_components": [
+      {
+        "biounit_id": "cordyceps_militaris",
+        "description_cid": "QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "immune system",
       "vital force"
     ],
-    "cover_image": "",
-    "form": "dried whole",
+    "cover_image_url": "",
+    "forms": [
+      "dried whole"
+    ],
     "species": "Cordyceps militaris",
     "prices": [
       {
@@ -288,17 +384,25 @@
     ]
   },
   {
-    "id": "chanterelle_dried",
+    "business_id": "chanterelle_dried",
     "title": "Foxes",
-    "description_cid": "QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE",
+    "organic_components": [
+      {
+        "biounit_id": "cantharellus_cibarius",
+        "description_cid": "QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "antiparasite",
       "immune system",
       "vital force"
     ],
-    "cover_image": "QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa",
-    "form": "dried whole",
+    "cover_image_url": "QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa",
+    "forms": [
+      "dried whole"
+    ],
     "species": "Cantharellus cibarius (Chanterelle)",
     "prices": [
       {
@@ -310,17 +414,25 @@
     ]
   },
   {
-    "id": "chanterelle_powder",
+    "business_id": "chanterelle_powder",
     "title": "Foxes",
-    "description_cid": "QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE",
+    "organic_components": [
+      {
+        "biounit_id": "cantharellus_cibarius",
+        "description_cid": "QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "antiparasite",
       "immune system",
       "vital force"
     ],
-    "cover_image": "QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa",
-    "form": "dried powder",
+    "cover_image_url": "QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa",
+    "forms": [
+      "dried powder"
+    ],
     "species": "Cantharellus cibarius (Chanterelle)",
     "prices": [
       {
@@ -332,17 +444,25 @@
     ]
   },
   {
-    "id": "aspen_bark_dried_strips",
+    "business_id": "aspen_bark_dried_strips",
     "title": "Kora Osiny",
-    "description_cid": "QmT1QMFRpSXHQPUv524EdthjxVUeZFgGM3c8FwVvrYbiXJ",
+    "organic_components": [
+      {
+        "biounit_id": "populus_tremula",
+        "description_cid": "QmT1QMFRpSXHQPUv524EdthjxVUeZFgGM3c8FwVvrYbiXJ",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "plant",
       "antiparasite",
       "immune system",
       "vital force"
     ],
-    "cover_image": "QmZGLPHZxDJP4VRbZbR8CRBY2widf5wMqMvu3rowhJGvCT",
-    "form": "dried strips",
+    "cover_image_url": "QmZGLPHZxDJP4VRbZbR8CRBY2widf5wMqMvu3rowhJGvCT",
+    "forms": [
+      "dried strips"
+    ],
     "species": "Populus tremula (Aspen)",
     "prices": [
       {
@@ -354,9 +474,15 @@
     ]
   },
   {
-    "id": "lions_mane_powder",
+    "business_id": "lions_mane_powder",
     "title": "Lions Main — Powder",
-    "description_cid": "QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1",
+    "organic_components": [
+      {
+        "biounit_id": "lions-mane",
+        "description_cid": "QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "mental health",
@@ -364,8 +490,10 @@
       "ADHD support",
       "mental force"
     ],
-    "cover_image": "QmTU5LpEp2qDBpCiWnZHEDuUK7BES3gm8wNWihn7ShqjAv",
-    "form": "powder",
+    "cover_image_url": "QmTU5LpEp2qDBpCiWnZHEDuUK7BES3gm8wNWihn7ShqjAv",
+    "forms": [
+      "powder"
+    ],
     "species": "Hericium erinaceus (Lion's Mane)",
     "prices": [
       {
@@ -377,9 +505,15 @@
     ]
   },
   {
-    "id": "Lion's Mane mushroom — whole dried",
+    "business_id": "Lion's Mane mushroom — whole dried",
     "title": "Lions Main",
-    "description_cid": "QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1",
+    "organic_components": [
+      {
+        "biounit_id": "lions-mane",
+        "description_cid": "QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1",
+        "proportion": "100%"
+      }
+    ],
     "categories": [
       "mushroom",
       "mental health",
@@ -387,8 +521,10 @@
       "ADHD support",
       "mental force"
     ],
-    "cover_image": "QmXzbH3aeiyYyn5b4YSHe2kvNCQuUXtMngL91MeVjHH3vJ",
-    "form": "whole dried",
+    "cover_image_url": "QmXzbH3aeiyYyn5b4YSHe2kvNCQuUXtMngL91MeVjHH3vJ",
+    "forms": [
+      "whole dried"
+    ],
     "species": "Hericium erinaceus (Lion's Mane)",
     "prices": [
       {
