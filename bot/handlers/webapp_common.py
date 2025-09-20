@@ -28,6 +28,7 @@ async def handle_web_app_data(message: types.Message, state: FSMContext):
     logger.info(f"[WEBAPP] Атрибуты сообщения: {dir(message)}")
 
     try:
+        logger.info(f"[WEBAPP][DEBUG] Сырые данные WebApp: {message.web_app_data.data}")
         data = json.loads(message.web_app_data.data)
         event = data.get("event")
         wallet_address = data.get("address")
@@ -57,6 +58,7 @@ async def handle_web_app_data(message: types.Message, state: FSMContext):
         # FSM-переход для created_access
         current_state = await state.get_state()
         logger.info(f"[WEBAPP] Текущее состояние FSM: {current_state}, event: {event}")
+        logger.info(f"[WEBAPP][DEBUG] FSM данные: {await state.get_data()}")
 
         if event == "created_access" and current_state == OnboardingStates.WebAppConnecting.state:
             logger.info(f"[WEBAPP] Завершаем онбординг для user_id={user_id}")
@@ -68,7 +70,9 @@ async def handle_web_app_data(message: types.Message, state: FSMContext):
             logger.info(f"[WEBAPP] Данные из FSM: {data}")
             invite_code = data.get('invite_code')
             
+            logger.info(f"[WEBAPP][DEBUG] Начинаем активацию инвайта: {invite_code} для адреса: {wallet_address}")
             new_invite_codes = await account_service.activate_and_mint_invites(invite_code, wallet_address)
+            logger.info(f"[WEBAPP][DEBUG] Результат активации инвайта: {new_invite_codes}")
             
             if invite_code and wallet_address and new_invite_codes:
                 logger.info(f"[WEBAPP][INVITE] Инвайт {invite_code} для адреса {wallet_address} успешно активирован")
@@ -130,5 +134,7 @@ async def handle_web_app_data(message: types.Message, state: FSMContext):
             parse_mode="Markdown"
         )
     except Exception as e:
-        logger.error(f"[WEBAPP][ERROR] Ошибка при разборе web_app_data: {str(e)}")
+        logger.error(f"[WEBAPP][ERROR] Ошибка при разборе web_app_data: {str(e)}", exc_info=True)
+        logger.error(f"[WEBAPP][ERROR] Тип ошибки: {type(e).__name__}")
+        logger.error(f"[WEBAPP][ERROR] Стек ошибки: {e.__traceback__}")
         await message.answer(loc.t("onboarding.webapp_error"))
