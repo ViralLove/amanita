@@ -2058,6 +2058,9 @@ async function action888(deployerInvite, sellerAddress, catalogData = null) {
     // 5. Назначение роли SELLER_ROLE
     await grantSellerRoleToUser(contracts.spiralEngine, sellerAddress);
     
+    // 5.1. Назначение роли ACTIVATOR_ROLE для активации пользователей
+    await grantActivatorRoleToSeller(contracts.spiralEngine, sellerAddress);
+    
     // 6. Создание SBT токена в SoulIdentity
     await setupSoulIdentityFor888(contracts.soulIdentity, sellerAddress);
     
@@ -2186,7 +2189,7 @@ async function activateSellerInSpiralEngine(spiralEngine, sellerAddress, deploye
             newInviteCodes,
             0 // nonce
         ).send({
-            from: deployerAccount.address,
+            from: deployerAccount.address, // Деплоер с ролью ACTIVATOR_ROLE активирует
             gas: 5000000, // Максимальный лимит газа
             gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
         });
@@ -2220,6 +2223,34 @@ async function grantSellerRoleToUser(spiralEngine, sellerAddress) {
         console.log(`✅ Роль SELLER_ROLE назначена, tx: ${grantTx.transactionHash}`);
     } catch (error) {
         console.error(`❌ Ошибка при назначении роли SELLER_ROLE: ${error.message}`);
+        console.error(`❌ Детали ошибки:`, error);
+        throw error;
+    }
+}
+
+// Назначение роли ACTIVATOR_ROLE селлеру для активации пользователей
+async function grantActivatorRoleToSeller(spiralEngine, sellerAddress) {
+    console.log(`🔷 Назначаем роль ACTIVATOR_ROLE селлеру ${sellerAddress} для активации пользователей...`);
+    
+    // Проверяем, есть ли уже роль ACTIVATOR_ROLE
+    const ACTIVATOR_ROLE = await spiralEngine.methods.ACTIVATOR_ROLE().call();
+    const hasActivatorRole = await spiralEngine.methods.hasRole(ACTIVATOR_ROLE, sellerAddress).call();
+    
+    if (hasActivatorRole) {
+        console.log(`✅ Пользователь уже имеет роль ACTIVATOR_ROLE, пропускаем назначение`);
+        return;
+    }
+    
+    try {
+        const grantTx = await spiralEngine.methods.grantRole(ACTIVATOR_ROLE, sellerAddress).send({
+            from: deployerAccount.address,
+            gas: network === 'polygon' ? 500000 : 300000,
+            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
+        });
+        console.log(`✅ Роль ACTIVATOR_ROLE назначена селлеру, tx: ${grantTx.transactionHash}`);
+        console.log(`✅ Теперь селлер может активировать пользователей через SpiralEngine.activateUser`);
+    } catch (error) {
+        console.error(`❌ Ошибка при назначении роли ACTIVATOR_ROLE: ${error.message}`);
         console.error(`❌ Детали ошибки:`, error);
         throw error;
     }
@@ -2346,9 +2377,10 @@ node deploy_full.js 888 <deployerInvite> <sellerAddress> [catalogData]
 3. Валидация деплоер инвайта
 4. Активация селлера в SpiralEngine
 5. Назначение роли SELLER_ROLE
-6. Создание SBT токена в SoulIdentity
-7. Загрузка каталога продуктов
-8. Генерация 12 инвайтов для селлера
+6. Назначение роли ACTIVATOR_ROLE (для активации пользователей)
+7. Создание SBT токена в SoulIdentity
+8. Загрузка каталога продуктов
+9. Генерация 12 инвайтов для селлера
 
 ### Результат:
 - Селлер полностью активирован и готов к работе
