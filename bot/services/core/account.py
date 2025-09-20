@@ -64,7 +64,17 @@ class AccountService:
             bool: True если адрес является продавцом, False иначе
         """
         logger.info(f"[AccountService] Проверка прав продавца для адреса: {wallet_address}")
-        result = self.blockchain_service._call_contract_read_function("InviteNFT", "isSeller", False, wallet_address)
+        try:
+            # Получаем SELLER_ROLE хеш из SpiralEngine
+            seller_role = self.blockchain_service.get_contract("SpiralEngine").functions.SELLER_ROLE().call()
+            
+            # Проверяем роль через SpiralEngine
+            result = self.blockchain_service._call_contract_read_function(
+                "SpiralEngine", "hasRole", False, seller_role, wallet_address
+            )
+        except Exception as e:
+            logger.error(f"[AccountService] Ошибка проверки роли продавца: {e}")
+            result = False
         logger.info(f"[AccountService] Результат проверки продавца: {result}")
         return result
     
@@ -80,15 +90,13 @@ class AccountService:
         """
         logger.info(f"[AccountService][CHECK] Проверяем наличие Invite NFT у адреса: {wallet_address}")
         
-        # Проверяем количество инвайтов у пользователя
-        invite_count = self.blockchain_service._call_contract_read_function("InviteNFT", "userInviteCount", 0, wallet_address)
-        logger.info(f"[AccountService] Количество инвайтов у {wallet_address}: {invite_count}")
-        
-        if invite_count > 0:
-            logger.info(f"[AccountService] Адрес {wallet_address} владеет {invite_count} инвайтами")
-            return True
-        else:
-            logger.warning(f"[AccountService] Адрес {wallet_address} не владеет Invite NFT")
+        try:
+            # Проверяем активацию пользователя через SpiralEngine
+            is_activated = self.blockchain_service.is_user_activated(wallet_address)
+            logger.info(f"[AccountService] Пользователь {wallet_address} активирован: {is_activated}")
+            return is_activated
+        except Exception as e:
+            logger.error(f"[AccountService] Ошибка проверки активации пользователя: {e}")
             return False
     
     def is_user_activated(self, user_address: str) -> bool:
@@ -102,49 +110,15 @@ class AccountService:
             bool: True если пользователь активирован, False иначе
         """
         logger.info(f"[AccountService] Проверка активации пользователя: {user_address}")
-        result = self.blockchain_service._call_contract_read_function("InviteNFT", "isUserActivated", False, user_address)
+        try:
+            # Используем метод is_user_activated из blockchain_service
+            result = self.blockchain_service.is_user_activated(user_address)
+        except Exception as e:
+            logger.error(f"[AccountService] Ошибка проверки активации пользователя: {e}")
+            result = False
         logger.info(f"[AccountService] Пользователь {user_address} активирован: {result}")
         return result
     
-    def get_all_activated_users(self) -> List[str]:
-        """
-        Получает список всех активированных пользователей.
-        
-        Returns:
-            List[str]: Список адресов активированных пользователей
-        """
-        logger.info("[AccountService] Получение списка активированных пользователей")
-        users = self.blockchain_service._call_contract_read_function("InviteNFT", "getAllActivatedUsers", [])
-        logger.info(f"[AccountService] Найдено активированных пользователей: {len(users)}")
-        return users
-    
-    def batch_validate_invite_codes(self, invite_codes: List[str], user_address: str) -> Tuple[List[str], List[str]]:
-        """
-        Пакетная валидация инвайт-кодов для пользователя.
-        
-        Args:
-            invite_codes: Список инвайт-кодов для проверки
-            user_address: Адрес пользователя
-            
-        Returns:
-            Tuple[List[str], List[str]]: Кортеж (валидные_коды, невалидные_коды)
-        """
-        logger.info(f"[AccountService] Пакетная валидация {len(invite_codes)} кодов для {user_address}")
-        result = self.blockchain_service._call_contract_read_function("InviteNFT", "batchValidateInviteCodes", ([], []), invite_codes, user_address)
-        success_array, reasons_array = result
-        
-        # Преобразуем результат в нужный формат
-        valid_codes = []
-        invalid_codes = []
-        
-        for i, (code, is_valid) in enumerate(zip(invite_codes, success_array)):
-            if is_valid:
-                valid_codes.append(code)
-            else:
-                invalid_codes.append(code)
-        
-        logger.info(f"[AccountService] Валидных кодов: {len(valid_codes)}, невалидных: {len(invalid_codes)}")
-        return valid_codes, invalid_codes
     
     async def activate_and_mint_invites(self, invite_code: str, wallet_address: str) -> List[str]:
         """
@@ -159,64 +133,53 @@ class AccountService:
         """
         logger.info(f"[AccountService] Активация инвайта {invite_code} для {wallet_address}")
         
-        # Генерируем 12 новых кодов в формате AMANITA-XXXX-YYYY
-        def generate_random_code():
-            import random
-            chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+        try:
+            # Генерируем ровно 12 уникальных инвайт-кодов для спиральной системы
+            new_invite_codes = self._generate_spiral_invite_codes(12)
+            logger.info(f"[AccountService] Сгенерированы {len(new_invite_codes)} новых спиральных инвайт-кодов")
+
+            # Всегда берем приватный ключ напрямую из окружения
+            seller_private_key = os.getenv("SELLER_PRIVATE_KEY")
+            if not seller_private_key:
+                raise ValueError("SELLER_PRIVATE_KEY не установлен в .env")
+            
+            # Активируем пользователя через SpiralEngine
+            result = await self.blockchain_service.activate_invite(
+                invite_code, 
+                wallet_address, 
+                new_invite_codes, 
+                0,  # expiry
+                seller_private_key
+            )
+            
+            if result.get("success"):
+                logger.info(f"[AccountService] Пользователь {wallet_address} активирован с {len(new_invite_codes)} новыми кодами")
+                return new_invite_codes
+            else:
+                raise Exception(f"Ошибка активации: {result.get('reason', 'Unknown error')}")
+                
+        except Exception as e:
+            logger.error(f"[AccountService] Ошибка активации пользователя: {e}")
+            raise
+
+    def _generate_spiral_invite_codes(self, count: int = 12) -> List[str]:
+        """Генерация уникальных инвайт-кодов для спиральной системы"""
+        import random
+        import string
+        
+        codes = set()
+        chars = string.ascii_uppercase + string.digits
+        
+        while len(codes) < count:
+            # Генерируем код в формате SPIRAL-XXXX-XXXX
             first_part = ''.join(random.choice(chars) for _ in range(4))
             second_part = ''.join(random.choice(chars) for _ in range(4))
-            return f"AMANITA-{first_part}-{second_part}"
-
-        new_invite_codes = [generate_random_code() for _ in range(12)]
-        logger.info(f"[AccountService] Сгенерированы новые инвайт-коды: {new_invite_codes}")
-
-        # Всегда берем приватный ключ напрямую из окружения
-        seller_private_key = os.getenv("SELLER_PRIVATE_KEY")
-        if not seller_private_key:
-            raise ValueError("SELLER_PRIVATE_KEY не установлен в .env")
-        
-        # Получаем контракт и функцию для оценки газа
-        contract = self.blockchain_service.get_contract("InviteNFT")
-        contract_function = getattr(contract.functions, "activateAndMintInvites")
-        
-        estimate_gas = await self.blockchain_service.estimate_gas_with_multiplier(
-            contract_function,
-            invite_code,
-            wallet_address,
-            new_invite_codes,
-            0  # expiry - добавляем 4-й аргумент
-        )
-
-        logger.info(f"[AccountService] Оценка газа: {estimate_gas}")
-        
-        # Увеличиваем лимит газа для сложных транзакций
-        gas_limit = max(estimate_gas, 10000000)  # 10M газа
-        logger.info(f"[AccountService] Используемый лимит газа: {gas_limit}")
+            code = f"SPIRAL-{first_part}-{second_part}"
             
-        tx_hash = await self.blockchain_service.transact_contract_function(
-            "InviteNFT",
-            "activateAndMintInvites",
-            seller_private_key,
-            invite_code,
-            wallet_address,
-            new_invite_codes,
-            0,
-            gas=gas_limit
-        )
-        logger.info(f"[AccountService] Транзакция отправлена: {tx_hash}")
+            # Проверяем уникальность
+            if code not in codes:
+                codes.add(code)
         
-        # Проверяем результат транзакции
-        if not tx_hash:
-            raise Exception("Транзакция не была отправлена или завершилась с ошибкой")
-        
-        # Ждем подтверждения транзакции
-        receipt = self.blockchain_service.web3.eth.wait_for_transaction_receipt(tx_hash)
-        logger.info(f"[AccountService] Транзакция выполнена: gasUsed={receipt['gasUsed']}, status={receipt['status']}")
-        
-        # Проверяем статус транзакции
-        if receipt['status'] != 1:
-            raise Exception(f"Транзакция завершилась с ошибкой. Status: {receipt['status']}")
-            
-        logger.info(f"[AccountService][INVITE] Успешно активирован инвайт и выданы новые для {wallet_address}")
-
-        return new_invite_codes
+        result = list(codes)
+        logger.info(f"[AccountService] Сгенерировано {count} уникальных инвайт-кодов для спиральной системы")
+        return result

@@ -59,6 +59,15 @@ def mock_blockchain_service(monkeypatch):
             # Ссылка на storage service для синхронизации
             self.storage_service = None
             
+            # Состояние для SpiralEngine
+            self.spiral_engine_state = {
+                "invite_codes": {},
+                "user_activations": {},
+                "user_roles": {},
+                "circle_members": {},
+                "violations": {}
+            }
+            
             # 🔧 ИЗОЛЯЦИЯ: Сбрасываем состояние при каждом создании фикстуры
             self._reset_state()
         
@@ -68,6 +77,15 @@ def mock_blockchain_service(monkeypatch):
             self._next_blockchain_id = 1
             self.product_statuses.clear()
             self.product_cids.clear()
+            
+            # Сброс состояния SpiralEngine
+            self.spiral_engine_state = {
+                "invite_codes": {},
+                "user_activations": {},
+                "user_roles": {},
+                "circle_members": {},
+                "violations": {}
+            }
             
             # 🔧 ИСПРАВЛЕНИЕ: Инициализируем тестовые данные с корректными статусами
             self._initialize_test_data()
@@ -86,9 +104,69 @@ def mock_blockchain_service(monkeypatch):
                 self.product_statuses[i] = False  # 🔧 ИСПРАВЛЕНИЕ: Все продукты неактивны по умолчанию
                 # НЕ создаем тестовые CID - они будут созданы через create_product
             
+            # 🆕 Инициализация тестовых данных для SpiralEngine
+            self._initialize_spiral_engine_test_data()
+            
             logger.info(f"🔧 [MockBlockchainService] Инициализированы тестовые данные: {len(self.product_statuses)} продуктов")
             logger.info(f"   - product_statuses: {self.product_statuses}")
             logger.info(f"   - product_cids: {self.product_cids}")
+            logger.info(f"   - spiral_engine_state: {self.spiral_engine_state}")
+        
+        def _initialize_spiral_engine_test_data(self):
+            """Инициализация тестовых данных для SpiralEngine"""
+            # Тестовые адреса
+            test_seller_address = "0x1234567890abcdef1234567890abcdef12345678"
+            test_user_address = "0x0987654321098765432109876543210987654321"
+            test_activator_address = "0x1111111111111111111111111111111111111111"
+            
+            # Хеши ролей (соответствуют реальным хешам из SpiralEngine)
+            seller_role_hash = "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6"
+            activator_role_hash = "0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a"
+            
+            # Инициализируем состояние SpiralEngine
+            self.spiral_engine_state.update({
+                # Тестовые инвайт-коды
+                "invite_codes": {
+                    "SPIRAL-TEST-CODE1": 1,
+                    "SPIRAL-TEST-CODE2": 2,
+                    "SPIRAL-EXIST-CODE": 3
+                },
+                
+                # Активации пользователей
+                "user_activations": {
+                    test_user_address: 1,  # Пользователь активирован через инвайт с ID 1
+                    "0x2222222222222222222222222222222222222222": 2  # Другой активированный пользователь
+                },
+                
+                # Роли пользователей
+                "user_roles": {
+                    test_seller_address: {
+                        seller_role_hash: True,
+                        activator_role_hash: False
+                    },
+                    test_activator_address: {
+                        seller_role_hash: False,
+                        activator_role_hash: True
+                    }
+                },
+                
+                # Члены кругов (спиральная иерархия)
+                "circle_members": {
+                    test_activator_address: [
+                        test_user_address,
+                        "0x2222222222222222222222222222222222222222"
+                    ],
+                    test_user_address: []  # Пользователь пока не активировал никого
+                },
+                
+                # Нарушения
+                "violations": {
+                    test_user_address: 0,
+                    "0x2222222222222222222222222222222222222222": 1
+                }
+            })
+            
+            logger.info("🆕 [MockBlockchainService] Инициализированы тестовые данные SpiralEngine")
         
         def _generate_next_blockchain_id(self):
             """Генерирует следующий уникальный blockchain ID"""
@@ -244,20 +322,24 @@ def mock_blockchain_service(monkeypatch):
             logger.info("🧹 [MockBlockchainService] Состояние очищено, счетчик ID сброшен")
         
         # 🔧 НОВОЕ: Поддержка InviteNFT методов для AccountService
-        def _call_contract_read_function(self, contract_address, function_name, *args):
+        def _call_contract_read_function(self, contract_name, function_name, default_value, *args):
             """Универсальный метод для вызова read функций контрактов"""
             logger.info(f"🔍 [MockBlockchainService] _call_contract_read_function: {function_name} с аргументами {args}")
             
-            # Определяем тип контракта по адресу или функции
+            # Поддержка SpiralEngine функций
+            if contract_name == "SpiralEngine":
+                return self._call_spiral_engine_function(function_name, default_value, *args)
+            
+            # Определяем тип контракта по функции (старая логика для обратной совместимости)
             if function_name in ["isSeller", "userInviteCount", "isUserActivated", "getAllActivatedUsers", 
                                "batchValidateInviteCodes", "getTokenIdByInviteCode", "getInviteCodeByTokenId",
                                "isInviteTokenUsed", "getInviteCreatedAt", "getInviteExpiry", 
                                "getInviteMinter", "getInviteFirstOwner", "validateInviteCode"]:
                 return self._call_invite_nft_function(function_name, *args)
             else:
-                # Для других функций возвращаем None (не поддерживаются в этом моке)
+                # Для других функций возвращаем default_value
                 logger.warning(f"⚠️ [MockBlockchainService] Функция {function_name} не поддерживается")
-                return None
+                return default_value
         
         def _call_invite_nft_function(self, function_name, *args):
             """Вызов функций InviteNFT контракта"""
@@ -272,12 +354,6 @@ def mock_blockchain_service(monkeypatch):
             elif function_name == "isUserActivated":
                 user_address = args[0] if args else "0x0000000000000000000000000000000000000000"
                 return self._is_user_activated(user_address)
-            elif function_name == "getAllActivatedUsers":
-                return self._get_all_activated_users()
-            elif function_name == "batchValidateInviteCodes":
-                invite_codes = args[0] if args else []
-                user_address = args[1] if len(args) > 1 else "0x0000000000000000000000000000000000000000"
-                return self._batch_validate_invite_codes(invite_codes, user_address)
             elif function_name == "getTokenIdByInviteCode":
                 invite_code = args[0] if args else ""
                 return self._get_token_id_by_invite_code(invite_code)
@@ -318,34 +394,6 @@ def mock_blockchain_service(monkeypatch):
             """Проверка активации пользователя"""
             return self._get_invite_nft_test_data()["activated_users"].get(user_address, 0) != 0
         
-        def _get_all_activated_users(self):
-            """Получение всех активированных пользователей"""
-            activated = self._get_invite_nft_test_data()["activated_users"]
-            return [addr for addr, status in activated.items() if status != 0]
-        
-        def _batch_validate_invite_codes(self, invite_codes, user_address):
-            """Пакетная валидация инвайт кодов"""
-            success_array = []
-            reasons_array = []
-            invite_data = self._get_invite_nft_test_data()["invite_codes"]
-            
-            for code in invite_codes:
-                if code in invite_data:
-                    invite_info = invite_data[code]
-                    if invite_info["used"]:
-                        success_array.append(False)
-                        reasons_array.append("already_used")
-                    elif invite_info["expiry"] != 0 and invite_info["expiry"] < time.time():
-                        success_array.append(False)
-                        reasons_array.append("expired")
-                    else:
-                        success_array.append(True)
-                        reasons_array.append("")
-                else:
-                    success_array.append(False)
-                    reasons_array.append("not_found")
-            
-            return success_array, reasons_array
         
         def _get_token_id_by_invite_code(self, invite_code):
             """Получение token ID по инвайт коду"""
@@ -436,6 +484,114 @@ def mock_blockchain_service(monkeypatch):
                     }
                 }
             return self._invite_nft_data
+        
+        def _call_spiral_engine_function(self, function_name, default_value, *args):
+            """Вызов функций SpiralEngine в моке"""
+            logger.info(f"🔍 [MockBlockchainService] SpiralEngine функция: {function_name} с аргументами {args}")
+            
+            if function_name == "inviteCodeExists":
+                invite_code = args[0] if args else ""
+                return invite_code in self.spiral_engine_state["invite_codes"]
+            
+            elif function_name == "inviteCodeToTokenId":
+                invite_code = args[0] if args else ""
+                return self.spiral_engine_state["invite_codes"].get(invite_code, 0)
+            
+            elif function_name == "isInviteUsed":
+                token_id = args[0] if args else 0
+                return token_id in [v for v in self.spiral_engine_state["user_activations"].values()]
+            
+            elif function_name == "usedInviteByUser":
+                user_address = args[0] if args else ""
+                return self.spiral_engine_state["user_activations"].get(user_address, 0)
+            
+            elif function_name == "hasRole":
+                role_hash = args[0] if len(args) > 0 else ""
+                user_address = args[1] if len(args) > 1 else ""
+                return self.spiral_engine_state["user_roles"].get(user_address, {}).get(role_hash, False)
+            
+            elif function_name == "getCircleSize":
+                activator_address = args[0] if args else ""
+                return len(self.spiral_engine_state["circle_members"].get(activator_address, []))
+            
+            elif function_name == "getCircleMembers":
+                activator_address = args[0] if args else ""
+                return self.spiral_engine_state["circle_members"].get(activator_address, [])
+            
+            elif function_name == "userInvites":
+                user_address = args[0] if args else ""
+                return self.spiral_engine_state["circle_members"].get(user_address, [])
+            
+            elif function_name == "violationCount":
+                user_address = args[0] if args else ""
+                return self.spiral_engine_state["violations"].get(user_address, 0)
+            
+            # Fallback
+            return default_value
+        
+        def get_contract(self, contract_name):
+            """Получение контракта для тестирования"""
+            if contract_name == "SpiralEngine":
+                # Возвращаем мок контракта с методами ролей
+                class MockSpiralEngineContract:
+                    class functions:
+                        @staticmethod
+                        def SELLER_ROLE():
+                            class MockRole:
+                                def call(self):
+                                    return "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6"  # SELLER_ROLE hash
+                            return MockRole()
+                        
+                        @staticmethod
+                        def ACTIVATOR_ROLE():
+                            class MockRole:
+                                def call(self):
+                                    return "0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a"  # ACTIVATOR_ROLE hash
+                            return MockRole()
+                
+                return MockSpiralEngineContract()
+            
+            return None
+        
+        # 🆕 Методы для AccountService тестов
+        async def activate_invite(self, invite_code, user_address, new_invite_codes, expiry, private_key):
+            """Мок активации инвайта через SpiralEngine"""
+            logger.info(f"🔍 [MockBlockchainService] activate_invite: {invite_code} -> {user_address}")
+            
+            if invite_code not in self.spiral_engine_state["invite_codes"]:
+                return {"success": False, "reason": "Invite code not found"}
+            
+            if user_address in self.spiral_engine_state["user_activations"]:
+                return {"success": False, "reason": "User already activated"}
+            
+            # Активируем пользователя
+            token_id = self.spiral_engine_state["invite_codes"][invite_code]
+            self.spiral_engine_state["user_activations"][user_address] = token_id
+            
+            # Добавляем новые инвайт-коды
+            next_token_id = max(self.spiral_engine_state["invite_codes"].values()) + 1
+            for code in new_invite_codes:
+                self.spiral_engine_state["invite_codes"][code] = next_token_id
+                next_token_id += 1
+            
+            return {"success": True, "tx_hash": "0xmocked_tx_hash"}
+        
+        def is_user_activated(self, user_address):
+            """Мок проверки активации пользователя"""
+            return self.spiral_engine_state["user_activations"].get(user_address, 0) > 0
+        
+        def validate_invite_code(self, invite_code):
+            """Мок валидации инвайт-кода"""
+            if invite_code not in self.spiral_engine_state["invite_codes"]:
+                return {"success": False, "message": "Invite code not found"}
+            
+            token_id = self.spiral_engine_state["invite_codes"][invite_code]
+            is_used = token_id in self.spiral_engine_state["user_activations"].values()
+            
+            if is_used:
+                return {"success": False, "message": "Invite code already used"}
+            
+            return {"success": True, "token_id": token_id, "invite_code": invite_code}
     
     # Подменяем BlockchainService на мок
     monkeypatch.setattr(blockchain, "BlockchainService", MockBlockchainService)
@@ -574,21 +730,6 @@ def mock_account_service():
             """Проверка активации пользователя"""
             return self.test_activated_users.get(user_address, False)
         
-        async def get_all_activated_users(self) -> list:
-            """Получение всех активированных пользователей"""
-            return [addr for addr, activated in self.test_activated_users.items() if activated]
-        
-        async def batch_validate_invite_codes(self, invite_codes: list, user_address: str) -> tuple:
-            """Пакетная валидация инвайт кодов"""
-            success_array = []
-            reasons_array = []
-            
-            for code in invite_codes:
-                is_valid = await self.validate_invite_code(code, user_address)
-                success_array.append(is_valid)
-                reasons_array.append("" if is_valid else "invalid_or_used")
-            
-            return success_array, reasons_array
         
         async def activate_and_mint_invites(self, invite_codes: list, user_address: str) -> bool:
             """Активация и минт инвайтов"""
@@ -1690,7 +1831,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 metadata_cid = await self.storage_service.upload_json(metadata)
                 if not metadata_cid:
                     return {
-                        "id": product_id,
+                        "business_id": business_id,
                         "status": "error",
                         "error": "Ошибка загрузки метаданных в IPFS"
                     }
@@ -1699,7 +1840,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                 tx_hash = await self.blockchain_service.create_product(metadata_cid)
                 if not tx_hash:
                     return {
-                        "id": product_id,
+                        "business_id": business_id,
                         "metadata_cid": metadata_cid,
                         "status": "error",
                         "error": "Ошибка записи в блокчейн"

@@ -241,7 +241,7 @@ class BlockchainService:
             contracts = {}
             
             # Получаем список всех контрактов из реестра
-            contract_names = ["InviteNFT", "ProductRegistry"]  # TODO: получать динамически из реестра
+            contract_names = ["SpiralEngine", "ProductRegistry", "SoulIdentity"]
             
             for name in contract_names:
                 try:
@@ -390,17 +390,70 @@ class BlockchainService:
             return None
 
     def validate_invite_code(self, invite_code: str) -> dict:
-        """Валидация инвайт-кода через контракт InviteNFT (web3 call)"""
-        result = self._call_contract_read_function("InviteNFT", "validateInviteCode", (False, "contract_not_found"), invite_code)
-        success, reason = result[0], result[1]
-        return {"success": success, "reason": reason}
+        """Валидация инвайт-кода через контракт SpiralEngine (web3 call)"""
+        logger.info(f"[BlockchainService] Валидация инвайт-кода: {invite_code}")
+        
+        try:
+            # Проверяем существование кода в SpiralEngine
+            exists = self._call_contract_read_function(
+                "SpiralEngine", "inviteCodeExists", False, invite_code
+            )
+            
+            if not exists:
+                return {"success": False, "reason": "Invite code not found"}
+            
+            # Получаем token ID
+            token_id = self._call_contract_read_function(
+                "SpiralEngine", "inviteCodeToTokenId", 0, invite_code
+            )
+            
+            # Проверяем, использован ли код
+            is_used = self._call_contract_read_function(
+                "SpiralEngine", "isInviteUsed", False, token_id
+            )
+            
+            if is_used:
+                return {"success": False, "reason": "Invite code already used"}
+            
+            return {"success": True, "token_id": token_id, "invite_code": invite_code}
+            
+        except Exception as e:
+            logger.error(f"[BlockchainService] Ошибка валидации инвайт-кода: {e}")
+            return {"success": False, "reason": str(e)}
 
-    def activate_invite(self, invite_code: str, user_address: str) -> dict:
-        """Активация инвайта"""
-        result = self._call_contract_read_function("InviteNFT", "activateInvite", None, invite_code, user_address)
-        if result is None:
-            return {"success": False, "reason": "contract_not_found"}
-        return {"success": True, "reason": "success"}
+    async def activate_invite(self, invite_code: str, user_address: str, new_invite_codes: List[str] = None, expiry: int = 0, private_key: str = None) -> dict:
+        """Активация инвайта через SpiralEngine"""
+        logger.info(f"[BlockchainService] Активация инвайта {invite_code} для пользователя {user_address}")
+        
+        try:
+            # Для SpiralEngine требуется транзакция, а не read функция
+            if not private_key:
+                return {"success": False, "reason": "Private key required for activation"}
+            
+            # Проверяем что передано ровно 12 новых кодов (требование SpiralEngine)
+            if not new_invite_codes or len(new_invite_codes) != 12:
+                return {"success": False, "reason": "SpiralEngine требует ровно 12 новых инвайт-кодов"}
+            
+            # Активируем пользователя через SpiralEngine
+            tx_hash = await self.transact_contract_function(
+                "SpiralEngine",
+                "activateUser",
+                private_key,
+                invite_code,
+                user_address,
+                new_invite_codes,
+                expiry
+            )
+            
+            if tx_hash:
+                logger.info(f"[BlockchainService] Пользователь {user_address} активирован, tx: {tx_hash}")
+                return {"success": True, "tx_hash": tx_hash}
+            else:
+                return {"success": False, "reason": "Ошибка активации пользователя"}
+                
+        except Exception as e:
+            logger.error(f"[BlockchainService] Ошибка активации инвайта: {e}")
+            return {"success": False, "reason": str(e)}
 
     def get_tx_status(self, tx_hash: str) -> str:
         """Получение статуса транзакции (заглушка)"""
@@ -408,31 +461,136 @@ class BlockchainService:
         return "confirmed" 
 
     def get_token_id_by_invite_code(self, invite_code: str) -> int:
-        return self._call_contract_read_function("InviteNFT", "getTokenIdByInviteCode", None, invite_code)
+        """Получение token ID по инвайт-коду через SpiralEngine"""
+        return self._call_contract_read_function("SpiralEngine", "inviteCodeToTokenId", 0, invite_code)
 
     def get_invite_code_by_token_id(self, token_id: int) -> str:
-        return self._call_contract_read_function("InviteNFT", "getInviteCodeByTokenId", None, token_id)
+        """Получение инвайт-кода по token ID через SpiralEngine"""
+        # SpiralEngine не имеет прямого метода для этого, возвращаем None
+        return None
 
     def get_invite_transfer_history(self, token_id: int) -> list:
-        return self._call_contract_read_function("InviteNFT", "getInviteTransferHistory", [], token_id)
+        """История передачи токена (Soulbound токены не передаются)"""
+        # SpiralEngine использует Soulbound токены, которые не передаются
+        return []
 
     def get_user_invites(self, user_address: str) -> list:
-        return self._call_contract_read_function("InviteNFT", "getUserInvites", [], user_address)
+        """Получение инвайтов пользователя через SpiralEngine"""
+        logger.info(f"[BlockchainService] Получение инвайтов пользователя: {user_address}")
+        
+        try:
+            # Получаем инвайты пользователя из SpiralEngine
+            invites = self._call_contract_read_function(
+                "SpiralEngine", "userInvites", [], user_address
+            )
+            
+            result = []
+            for invite_code in invites:
+                token_id = self._call_contract_read_function(
+                    "SpiralEngine", "inviteCodeToTokenId", 0, invite_code
+                )
+                
+                is_used = self._call_contract_read_function(
+                    "SpiralEngine", "isInviteUsed", False, token_id
+                )
+                
+                result.append({
+                    "invite_code": invite_code,
+                    "token_id": token_id,
+                    "is_used": is_used
+                })
+            
+            logger.info(f"[BlockchainService] Найдено {len(result)} инвайтов для пользователя {user_address}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"[BlockchainService] Ошибка получения инвайтов пользователя: {e}")
+            return []
 
     def is_invite_token_used(self, token_id: int) -> bool:
-        return self._call_contract_read_function("InviteNFT", "isInviteTokenUsed", False, token_id)
+        """Проверка использования токена через SpiralEngine"""
+        return self._call_contract_read_function("SpiralEngine", "isInviteUsed", False, token_id)
 
     def get_invite_created_at(self, token_id: int) -> int:
-        return self._call_contract_read_function("InviteNFT", "getInviteCreatedAt", 0, token_id)
+        """Получение времени создания токена (SpiralEngine не поддерживает)"""
+        return 0
 
     def get_invite_expiry(self, token_id: int) -> int:
-        return self._call_contract_read_function("InviteNFT", "getInviteExpiry", 0, token_id)
+        """Получение времени истечения токена (SpiralEngine не поддерживает)"""
+        return 0
 
     def get_invite_minter(self, token_id: int) -> str:
-        return self._call_contract_read_function("InviteNFT", "getInviteMinter", None, token_id)
+        """Получение минтера токена (SpiralEngine не поддерживает)"""
+        return None
 
     def get_invite_first_owner(self, token_id: int) -> str:
-        return self._call_contract_read_function("InviteNFT", "getInviteFirstOwner", None, token_id)
+        """Получение первого владельца токена (SpiralEngine использует Soulbound)"""
+        return None
+    
+    def is_user_activated(self, user_address: str) -> bool:
+        """Проверка активации пользователя через SpiralEngine"""
+        logger.info(f"[BlockchainService] Проверка активации пользователя: {user_address}")
+        
+        try:
+            # Проверяем использованный инвайт пользователя
+            used_invite = self._call_contract_read_function(
+                "SpiralEngine", "usedInviteByUser", 0, user_address
+            )
+            
+            is_activated = used_invite > 0
+            logger.info(f"[BlockchainService] Пользователь {user_address} активирован: {is_activated}")
+            return is_activated
+            
+        except Exception as e:
+            logger.error(f"[BlockchainService] Ошибка проверки активации пользователя: {e}")
+            return False
+    
+    async def mint_invite(self, invite_code: str, token_id: int, private_key: str) -> str:
+        """Минт инвайта через SpiralEngine"""
+        logger.info(f"[BlockchainService] Минт инвайта {invite_code} с token_id {token_id}")
+        
+        try:
+            # Минтим инвайт через SpiralEngine
+            tx_hash = await self.transact_contract_function(
+                "SpiralEngine",
+                "mintInvite",
+                private_key,
+                invite_code,
+                token_id
+            )
+            
+            if tx_hash:
+                logger.info(f"[BlockchainService] Инвайт {invite_code} заминчен, tx: {tx_hash}")
+                return tx_hash
+            else:
+                raise Exception("Ошибка минта инвайта")
+                
+        except Exception as e:
+            logger.error(f"[BlockchainService] Ошибка минта инвайта: {e}")
+            raise
+    
+    async def grant_seller_role(self, user_address: str, private_key: str) -> str:
+        """Назначение роли продавца через SpiralEngine"""
+        logger.info(f"[BlockchainService] Назначение роли продавца пользователю: {user_address}")
+        
+        try:
+            # Назначаем роль продавца через SpiralEngine
+            tx_hash = await self.transact_contract_function(
+                "SpiralEngine",
+                "grantSellerRole",
+                private_key,
+                user_address
+            )
+            
+            if tx_hash:
+                logger.info(f"[BlockchainService] Роль продавца назначена пользователю {user_address}, tx: {tx_hash}")
+                return tx_hash
+            else:
+                raise Exception("Ошибка назначения роли продавца")
+                
+        except Exception as e:
+            logger.error(f"[BlockchainService] Ошибка назначения роли продавца: {e}")
+            raise
 
     # Методы для работы с продуктами
     def get_catalog_version(self) -> int:

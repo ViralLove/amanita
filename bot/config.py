@@ -88,5 +88,23 @@ if not AMANITA_REGISTRY_CONTRACT_ADDRESS:
 
 # Настройки путей
 # Корневая папка приложения (bot для локальной разработки, app для продакшена)
-APP_ROOT_DIR = os.getenv("APP_ROOT_DIR", "bot")
-ABI_BASE_DIR = os.getenv("ABI_BASE_DIR", f"{APP_ROOT_DIR}/artifacts/contracts") 
+APP_ROOT_DIR = os.getenv("APP_ROOT_DIR", "app")
+
+# Параметризация по среде выполнения
+ENVIRONMENT = os.getenv("ENVIRONMENT", "local")  # local | prod
+
+if ENVIRONMENT == "local":
+    # Для локальной разработки - используем корневую папку artifacts
+    # Определяем правильный путь относительно корня проекта
+    current_dir = os.path.dirname(os.path.abspath(__file__))  # bot/
+    project_root = os.path.dirname(current_dir)  # корень проекта
+    ABI_BASE_DIR = os.getenv("ABI_BASE_DIR", os.path.join(project_root, "artifacts", "contracts"))
+    logging.info(f"[CONFIG] ENVIRONMENT: local")
+    logging.info(f"[CONFIG] current_dir (bot/): {current_dir}")
+    logging.info(f"[CONFIG] project_root: {project_root}")
+    logging.info(f"[CONFIG] ABI_BASE_DIR: {ABI_BASE_DIR}")
+else:
+    # Для продакшена - используем папку app/artifacts
+    ABI_BASE_DIR = os.getenv("ABI_BASE_DIR", f"{APP_ROOT_DIR}/artifacts/contracts")
+    logging.info(f"[CONFIG] ENVIRONMENT: prod")
+    logging.info(f"[CONFIG] ABI_BASE_DIR: {ABI_BASE_DIR}") 
