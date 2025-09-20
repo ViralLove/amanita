@@ -1,0 +1,57 @@
+# Исключения для Docker build
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Тестовые файлы
+tests/
+*.test.js
+*.spec.js
+
+# Документация
+docs/
+README.md
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log
+logs/
+
+# Временные файлы
+tmp/
+temp/
+*.tmp
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Railway
+railway.json
+railway.toml
+
+# Локальные настройки
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Кэш
+.cache/
+.parcel-cache/

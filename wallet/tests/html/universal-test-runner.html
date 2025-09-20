@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Универсальный тестовый раннер</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            min-height: 100vh;
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn:hover { opacity: 0.8; }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.running { background: #fff3cd; color: #856404; }
+        .summary {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s ease;
+        }
+        .tests-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .test-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 5px solid #ddd;
+        }
+        .test-card.passed { border-left-color: #28a745; }
+        .test-card.failed { border-left-color: #dc3545; }
+        .test-card.running { border-left-color: #ffc107; }
+        .test-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .test-title h3 {
+            margin: 0;
+            font-size: 16px;
+        }
+        .test-status {
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .test-status.pending { background: #e9ecef; color: #6c757d; }
+        .test-status.running { background: #fff3cd; color: #856404; }
+        .test-status.passed { background: #d4edda; color: #155724; }
+        .test-status.failed { background: #f8d7da; color: #721c24; }
+        .test-description {
+            color: #6c757d;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .test-log {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 100px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .test-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .test-actions .btn {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Универсальный тестовый раннер</h1>
+            <p>Масштабируемое решение для тестирования через браузер</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" onclick="runAllTests()">🚀 Запустить все тесты</button>
+            <button class="btn btn-info" onclick="runIndividualTests()">🔍 Запустить по одному</button>
+            <button class="btn btn-danger" onclick="clearResults()">🗑️ Очистить результаты</button>
+            <button class="btn btn-success" onclick="exportResults()">📄 Экспорт результатов</button>
+        </div>
+
+        <div id="status" class="status info">Готов к тестированию</div>
+
+        <div class="summary">
+            <h3>📊 Сводка результатов</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            <div id="summaryText">Ожидание запуска тестов...</div>
+        </div>
+
+        <div class="tests-grid" id="testsGrid">
+            <!-- Тесты будут добавлены динамически -->
+        </div>
+    </div>
+
+    <!-- Подключаем main.js для криптографических функций -->
+    <script src="../../main.js?v=8" onload="console.log('✅ main.js загружен')" onerror="console.error('❌ Ошибка загрузки main.js')"></script>
+    
+    <!-- Подключаем тесты -->
+    <script src="../crypto-tests.js?v=8" onload="console.log('✅ crypto-tests.js загружен')" onerror="console.error('❌ Ошибка загрузки crypto-tests.js')"></script>
+
+    <script>
+        // Универсальные тесты - можно легко добавлять новые
+        const allTests = [
+            {
+                id: 'test_generateSalt',
+                name: 'test_generateSalt',
+                title: 'Генерация криптографически стойкой соли',
+                description: 'Проверка генерации 16-байтной криптографически стойкой соли',
+                category: 'Криптографические утилиты'
+            },
+            {
+                id: 'test_generateIV',
+                name: 'test_generateIV',
+                title: 'Генерация вектора инициализации',
+                description: 'Проверка генерации 12-байтного случайного IV',
+                category: 'Криптографические утилиты'
+            },
+            {
+                id: 'test_encryptWithAES',
+                name: 'test_encryptWithAES',
+                title: 'AES-GCM шифрование',
+                description: 'Проверка AES-GCM шифрования с PBKDF2',
+                category: 'Криптографические утилиты'
+            },
+            {
+                id: 'test_decryptWithAES',
+                name: 'test_decryptWithAES',
+                title: 'AES-GCM расшифровка',
+                description: 'Проверка AES-GCM расшифровки с проверкой целостности',
+                category: 'Криптографические утилиты'
+            },
+            {
+                id: 'test_encrypt_decrypt_roundtrip',
+                name: 'test_encrypt_decrypt_roundtrip',
+                title: 'Полный цикл шифрование→расшифровка',
+                description: 'Проверка идентичности данных после полного цикла',
+                category: 'Криптографические утилиты'
+            },
+            {
+                id: 'test_wrong_pin_rejection',
+                name: 'test_wrong_pin_rejection',
+                title: 'Отклонение неверного PIN',
+                description: 'Проверка отклонения неверного PIN при расшифровке',
+                category: 'Безопасность PIN-кода'
+            },
+            {
+                id: 'test_pin_brute_force_protection',
+                name: 'test_pin_brute_force_protection',
+                title: 'Защита от брутфорса',
+                description: 'Проверка защиты от брутфорса (время выполнения)',
+                category: 'Безопасность PIN-кода'
+            },
+            {
+                id: 'test_pin_length_validation',
+                name: 'test_pin_length_validation',
+                title: 'Валидация длины PIN',
+                description: 'Проверка валидации длины PIN (5 цифр)',
+                category: 'Безопасность PIN-кода'
+            },
+            {
+                id: 'test_saveWalletWithPin_aes_gcm',
+                name: 'test_saveWalletWithPin_aes_gcm',
+                title: 'Сохранение кошелька с AES-GCM',
+                description: 'Проверка сохранения кошелька с AES-GCM шифрованием',
+                category: 'Интеграция с основными функциями'
+            },
+            {
+                id: 'test_processPinEntry_unlock_aes_gcm',
+                name: 'test_processPinEntry_unlock_aes_gcm',
+                title: 'Разблокировка с AES-GCM',
+                description: 'Проверка разблокировки с AES-GCM расшифровкой',
+                category: 'Интеграция с основными функциями'
+            },
+            {
+                id: 'test_handleSignTransaction_aes_gcm',
+                name: 'test_handleSignTransaction_aes_gcm',
+                title: 'Подписание транзакций с AES-GCM',
+                description: 'Проверка подписания транзакций с AES-GCM',
+                category: 'Интеграция с основными функциями'
+            }
+        ];
+
+        let testResults = {};
+        let testLogs = {};
+        let isRunning = false;
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            console.log(`STATUS: ${message}`);
+        }
+
+        function createTestCard(test) {
+            return `
+                <div class="test-card" id="card-${test.id}">
+                    <div class="test-title">
+                        <h3>${test.title}</h3>
+                        <span class="test-status pending" id="status-${test.id}">Ожидание</span>
+                    </div>
+                    <div class="test-description">${test.description}</div>
+                    <div class="test-log" id="log-${test.id}">Ожидание выполнения...</div>
+                    <div class="test-actions" id="actions-${test.id}" style="display: none;">
+                        <button class="btn btn-info" onclick="downloadTestLog('${test.id}')">📄 Скачать лог</button>
+                        <button class="btn btn-info" onclick="showDetailedLog('${test.id}')">🔍 Детальный лог</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateTestStatus(testId, status, message = '') {
+            const card = document.getElementById(`card-${testId}`);
+            const statusEl = document.getElementById(`status-${testId}`);
+            const logEl = document.getElementById(`log-${testId}`);
+            const actionsEl = document.getElementById(`actions-${testId}`);
+            
+            if (statusEl) statusEl.textContent = status;
+            if (statusEl) statusEl.className = `test-status ${status}`;
+            if (card) card.className = `test-card ${status}`;
+            
+            if (message && logEl) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] ${message}`;
+                logEl.innerHTML += `<div>${logEntry}</div>`;
+                logEl.scrollTop = logEl.scrollHeight;
+                
+                if (!testLogs[testId]) testLogs[testId] = [];
+                testLogs[testId].push(logEntry);
+            }
+            
+            if ((status === 'passed' || status === 'failed') && actionsEl) {
+                actionsEl.style.display = 'flex';
+            }
+        }
+
+        function updateProgress() {
+            const completed = Object.keys(testResults).length;
+            const passed = Object.values(testResults).filter(r => r === true).length;
+            const failed = Object.values(testResults).filter(r => r === false).length;
+            
+            const progress = (completed / allTests.length) * 100;
+            const progressFill = document.getElementById('progressFill');
+            if (progressFill) progressFill.style.width = `${progress}%`;
+            
+            const summaryText = document.getElementById('summaryText');
+            if (summaryText) {
+                if (completed === 0) {
+                    summaryText.textContent = 'Ожидание запуска тестов...';
+                } else if (completed < allTests.length) {
+                    summaryText.textContent = `Выполнено: ${completed}/${allTests.length} | Пройдено: ${passed} | Провалено: ${failed}`;
+                } else {
+                    summaryText.innerHTML = `
+                        <strong>Завершено: ${completed}/${allTests.length}</strong><br>
+                        ✅ Пройдено: ${passed}<br>
+                        ❌ Провалено: ${failed}<br>
+                        📈 Успешность: ${((passed/allTests.length)*100).toFixed(1)}%
+                    `;
+                }
+            }
+        }
+
+        function initializeTests() {
+            console.log('=== НАЧАЛО initializeTests ===');
+            
+            const grid = document.getElementById('testsGrid');
+            if (!grid) {
+                console.error('❌ Элемент testsGrid не найден!');
+                return;
+            }
+            
+            console.log('✅ testsGrid найден, очищаем...');
+            grid.innerHTML = '';
+            
+            console.log('Создаем карточки для', allTests.length, 'тестов');
+            
+            allTests.forEach((test, index) => {
+                console.log(`--- Создаем карточку ${index + 1}/${allTests.length} ---`);
+                const cardHtml = createTestCard(test);
+                grid.innerHTML += cardHtml;
+                console.log(`✅ Карточка ${test.title} добавлена в grid`);
+            });
+            
+            console.log('=== КОНЕЦ initializeTests ===');
+            console.log('grid.innerHTML длина:', grid.innerHTML.length);
+            console.log('Количество элементов в grid:', grid.children.length);
+        }
+
+        async function runAllTests() {
+            if (isRunning) return;
+            isRunning = true;
+            updateStatus('Запуск всех тестов...', 'running');
+            
+            for (const test of allTests) {
+                try {
+                    updateTestStatus(test.id, 'running', 'Выполняется...');
+                    
+                    if (typeof window[test.name] === 'function') {
+                        const result = await window[test.name]();
+                        testResults[test.id] = result;
+                        updateTestStatus(test.id, result ? 'passed' : 'failed', 
+                            result ? 'Тест пройден' : 'Тест провален');
+                    } else {
+                        testResults[test.id] = false;
+                        updateTestStatus(test.id, 'failed', 'Функция теста не найдена');
+                    }
+                } catch (error) {
+                    testResults[test.id] = false;
+                    updateTestStatus(test.id, 'failed', `Ошибка: ${error.message}`);
+                }
+                
+                updateProgress();
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            isRunning = false;
+            updateStatus('Все тесты завершены', 'success');
+        }
+
+        async function runIndividualTests() {
+            if (isRunning) return;
+            isRunning = true;
+            updateStatus('Запуск тестов по одному...', 'running');
+            
+            for (const test of allTests) {
+                try {
+                    updateTestStatus(test.id, 'running', 'Выполняется...');
+                    
+                    if (typeof window[test.name] === 'function') {
+                        const result = await window[test.name]();
+                        testResults[test.id] = result;
+                        updateTestStatus(test.id, result ? 'passed' : 'failed', 
+                            result ? 'Тест пройден' : 'Тест провален');
+                    } else {
+                        testResults[test.id] = false;
+                        updateTestStatus(test.id, 'failed', 'Функция теста не найдена');
+                    }
+                } catch (error) {
+                    testResults[test.id] = false;
+                    updateTestStatus(test.id, 'failed', `Ошибка: ${error.message}`);
+                }
+                
+                updateProgress();
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            isRunning = false;
+            updateStatus('Все тесты завершены', 'success');
+        }
+
+        function clearResults() {
+            testResults = {};
+            testLogs = {};
+            updateProgress();
+            
+            allTests.forEach(test => {
+                updateTestStatus(test.id, 'pending', 'Ожидание выполнения...');
+                const logEl = document.getElementById(`log-${test.id}`);
+                if (logEl) logEl.innerHTML = 'Ожидание выполнения...';
+                const actionsEl = document.getElementById(`actions-${test.id}`);
+                if (actionsEl) actionsEl.style.display = 'none';
+            });
+            
+            updateStatus('Результаты очищены', 'info');
+        }
+
+        function exportResults() {
+            const timestamp = new Date().toISOString().slice(0,19);
+            const passed = Object.values(testResults).filter(r => r === true).length;
+            const total = allTests.length;
+            
+            let content = `# Универсальный тестовый отчет\n`;
+            content += `Дата: ${new Date().toLocaleString()}\n`;
+            content += `Всего тестов: ${total}\n`;
+            content += `Пройдено: ${passed}\n`;
+            content += `Провалено: ${total - passed}\n`;
+            content += `Успешность: ${((passed/total)*100).toFixed(1)}%\n\n`;
+            
+            content += `## Детальные результаты:\n\n`;
+            
+            allTests.forEach(test => {
+                const result = testResults[test.id];
+                const status = result === true ? '✅ ПРОЙДЕН' : result === false ? '❌ ПРОВАЛЕН' : '⏳ НЕ ВЫПОЛНЕН';
+                content += `### ${test.title}\n`;
+                content += `- **Статус:** ${status}\n`;
+                content += `- **Описание:** ${test.description}\n`;
+                content += `- **Категория:** ${test.category}\n\n`;
+            });
+            
+            const blob = new Blob([content], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `universal-test-report-${timestamp}.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadTestLog(testId) {
+            const test = allTests.find(t => t.id === testId);
+            const logs = testLogs[testId] || [];
+            const result = testResults[testId];
+            
+            let logContent = `# Детальный лог теста: ${test.title}\n`;
+            logContent += `Дата: ${new Date().toLocaleString()}\n`;
+            logContent += `Статус: ${result ? '✅ ПРОЙДЕН' : '❌ ПРОВАЛЕН'}\n`;
+            logContent += `Описание: ${test.description}\n`;
+            logContent += `Категория: ${test.category}\n\n`;
+            logContent += `## Логи выполнения:\n\n`;
+            
+            logs.forEach(logEntry => {
+                logContent += `${logEntry}\n`;
+            });
+            
+            const blob = new Blob([logContent], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `test-log-${testId}-${new Date().toISOString().slice(0,19)}.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function showDetailedLog(testId) {
+            const test = allTests.find(t => t.id === testId);
+            const logs = testLogs[testId] || [];
+            const result = testResults[testId];
+            
+            let logContent = `Детальный лог теста: ${test.title}\n`;
+            logContent += `Дата: ${new Date().toLocaleString()}\n`;
+            logContent += `Статус: ${result ? '✅ ПРОЙДЕН' : '❌ ПРОВАЛЕН'}\n\n`;
+            logContent += `Логи выполнения:\n`;
+            logContent += `${'='.repeat(50)}\n`;
+            
+            logs.forEach(logEntry => {
+                logContent += `${logEntry}\n`;
+            });
+            
+            alert(logContent);
+        }
+
+        // Автоматический запуск при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== DOMContentLoaded СРАБОТАЛ ===');
+            
+            setTimeout(() => {
+                initializeTests();
+                updateProgress();
+            }, 1000);
+        });
+
+        // Перехватываем ошибки
+        window.addEventListener('error', function(event) {
+            console.error(`❌ ОШИБКА: ${event.message}`);
+        });
+    </script>
+</body>
+</html>

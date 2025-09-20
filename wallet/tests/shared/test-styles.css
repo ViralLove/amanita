@@ -1,0 +1,343 @@
+/**
+ * Переиспользуемые стили для тестовых страниц
+ * Используется всеми HTML тестовыми страницами
+ */
+
+/* === ОСНОВНЫЕ СТИЛИ === */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    overflow: hidden;
+}
+
+/* === ЗАГОЛОВОК === */
+.header {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    padding: 30px;
+    text-align: center;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 2.5em;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.header p {
+    margin: 10px 0 0 0;
+    opacity: 0.9;
+    font-size: 1.1em;
+}
+
+/* === ПАНЕЛЬ УПРАВЛЕНИЯ === */
+.controls {
+    padding: 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    text-align: center;
+}
+
+/* === КНОПКИ === */
+.btn {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    margin: 5px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+.btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+.btn-danger:hover {
+    box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    box-shadow: 0 4px 15px rgba(23, 162, 184, 0.3);
+}
+
+.btn-info:hover {
+    box-shadow: 0 6px 20px rgba(23, 162, 184, 0.4);
+}
+
+/* === СТАТУС === */
+.status {
+    padding: 15px;
+    margin: 20px;
+    border-radius: 10px;
+    font-weight: bold;
+    text-align: center;
+    font-size: 1.2em;
+}
+
+.status.running {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    color: #856404;
+    border: 2px solid #ffc107;
+}
+
+.status.success {
+    background: linear-gradient(135deg, #d4edda 0%, #a8e6cf 100%);
+    color: #155724;
+    border: 2px solid #28a745;
+}
+
+.status.error {
+    background: linear-gradient(135deg, #f8d7da 0%, #ffb3ba 100%);
+    color: #721c24;
+    border: 2px solid #dc3545;
+}
+
+/* === СЕТКА ТЕСТОВ === */
+.tests-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
+
+/* === КАРТОЧКИ ТЕСТОВ === */
+.test-card {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.test-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.test-card.passed {
+    border-color: #28a745;
+    background: linear-gradient(135deg, #d4edda 0%, #f8fff8 100%);
+}
+
+.test-card.failed {
+    border-color: #dc3545;
+    background: linear-gradient(135deg, #f8d7da 0%, #fff8f8 100%);
+}
+
+.test-card.running {
+    border-color: #ffc107;
+    background: linear-gradient(135deg, #fff3cd 0%, #fffef8 100%);
+}
+
+/* === ЗАГОЛОВОК ТЕСТА === */
+.test-title {
+    font-size: 1.3em;
+    font-weight: bold;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.test-status {
+    font-size: 0.9em;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-weight: bold;
+}
+
+.test-status.pending {
+    background: #e9ecef;
+    color: #6c757d;
+}
+
+.test-status.running {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.test-status.passed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.test-status.failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* === ОПИСАНИЕ ТЕСТА === */
+.test-description {
+    color: #6c757d;
+    margin: 10px 0;
+    font-size: 0.9em;
+}
+
+/* === ЛОГ ТЕСТА === */
+.test-log {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 10px;
+    margin-top: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8em;
+}
+
+/* === ДЕЙСТВИЯ ТЕСТА === */
+.test-actions {
+    margin-top: 10px;
+    display: none;
+}
+
+.test-actions button {
+    font-size: 12px;
+    padding: 5px 10px;
+    margin-right: 5px;
+}
+
+/* === СВОДКА РЕЗУЛЬТАТОВ === */
+.summary {
+    background: #f8f9fa;
+    padding: 20px;
+    margin: 20px;
+    border-radius: 10px;
+    border: 1px solid #dee2e6;
+}
+
+.summary h3 {
+    margin-top: 0;
+    color: #2c3e50;
+}
+
+/* === ПРОГРЕСС-БАР === */
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    transition: width 0.3s ease;
+    border-radius: 10px;
+}
+
+/* === ИКОНКИ === */
+.icon {
+    font-size: 1.2em;
+}
+
+/* === МОДАЛЬНЫЕ ОКНА === */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 80%;
+    max-height: 80%;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    position: relative;
+}
+
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.modal-download {
+    position: absolute;
+    top: 10px;
+    right: 80px;
+    background: #17a2b8;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+/* === АДАПТИВНОСТЬ === */
+@media (max-width: 768px) {
+    .container {
+        margin: 10px;
+        border-radius: 10px;
+    }
+    
+    .header {
+        padding: 20px;
+    }
+    
+    .header h1 {
+        font-size: 2em;
+    }
+    
+    .tests-grid {
+        grid-template-columns: 1fr;
+        padding: 15px;
+    }
+    
+    .btn {
+        font-size: 14px;
+        padding: 10px 20px;
+    }
+}
