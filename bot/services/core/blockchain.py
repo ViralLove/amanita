@@ -357,8 +357,12 @@ class BlockchainService:
             # Оцениваем газ с множителем
             estimated_gas = await self.estimate_gas_with_multiplier(contract_function, *args)
             
-            # Создаем транзакцию
-            gas_limit = kwargs.get('gas', estimated_gas)  # Берем gas из kwargs или используем оценку
+            # Специальный лимит газа для SpiralEngine.activateUser (создает много новых инвайтов)
+            if contract_name == "SpiralEngine" and function_name == "activateUser":
+                gas_limit = kwargs.get('gas', max(estimated_gas, 5000000))  # Минимум 5M газа для activateUser
+                logger.info(f"[Web3] [TX] SpiralEngine.activateUser: увеличен лимит газа до {gas_limit}")
+            else:
+                gas_limit = kwargs.get('gas', estimated_gas)  # Берем gas из kwargs или используем оценку
             txn = contract_function(*args).build_transaction({
                 'value': 0,
                 'chainId': self.chain_id,
