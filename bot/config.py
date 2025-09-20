@@ -93,6 +93,10 @@ APP_ROOT_DIR = os.getenv("APP_ROOT_DIR", "app")
 # Параметризация по среде выполнения
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")  # local | prod
 
+# Параметризация загрузки каталога на старте
+LOAD_CATALOG = os.getenv("LOAD_CATALOG", "true").lower() in ["true", "1", "yes", "on"]
+logging.info(f"[CONFIG] LOAD_CATALOG: {LOAD_CATALOG}")
+
 if ENVIRONMENT == "local":
     # Для локальной разработки - используем корневую папку artifacts
     # Определяем правильный путь относительно корня проекта

@@ -22,6 +22,7 @@ from api.config import APIConfig
 import sentry_sdk
 from utils.sentry_init import init_sentry
 from utils.logging_setup import setup_logging
+from config import LOAD_CATALOG
 
 init_sentry()
 logger = setup_logging(
@@ -92,13 +93,16 @@ async def main():
         logger.info("Все обработчики успешно зарегистрированы")
         print("=== ОБРАБОТЧИКИ ЗАРЕГИСТРИРОВАНЫ ===")
 
-        # === Фоновая загрузка каталога ===
-        logger.info("Запуск фоновой загрузки каталога продуктов...")
-        async def preload_catalog():
-            await product_registry_service.get_all_products()
-            logger.info("Фоновая загрузка каталога завершена!")
-        asyncio.create_task(preload_catalog())
-        logger.info("Фоновая задача по загрузке каталога запущена")
+        # === Фоновая загрузка каталога (параметризованная) ===
+        if LOAD_CATALOG:
+            logger.info("Запуск фоновой загрузки каталога продуктов...")
+            async def preload_catalog():
+                await product_registry_service.get_all_products()
+                logger.info("Фоновая загрузка каталога завершена!")
+            asyncio.create_task(preload_catalog())
+            logger.info("Фоновая задача по загрузке каталога запущена")
+        else:
+            logger.info("Загрузка каталога на старте отключена (LOAD_CATALOG=false)")
         # === Конец фоновой загрузки ===
 
         # Создание FastAPI приложения с ServiceFactory
