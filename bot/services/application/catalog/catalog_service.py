@@ -18,16 +18,16 @@ logger = logging.getLogger(__name__)
 class CatalogService:
     """Сервис для работы с каталогом продуктов"""
     
-    def __init__(self, image_service: ImageService = None):
+    def __init__(self, image_service: ImageService = None, formatter_service = None):
         """
         Инициализация сервиса каталога
         
         Args:
             image_service: Сервис для работы с изображениями
+            formatter_service: Сервис для форматирования продуктов
         """
         self.image_service = image_service or ImageService()
-        # Formatter service будет внедрен через DI в ItemY 5.2
-        self.formatter_service = None
+        self.formatter_service = formatter_service
         self.logger = logging.getLogger(__name__)
     
     async def get_catalog_with_progress(self) -> List[Any]:
@@ -39,15 +39,19 @@ class CatalogService:
         """
         try:
             self.logger.info("[CatalogService] Запрос каталога товаров")
+            self.logger.info(f"[CatalogService] product_registry_service: {product_registry_service}")
             
             # Получаем каталог через сервис (с кэшированием)
+            self.logger.info("[CatalogService] Вызываем product_registry_service.get_all_products()")
             products = await product_registry_service.get_all_products()
+            self.logger.info(f"[CatalogService] Получен ответ от product_registry_service: {type(products)}")
             
             if not products:
                 self.logger.info("[CatalogService] Каталог пуст")
                 return []
             
             self.logger.info(f"[CatalogService] Найдено {len(products)} продуктов")
+            self.logger.info(f"[CatalogService] Тип первого продукта: {type(products[0]) if products else 'N/A'}")
             return products
             
         except Exception as e:
@@ -85,23 +89,35 @@ class CatalogService:
             loc: Объект локализации
         """
         try:
+            self.logger.info(f"[CatalogService] send_catalog_to_user вызван для user_id {callback.from_user.id}")
+            self.logger.info(f"[CatalogService] Количество продуктов для отправки: {len(products) if products else 0}")
+            
             if not products:
-                await callback.message.answer(loc.t("catalog.empty"))
+                self.logger.info(f"[CatalogService] Каталог пуст, отправляем сообщение об этом")
+                try:
+                    empty_message = loc.t("catalog.empty")
+                except:
+                    empty_message = "📭 Каталог товаров пуст"
+                await callback.message.answer(empty_message)
                 return
             
             # Отправляем сообщение о прогрессе с хэштегами для навигации
+            self.logger.info(f"[CatalogService] Отправляем сообщение о прогрессе для user_id {callback.from_user.id}")
             progress_message = await callback.message.answer(
-                f"📦 Загружаем каталог: 0/{len(products)} продуктов...\n\n"
-                f"🔍 <b>Навигация:</b> #catalog"
+                f"🔄 Загружаем каталог..."
             )
+            self.logger.info(f"[CatalogService] Сообщение о прогрессе отправлено")
             
             # Отправляем каждый продукт отдельным сообщением
+            self.logger.info(f"[CatalogService] Начинаем отправку {len(products)} продуктов")
             for i, product in enumerate(products):
                 try:
+                    self.logger.info(f"[CatalogService] Отправляем продукт {i+1}/{len(products)} для user_id {callback.from_user.id}")
                     await self._send_single_product(callback, product, loc)
                     
                     # Обновляем прогресс
-                    await progress_message.edit_text(f"📦 Загружаем каталог: {i+1}/{len(products)} продуктов...")
+                    self.logger.info(f"[CatalogService] Обновляем прогресс: {i+1}/{len(products)}")
+                    await progress_message.edit_text(f"🔄 Загружаем каталог...")
                     
                     # Добавляем разделитель между продуктами (кроме последнего)
                     if i < len(products) - 1:
@@ -113,7 +129,11 @@ class CatalogService:
             
             # Удаляем сообщение о прогрессе и отправляем финальное сообщение
             await progress_message.delete()
-            await callback.message.answer(f"✅ Каталог загружен! Всего продуктов: {len(products)}")
+            try:
+                final_message = loc.t("progress.catalog_loading.completed")
+                await callback.message.answer(final_message)
+            except:
+                await callback.message.answer(f"✅ Каталог загружен! Всего продуктов: {len(products)}")
             
             self.logger.info(f"[CatalogService] Каталог успешно отправлен: {len(products)} продуктов")
             
@@ -132,17 +152,28 @@ class CatalogService:
             loc: Объект локализации
         """
         try:
+            self.logger.info(f"[CatalogService] _send_single_product вызван для продукта: {getattr(product, 'id', 'unknown')}")
+            self.logger.info(f"[CatalogService] Тип продукта: {type(product)}")
+            self.logger.info(f"[CatalogService] Атрибуты продукта: {dir(product)}")
+            
             # Форматируем продукт через сервис форматирования
             try:
-                formatted_sections = self.formatter_service.format_product_for_telegram(product, loc)
-                
-                # Объединяем все секции в единый текст
-                product_text = (
-                    formatted_sections['main_info'] +
-                    formatted_sections['composition'] +
-                    formatted_sections['pricing'] +
-                    formatted_sections['details']
-                )
+                self.logger.info(f"[CatalogService] formatter_service: {self.formatter_service}")
+                if self.formatter_service:
+                    formatted_sections = self.formatter_service.format_product_for_telegram(product, loc)
+                    
+                    # Объединяем все секции в единый текст
+                    product_text = (
+                        formatted_sections['main_info'] +
+                        formatted_sections['composition'] +
+                        formatted_sections['pricing'] +
+                        formatted_sections['details']
+                    )
+                else:
+                    self.logger.warning(f"[CatalogService] formatter_service is None, используем fallback форматирование")
+                    # Fallback форматирование без ошибки
+                    title = getattr(product, 'title', 'Продукт')
+                    product_text = f"🍄 <b>{title}</b>"
             except Exception as e:
                 self.logger.error(f"[CatalogService] Ошибка сервиса форматирования для продукта {getattr(product, 'id', 'unknown')}: {e}")
                 # Fallback форматирование
@@ -150,7 +181,12 @@ class CatalogService:
             
             # Обрезаем текст если он слишком длинный для Telegram
             original_length = len(product_text)
-            product_text = self.formatter_service._truncate_text(product_text)
+            if self.formatter_service and hasattr(self.formatter_service, '_truncate_text'):
+                product_text = self.formatter_service._truncate_text(product_text)
+            else:
+                # Простое обрезание если сервис форматирования недоступен
+                if len(product_text) > 4000:
+                    product_text = product_text[:3997] + "..."
             final_length = len(product_text)
             
             if original_length != final_length:

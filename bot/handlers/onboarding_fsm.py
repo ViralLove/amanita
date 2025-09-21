@@ -83,6 +83,12 @@ async def process_invite_code(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     lang = user_settings.get_language(user_id)
     loc = Localization(lang)
+    
+    # Проверяем, что сообщение содержит текст
+    if not message.text:
+        await message.answer("⚠️ Пожалуйста, отправьте текстовое сообщение с кодом приглашения.")
+        return
+    
     invite_code = message.text.strip()
 
     logger.info(f"[INVITE] Получен инвайт-код для проверки: {invite_code}")

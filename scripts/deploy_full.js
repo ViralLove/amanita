@@ -202,6 +202,7 @@ async function deployContract(contractName, constructorArgs = [], options = {}) 
  * 5 - деплой конкретного контракта по имени (требует contractName)
  * 6 - очистка каталога продавца (требует SELLER_ADDRESS и SELLER_PRIVATE_KEY)
  * 7 - активация продавца через инвайт-код (требует INVITE_CODE и SELLER_ADDRESS)
+ * 9 - назначение роли ACTIVATOR_ROLE селлеру из .env
  * 40 - создание каталога с неактивными продуктами (аналогично action=4)
  * 41 - активация существующих продуктов в каталоге
  */
@@ -505,17 +506,14 @@ async function main(action) {
       console.log(`✅ Продавец ${SELLER_ADDRESS} успешно активирован!`);
     }
 
-    // Активация пользователя (без назначения роли селлера)
+    // Назначение роли ACTIVATOR_ROLE селлеру из .env
     if (action === 9) {
-      const userAddress = args[1];
-      if (!userAddress) {
-        throw new Error("Для action 9 требуется указать адрес пользователя");
+      const sellerAddress = SELLER_ADDRESS;
+      if (!sellerAddress) {
+        throw new Error("Для action 9 требуется SELLER_ADDRESS в .env");
       }
-      const inviteCode = args[2] || process.env.INVITE_CODE;
-      if (!inviteCode) {
-        throw new Error("Для action 9 требуется указать инвайт-код");
-      }
-      await activateUser(inviteCode, userAddress);
+      console.log(`🔑 Action 9: Назначаем роль ACTIVATOR_ROLE селлеру ${sellerAddress}`);
+      await grantActivatorRoleToSellerOnly(sellerAddress);
     }
 
     // Назначение роли SELLER_ROLE
@@ -2352,6 +2350,31 @@ function generateInviteCodes(count) {
         codes.push(inviteCode);
     }
     return codes;
+}
+
+/**
+ * Назначение роли ACTIVATOR_ROLE селлеру (для Action 9)
+ * @param {string} sellerAddress - адрес селлера из .env
+ */
+async function grantActivatorRoleToSellerOnly(sellerAddress) {
+    console.log(`🔷 Загружаем SpiralEngine для назначения роли ACTIVATOR_ROLE...`);
+    
+    // Загружаем SpiralEngine
+    const spiralEngine = await loadContract("SpiralEngine");
+    console.log(`✅ SpiralEngine загружен: ${spiralEngine.options.address}`);
+    
+    // Проверяем, активирован ли пользователь
+    const usedInvite = await spiralEngine.methods.usedInviteByUser(sellerAddress).call();
+    if (usedInvite == 0) {
+        console.log(`⚠️ Пользователь ${sellerAddress} не активирован, но продолжаем...`);
+    } else {
+        console.log(`✅ Пользователь ${sellerAddress} активирован (использовал инвайт ${usedInvite})`);
+    }
+    
+    // Вызываем существующую функцию для назначения роли
+    await grantActivatorRoleToSeller(spiralEngine, sellerAddress);
+    
+    console.log(`✅ Action 9 завершен успешно!`);
 }
 
 // Обновление документации

@@ -20,6 +20,8 @@ class NavigationHandler(BaseCatalogHandler, ErrorHandlerMixin, LocalizationMixin
     def __init__(self):
         """Инициализация обработчика навигации"""
         super().__init__()
+        # Инициализируем кэш локализации для LocalizationMixin
+        self._localization_cache = {}
         self.logger.info(f"[{self.__class__.__name__}] Инициализирован")
     
     async def handle_callback(self, callback: CallbackQuery) -> None:
@@ -54,7 +56,7 @@ async def scroll_to_catalog(callback: CallbackQuery):
             parse_mode="HTML"
         )
         
-        logger.info(f"[NAVIGATION_HANDLER] Улучшенное сообщение со скроллом к каталогу отправлено для пользователя {user_id}")
+        logger.info(f"[NAVIGATION_HANDLER] Улучшенное сообщение со скроллом к каталогу отправлено для пользователя {callback.from_user.id}")
         
     except Exception as e:
         logger.error(f"[NAVIGATION_HANDLER] Ошибка при скролле к каталогу: {e}")
@@ -98,13 +100,38 @@ async def handle_scroll_to_catalog(self, callback: CallbackQuery) -> None:
         loc = self.get_localization(callback)
         
         # Создаем сообщение с хэштегами для навигации
+        try:
+            catalog_title = loc.t('catalog.title')
+        except:
+            catalog_title = 'Каталог продуктов'
+        try:
+            catalog_main = loc.t('catalog.main')
+        except:
+            catalog_main = 'основной каталог'
+        try:
+            catalog_search = loc.t('catalog.search')
+        except:
+            catalog_search = 'поиск по каталогу'
+        try:
+            catalog_categories = loc.t('catalog.categories')
+        except:
+            catalog_categories = 'категории продуктов'
+        try:
+            catalog_favorites = loc.t('catalog.favorites')
+        except:
+            catalog_favorites = 'избранные продукты'
+        try:
+            catalog_tip = loc.t('catalog.tip')
+        except:
+            catalog_tip = 'Используйте хэштеги для быстрой навигации!'
+            
         scroll_message = (
-            f"📚 <b>{loc.t('catalog.title', 'Каталог продуктов')}</b>\n\n"
-            f"• #catalog - {loc.t('catalog.main', 'основной каталог')}\n"
-            f"• #search - {loc.t('catalog.search', 'поиск по каталогу')}\n"
-            f"• #categories - {loc.t('catalog.categories', 'категории продуктов')}\n"
-            f"• #favorites - {loc.t('catalog.favorites', 'избранные продукты')}\n\n"
-            f"💡 {loc.t('catalog.tip', 'Используйте хэштеги для быстрой навигации!')}"
+            f"📚 <b>{catalog_title}</b>\n\n"
+            f"• #catalog - {catalog_main}\n"
+            f"• #search - {catalog_search}\n"
+            f"• #categories - {catalog_categories}\n"
+            f"• #favorites - {catalog_favorites}\n\n"
+            f"💡 {catalog_tip}"
         )
         
         # Отправляем сообщение

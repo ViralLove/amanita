@@ -95,17 +95,35 @@ class ErrorHandlerMixin:
             error_message = str(error).lower()
             
             if "timeout" in error_message:
-                return loc.t('error.timeout', '⏰ Время ожидания истекло. Попробуйте позже.')
+                try:
+                    return loc.t('error.timeout')
+                except:
+                    return '⏰ Время ожидания истекло. Попробуйте позже.'
             elif "connection" in error_message:
-                return loc.t('error.connection', '🔌 Ошибка подключения. Проверьте интернет.')
+                try:
+                    return loc.t('error.connection')
+                except:
+                    return '🔌 Ошибка подключения. Проверьте интернет.'
             elif "not found" in error_message:
-                return loc.t('error.not_found', '📭 Запрашиваемый ресурс не найден.')
+                try:
+                    return loc.t('error.not_found')
+                except:
+                    return '📭 Запрашиваемый ресурс не найден.'
             elif "permission" in error_message or "access" in error_message:
-                return loc.t('error.permission', '🔒 Недостаточно прав для выполнения операции.')
+                try:
+                    return loc.t('error.permission')
+                except:
+                    return '🔒 Недостаточно прав для выполнения операции.'
             elif "validation" in error_message or "invalid" in error_message:
-                return loc.t('error.validation', '❌ Некорректные данные.')
+                try:
+                    return loc.t('error.validation')
+                except:
+                    return '❌ Некорректные данные.'
             else:
-                return loc.t('error.general', '❌ Произошла ошибка. Попробуйте позже.')
+                try:
+                    return loc.t('error.general')
+                except:
+                    return '❌ Произошла ошибка. Попробуйте позже.'
                 
         except Exception as e:
             self.logger.error(f"[{self.__class__.__name__}] Ошибка получения сообщения об ошибке: {e}")
@@ -146,7 +164,10 @@ class ErrorHandlerMixin:
             if custom_message:
                 error_message = custom_message
             else:
-                error_message = loc.t(f'error.{error_type}', f'❌ Ошибка: {error_type}')
+                try:
+                    error_message = loc.t(f'error.{error_type}')
+                except:
+                    error_message = f'❌ Ошибка: {error_type}'
             
             await callback.message.answer(error_message)
             await callback.answer()

@@ -81,7 +81,8 @@ class LocalizationMixin:
         """
         try:
             loc = self.get_localization(callback, use_cache)
-            translated_text = loc.t(key, default, **kwargs)
+            # Исправляем вызов метода t() - он принимает только key
+            translated_text = loc.t(key)
             
             self.logger.debug(f"[{self.__class__.__name__}] Переведен текст: {key} -> {translated_text}")
             return translated_text

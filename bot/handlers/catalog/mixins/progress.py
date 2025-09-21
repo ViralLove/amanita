@@ -179,7 +179,10 @@ class ProgressMixin:
             Optional[Message]: Сообщение о прогрессе или None
         """
         try:
-            progress_text = loc.t(f'progress.{operation}', f'⏳ {operation}...')
+            try:
+                progress_text = loc.t(f'progress.{operation}.start')
+            except:
+                progress_text = f'🔄 {operation}...'
             progress_message = await callback.message.answer(progress_text)
             
             self.logger.info(f"[{self.__class__.__name__}] Создано простое сообщение о прогрессе для операции: {operation}")
@@ -208,7 +211,10 @@ class ProgressMixin:
             percentage = int((progress / total) * 100) if total > 0 else 0
             progress_bar = "█" * int((progress / total) * 10) + "░" * (10 - int((progress / total) * 10)) if total > 0 else "░" * 10
             
-            progress_text = f"{loc.t(f'progress.{operation}', f'⏳ {operation}...')}\n{progress_bar} {percentage}%"
+            try:
+                progress_text = f"{loc.t(f'progress.{operation}')}\n{progress_bar} {percentage}%"
+            except:
+                progress_text = f"⏳ {operation}...\n{progress_bar} {percentage}%"
             
             await message.edit_text(progress_text)
             
@@ -235,9 +241,15 @@ class ProgressMixin:
         """
         try:
             if success:
-                completion_text = loc.t(f'progress.{operation}.completed', f'✅ {operation} завершено успешно!')
+                try:
+                    completion_text = loc.t(f'progress.{operation}.completed')
+                except:
+                    completion_text = f'✅ {operation} завершено успешно!'
             else:
-                completion_text = loc.t(f'progress.{operation}.failed', f'❌ {operation} завершилось с ошибкой')
+                try:
+                    completion_text = loc.t(f'progress.{operation}.failed')
+                except:
+                    completion_text = f'❌ {operation} завершилось с ошибкой'
             
             await message.edit_text(completion_text)
             

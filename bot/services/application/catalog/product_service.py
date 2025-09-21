@@ -18,16 +18,16 @@ logger = logging.getLogger(__name__)
 class ProductService:
     """Сервис для работы с детальной информацией о продуктах"""
     
-    def __init__(self, image_service: ImageService = None):
+    def __init__(self, image_service: ImageService = None, formatter_service = None):
         """
         Инициализация сервиса продуктов
         
         Args:
             image_service: Сервис для работы с изображениями
+            formatter_service: Сервис для форматирования продуктов
         """
         self.image_service = image_service or ImageService()
-        # Formatter service будет внедрен через DI в ItemY 5.2
-        self.formatter_service = None
+        self.formatter_service = formatter_service
         self.logger = logging.getLogger(__name__)
     
     async def get_product_by_id(self, product_id: str) -> Optional[Any]:

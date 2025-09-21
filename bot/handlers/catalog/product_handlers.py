@@ -22,6 +22,8 @@ class ProductHandler(BaseCatalogHandler, ErrorHandlerMixin, LocalizationMixin, P
     def __init__(self):
         """Инициализация обработчика продуктов"""
         super().__init__()
+        # Инициализируем кэш локализации для LocalizationMixin
+        self._localization_cache = {}
         self.logger.info(f"[{self.__class__.__name__}] Инициализирован")
     
     async def handle_callback(self, callback: CallbackQuery) -> None:
@@ -135,7 +137,10 @@ async def handle_show_product_details(self, callback: CallbackQuery) -> None:
             
             if not product:
                 # Продукт не найден
-                not_found_message = loc.t('product.not_found', f'📭 Продукт с ID {product_id} не найден')
+                try:
+                    not_found_message = loc.t('product.not_found')
+                except:
+                    not_found_message = f'📭 Продукт с ID {product_id} не найден'
                 if progress_message:
                     await self.complete_simple_progress(progress_message, "product_loading", loc, False)
                     await callback.message.answer(not_found_message)

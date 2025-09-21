@@ -106,8 +106,9 @@ def get_catalog_service(
     """Dependency provider для CatalogService с зависимостями"""
     if image_service is None:
         image_service = get_image_service()
-    # formatter_service будет добавлен позже
-    return CatalogService(image_service=image_service)
+    if formatter_service is None:
+        formatter_service = get_formatter_service()
+    return CatalogService(image_service=image_service, formatter_service=formatter_service)
 
 
 def get_product_service(
@@ -117,8 +118,9 @@ def get_product_service(
     """Dependency provider для ProductService с зависимостями"""
     if image_service is None:
         image_service = get_image_service()
-    # formatter_service будет добавлен позже
-    return ProductService(image_service=image_service)
+    if formatter_service is None:
+        formatter_service = get_formatter_service()
+    return ProductService(image_service=image_service, formatter_service=formatter_service)
 
 
 def get_image_service() -> ImageService:
@@ -138,5 +140,5 @@ def get_storage_service():
 
 def get_formatter_service():
     """Dependency provider для ProductFormatterService"""
-    # Будет реализовано позже для избежания циклических зависимостей
-    return None 
+    from handlers.common.formatting import ProductFormatterService
+    return ProductFormatterService() 

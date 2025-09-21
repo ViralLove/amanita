@@ -149,7 +149,10 @@ class BaseCatalogHandler(ABC):
             
             # Отправляем сообщение об ошибке пользователю
             loc = self.get_user_localization(callback)
-            error_message = loc.t('error.general', '❌ Произошла ошибка. Попробуйте позже.')
+            try:
+                error_message = loc.t('error.general')
+            except:
+                error_message = '❌ Произошла ошибка. Попробуйте позже.'
             
             await callback.message.answer(error_message)
             await callback.answer()

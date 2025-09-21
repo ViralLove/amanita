@@ -46,10 +46,10 @@ class OrganicComponent:
         if not self.biounit_id or not self.biounit_id.strip():
             raise ValueError("biounit_id не может быть пустым")
         
-        # Проверка формата biounit_id (должен содержать только буквы, цифры и подчеркивания)
-        biounit_pattern = r'^[a-zA-Z0-9_]+$'
+        # Проверка формата biounit_id (должен содержать только буквы, цифры, подчеркивания и дефисы)
+        biounit_pattern = r'^[a-zA-Z0-9_-]+$'
         if not re.match(biounit_pattern, self.biounit_id):
-            raise ValueError(f"biounit_id '{self.biounit_id}' содержит недопустимые символы. Разрешены только буквы, цифры и подчеркивания")
+            raise ValueError(f"biounit_id '{self.biounit_id}' содержит недопустимые символы. Разрешены только буквы, цифры, подчеркивания и дефисы")
         
         # Проверка длины biounit_id (от 1 до 50 символов)
         if len(self.biounit_id) > 50:
