@@ -200,9 +200,19 @@ class ProductAssembler:
             if self.storage_service:
                 self.logger.info("🔧 Обогащаем метаданные описаниями перед созданием Product...")
                 enriched_metadata = self._enrich_metadata_with_descriptions(metadata)
+                
+                # Валидация данных перед созданием Product
+                self.logger.info("🔍 Валидируем обогащенные метаданные...")
+                self._validate_product_metadata(enriched_metadata)
+                
                 product = Product.from_dict(enriched_metadata)
             else:
                 self.logger.info("⚠️ storage_service недоступен, создаем Product без обогащения")
+                
+                # Валидация данных перед созданием Product
+                self.logger.info("🔍 Валидируем метаданные...")
+                self._validate_product_metadata(metadata)
+                
                 product = Product.from_dict(metadata)
             
             self.logger.info(f"✅ Продукт создан с business_id: {product.business_id}, заголовком: {product.title}")
@@ -214,6 +224,53 @@ class ProductAssembler:
             import traceback
             self.logger.error(f"🔍 Stack trace: {traceback.format_exc()}")
             return None
+    
+    def _validate_product_metadata(self, metadata: Dict[str, Any]) -> None:
+        """
+        Валидирует метаданные продукта перед созданием Product объекта.
+        
+        Args:
+            metadata: Метаданные продукта для валидации
+            
+        Raises:
+            ValueError: Если валидация не прошла
+        """
+        self.logger.info("🔍 Начинаем валидацию метаданных продукта...")
+        
+        # Проверяем обязательные поля
+        required_fields = ['business_id', 'title', 'organic_components', 'categories', 'forms', 'species']
+        for field in required_fields:
+            if field not in metadata:
+                raise ValueError(f"Отсутствует обязательное поле: {field}")
+            if not metadata[field]:
+                raise ValueError(f"Поле {field} не может быть пустым")
+        
+        # Валидация organic_components
+        if not isinstance(metadata['organic_components'], list):
+            raise ValueError("organic_components должен быть списком")
+        
+        if len(metadata['organic_components']) == 0:
+            raise ValueError("organic_components не может быть пустым")
+        
+        # Валидация каждого компонента
+        for i, component in enumerate(metadata['organic_components']):
+            if not isinstance(component, dict):
+                raise ValueError(f"Компонент {i} должен быть словарем")
+            
+            component_required_fields = ['biounit_id', 'description_cid', 'proportion']
+            for field in component_required_fields:
+                if field not in component:
+                    raise ValueError(f"Отсутствует поле {field} в компоненте {i}")
+                if not component[field] or not str(component[field]).strip():
+                    raise ValueError(f"Поле {field} в компоненте {i} не может быть пустым")
+        
+        # Валидация cover_image_url (разрешаем пустые значения)
+        if 'cover_image_url' in metadata and metadata['cover_image_url']:
+            cover_image_url = metadata['cover_image_url'].strip()
+            if cover_image_url and not cover_image_url.startswith('Qm'):
+                raise ValueError(f"cover_image_url должен быть валидным CID или пустым: {cover_image_url}")
+        
+        self.logger.info("✅ Валидация метаданных продукта прошла успешно")
     
     def _enrich_metadata_with_descriptions(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
