@@ -14,7 +14,7 @@ def test_invalid_biounit_id():
     try:
         # Невалидный biounit_id с недопустимыми символами
         component = OrganicComponent(
-            biounit_id='invalid-id-with-dashes',  # Содержит дефисы
+            biounit_id='invalid@id-with-special-chars',  # Содержит спецсимволы
             description_cid='Qm123456789',
             proportion='100%'
         )
