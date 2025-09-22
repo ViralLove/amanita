@@ -509,10 +509,11 @@ class Product:
         if not self.business_id or not isinstance(self.business_id, str):
             raise ValueError("business_id должен быть непустой строкой")
         
-        # Валидация cover_image_url как CID
-        cid_result = cid_validator.validate(self.cover_image_url)
-        if not cid_result.is_valid:
-            raise ValueError(f"cover_image_url: {cid_result.error_message}")
+        # Валидация cover_image_url как CID (разрешаем пустые значения)
+        if self.cover_image_url and self.cover_image_url.strip():
+            cid_result = cid_validator.validate(self.cover_image_url)
+            if not cid_result.is_valid:
+                raise ValueError(f"cover_image_url: {cid_result.error_message}")
         
         # Валидация organic_components
         if not self.organic_components:
