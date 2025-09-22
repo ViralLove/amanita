@@ -135,7 +135,7 @@ class ImageService:
             product_id = getattr(product, 'id', getattr(product, 'business_id', 'unknown'))
             keyboard = get_product_keyboard(product_id, loc)
             
-            if product.cover_image_url:
+            if product.cover_image_url and product.cover_image_url.strip():
                 try:
                     # Получаем URL изображения через storage service
                     image_url = self.storage_service.get_public_url(product.cover_image_url)
@@ -190,7 +190,7 @@ class ImageService:
             product_id = getattr(product, 'id', getattr(product, 'business_id', 'unknown'))
             keyboard = get_product_details_keyboard_with_scroll(product_id, loc)
             
-            if product.cover_image_url:
+            if product.cover_image_url and product.cover_image_url.strip():
                 try:
                     # Получаем URL изображения через storage service
                     image_url = self.storage_service.get_public_url(product.cover_image_url)
