@@ -4,6 +4,9 @@ const fs = require("fs");
 const path = require("path");
 const hre = require("hardhat");
 
+// Добавляем поддержку fetch для Node.js
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+
 require('dotenv').config();
 
 // Получаем конфигурацию сети
@@ -210,12 +213,12 @@ async function main(action) {
 
   // Проверка корректности action
   if (action === undefined || action === null) {
-    throw new Error("Не указан параметр action. Используйте: node deploy_full.js <action> [contract_name] (0-10, 40-41, 777, 888)");
+    throw new Error("Не указан параметр action. Используйте: node deploy_full.js <action> [contract_name] (0-13, 40-41, 777, 888)");
   }
 
   action = parseInt(action);
-  if (isNaN(action) || (action < 0 || action > 10) && (action < 40 || action > 41) && action !== 777 && action !== 888) {
-    throw new Error("Некорректное значение action. Допустимые значения: 0-10, 40-41, 777, 888");
+  if (isNaN(action) || (action < 0 || action > 13) && (action < 40 || action > 41) && action !== 777 && action !== 888) {
+    throw new Error("Некорректное значение action. Допустимые значения: 0-13, 40-41, 777, 888");
   }
 
   // Для action 5 требуется дополнительный параметр
@@ -523,6 +526,68 @@ async function main(action) {
         throw new Error("Для action 10 требуется указать адрес пользователя");
       }
       await grantSellerRole(userAddress);
+    }
+
+    // Генерация инвайтов для активного селлера
+    if (action === 11) {
+      const sellerAddress = SELLER_ADDRESS;
+      const inviteCount = parseInt(args[1]) || 12; // По умолчанию 12 инвайтов
+      
+      if (!sellerAddress) {
+        throw new Error("Для action 11 требуется SELLER_ADDRESS в .env");
+      }
+      
+      console.log(`\n🎲 Action 11: Генерируем ${inviteCount} инвайтов для селлера ${sellerAddress}...`);
+      
+      // Загружаем SpiralEngine
+      const spiralEngine = await loadContract("SpiralEngine");
+      console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
+      
+      // Проверяем что селлер активирован и имеет роль SELLER_ROLE
+      await validateSellerAccess(sellerAddress, spiralEngine);
+      
+      // Генерируем инвайты используя существующую функцию из action 888
+      await generateInvitesForSellerAction11(spiralEngine, sellerAddress, inviteCount);
+      
+      console.log("✅ Action 11 завершен успешно!");
+    }
+
+    // Получение полного каталога с загрузкой данных через CID
+    if (action === 12) {
+      const sellerAddress = SELLER_ADDRESS || args[1];
+      if (!sellerAddress) {
+        throw new Error("Для action 12 требуется SELLER_ADDRESS в .env или указать адрес продавца как аргумент");
+      }
+      
+      console.log(`\n📋 Action 12: Получаем полный каталог для продавца ${sellerAddress}...`);
+      
+      // Загружаем ProductRegistry
+      const productRegistry = await loadContract("ProductRegistry");
+      console.log("📦 Адрес ProductRegistry:", productRegistry.options.address);
+      
+      // Получаем полный каталог с загрузкой данных
+      await getFullCatalogWithData(productRegistry, sellerAddress);
+      
+      console.log("✅ Action 12 завершен успешно!");
+    }
+
+    // Обновление продуктов кордицепса с исправленными изображениями
+    if (action === 13) {
+      const sellerAddress = SELLER_ADDRESS || args[1];
+      if (!sellerAddress) {
+        throw new Error("Для action 13 требуется SELLER_ADDRESS в .env или указать адрес продавца как аргумент");
+      }
+      
+      console.log(`\n🔄 Action 13: Обновляем продукты кордицепса для продавца ${sellerAddress}...`);
+      
+      // Загружаем ProductRegistry
+      const productRegistry = await loadContract("ProductRegistry");
+      console.log("📦 Адрес ProductRegistry:", productRegistry.options.address);
+      
+      // Обновляем продукты кордицепса
+      await updateCordycepsProducts(productRegistry, sellerAddress);
+      
+      console.log("✅ Action 13 завершен успешно!");
     }
 
     // Выводим адреса контрактов только если они были задействованы
@@ -2415,6 +2480,333 @@ node deploy_full.js 888 <deployerInvite> <sellerAddress> [catalogData]
     console.log("✅ Документация обновлена");
 }
 
+/**
+ * Генерация инвайтов для активного селлера (Action 11)
+ * Использует существующую логику из generateInvitesForSeller с поддержкой кастомного количества
+ * @param {Object} spiralEngine - экземпляр контракта SpiralEngine
+ * @param {string} sellerAddress - адрес селлера
+ * @param {number} inviteCount - количество инвайтов для генерации
+ */
+async function generateInvitesForSellerAction11(spiralEngine, sellerAddress, inviteCount) {
+    console.log(`🔷 Генерируем ${inviteCount} инвайтов для селлера ${sellerAddress}...`);
+    
+    // Генерируем инвайт коды в стандартном формате AMANITA-XXXX-XXXX
+    const inviteCodes = generateInviteCodes(inviteCount);
+    console.log(`🔷 Сгенерированы инвайт коды: ${inviteCodes.join(", ")}`);
+    
+    for (let i = 0; i < inviteCount; i++) {
+        const inviteCode = inviteCodes[i];
+        
+        const mintTx = await spiralEngine.methods.mintInvite(inviteCode, 0).send({
+            from: sellerAddress,
+            gas: 500000,
+            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
+        });
+        
+        console.log(`✅ Инвайт ${inviteCode} создан, tx: ${mintTx.transactionHash}`);
+    }
+    
+    // Сохраняем инвайты в файл (используем тот же формат что и в action 888)
+    const invitesPath = path.join(__dirname, "..", "bot", "flowers", `${sellerAddress}_invites.txt`);
+    fs.writeFileSync(invitesPath, inviteCodes.join("\n"));
+    console.log(`✅ Инвайты селлера сохранены в ${invitesPath}`);
+}
+
+/**
+ * Получение полного каталога с загрузкой всех данных через CID
+ * @param {Object} productRegistry - контракт ProductRegistry
+ * @param {string} sellerAddress - адрес продавца
+ */
+async function getFullCatalogWithData(productRegistry, sellerAddress) {
+    console.log(`🔍 Получаем продукты продавца ${sellerAddress}...`);
+    
+    try {
+        // Получаем все продукты продавца
+        const products = await productRegistry.methods.getProductsBySellerFull().call({
+            from: sellerAddress
+        });
+        console.log(`📦 Найдено ${products.length} продуктов`);
+        
+        if (products.length === 0) {
+            console.log("⚠️ У продавца нет продуктов в каталоге");
+            return;
+        }
+        
+        // Подсчитываем активные продукты
+        const activeProductsCount = products.filter(p => p.active).length;
+        console.log(`🟢 Активных продуктов: ${activeProductsCount}`);
+        
+        // Создаем директорию для сохранения данных каталога
+        const catalogDir = path.join(__dirname, "..", "bot", "catalog_data");
+        if (!fs.existsSync(catalogDir)) {
+            fs.mkdirSync(catalogDir, { recursive: true });
+        }
+        
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const catalogFile = path.join(catalogDir, `catalog_${sellerAddress}_${timestamp}.json`);
+        
+        const catalogData = {
+            seller_address: sellerAddress,
+            timestamp: new Date().toISOString(),
+            total_products: products.length,
+            active_products: activeProductsCount,
+            products: []
+        };
+        
+        console.log(`\n📋 Обрабатываем продукты...`);
+        
+        for (let i = 0; i < products.length; i++) {
+            const product = products[i];
+            console.log(`\n🔍 Продукт ${i + 1}/${products.length}: ID=${product.id}`);
+            console.log(`  📦 CID продукта: ${product.ipfsCID}`);
+            console.log(`  👤 Продавец: ${product.seller}`);
+            console.log(`  🟢 Активен: ${product.active}`);
+            
+            try {
+                // Загружаем данные продукта через CID
+                const productData = await downloadDataFromCID(product.ipfsCID, 'product');
+                
+                if (productData) {
+                    console.log(`  ✅ Данные продукта загружены`);
+                    console.log(`    🏷️ Название: ${productData.title || 'N/A'}`);
+                    console.log(`    🧬 Вид: ${productData.species || 'N/A'}`);
+                    console.log(`    📝 Компонентов: ${productData.organic_components?.length || 0}`);
+                    console.log(`    🖼️ Обложка: ${productData.cover_image_url || 'НЕТ'}`);
+                    
+                    // Загружаем описания компонентов
+                    if (productData.organic_components) {
+                        console.log(`    📚 Загружаем описания компонентов...`);
+                        for (let j = 0; j < productData.organic_components.length; j++) {
+                            const component = productData.organic_components[j];
+                            console.log(`      🔬 Компонент ${j + 1}: ${component.biounit_id}`);
+                            console.log(`        📄 CID описания: ${component.description_cid}`);
+                            
+                            try {
+                                const descriptionData = await downloadDataFromCID(component.description_cid, 'description');
+                                if (descriptionData) {
+                                    console.log(`        ✅ Описание загружено`);
+                                    console.log(`        📝 Название: ${descriptionData.title || 'N/A'}`);
+                                    component.description_data = descriptionData;
+                                } else {
+                                    console.log(`        ❌ Не удалось загрузить описание`);
+                                }
+                            } catch (descError) {
+                                console.log(`        ❌ Ошибка загрузки описания: ${descError.message}`);
+                            }
+                        }
+                    }
+                    
+                    catalogData.products.push({
+                        blockchain_id: product.id,
+                        seller: product.seller,
+                        active: product.active,
+                        product_cid: product.ipfsCID,
+                        product_data: productData
+                    });
+                } else {
+                    console.log(`  ❌ Не удалось загрузить данные продукта`);
+                    catalogData.products.push({
+                        blockchain_id: product.id,
+                        seller: product.seller,
+                        active: product.active,
+                        product_cid: product.ipfsCID,
+                        product_data: null,
+                        error: "Failed to download product data"
+                    });
+                }
+                
+            } catch (error) {
+                console.log(`  ❌ Ошибка обработки продукта: ${error.message}`);
+                catalogData.products.push({
+                    blockchain_id: product.id,
+                    seller: product.seller,
+                    active: product.active,
+                    product_cid: product.ipfsCID,
+                    product_data: null,
+                    error: error.message
+                });
+            }
+        }
+        
+        // Сохраняем данные каталога (обрабатываем BigInt)
+        const jsonString = JSON.stringify(catalogData, (key, value) => 
+            typeof value === 'bigint' ? value.toString() : value, 2
+        );
+        fs.writeFileSync(catalogFile, jsonString);
+        console.log(`\n✅ Данные каталога сохранены в: ${catalogFile}`);
+        
+        // Выводим статистику
+        const successfulProducts = catalogData.products.filter(p => p.product_data !== null).length;
+        const failedProducts = catalogData.products.length - successfulProducts;
+        
+        console.log(`\n📊 Статистика каталога:`);
+        console.log(`  📦 Всего продуктов: ${catalogData.total_products}`);
+        console.log(`  🟢 Активных: ${catalogData.active_products}`);
+        console.log(`  ✅ Успешно загружено: ${successfulProducts}`);
+        console.log(`  ❌ Ошибок загрузки: ${failedProducts}`);
+        
+        // Выводим проблемы валидации
+        console.log(`\n🔍 Анализ проблем валидации:`);
+        catalogData.products.forEach((product, index) => {
+            if (product.product_data) {
+                const issues = [];
+                
+                // Проверяем cover_image_url
+                if (!product.product_data.cover_image_url || product.product_data.cover_image_url.trim() === '') {
+                    issues.push('Пустой cover_image_url');
+                }
+                
+                // Проверяем biounit_id на дефисы
+                if (product.product_data.organic_components) {
+                    product.product_data.organic_components.forEach(comp => {
+                        if (comp.biounit_id && comp.biounit_id.includes('-')) {
+                            issues.push(`biounit_id с дефисом: ${comp.biounit_id}`);
+                        }
+                    });
+                }
+                
+                if (issues.length > 0) {
+                    console.log(`  ⚠️ Продукт ${index + 1} (ID=${product.blockchain_id}): ${issues.join(', ')}`);
+                }
+            }
+        });
+        
+    } catch (error) {
+        console.error(`❌ Ошибка получения каталога: ${error.message}`);
+        throw error;
+    }
+}
+
+/**
+ * Загрузка данных через CID из IPFS
+ * @param {string} cid - Content Identifier
+ * @param {string} type - тип данных ('product', 'description', 'image')
+ * @returns {Object|null} загруженные данные или null при ошибке
+ */
+async function downloadDataFromCID(cid, type) {
+    if (!cid || cid.trim() === '') {
+        console.log(`    ⚠️ Пустой CID для типа ${type}`);
+        return null;
+    }
+    
+    try {
+        // Используем Pinata Gateway для загрузки
+        const url = `https://gateway.pinata.cloud/ipfs/${cid}`;
+        console.log(`    🔗 Загружаем ${type} из: ${url}`);
+        
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log(`    ✅ ${type} загружен успешно`);
+        return data;
+        
+    } catch (error) {
+        console.log(`    ❌ Ошибка загрузки ${type}: ${error.message}`);
+        return null;
+    }
+}
+
+/**
+ * Обновляет продукты кордицепса с исправленными изображениями
+ * @param {Object} productRegistry - контракт ProductRegistry
+ * @param {string} sellerAddress - адрес продавца
+ */
+async function updateCordycepsProducts(productRegistry, sellerAddress) {
+    console.log(`🔍 Ищем продукты кордицепса для продавца ${sellerAddress}...`);
+    
+    try {
+        // Получаем все продукты продавца
+        const products = await productRegistry.methods.getProductsBySellerFull().call({
+            from: sellerAddress
+        });
+        console.log(`📦 Найдено ${products.length} продуктов`);
+        
+        // Фильтруем продукты кордицепса
+        const cordycepsProducts = [];
+        for (let i = 0; i < products.length; i++) {
+            const product = products[i];
+            console.log(`🔍 Проверяем продукт ${i + 1}: ID=${product.id}, CID=${product.ipfsCID}`);
+            
+            // Загружаем данные продукта
+            const productData = await downloadDataFromCID(product.ipfsCID, 'product');
+            if (productData && productData.business_id && productData.business_id.includes('cordyceps')) {
+                cordycepsProducts.push({
+                    id: product.id,
+                    cid: product.ipfsCID,
+                    business_id: productData.business_id,
+                    current_data: productData
+                });
+                console.log(`  ✅ Найден продукт кордицепса: ${productData.business_id}`);
+            }
+        }
+        
+        console.log(`\n📋 Найдено ${cordycepsProducts.length} продуктов кордицепса`);
+        
+        if (cordycepsProducts.length === 0) {
+            console.log("⚠️ Продукты кордицепса не найдены");
+            return;
+        }
+        
+        // Загружаем обновленные данные из файла
+        const updateDataPath = path.join(__dirname, "..", "bot", "catalog", "cordyceps_contract_update.json");
+        if (!fs.existsSync(updateDataPath)) {
+            throw new Error(`Файл ${updateDataPath} не найден. Сначала запустите fix_cordyceps_images.py`);
+        }
+        
+        const updateData = JSON.parse(fs.readFileSync(updateDataPath, "utf8"));
+        console.log(`📋 Загружены данные для обновления: ${updateData.updated_products.length} продуктов`);
+        
+        // Обновляем каждый продукт
+        for (const cordycepsProduct of cordycepsProducts) {
+            console.log(`\n🔄 Обновляем продукт ${cordycepsProduct.business_id} (ID: ${cordycepsProduct.id})`);
+            
+            // Находим соответствующие обновленные данные
+            const updatedProduct = updateData.updated_products.find(p => p.id === cordycepsProduct.business_id);
+            if (!updatedProduct) {
+                console.log(`  ⚠️ Обновленные данные для ${cordycepsProduct.business_id} не найдены`);
+                continue;
+            }
+            
+            console.log(`  📦 Новый CID: ${updatedProduct.ipfsCID}`);
+            
+            // Извлекаем цену из текущих данных
+            let price = 0;
+            if (cordycepsProduct.current_data.prices && cordycepsProduct.current_data.prices.length > 0) {
+                price = parseInt(cordycepsProduct.current_data.prices[0].price) || 0;
+            }
+            
+            console.log(`  💰 Цена для события: ${price}`);
+            
+            try {
+                // Обновляем продукт в контракте
+                await productRegistry.methods.updateProduct(
+                    cordycepsProduct.id,
+                    updatedProduct.ipfsCID,
+                    price
+                ).send({
+                    from: sellerAddress,
+                    gas: 500000,
+                    gasPrice: web3.utils.toWei('50', 'gwei')
+                });
+                
+                console.log(`  ✅ Продукт ${cordycepsProduct.business_id} обновлен успешно`);
+                
+            } catch (error) {
+                console.log(`  ❌ Ошибка обновления продукта ${cordycepsProduct.business_id}: ${error.message}`);
+            }
+        }
+        
+        console.log("\n🎉 Обновление продуктов кордицепса завершено!");
+        
+    } catch (error) {
+        console.error(`❌ Ошибка обновления продуктов кордицепса: ${error.message}`);
+        throw error;
+    }
+}
+
 // Получаем action из аргументов командной строки или переменной окружения
 // Игнорируем флаги Hardhat (--network, --verbose и т.д.)
 const args = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
@@ -2424,7 +2816,7 @@ console.log("[deploy_full.js] action:", action);
 // Проверяем что action является числом
 if (isNaN(parseInt(action))) {
   console.error("❌ Ошибка: action должен быть числом");
-  console.error("Допустимые значения: 0-10, 40-41, 777, 888");
+  console.error("Допустимые значения: 0-12, 40-41, 777, 888");
   process.exit(1);
 }
 
