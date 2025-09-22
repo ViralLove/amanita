@@ -248,6 +248,43 @@ npx hardhat run scripts/deploy_full.js --network localhost 5 SoulMetadata
 npx hardhat run scripts/deploy_full.js --network localhost 5 SoulIdentity
 ```
 
+#### `11` - Генерация инвайтов для активного селлера
+```bash
+# Способ 1 - через переменную окружения (12 инвайтов по умолчанию)
+DEPLOY_ACTION=11 npx hardhat run scripts/deploy_full.js --network localhost
+
+# Способ 2 - через аргументы командной строки (кастомное количество)
+npx hardhat run scripts/deploy_full.js --network localhost 11 <COUNT>
+```
+**Описание:** Генерирует инвайт-коды для активного селлера (SELLER_ADDRESS из .env)
+**Параметры:**
+- `COUNT`: количество инвайтов для генерации (по умолчанию 12)
+**Требования:** 
+- SELLER_ADDRESS должен быть активирован и иметь роль SELLER_ROLE
+- SELLER_PRIVATE_KEY в .env (для подписи транзакций)
+**Результат:** Сохраняет инвайты в `bot/flowers/{SELLER_ADDRESS}_invites.txt`
+**Использование:** Регулярное пополнение инвайтов для приглашения аудитории
+
+#### `12` - Получение полного каталога с данными
+```bash
+# Способ 1 - через переменную окружения (использует SELLER_ADDRESS)
+DEPLOY_ACTION=12 npx hardhat run scripts/deploy_full.js --network localhost
+
+# Способ 2 - через аргументы командной строки (указать адрес продавца)
+npx hardhat run scripts/deploy_full.js --network localhost 12 <SELLER_ADDRESS>
+```
+**Описание:** Получает полный каталог продавца из блокчейна и загружает все связанные данные через CID
+**Параметры:**
+- `SELLER_ADDRESS`: адрес продавца (если не указан, используется SELLER_ADDRESS из .env)
+**Функциональность:**
+- Получает все продукты продавца из блокчейна
+- Загружает данные продуктов через IPFS CID
+- Загружает описания компонентов через их CID
+- Анализирует проблемы валидации (пустые cover_image_url, дефисы в biounit_id)
+- Сохраняет полные данные в JSON файл
+**Результат:** Сохраняет данные в `bot/catalog_data/catalog_{SELLER_ADDRESS}_{timestamp}.json`
+**Использование:** Отладка проблем валидации, анализ данных каталога
+
 ### Действия с каталогом
 
 #### `40` - Создание каталога (альтернатива action 4)
@@ -574,7 +611,9 @@ DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
 DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
 
 # 4. Полная инициализация селлера (способ 1 - через переменные окружения)
-DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-29NV-YTBS SELLER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8 npx hardhat run scripts/deploy_full.js --network localhost
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-B1G4-ADJO npx hardhat run scripts/deploy_full.js --network localhost
+или
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-QDBQ-JJSS SELLER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8 npx hardhat run scripts/deploy_full.js --network localhost
 
 # Альтернативно - через аргументы командной строки:
 # npx hardhat run scripts/deploy_full.js --network localhost 1
