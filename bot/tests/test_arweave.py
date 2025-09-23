@@ -27,7 +27,7 @@ def arweave_uploader():
     """
     load_dotenv()
     key_path = os.getenv("ARWEAVE_PRIVATE_KEY")
-    logger.info(f"ARWEAVE_PRIVATE_KEY: {key_path[:50]}..." if key_path and len(key_path) > 50 else key_path)
+    logger.info("ARWEAVE_PRIVATE_KEY: ********")
     assert key_path, "ARWEAVE_PRIVATE_KEY не установлен в .env"
     
     # Проверяем, является ли ключ JSON строкой или файлом

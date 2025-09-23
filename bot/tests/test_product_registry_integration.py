@@ -289,7 +289,7 @@ def test_seller_account_fixture():
         logger.info("🔧 Тест 2: Проверка при наличии SELLER_PRIVATE_KEY")
         if original_seller_key:
             # Если ключ был установлен, проверяем, что он валидный
-            logger.info(f"🔧 SELLER_PRIVATE_KEY найден: {original_seller_key[:10]}...")
+            logger.info("🔧 SELLER_PRIVATE_KEY найден: ********")
             
             # Проверяем, что ключ можно использовать для создания аккаунта
             try:

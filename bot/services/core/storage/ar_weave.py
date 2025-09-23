@@ -25,7 +25,7 @@ class ArWeaveUploader(BaseStorageProvider):
         if not ARWEAVE_PRIVATE_KEY:
             raise FileNotFoundError("ARWEAVE_PRIVATE_KEY is missing.")
         
-        logger.info(f"ARWEAVE_PRIVATE_KEY: {ARWEAVE_PRIVATE_KEY[:50]}..." if len(ARWEAVE_PRIVATE_KEY) > 50 else ARWEAVE_PRIVATE_KEY)
+        logger.info("ARWEAVE_PRIVATE_KEY: ********")
         
         # Проверяем, является ли ключ JSON строкой или файлом
         if ARWEAVE_PRIVATE_KEY.startswith('{'):

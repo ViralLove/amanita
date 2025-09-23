@@ -2569,7 +2569,7 @@ def integration_storage_config():
     
     print(f"🔍 [DEVOPS] PINATA_API_KEY: {'✅ Установлен' if pinata_api_key else '❌ Не установлен'}")
     print(f"🔍 [DEVOPS] PINATA_SECRET_KEY: {'✅ Установлен' if pinata_secret_key else '❌ Не установлен'}")
-    print(f"🔍 [DEVOPS] ARWEAVE_PRIVATE_KEY: {'✅ Установлен' if arweave_private_key else '❌ Не установлен'}")
+    print("🔍 [DEVOPS] ARWEAVE_PRIVATE_KEY: ********")
     
     configs = {
         "mock": {
