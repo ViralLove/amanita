@@ -9,10 +9,10 @@ import argparse
 import traceback
 
 # Импортируем фасадные методы
-from utility.upload_catalog_images import process_catalog_images
-from utility.upload_organic_descriptions import process_organic_descriptions
-from utility.catalog_csv2json import process_catalog_conversion
-from utility.prepare_products_for_registry import process_registry_preparation
+from .upload_catalog_images import process_catalog_images
+from .upload_organic_descriptions import process_organic_descriptions
+from .catalog_csv2json import process_catalog_conversion
+from .prepare_products_for_registry import process_registry_preparation
 from services.product.registry import ProductRegistryService
 from services.core.blockchain import BlockchainService
 from services.service_factory import ServiceFactory
@@ -85,14 +85,14 @@ class CatalogPipelineConfig:
 def load_pipeline_config() -> CatalogPipelineConfig:
     """Загружает конфигурацию из .env файла"""
     load_dotenv(os.path.join("bot", ".env"))
-    base_dir = os.path.join("bot", "catalog")
+    base_dir = "catalog"
 
     serviceFactory = ServiceFactory()
     productRegistry = serviceFactory.create_product_registry_service()
     
     return CatalogPipelineConfig(
         # Входные данные
-        IMAGES_DIR=os.getenv("CATALOG_IMAGES_DIR", os.path.join(base_dir)),
+        IMAGES_DIR=os.getenv("CATALOG_IMAGES_DIR", base_dir),
         CATALOG_CSV=os.getenv("CATALOG_CSV_PATH", os.path.join(base_dir, "Iveta_catalog.csv")),
         ORGANIC_DESCRIPTIONS_JSON=os.getenv("ORGANIC_DESCRIPTIONS_JSON", os.path.join(base_dir, "organic_descriptions.json")),
         

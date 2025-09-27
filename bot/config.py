@@ -82,9 +82,9 @@ if STORAGE_COMMUNICATION_TYPE not in ["sync", "async", "hybrid"]:
 logging.info(f"[CONFIG] STORAGE_COMMUNICATION_TYPE: {STORAGE_COMMUNICATION_TYPE}")
 
 # Адрес реестра контрактов
-AMANITA_REGISTRY_CONTRACT_ADDRESS = os.getenv("AMANITA_REGISTRY_CONTRACT_ADDRESS")
-if not AMANITA_REGISTRY_CONTRACT_ADDRESS:
-    raise ValueError("AMANITA_REGISTRY_CONTRACT_ADDRESS не установлен в .env")
+MAGIC_REGISTRY_CONTRACT_ADDRESS = os.getenv("MAGIC_REGISTRY_CONTRACT_ADDRESS")
+if not MAGIC_REGISTRY_CONTRACT_ADDRESS:
+    raise ValueError("MAGIC_REGISTRY_CONTRACT_ADDRESS не установлен в .env")
 
 # Настройки путей
 # Корневая папка приложения (bot для локальной разработки, app для продакшена)

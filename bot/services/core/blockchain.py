@@ -14,7 +14,7 @@ try:
         SELLER_PRIVATE_KEY,
         RPC_URL,
         ABI_BASE_DIR,
-        AMANITA_REGISTRY_CONTRACT_ADDRESS
+        MAGIC_REGISTRY_CONTRACT_ADDRESS
     )
 except ImportError:
     # Fallback для запуска из папки bot
@@ -22,7 +22,7 @@ except ImportError:
         SELLER_PRIVATE_KEY,
         RPC_URL,
         ABI_BASE_DIR,
-        AMANITA_REGISTRY_CONTRACT_ADDRESS
+        MAGIC_REGISTRY_CONTRACT_ADDRESS
     )
 
 load_dotenv(dotenv_path="bot/.env")
@@ -220,15 +220,15 @@ class BlockchainService:
         """Загружает контракт реестра"""
         try:
             # Загружаем ABI (единый путь загрузки)
-            abi = load_abi("AmanitaRegistry")
+            abi = load_abi("MagicRegistry")
                 
             # Создаем контракт
             contract = self.web3.eth.contract(
-                address=AMANITA_REGISTRY_CONTRACT_ADDRESS,
+                address=MAGIC_REGISTRY_CONTRACT_ADDRESS,
                 abi=abi
             )
             
-            logger.info(f"[Web3] Загружен контракт реестра: {AMANITA_REGISTRY_CONTRACT_ADDRESS}")
+            logger.info(f"[Web3] Загружен контракт реестра: {MAGIC_REGISTRY_CONTRACT_ADDRESS}")
             return contract
             
         except Exception as e:
@@ -246,7 +246,7 @@ class BlockchainService:
             for name in contract_names:
                 try:
                     # Получаем адрес контракта из реестра
-                    address = self.registry.functions.getAddress(name).call()
+                    address = self.registry.functions.get(name).call()
                     logger.info(f"[Web3] Получен адрес контракта {name}: {address}")
                     
                     # Загружаем ABI (единый путь загрузки)

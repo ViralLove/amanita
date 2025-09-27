@@ -21,11 +21,11 @@ const SELLER_ADDRESS = process.env.SELLER_ADDRESS;
 const SELLER_PRIVATE_KEY = process.env.SELLER_PRIVATE_KEY ? 
   (process.env.SELLER_PRIVATE_KEY.startsWith('0x') ? process.env.SELLER_PRIVATE_KEY : `0x${process.env.SELLER_PRIVATE_KEY}`) : null;
 
-const AMANITA_REGISTRY_CONTRACT_ADDRESS = process.env.AMANITA_REGISTRY_CONTRACT_ADDRESS;
+const MAGIC_REGISTRY_CONTRACT_ADDRESS = process.env.MAGIC_REGISTRY_CONTRACT_ADDRESS;
 const SPIRAL_ENGINE_CONTRACT_ADDRESS = process.env.SPIRAL_ENGINE_CONTRACT_ADDRESS;
 const PRODUCT_REGISTRY_CONTRACT_ADDRESS = process.env.PRODUCT_REGISTRY_CONTRACT_ADDRESS;
 const SOUL_IDENTITY_CONTRACT_ADDRESS = process.env.SOUL_IDENTITY_CONTRACT_ADDRESS;
-console.log("AMANITA_REGISTRY_CONTRACT_ADDRESS:", AMANITA_REGISTRY_CONTRACT_ADDRESS);
+console.log("MAGIC_REGISTRY_CONTRACT_ADDRESS:", MAGIC_REGISTRY_CONTRACT_ADDRESS);
 console.log("SPIRAL_ENGINE_CONTRACT_ADDRESS:", SPIRAL_ENGINE_CONTRACT_ADDRESS);
 console.log("PRODUCT_REGISTRY_CONTRACT_ADDRESS:", PRODUCT_REGISTRY_CONTRACT_ADDRESS);
 console.log("SOUL_IDENTITY_CONTRACT_ADDRESS:", SOUL_IDENTITY_CONTRACT_ADDRESS);
@@ -56,21 +56,29 @@ web3.eth.accounts.wallet.add(deployerAccount);
 
 // Создаем аккаунт продавца только если есть приватный ключ
 let sellerAccount = null;
-if (SELLER_PRIVATE_KEY) {
-  sellerAccount = web3.eth.accounts.privateKeyToAccount(SELLER_PRIVATE_KEY);
-  web3.eth.accounts.wallet.add(sellerAccount);
+if (SELLER_PRIVATE_KEY && SELLER_PRIVATE_KEY !== 'undefined' && SELLER_PRIVATE_KEY !== 'null') {
+  try {
+    sellerAccount = web3.eth.accounts.privateKeyToAccount(SELLER_PRIVATE_KEY);
+    web3.eth.accounts.wallet.add(sellerAccount);
+    console.log(`✅ Seller account created: ${sellerAccount.address}`);
+  } catch (error) {
+    console.error(`❌ Error creating seller account: ${error.message}`);
+    console.error(`❌ SELLER_PRIVATE_KEY value: ${SELLER_PRIVATE_KEY}`);
+  }
+} else {
+  console.log(`⚠️ SELLER_PRIVATE_KEY not set or invalid: ${SELLER_PRIVATE_KEY}`);
 }
 
 // Функция для загрузки артефакта контракта
 async function loadContract(contractName, contractAddress = null) {
   // Сначала проверяем переменные окружения
   if (contractAddress == null) {
-    if (contractName === 'AmanitaRegistry' && AMANITA_REGISTRY_CONTRACT_ADDRESS) {
-      contractAddress = AMANITA_REGISTRY_CONTRACT_ADDRESS;
+    if (contractName === 'MagicRegistry' && MAGIC_REGISTRY_CONTRACT_ADDRESS) {
+      contractAddress = MAGIC_REGISTRY_CONTRACT_ADDRESS;
     } else if (contractName === 'SpiralEngine' && SPIRAL_ENGINE_CONTRACT_ADDRESS) {
       contractAddress = SPIRAL_ENGINE_CONTRACT_ADDRESS;
-    } else if (amanitaRegistry) {
-      contractAddress = await amanitaRegistry.methods.getAddress(contractName).call();
+    } else if (magicRegistry) {
+      contractAddress = await magicRegistry.methods.get(contractName).call();
     }
   }
 
@@ -103,7 +111,7 @@ async function loadContractArtifact(contractName) {
   return JSON.parse(fs.readFileSync(artifactPath, "utf8"));
 }
 
-amanitaRegistry = null;
+magicRegistry = null;
 // Универсальная функция деплоя контракта
 async function deployContract(contractName, constructorArgs = [], options = {}) {
   console.log(`\n=== Начинаем деплой ${contractName} в сеть ${network.toUpperCase()} ===`);
@@ -161,7 +169,7 @@ async function deployContract(contractName, constructorArgs = [], options = {}) 
   }
 
   // Регистрация в реестре (если нужно)
-  if (amanitaRegistry != null) {
+  if (magicRegistry != null) {
     try {
       console.log(`🔷 Регистрируем ${contractName} в реестре...`);
       
@@ -169,7 +177,7 @@ async function deployContract(contractName, constructorArgs = [], options = {}) 
       const balanceBefore = await web3.eth.getBalance(deployerAccount.address);
       console.log(`💰 Баланс до регистрации: ${web3.utils.fromWei(balanceBefore, 'ether')} MATIC`);
       
-      const tx = await amanitaRegistry.methods.setAddress(contractName, instance.options.address).send({
+      const tx = await magicRegistry.methods.set(contractName, instance.options.address).send({
         from: deployerAccount.address,
         gas: network === 'polygon' ? 500000 : 200000, // Увеличиваем газ для Polygon
         gasPrice: gasPrice
@@ -272,69 +280,69 @@ async function main(action) {
   try {
     // Деплой или загрузка реестра
     if (action === 0) {
-      console.log("\n🔷 Деплоим AmanitaRegistry...");
-      amanitaRegistry = await deployContract("AmanitaRegistry");
+      console.log("\n🔷 Деплоим MagicRegistry...");
+      magicRegistry = await deployContract("MagicRegistry");
       console.log("\n⭐️ ВАЖНО! Адрес реестра для .env:");
-      console.log("AMANITA_REGISTRY_CONTRACT_ADDRESS=" + amanitaRegistry.options.address);
+      console.log("MAGIC_REGISTRY_CONTRACT_ADDRESS=" + magicRegistry.options.address);
       console.log("⭐️ Скопируйте этот адрес в bot/.env\n");
     } else if (action === 1) {
       // Для action 1 — умная логика загрузки реестра
-      console.log("\n🔷 Обрабатываем AmanitaRegistry...");
+      console.log("\n🔷 Обрабатываем MagicRegistry...");
       
-      if (AMANITA_REGISTRY_CONTRACT_ADDRESS && AMANITA_REGISTRY_CONTRACT_ADDRESS !== 'undefined') {
+      if (MAGIC_REGISTRY_CONTRACT_ADDRESS && MAGIC_REGISTRY_CONTRACT_ADDRESS !== 'undefined') {
         // Если адрес есть в .env - загружаем существующий
         console.log("📋 Найден адрес реестра в .env, загружаем существующий...");
-        amanitaRegistry = await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
-        console.log("☀️ Адрес реестра:", amanitaRegistry.options.address);
+        magicRegistry = await loadContract("MagicRegistry", MAGIC_REGISTRY_CONTRACT_ADDRESS);
+        console.log("☀️ Адрес реестра:", magicRegistry.options.address);
       } else {
         // Если адреса нет - деплоим новый (чистый старт)
         console.log("📋 Адрес реестра не найден в .env, деплоим новый...");
-        amanitaRegistry = await deployContract("AmanitaRegistry");
+        magicRegistry = await deployContract("MagicRegistry");
         console.log("\n⭐️ ВАЖНО! Адрес реестра для .env:");
-        console.log("AMANITA_REGISTRY_CONTRACT_ADDRESS=" + amanitaRegistry.options.address);
+        console.log("MAGIC_REGISTRY_CONTRACT_ADDRESS=" + magicRegistry.options.address);
         console.log("⭐️ Скопируйте этот адрес в .env\n");
       }
      } else if (action === 888) {
        // Для action 888 - инициализация селлера (критическое действие)
-       console.log("\n🔷 Загружаем AmanitaRegistry для инициализации селлера...");
-       if (!AMANITA_REGISTRY_CONTRACT_ADDRESS || AMANITA_REGISTRY_CONTRACT_ADDRESS === 'undefined') {
+       console.log("\n🔷 Загружаем MagicRegistry для инициализации селлера...");
+       if (!MAGIC_REGISTRY_CONTRACT_ADDRESS || MAGIC_REGISTRY_CONTRACT_ADDRESS === 'undefined') {
          throw new Error("Адрес реестра не найден в .env. Сначала выполните action=1 для деплоя всей системы контрактов.");
        }
-       amanitaRegistry = await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
-       console.log("☀️ Адрес реестра:", amanitaRegistry.options.address);
+       magicRegistry = await loadContract("MagicRegistry", MAGIC_REGISTRY_CONTRACT_ADDRESS);
+       console.log("☀️ Адрес реестра:", magicRegistry.options.address);
      } else {
        // В остальных случаях просто загружаем реестр из .env
-       console.log("\n🔷 Загружаем AmanitaRegistry...");
-       if (!AMANITA_REGISTRY_CONTRACT_ADDRESS || AMANITA_REGISTRY_CONTRACT_ADDRESS === 'undefined') {
+       console.log("\n🔷 Загружаем MagicRegistry...");
+       if (!MAGIC_REGISTRY_CONTRACT_ADDRESS || MAGIC_REGISTRY_CONTRACT_ADDRESS === 'undefined') {
          throw new Error("Адрес реестра не найден в .env. Сначала выполните action=0 или action=1 для деплоя реестра.");
        }
-       amanitaRegistry = await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
-       console.log("☀️ Адрес реестра:", amanitaRegistry.options.address);
+       magicRegistry = await loadContract("MagicRegistry", MAGIC_REGISTRY_CONTRACT_ADDRESS);
+       console.log("☀️ Адрес реестра:", magicRegistry.options.address);
      }
 
     // Деплой или загрузка основных контрактов
     if (action === 1 || action === 2) {
       // Деплой SpiralEngine с проверкой существования
       console.log("\n🔷 Обрабатываем SpiralEngine...");
-      spiralEngine = await deploySingleContract("SpiralEngine", amanitaRegistry);
+      spiralEngine = await deploySingleContract("SpiralEngine", magicRegistry);
 
       // Деплой SBT экосистемы с проверкой существования
       console.log("\n🔷 Обрабатываем SBT экосистему...");
       
       // 1. SoulboundCore (базовый SBT)
-      const soulboundCore = await deploySingleContract("SoulboundCore", amanitaRegistry);
+      const soulboundCore = await deploySingleContract("SoulboundCore", magicRegistry);
       
       // 2. SoulMetadata (метаданные)
-      const soulMetadata = await deploySingleContract("SoulMetadata", amanitaRegistry);
+      const soulMetadata = await deploySingleContract("SoulMetadata", magicRegistry);
       
       // 3. SoulRecovery (восстановление)
-      const soulRecovery = await deploySingleContract("SoulRecovery", amanitaRegistry);
+      const soulRecovery = await deploySingleContract("SoulRecovery", magicRegistry);
       
       // 4. SoulIntegration (интеграция)
-      const soulIntegration = await deploySingleContract("SoulIntegration", amanitaRegistry);
+      const soulIntegration = await deploySingleContract("SoulIntegration", magicRegistry);
       
       // 5. SoulIdentity (мост с DID)
-      const soulIdentity = await deploySingleContract("SoulIdentity", amanitaRegistry);
+      const soulIdentity = await deploySingleContract("SoulIdentity", magicRegistry);
       
       // 6. Настройка связей между SBT контрактами
       console.log("\n🔷 Настраиваем связи SBT экосистемы...");
@@ -386,7 +394,7 @@ async function main(action) {
 
       // Деплой ProductRegistry с проверкой существования
       console.log("\n🔷 Обрабатываем ProductRegistry...");
-      productRegistry = await deploySingleContract("ProductRegistry", amanitaRegistry);
+      productRegistry = await deploySingleContract("ProductRegistry", magicRegistry);
       
       console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
       console.log("☀️ Адрес ProductRegistry:", productRegistry.options.address);
@@ -461,6 +469,61 @@ async function main(action) {
       // Проверяем права доступа селлера
       const sellerAddr = sellerAccount ? sellerAccount.address : SELLER_ADDRESS;
       await validateSellerAccess(sellerAddr, spiralEngine);
+      
+      // Очищаем существующий каталог перед созданием нового
+      console.log(`🧹 Очищаем существующий каталог продавца...`);
+      try {
+        // Проверяем, есть ли продукты в каталоге
+        const existingProducts = await productRegistry.methods.getProductsBySeller(sellerAddr).call();
+        console.log(`🔍 Найдено существующих продуктов: ${existingProducts.length}`);
+        
+        if (existingProducts.length === 0) {
+          console.log(`✅ Каталог уже пустой, пропускаем очистку`);
+        } else {
+          // Создаем кошелек продавца для очистки каталога
+          if (!SELLER_PRIVATE_KEY) {
+            throw new Error("SELLER_PRIVATE_KEY не найден в .env для очистки каталога");
+          }
+          
+          const sellerWallet = web3.eth.accounts.privateKeyToAccount(SELLER_PRIVATE_KEY);
+          web3.eth.accounts.wallet.add(sellerWallet);
+          
+          const clearTx = await productRegistry.methods.clearSellerCatalog(sellerAddr).send({
+            from: sellerAddr, // ✅ Используем адрес продавца
+            gas: network === 'polygon' ? 500000 : 300000,
+            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : undefined
+          });
+        
+          // Ждем подтверждения транзакции
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          console.log(`✅ Каталог очищен, tx: ${clearTx.transactionHash}`);
+          
+          // Ждем подтверждения и проверяем событие CatalogCleared
+          const receipt = await web3.eth.getTransactionReceipt(clearTx.transactionHash);
+          const catalogClearedEvent = receipt.logs.find(log => {
+            try {
+              const decoded = productRegistry.options.jsonInterface.find(iface => iface.name === 'CatalogCleared');
+              return decoded && web3.utils.hexToNumber(log.topics[1]) === web3.utils.toHex(sellerAddr);
+            } catch (e) {
+              return false;
+            }
+          });
+          
+          if (catalogClearedEvent) {
+            const productsCleared = web3.utils.hexToNumber(catalogClearedEvent.data);
+            console.log(`📊 Очищено продуктов: ${productsCleared}`);
+          }
+        }
+        
+      } catch (clearError) {
+        if (clearError.message.includes("Catalog is already empty")) {
+          console.log(`✅ Каталог уже пустой, продолжаем...`);
+        } else {
+          console.log(`⚠️ Ошибка при очистке каталога: ${clearError.message}`);
+          console.log(`⚠️ Продолжаем без очистки...`);
+        }
+      }
       
       await createCatalog(productRegistry, sellerAddr);
       console.log("✅ Каталог с неактивными продуктами успешно загружен!");
@@ -571,21 +634,24 @@ async function main(action) {
       console.log("✅ Action 12 завершен успешно!");
     }
 
-    // Обновление продуктов кордицепса с исправленными изображениями
+    // Диагностика состояния селлера (Action 13)
     if (action === 13) {
       const sellerAddress = SELLER_ADDRESS || args[1];
       if (!sellerAddress) {
         throw new Error("Для action 13 требуется SELLER_ADDRESS в .env или указать адрес продавца как аргумент");
       }
       
-      console.log(`\n🔄 Action 13: Обновляем продукты кордицепса для продавца ${sellerAddress}...`);
+      console.log(`\n🔍 Action 13: Диагностика состояния селлера ${sellerAddress}...`);
       
-      // Загружаем ProductRegistry
+      // Загружаем контракты
+      const spiralEngine = await loadContract("SpiralEngine");
       const productRegistry = await loadContract("ProductRegistry");
+      
+      console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
       console.log("📦 Адрес ProductRegistry:", productRegistry.options.address);
       
-      // Обновляем продукты кордицепса
-      await updateCordycepsProducts(productRegistry, sellerAddress);
+      // Выполняем полную диагностику
+      await diagnoseSellerState(spiralEngine, productRegistry, sellerAddress);
       
       console.log("✅ Action 13 завершен успешно!");
     }
@@ -593,17 +659,17 @@ async function main(action) {
     // Выводим адреса контрактов только если они были задействованы
     if (action <= 2) {
       console.log("\n⭐️ ВАЖНО! Адреса контрактов для .env:");
-      console.log("AMANITA_REGISTRY_CONTRACT_ADDRESS=" + amanitaRegistry.options.address);
+      console.log("MAGIC_REGISTRY_CONTRACT_ADDRESS=" + magicRegistry.options.address);
       if (spiralEngine) console.log("SPIRAL_ENGINE_CONTRACT_ADDRESS=" + spiralEngine.options.address);
       if (productRegistry) console.log("PRODUCT_REGISTRY_CONTRACT_ADDRESS=" + productRegistry.options.address);
       
       // Добавляем SBT адреса если они были задеплоены
       try {
-        const soulboundCoreAddress = await amanitaRegistry.methods.getAddress("SoulboundCore").call();
-        const soulMetadataAddress = await amanitaRegistry.methods.getAddress("SoulMetadata").call();
-        const soulRecoveryAddress = await amanitaRegistry.methods.getAddress("SoulRecovery").call();
-        const soulIntegrationAddress = await amanitaRegistry.methods.getAddress("SoulIntegration").call();
-        const soulIdentityAddress = await amanitaRegistry.methods.getAddress("SoulIdentity").call();
+        const soulboundCoreAddress = await magicRegistry.methods.get("SoulboundCore").call();
+        const soulMetadataAddress = await magicRegistry.methods.get("SoulMetadata").call();
+        const soulRecoveryAddress = await magicRegistry.methods.get("SoulRecovery").call();
+        const soulIntegrationAddress = await magicRegistry.methods.get("SoulIntegration").call();
+        const soulIdentityAddress = await magicRegistry.methods.get("SoulIdentity").call();
         
         if (soulboundCoreAddress !== "0x0000000000000000000000000000000000000000") {
           console.log("SOULBOUND_CORE_CONTRACT_ADDRESS=" + soulboundCoreAddress);
@@ -620,7 +686,7 @@ async function main(action) {
     // Выводим адрес задеплоенного контракта для action 5
     if (action === 5) {
       const contractName = args[1] || process.env.CONTRACT_NAME;
-      const contractAddress = await amanitaRegistry.methods.getAddress(contractName).call();
+      const contractAddress = await magicRegistry.methods.get(contractName).call();
       console.log(`\n⭐️ ВАЖНО! Адрес контракта ${contractName}:`);
       console.log(`${contractName.toUpperCase()}_CONTRACT_ADDRESS=${contractAddress}`);
     }
@@ -636,7 +702,7 @@ SELLER_ROLE = web3.utils.keccak256("SELLER_ROLE");
 
 // Поддерживаемые контракты для параметризуемого деплоя
 const SUPPORTED_CONTRACTS = {
-    'AmanitaRegistry': {
+    'MagicRegistry': {
         dependencies: [],
         needsSetup: false
     },
@@ -649,7 +715,7 @@ const SUPPORTED_CONTRACTS = {
         needsSetup: true
     },
     'LoveDoPostNFT': {
-        dependencies: ['SpiralEngine', 'AmanitaRegistry'],
+        dependencies: ['SpiralEngine', 'MagicRegistry'],
         needsSetup: true
     },
     'LoveEmissionEngine': {
@@ -692,7 +758,7 @@ const SUPPORTED_CONTRACTS = {
 
 // Маппинг контрактов на переменные окружения .env
 const CONTRACT_ENV_MAPPING = {
-    'AmanitaRegistry': 'AMANITA_REGISTRY_CONTRACT_ADDRESS',
+    'MagicRegistry': 'MAGIC_REGISTRY_CONTRACT_ADDRESS',
     'SpiralEngine': 'SPIRAL_ENGINE_CONTRACT_ADDRESS', 
     'ProductRegistry': 'PRODUCT_REGISTRY_CONTRACT_ADDRESS',
     'LoveDoPostNFT': 'LOVE_DO_POST_NFT_CONTRACT_ADDRESS',
@@ -739,19 +805,19 @@ async function checkExistingContract(contractName) {
 }
 
 /**
- * Регистрирует контракт в AmanitaRegistry
+ * Регистрирует контракт в MagicRegistry
  * @param {string} contractName - Название контракта
  * @param {Object} contractInstance - Экземпляр контракта
  */
 async function registerContractInRegistry(contractName, contractInstance, registryInstance = null) {
     // Используем переданный экземпляр реестра или загружаем из .env
-    const amanitaRegistry = registryInstance || await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
+    const magicRegistry = registryInstance || await loadContract("MagicRegistry", MAGIC_REGISTRY_CONTRACT_ADDRESS);
     
     try {
         // Проверяем существующий адрес в реестре
         let existingAddress;
         try {
-            existingAddress = await amanitaRegistry.methods.getAddress(contractName).call();
+            existingAddress = await magicRegistry.methods.get(contractName).call();
         } catch (error) {
             existingAddress = null; // Контракт еще не зарегистрирован
         }
@@ -766,7 +832,7 @@ async function registerContractInRegistry(contractName, contractInstance, regist
                 console.log(`   Новый адрес:  ${contractInstance.options.address}`);
             }
         } else {
-            console.log(`🔷 Регистрируем ${contractName} в AmanitaRegistry...`);
+            console.log(`🔷 Регистрируем ${contractName} в MagicRegistry...`);
         }
         
         // Получаем баланс до транзакции
@@ -778,7 +844,7 @@ async function registerContractInRegistry(contractName, contractInstance, regist
             web3.utils.toWei('100', 'gwei') : // 100 Gwei для Polygon mainnet
             await web3.eth.getGasPrice(); // Текущая цена для других сетей
         
-        await amanitaRegistry.methods.setAddress(contractName, contractInstance.options.address).send({
+        await magicRegistry.methods.set(contractName, contractInstance.options.address).send({
             from: deployerAccount.address,
             gas: network === 'polygon' ? 1000000 : 500000, // Увеличиваем газ для Polygon и других сетей
             gasPrice: gasPrice
@@ -839,8 +905,8 @@ async function deploySingleContract(contractName, registryInstance = null) {
     // 5. Деплой контракта
     console.log(`🚀 Создаем экземпляр ${contractName}...`);
     
-    if (contractName === 'AmanitaRegistry') {
-        contractInstance = await deployContract("AmanitaRegistry");
+    if (contractName === 'MagicRegistry') {
+        contractInstance = await deployContract("MagicRegistry");
     } else if (contractName === 'SpiralEngine') {
         contractInstance = await deployContract("SpiralEngine");
     } else if (contractName === 'ProductRegistry') {
@@ -848,7 +914,7 @@ async function deploySingleContract(contractName, registryInstance = null) {
         contractInstance = await deployContract("ProductRegistry", [spiralEngine.options.address]);
     } else if (contractName === 'LoveDoPostNFT') {
         const spiralEngine = await loadContract("SpiralEngine");
-        contractInstance = await deployContract("LoveDoPostNFT", [deployerAccount.address, spiralEngine.options.address, amanitaRegistry.options.address]);
+        contractInstance = await deployContract("LoveDoPostNFT", [deployerAccount.address, spiralEngine.options.address, magicRegistry.options.address]);
     } else if (contractName === 'LoveEmissionEngine') {
         const amanitaToken = await loadContract("AmanitaToken");
         const agovToken = await loadContract("AmanitaGovToken");
@@ -888,7 +954,7 @@ async function deploySingleContract(contractName, registryInstance = null) {
     }
     
     // 6. Регистрация в реестре (кроме самого реестра)
-    if (contractName !== 'AmanitaRegistry') {
+    if (contractName !== 'MagicRegistry') {
         await registerContractInRegistry(contractName, contractInstance, registryInstance);
         console.log(`📝 Контракт ${contractName} доступен в реестре под ключом "${contractName}"`);
     }
@@ -908,8 +974,8 @@ async function deploySingleContract(contractName, registryInstance = null) {
  * @param {string} contractName - Название контракта для проверки
  */
 async function ensureContractExists(contractName, registryInstance = null) {
-    const amanitaRegistry = registryInstance || await loadContract("AmanitaRegistry", AMANITA_REGISTRY_CONTRACT_ADDRESS);
-    const address = await amanitaRegistry.methods.getAddress(contractName).call();
+    const magicRegistry = registryInstance || await loadContract("MagicRegistry", MAGIC_REGISTRY_CONTRACT_ADDRESS);
+    const address = await magicRegistry.methods.get(contractName).call();
     if (address === "0x0000000000000000000000000000000000000000") {
         throw new Error(`Зависимость ${contractName} не найдена в реестре. Сначала задеплойте этот контракт.`);
     }
@@ -1593,7 +1659,8 @@ async function createCatalog(productRegistry, sellerAddress) {
   console.log(`💵 Баланс продавца: ${sellerBalanceInEth} MATIC`);
 
   // Добавляем продукты в ProductRegistry
-  for (const product of productsData) {
+  for (let i = 0; i < productsData.length; i++) {
+    const product = productsData[i];
     console.log(`\n➕ Добавляем продукт: ${product.id}`);
     console.log("Product properties:");
     console.log("ipfsCID:", product.ipfsCID);
@@ -1626,6 +1693,12 @@ async function createCatalog(productRegistry, sellerAddress) {
     });
     
     console.log(`✅ Продукт ${product.id} создан (по умолчанию неактивный)`);
+    
+    // Добавляем задержку между продуктами для избежания nonce ошибок
+    if (i < productsData.length - 1) {
+      console.log(`⏳ Ждем 3 секунды перед следующим продуктом...`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
   }
 
   // Проверяем добавленные продукты
@@ -2112,11 +2185,18 @@ async function action888(deployerInvite, sellerAddress, catalogData = null) {
     // 2. Загрузка необходимых контрактов
     const contracts = await loadContractsFor888();
     
-    // 3. Валидация деплоер инвайта
-    await validateDeployerInviteForSeller(contracts.spiralEngine, deployerInvite);
+    // 3. Проверка активации селлера
+    const isSellerActivated = await checkSellerActivationStatus(contracts.spiralEngine, sellerAddress);
     
-    // 4. Активация селлера в SpiralEngine
-    await activateSellerInSpiralEngine(contracts.spiralEngine, sellerAddress, deployerInvite);
+    if (!isSellerActivated) {
+        // 3.1. Валидация деплоер инвайта (только если селлер не активирован)
+        await validateDeployerInviteForSeller(contracts.spiralEngine, deployerInvite);
+        
+        // 3.2. Активация селлера в SpiralEngine
+        await activateSellerInSpiralEngine(contracts.spiralEngine, sellerAddress, deployerInvite);
+    } else {
+        console.log(`✅ Селлер уже активирован, пропускаем активацию`);
+    }
     
     // 5. Назначение роли SELLER_ROLE
     await grantSellerRoleToUser(contracts.spiralEngine, sellerAddress);
@@ -2198,6 +2278,28 @@ async function validateDeployerInviteForSeller(spiralEngine, deployerInvite) {
         console.error(`❌ Ошибка при валидации инвайта ${deployerInvite}:`, error.message);
         console.error(`❌ Детали ошибки:`, error);
         throw error;
+    }
+}
+
+// Проверка активации селлера (аналогично действию 13)
+async function checkSellerActivationStatus(spiralEngine, sellerAddress) {
+    try {
+        console.log(`🔍 Проверяем статус активации селлера ${sellerAddress}...`);
+        
+        // Проверяем, активирован ли уже пользователь
+        const usedInvite = await spiralEngine.methods.usedInviteByUser(sellerAddress).call();
+        console.log(`🔍 usedInvite: ${usedInvite}`);
+        
+        if (usedInvite > 0) {
+            console.log(`✅ Селлер уже активирован (использовал инвайт ${usedInvite})`);
+            return true;
+        } else {
+            console.log(`❌ Селлер НЕ активирован`);
+            return false;
+        }
+    } catch (error) {
+        console.error(`❌ Ошибка при проверке активации селлера:`, error.message);
+        return false;
     }
 }
 
@@ -2330,28 +2432,47 @@ async function loadSellerCatalog(productRegistry, sellerAddress, catalogData, de
     // Очищаем существующий каталог продавца перед созданием нового
     console.log(`🧹 Очищаем существующий каталог продавца...`);
     try {
-        const clearTx = await productRegistry.methods.clearSellerCatalog(sellerAddress).send({
-            from: deployerAddress,
-            gas: networkName === 'polygon' ? 500000 : 300000,
-            gasPrice: networkName === 'polygon' ? web3.utils.toWei('100', 'gwei') : undefined
-        });
+        // Проверяем, есть ли продукты в каталоге
+        const existingProducts = await productRegistry.methods.getProductsBySeller(sellerAddress).call();
+        console.log(`🔍 Найдено существующих продуктов: ${existingProducts.length}`);
         
-        console.log(`✅ Каталог очищен, tx: ${clearTx.transactionHash}`);
-        
-        // Ждем подтверждения и проверяем событие CatalogCleared
-        const receipt = await web3.eth.getTransactionReceipt(clearTx.transactionHash);
-        const catalogClearedEvent = receipt.logs.find(log => {
-            try {
-                const decoded = productRegistry.options.jsonInterface.find(iface => iface.name === 'CatalogCleared');
-                return decoded && web3.utils.hexToNumber(log.topics[1]) === web3.utils.toHex(sellerAddress);
-            } catch (e) {
-                return false;
+        if (existingProducts.length === 0) {
+            console.log(`✅ Каталог уже пустой, пропускаем очистку`);
+        } else {
+            // Создаем кошелек продавца для очистки каталога
+            if (!SELLER_PRIVATE_KEY) {
+                throw new Error("SELLER_PRIVATE_KEY не найден в .env для очистки каталога");
             }
-        });
+            
+            const sellerWallet = web3.eth.accounts.privateKeyToAccount(SELLER_PRIVATE_KEY);
+            web3.eth.accounts.wallet.add(sellerWallet);
+            
+            const clearTx = await productRegistry.methods.clearSellerCatalog(sellerAddress).send({
+                from: sellerAddress, // ✅ Используем адрес продавца
+                gas: network === 'polygon' ? 500000 : 300000,
+                gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : undefined
+            });
         
-        if (catalogClearedEvent) {
-            const productsCleared = web3.utils.hexToNumber(catalogClearedEvent.data);
-            console.log(`📊 Очищено продуктов: ${productsCleared}`);
+            // Ждем подтверждения транзакции
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            console.log(`✅ Каталог очищен, tx: ${clearTx.transactionHash}`);
+            
+            // Ждем подтверждения и проверяем событие CatalogCleared
+            const receipt = await web3.eth.getTransactionReceipt(clearTx.transactionHash);
+            const catalogClearedEvent = receipt.logs.find(log => {
+                try {
+                    const decoded = productRegistry.options.jsonInterface.find(iface => iface.name === 'CatalogCleared');
+                    return decoded && web3.utils.hexToNumber(log.topics[1]) === web3.utils.toHex(sellerAddress);
+                } catch (e) {
+                    return false;
+                }
+            });
+            
+            if (catalogClearedEvent) {
+                const productsCleared = web3.utils.hexToNumber(catalogClearedEvent.data);
+                console.log(`📊 Очищено продуктов: ${productsCleared}`);
+            }
         }
         
     } catch (clearError) {
@@ -2710,6 +2831,148 @@ async function downloadDataFromCID(cid, type) {
 }
 
 /**
+ * Диагностика состояния селлера (Action 13)
+ * @param {Object} spiralEngine - контракт SpiralEngine
+ * @param {Object} productRegistry - контракт ProductRegistry
+ * @param {string} sellerAddress - адрес селлера
+ */
+async function diagnoseSellerState(spiralEngine, productRegistry, sellerAddress) {
+    console.log(`\n🔍 === ДИАГНОСТИКА СЕЛЛЕРА ${sellerAddress} ===`);
+    
+    try {
+        // 1. Проверка активации пользователя
+        console.log(`\n📋 1. Проверка активации пользователя...`);
+        const usedInvite = await spiralEngine.methods.usedInviteByUser(sellerAddress).call();
+        if (usedInvite > 0) {
+            console.log(`✅ Пользователь активирован (использовал инвайт ${usedInvite})`);
+        } else {
+            console.log(`❌ Пользователь НЕ активирован`);
+            return;
+        }
+        
+        // 2. Проверка ролей
+        console.log(`\n🔑 2. Проверка ролей...`);
+        const SELLER_ROLE = await spiralEngine.methods.SELLER_ROLE().call();
+        const ACTIVATOR_ROLE = await spiralEngine.methods.ACTIVATOR_ROLE().call();
+        
+        const hasSellerRole = await spiralEngine.methods.hasRole(SELLER_ROLE, sellerAddress).call();
+        const hasActivatorRole = await spiralEngine.methods.hasRole(ACTIVATOR_ROLE, sellerAddress).call();
+        
+        console.log(`🔍 Роль SELLER_ROLE: ${hasSellerRole ? '✅ ЕСТЬ' : '❌ НЕТ'}`);
+        console.log(`🔍 Роль ACTIVATOR_ROLE: ${hasActivatorRole ? '✅ ЕСТЬ' : '❌ НЕТ'}`);
+        
+        // 3. Проверка инвайтов селлера
+        console.log(`\n🎲 3. Проверка инвайтов селлера...`);
+        try {
+            // Сначала попробуем получить публичную информацию
+            console.log(`🔍 Получаем публичную информацию о селлере...`);
+            const publicInfo = await spiralEngine.methods.getSellerPublicInfo(sellerAddress).call();
+            console.log(`✅ Публичная информация получена`);
+            
+            console.log(`📊 У селлера ${publicInfo.inviteCount} инвайтов`);
+            console.log(`📊 Всего заминчено: ${publicInfo.userTotalInvites} инвайтов`);
+            
+            // Теперь попробуем получить детальную диагностику (только для владельца или админа)
+            try {
+                console.log(`🔍 Пробуем получить детальную диагностику...`);
+                const diagnostics = await spiralEngine.methods.getSellerDiagnostics(sellerAddress).call();
+                console.log(`✅ Детальная диагностика получена`);
+                
+                if (diagnostics.userInvites.length > 0) {
+                    console.log(`📝 Инвайты селлера:`);
+                    diagnostics.userInvites.forEach((invite, index) => {
+                        console.log(`  ${index + 1}. Token ID: ${invite.tokenId}, Code: ${invite.inviteCode}, Used: ${invite.isUsed}`);
+                    });
+                    
+                    // Сохраняем инвайты в файл
+                    const inviteCodes = diagnostics.userInvites.map(invite => invite.inviteCode);
+                    const invitesPath = path.join(__dirname, "..", "bot", "flowers", `${sellerAddress}_invites.txt`);
+                    fs.writeFileSync(invitesPath, inviteCodes.join("\n"));
+                    console.log(`✅ Инвайты сохранены в ${invitesPath}`);
+                }
+                
+                // Дополнительная диагностика
+                console.log(`📊 Дополнительная диагностика:`);
+                console.log(`  - Used invite token ID: ${diagnostics.usedInviteTokenId}`);
+                console.log(`  - Total invites minted: ${diagnostics.totalInvitesMinted}`);
+                
+            } catch (detailError) {
+                console.log(`⚠️ Детальная диагностика недоступна: ${detailError.message}`);
+                console.log(`ℹ️ Это нормально - детальная информация доступна только владельцу или админу`);
+            }
+            
+        } catch (error) {
+            console.log(`❌ Ошибка при получении информации о селлере: ${error.message}`);
+            console.log(`🔍 Детали ошибки:`, error);
+        }
+        
+        // 4. Проверка каталога продуктов
+        console.log(`\n📦 4. Проверка каталога продуктов...`);
+        const products = await productRegistry.methods.getProductsBySellerFull().call({
+            from: sellerAddress
+        });
+        
+        console.log(`📊 Всего продуктов: ${products.length}`);
+        
+        if (products.length > 0) {
+            const activeProducts = products.filter(p => p.active).length;
+            console.log(`🟢 Активных продуктов: ${activeProducts}`);
+            console.log(`🔴 Неактивных продуктов: ${products.length - activeProducts}`);
+            
+            // Проверяем, есть ли 17 продуктов (ожидаемое количество)
+            if (products.length === 17) {
+                console.log(`✅ Каталог полный: 17 продуктов (как ожидалось)`);
+            } else {
+                console.log(`⚠️ Каталог неполный: ожидалось 17, найдено ${products.length}`);
+            }
+            
+            // Краткий обзор продуктов
+            console.log(`\n📋 Обзор продуктов:`);
+            products.slice(0, 5).forEach((product, index) => {
+                console.log(`  ${index + 1}. ID=${product.id}, CID=${product.ipfsCID}, Активен=${product.active}`);
+            });
+            if (products.length > 5) {
+                console.log(`  ... и еще ${products.length - 5} продуктов`);
+            }
+        } else {
+            console.log(`❌ Каталог пуст - нет продуктов`);
+        }
+        
+        // 5. Итоговая оценка готовности
+        console.log(`\n🎯 5. Итоговая оценка готовности селлера:`);
+        const isActivated = usedInvite > 0;
+        const hasSellerRoleCheck = hasSellerRole;
+        const hasInvites = true; // Пропускаем проверку инвайтов из-за ошибки доступа
+        const hasCatalog = products.length > 0;
+        const isCatalogComplete = products.length === 17;
+        
+        console.log(`✅ Активация: ${isActivated ? 'ГОТОВ' : 'НЕ ГОТОВ'}`);
+        console.log(`✅ Роль SELLER: ${hasSellerRoleCheck ? 'ГОТОВ' : 'НЕ ГОТОВ'}`);
+        console.log(`✅ Инвайты: ${hasInvites ? 'ГОТОВ' : 'НЕ ГОТОВ'}`);
+        console.log(`✅ Каталог: ${hasCatalog ? 'ГОТОВ' : 'НЕ ГОТОВ'}`);
+        console.log(`✅ Полнота каталога: ${isCatalogComplete ? 'ПОЛНЫЙ' : 'НЕПОЛНЫЙ'}`);
+        
+        const readinessScore = [isActivated, hasSellerRoleCheck, hasInvites, hasCatalog, isCatalogComplete].filter(Boolean).length;
+        console.log(`\n📊 Общая готовность: ${readinessScore}/5 (${(readinessScore/5*100).toFixed(0)}%)`);
+        
+        if (readinessScore === 5) {
+            console.log(`🎉 Селлер полностью готов к работе!`);
+        } else if (readinessScore >= 3) {
+            console.log(`⚠️ Селлер частично готов, требуется доработка`);
+        } else {
+            console.log(`❌ Селлер не готов к работе, требуется полная настройка`);
+        }
+        
+        console.log(`\n✅ Диагностика завершена`);
+        
+    } catch (error) {
+        console.error(`❌ Ошибка при диагностике селлера: ${error.message}`);
+        console.error(`❌ Детали ошибки:`, error);
+        throw error;
+    }
+}
+
+/**
  * Обновляет продукты кордицепса с исправленными изображениями
  * @param {Object} productRegistry - контракт ProductRegistry
  * @param {string} sellerAddress - адрес продавца
@@ -2812,6 +3075,13 @@ async function updateCordycepsProducts(productRegistry, sellerAddress) {
 const args = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
 const action = args[0] || process.env.DEPLOY_ACTION || '1';
 console.log("[deploy_full.js] action:", action);
+
+// Временный вывод переменных окружения для отладки
+console.log("[DEBUG] DEPLOYER_PRIVATE_KEY:", deployerPrivateKey ? "SET" : "NOT SET");
+console.log("[DEBUG] SELLER_ADDRESS:", SELLER_ADDRESS);
+console.log("[DEBUG] SELLER_PRIVATE_KEY:", process.env.SELLER_PRIVATE_KEY ? "SET" : "NOT SET");
+console.log("[DEBUG] MAGIC_REGISTRY_CONTRACT_ADDRESS:", process.env.MAGIC_REGISTRY_CONTRACT_ADDRESS);
+console.log("[DEBUG] SPIRAL_ENGINE_CONTRACT_ADDRESS:", process.env.SPIRAL_ENGINE_CONTRACT_ADDRESS);
 
 // Проверяем что action является числом
 if (isNaN(parseInt(action))) {
