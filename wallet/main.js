@@ -167,31 +167,58 @@ window.DEBUG_MODE = getEnvVar('DEBUG_MODE', 'false') === 'true' ||
                    localStorage.getItem('amanita_debug') === 'true';
 
 // Дополнительная функция логирования для совместимости с индексным файлом
+// Флаг защиты от рекурсивных вызовов логирования
+let isLoggingInProgress = false;
+
 function logIfAvailable(message, isError = false) {
+  // Всегда логируем в консоль (безопасно)
   console.log(message);
+  
+  // Временно отключаем DOM логирование для предотвращения рекурсии
+  // TODO: Восстановить DOM логирование после исправления рекурсии
+  return;
   
   // Проверяем, включен ли режим отладки
   if (!window.DEBUG_MODE) {
     return;
   }
   
-  // Добавляем временную метку
-  const timestamp = new Date().toLocaleTimeString();
-  const formattedMessage = `[${timestamp}] ${message}`;
-  
-  // Логируем в debug-panel
-  const logElem = document.getElementById('init-log');
-  if (logElem) {
-    const line = document.createElement('div');
-    line.textContent = formattedMessage;
-    if (isError) {
-      line.style.color = '#ff6b6b';
-    }
-    logElem.appendChild(line);
-    
-    // Автоматическая прокрутка вниз
-    logElem.scrollTop = logElem.scrollHeight;
+  // Защита от рекурсивных вызовов
+  if (isLoggingInProgress) {
+    console.warn('⚠️ Предотвращена рекурсия в logIfAvailable:', message);
+    return;
   }
+  
+  // Асинхронное выполнение DOM операций для предотвращения рекурсии
+  requestAnimationFrame(() => {
+    try {
+      isLoggingInProgress = true;
+      
+      // Добавляем временную метку
+      const timestamp = new Date().toLocaleTimeString();
+      const formattedMessage = `[${timestamp}] ${message}`;
+      
+      // Логируем в debug-panel
+      const logElem = document.getElementById('init-log');
+      if (logElem) {
+        const line = document.createElement('div');
+        line.textContent = formattedMessage;
+        if (isError) {
+          line.style.color = '#ff6b6b';
+        }
+        logElem.appendChild(line);
+        
+        // Автоматическая прокрутка вниз
+        logElem.scrollTop = logElem.scrollHeight;
+      }
+    } catch (error) {
+      // Изолируем ошибки DOM от основной логики
+      console.error('❌ Ошибка в logIfAvailable DOM операциях:', error);
+    } finally {
+      // Сбрасываем флаг в блоке finally для гарантии
+      isLoggingInProgress = false;
+    }
+  });
 }
 
 // Функция для сбора информации о состоянии Telegram API
@@ -311,8 +338,6 @@ function attachUIHandlers() {
   const restoreBtn = document.getElementById('restore-btn');
   const restoreConfirmBtn = document.getElementById('restore-confirm-btn');
   const revealSeedBtn = document.getElementById('reveal-seed-btn');
-  const backToStartBtn = document.getElementById('back-to-start-btn');
-  const clearWalletBtn = document.getElementById('clear-wallet-btn');
   const confirmWalletBtn = document.getElementById('btn_confirm_wallet');
   const copySeedBtn = document.getElementById('copy-seed-btn');
   
@@ -320,8 +345,6 @@ function attachUIHandlers() {
   if (!restoreBtn) logIfAvailable("❌ Кнопка restore-btn не найдена!", true);
   if (!restoreConfirmBtn) logIfAvailable("❌ Кнопка restore-confirm-btn не найдена!", true);
   if (!revealSeedBtn) logIfAvailable("❌ Кнопка reveal-seed-btn не найдена!", true);
-  if (!backToStartBtn) logIfAvailable("❌ Кнопка back-to-start-btn не найдена!", true);
-  if (!clearWalletBtn) logIfAvailable("❌ Кнопка clear-wallet-btn не найдена!", true);
   if (!confirmWalletBtn) logIfAvailable("❌ Кнопка btn_confirm_wallet не найдена!", true);
   if (!copySeedBtn) logIfAvailable("❌ Кнопка copy-seed-btn не найдена!", true);
   
@@ -347,7 +370,6 @@ function attachUIHandlers() {
   if (restoreBtn) restoreBtn.onclick = showRestoreScreen;
   if (restoreConfirmBtn) restoreConfirmBtn.onclick = handleRestoreWallet;
   if (revealSeedBtn) revealSeedBtn.onclick = toggleSeedVisibility;
-  if (backToStartBtn) backToStartBtn.onclick = () => switchView('start-screen');
   if (copySeedBtn) copySeedBtn.onclick = copySeedPhrase;
   
   if (confirmWalletBtn) {
@@ -361,9 +383,7 @@ function attachUIHandlers() {
   }
 
   // Обработчики для новых кнопок управления кошельком
-  if (clearWalletBtn) {
-    clearWalletBtn.onclick = clearWallet;
-  }
+  // clearWalletBtn удален - кнопка отсутствует в HTML
   
 }
 
@@ -1289,6 +1309,7 @@ function showRestoreScreen() {
 function switchView(viewId) {
   console.log(`🔄 Вызвана функция switchView с ID: "${viewId}"`);
   
+  // Исправлен массив - убрано дублирование seed-screen
   const all = [
     'start-screen',
     'seed-screen',
@@ -1297,7 +1318,6 @@ function switchView(viewId) {
     'unlock-screen',
     'view-screen',
     'sign-screen',
-    'seed-screen',
     'setup-pin-screen',
     'success-screen'
   ];
@@ -1306,7 +1326,8 @@ function switchView(viewId) {
   all.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      el.style.display = 'none';
+      // Используем только CSS классы для согласованности - inline стили удалены
+      el.classList.add('hidden');
       console.log(`🙈 Скрыт экран: ${id}`);
     } else {
       console.warn(`⚠️ Элемент с ID "${id}" не найден в DOM при попытке скрыть`);
@@ -1322,7 +1343,7 @@ function switchView(viewId) {
     // показываем restore-screen вместо этого, если он существует.
     const fallbackView = document.getElementById('restore-screen');
     if (fallbackView) {
-        fallbackView.style.display = 'block';
+        fallbackView.classList.remove('hidden');
         logIfAvailable(`🔁 Автоматически показан экран: restore-screen вместо start-screen в режиме ${mode}`);
     }
     return; // Важно завершить выполнение, чтобы не пытаться показать viewId, который был start-screen
@@ -1331,12 +1352,18 @@ function switchView(viewId) {
   const view = document.getElementById(viewId);
   if (view) {
     console.log(`👁️ Показываем экран: ${viewId}`);
-    view.style.display = 'block';
+    // Используем только CSS классы для согласованности - inline стили удалены
+    view.classList.remove('hidden');
     logIfAvailable(`🔁 Показан экран: ${viewId}`);
   } else {
     console.error(`❌ Элемент с ID "${viewId}" не найден в DOM при попытке показать`);
     console.warn(`[WebApp] ⚠️ Элемент view ${viewId} не найден`);
   }
+}
+
+// === Утилита для определения видимого экрана ===
+function getVisibleView() {
+  return document.querySelector('.view:not(.hidden)');
 }
 
 // === Новая функция: проверка целостности данных кошелька ===
@@ -1771,8 +1798,7 @@ function updateButtonTexts() {
     { id: 'copy-seed-btn', key: 'btn_copy_seed', icon: '📋' },
     { id: 'btn_confirm_wallet', key: 'btn_confirm_wallet', icon: '✅' },
     { id: 'restore-confirm-btn', key: 'btn_restore_wallet', icon: '✅' }, // Использует тот же ключ, что и restore-btn
-    { id: 'back-to-start-btn', key: 'btn_back', icon: '⬅️' },
-    // { id: 'clear-wallet-btn', key: 'btn_delete_wallet', icon: '🗑️' }, // такой кнопки нет в HTML сейчас
+    // back-to-start-btn и clear-wallet-btn удалены - кнопки отсутствуют в HTML
     { id: 'setup-pin-submit-btn', key: 'setup_pin_submit_btn', icon: '🔐'},
     { id: 'sign-submit-btn', key: 'btn_sign_submit', icon: '✍️' },
     // { id: 'unlock-submit-btn', key: 'unlock_btn', icon: '🔓' }, // такой кнопки нет в HTML сейчас
