@@ -494,8 +494,10 @@ async function main(action) {
             gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : undefined
           });
         
-          // Ждем подтверждения транзакции
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Ждем подтверждения транзакции (только для mainnet)
+          if (network === 'polygon') {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
           
           console.log(`✅ Каталог очищен, tx: ${clearTx.transactionHash}`);
           
@@ -1694,8 +1696,8 @@ async function createCatalog(productRegistry, sellerAddress) {
     
     console.log(`✅ Продукт ${product.id} создан (по умолчанию неактивный)`);
     
-    // Добавляем задержку между продуктами для избежания nonce ошибок
-    if (i < productsData.length - 1) {
+    // Добавляем задержку между продуктами для избежания nonce ошибок (только для mainnet)
+    if (i < productsData.length - 1 && network === 'polygon') {
       console.log(`⏳ Ждем 3 секунды перед следующим продуктом...`);
       await new Promise(resolve => setTimeout(resolve, 3000));
     }
@@ -2453,8 +2455,10 @@ async function loadSellerCatalog(productRegistry, sellerAddress, catalogData, de
                 gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : undefined
             });
         
-            // Ждем подтверждения транзакции
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Ждем подтверждения транзакции (только для mainnet)
+            if (network === 'polygon') {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
             
             console.log(`✅ Каталог очищен, tx: ${clearTx.transactionHash}`);
             
