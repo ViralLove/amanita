@@ -52,7 +52,7 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
     mapping(uint256 => address) public inviteFirstOwner;
 
     // Маппинг: user (адрес) => список всех его инвайтов (tokenId)
-    mapping(address => uint256[]) public userInvites;
+    mapping(address => uint256[]) private userInvites;
 
     // Счётчик общего количества использованных инвайтов
     uint256 public totalInvitesUsed;
@@ -101,6 +101,32 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
     
     // Адрес контракта SoulIdentity для делегирования SBT функций
     ISoulIdentity public soulIdentity;
+
+    // === СТРУКТУРЫ ДЛЯ ДИАГНОСТИКИ ===
+    
+    /**
+     * @dev Структура для хранения информации об инвайте
+     */
+    struct InviteInfo {
+        string inviteCode;           // Код инвайта
+        uint256 tokenId;            // ID токена инвайта
+        bool isUsed;                // Статус использования
+        address activatedBy;        // Адрес активатора (если инвайт использован)
+        uint256 activationTime;     // Время активации
+        uint256 expiry;             // Срок действия
+    }
+    
+    /**
+     * @dev Структура для полной диагностики состояния селлера
+     */
+    struct SellerDiagnostics {
+        bool isActivated;           // Статус активации пользователя
+        uint256 usedInviteTokenId;  // ID использованного инвайта
+        bool hasSellerRole;         // Наличие роли SELLER_ROLE
+        bool hasActivatorRole;      // Наличие роли ACTIVATOR_ROLE
+        InviteInfo[] userInvites;   // Массив инвайтов пользователя
+        uint256 totalInvitesMinted; // Общее количество заминченных инвайтов
+    }
 
     // === СОБЫТИЯ ===
     
@@ -413,5 +439,100 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
      */
     function _baseURI() internal pure override returns (string memory) {
         return "https://api.amanita.com/spiral/";
+    }
+
+    // === ДИАГНОСТИЧЕСКИЕ ФУНКЦИИ ===
+    
+    /**
+     * @dev Получить полную диагностику состояния селлера
+     * @param seller адрес селлера для диагностики
+     * @return диагностическая информация о состоянии селлера
+     */
+    function getSellerDiagnostics(address seller) public view returns (SellerDiagnostics memory) {
+        // Только владелец или админ может получить полную диагностику
+        require(
+            msg.sender == seller || hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+            "SpiralEngine: only owner or admin can access seller diagnostics"
+        );
+        
+        SellerDiagnostics memory diagnostics;
+        
+        // Проверка активации пользователя
+        uint256 usedInvite = usedInviteByUser[seller];
+        diagnostics.isActivated = usedInvite > 0;
+        diagnostics.usedInviteTokenId = usedInvite > 0 ? usedInvite - 1 : 0; // -1 чтобы избежать конфликта с tokenId = 0
+        
+        // Проверка ролей
+        diagnostics.hasSellerRole = hasRole(SELLER_ROLE, seller);
+        diagnostics.hasActivatorRole = hasRole(ACTIVATOR_ROLE, seller);
+        
+        // Получение инвайтов пользователя (теперь через private mapping)
+        uint256[] memory userInviteIds = userInvites[seller];
+        diagnostics.userInvites = new InviteInfo[](userInviteIds.length);
+        
+        for (uint256 i = 0; i < userInviteIds.length; i++) {
+            uint256 tokenId = userInviteIds[i];
+            diagnostics.userInvites[i] = InviteInfo({
+                inviteCode: tokenIdToInviteCode[tokenId],
+                tokenId: tokenId,
+                isUsed: isInviteUsed[tokenId],
+                activatedBy: address(0), // TODO: добавить отслеживание активатора инвайта
+                activationTime: 0,       // TODO: добавить отслеживание времени активации
+                expiry: inviteExpiry[tokenId]
+            });
+        }
+        
+        // Общее количество заминченных инвайтов
+        diagnostics.totalInvitesMinted = userInviteCount[seller];
+        
+        return diagnostics;
+    }
+    
+    /**
+     * @dev Получить инвайты пользователя (только владелец или админ)
+     * @param user адрес пользователя
+     * @return массив ID токенов инвайтов пользователя
+     */
+    function getUserInvites(address user) public view returns (uint256[] memory) {
+        // Только владелец может получить свои инвайты, или админ для аудита
+        require(
+            msg.sender == user || hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+            "SpiralEngine: only owner or admin can access invites"
+        );
+        return userInvites[user];
+    }
+    
+    /**
+     * @dev Получить количество инвайтов пользователя (публичный доступ)
+     * @param user адрес пользователя
+     * @return количество инвайтов
+     */
+    function getUserInviteCount(address user) public view returns (uint256) {
+        return userInvites[user].length;
+    }
+    
+    /**
+     * @dev Получить публичную информацию о селлере (без приватных данных)
+     * @param seller адрес селлера
+     * @return isActivated статус активации пользователя
+     * @return hasSellerRole наличие роли SELLER_ROLE
+     * @return hasActivatorRole наличие роли ACTIVATOR_ROLE
+     * @return inviteCount количество инвайтов пользователя
+     * @return userTotalInvites общее количество заминченных инвайтов пользователем
+     */
+    function getSellerPublicInfo(address seller) public view returns (
+        bool isActivated,
+        bool hasSellerRole,
+        bool hasActivatorRole,
+        uint256 inviteCount,
+        uint256 userTotalInvites
+    ) {
+        // Публичная информация доступна всем
+        uint256 usedInvite = usedInviteByUser[seller];
+        isActivated = usedInvite > 0;
+        hasSellerRole = hasRole(SELLER_ROLE, seller);
+        hasActivatorRole = hasRole(ACTIVATOR_ROLE, seller);
+        inviteCount = userInvites[seller].length;
+        userTotalInvites = userInviteCount[seller];
     }
 }

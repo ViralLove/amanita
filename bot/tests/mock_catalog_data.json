@@ -1,0 +1,50 @@
+{
+  "products": [
+    {
+      "business_id": "amanita_lux",
+      "title": "Amanita — LUX",
+      "organic_components": [
+        {
+          "biounit_id": "amanita_muscaria",
+          "description_cid": "QmTestDescription1",
+          "proportion": "100%"
+        }
+      ],
+      "categories": ["mushroom", "luxury"],
+      "cover_image_url": "QmTestImage1",
+      "forms": ["whole dried"],
+      "species": "Amanita muscaria",
+      "prices": [
+        {
+          "weight": "50",
+          "weight_unit": "g",
+          "price": "25",
+          "currency": "EUR"
+        }
+      ]
+    },
+    {
+      "business_id": "lions_mane_test",
+      "title": "Lion's Mane Test",
+      "organic_components": [
+        {
+          "biounit_id": "lions-mane",
+          "description_cid": "QmTestDescription2",
+          "proportion": "100%"
+        }
+      ],
+      "categories": ["mushroom", "mental health"],
+      "cover_image_url": "QmTestImage2",
+      "forms": ["powder"],
+      "species": "Hericium erinaceus",
+      "prices": [
+        {
+          "weight": "100",
+          "weight_unit": "g",
+          "price": "40",
+          "currency": "EUR"
+        }
+      ]
+    }
+  ]
+}

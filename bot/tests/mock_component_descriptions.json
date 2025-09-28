@@ -1,0 +1,58 @@
+{
+  "QmTestDescription1": {
+    "id": "amanita_muscaria",
+    "title": "Amanita muscaria",
+    "scientific_name": "Amanita muscaria",
+    "generic_description": "Мухомор красный - один из самых известных грибов с психоактивными свойствами.",
+    "effects": [
+      "Нейротропное действие",
+      "Визуальные эффекты",
+      "Изменение восприятия"
+    ],
+    "shamanic": {
+      "traditional_use": "Использовался шаманами для духовных практик",
+      "cultural_significance": "Важный элемент северных традиций"
+    },
+    "warnings": [
+      "Требует осторожного подхода",
+      "Не рекомендуется новичкам"
+    ],
+    "dosage_instructions": [
+      {
+        "form": "whole dried",
+        "min_dose": "0.5",
+        "max_dose": "2.0",
+        "unit": "g",
+        "notes": "Начинать с минимальной дозы"
+      }
+    ]
+  },
+  "QmTestDescription2": {
+    "id": "lions-mane",
+    "title": "Lion's Mane",
+    "scientific_name": "Hericium erinaceus",
+    "generic_description": "Львиная грива - один из самых изученных нейротропных грибов.",
+    "effects": [
+      "Улучшение когнитивных функций",
+      "Поддержка нервной системы",
+      "Повышение концентрации"
+    ],
+    "shamanic": {
+      "traditional_use": "Использовался для улучшения умственных способностей",
+      "cultural_significance": "Ценился за лечебные свойства"
+    },
+    "warnings": [
+      "Может вызывать аллергические реакции",
+      "Проконсультируйтесь с врачом"
+    ],
+    "dosage_instructions": [
+      {
+        "form": "powder",
+        "min_dose": "1.0",
+        "max_dose": "3.0",
+        "unit": "g",
+        "notes": "Принимать утром натощак"
+      }
+    ]
+  }
+}

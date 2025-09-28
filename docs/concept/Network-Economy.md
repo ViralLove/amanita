@@ -41,7 +41,7 @@ This document describes the network economy principles of the AMANITA ecosystem,
 - **Distribution:** Direct to sellers based on social proof
 - **Value Creation:** Through real social interactions and reputation building
 
-### 2. $AGOV - Governance Token (ERC-20Votes)
+### 2. $LGOV - Governance Token (ERC-20Votes)
 **Purpose:** Governance and collective decision-making for ecosystem development
 
 **Key Characteristics:**

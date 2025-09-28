@@ -48,10 +48,14 @@ railway environment Iveta
 ### Создание и загрузка Docker образа
 
 ```bash
-# Собрать Docker образ для linux/amd64
+# 1. Сначала скопировать свежие ABI файлы из contracts/artifacts в bot/artifacts
+# Копируем содержимое artifacts/contracts/ папки напрямую в bot/artifacts/contracts/
+cp -r artifacts/contracts/* bot/artifacts/contracts/
+
+# 2. Собрать Docker образ для linux/amd64
 docker build --platform linux/amd64 -t zeya88888888/amanita-bot:latest .
 
-# Загрузить в Docker Hub
+# 3. Загрузить в Docker Hub
 docker push zeya88888888/amanita-bot:latest
 ```
 

@@ -291,6 +291,8 @@ class ProductRegistryService:
 
         self.logger.info(f"[ProductRegistry] get_all_products id(self)={id(self)}")
         self.logger.info(f"[ProductRegistry] 🚀 Начинаем получение всех продуктов")
+        self.logger.info(f"[ProductRegistry] blockchain_service: {self.blockchain_service}")
+        self.logger.info(f"[ProductRegistry] cache_service: {self.cache_service}")
 
         try:
             # Проверяем версию каталога
@@ -301,6 +303,7 @@ class ProductRegistryService:
             # Проверяем кэш
             self.logger.info(f"[ProductRegistry] 🔍 Проверяем кэш каталога...")
             cached_catalog = self.cache_service.get_cached_item("catalog", "catalog")
+            self.logger.info(f"[ProductRegistry] cached_catalog: {cached_catalog}")
             
             if cached_catalog:
                 products_in_cache = cached_catalog.get('products', [])

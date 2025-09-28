@@ -29,12 +29,10 @@ contract AmanitaRegistry {
      */
     function setAddress(string calldata name, address newAddress) external onlyOwner {
         require(newAddress != address(0), "AmanitaRegistry: zero address");
-
-        // Если это новый ключ, сохраняем имя в массив
-        if (addresses[name] == address(0)) {
-            contractNames.push(name);
-        }
-
+        
+        // Всегда добавляем имя в массив (дубликаты не критичны)
+        contractNames.push(name);
+        
         addresses[name] = newAddress;
         emit AddressUpdated(name, newAddress);
     }

@@ -2,86 +2,103 @@
   {
     "id": "amanita1",
     "ipfsCID": "QmZVqoSXyKtSuqkFUaXnYRenGXHwhSYLEpMCrwUpSKHr2Q",
-    "active": true
+    "active": true,
+    "tx_hash": "47e257482c250b357beb93c3ebc132d0ee742e619e651166545d0a1a9eba9672"
   },
   {
     "id": "amanita_closed_cups",
     "ipfsCID": "QmdNLN1ZNq3MVkH2iWJUjtsHSme8Lp3VhEd8x44tGU2zP8",
-    "active": true
+    "active": true,
+    "tx_hash": "47bb0039d6286f634e37144a0deb063563d321aa49e40093851a781b44152999"
   },
   {
     "id": "amanita_broken_closed_cups",
     "ipfsCID": "QmQf2K1gTcc5xFhFvtkw4rbxGNzzrszAZxtxHnTvFRVZKw",
-    "active": true
+    "active": true,
+    "tx_hash": "8d5f90c3686b398c0affa8d211b12214d614f0d7a8e0b1e47769106f73fcaca5"
   },
   {
     "id": "amanita_lux",
     "ipfsCID": "QmQHMTL5ep9pKfs5bnQBwUvz2FGEkN6HAjuBVRwRvQMMD7",
-    "active": true
+    "active": true,
+    "tx_hash": "98e8f5aa6a37915b7aa4649bcba79a7d15822a5dd7e216a67e7b0485e20d6778"
   },
   {
     "id": "amanita_pantherina_whole",
     "ipfsCID": "QmechqN79C7ftRDfQNqTJ58tJEfDQRWSK3UwUEbSe6nHFn",
-    "active": true
+    "active": true,
+    "tx_hash": "64058d0f3a77a31a5121e38bf3b74b4a84243b45fa43aa589ed69330661e9249"
   },
   {
     "id": "amanita_pantherina_powder",
     "ipfsCID": "QmZRJW6SDA7pRfBV1vvQ9eFDHgZ2xS71tX4ML1wRryQNKb",
-    "active": true
+    "active": true,
+    "tx_hash": "1281531d6d416dd0576ca8413b2086e6ed8cdd55c4b963082f1d8d22369d530f"
   },
   {
     "id": "amanita_tincture",
     "ipfsCID": "Qmavs8CbZjeGDXL11a2dmdjZTCAXnu4NED6pY4ULEpaYk6",
-    "active": true
+    "active": true,
+    "tx_hash": "21f42769451f1d49094049925ceb95df67baca5d8db34a16712e1b63b9b33eb0"
   },
   {
     "id": "blue_lotus_tincture",
     "ipfsCID": "QmWGkSCke5cpwvUjy9JRnaqxjHAbf2QwmqpaATZHMK9yNT",
-    "active": true
+    "active": true,
+    "tx_hash": "0c321dd76416da8c90e9da7cce63b1f11af52116532c49f1c492f74138c2290e"
   },
   {
     "id": "blue_lotus_flowers",
     "ipfsCID": "QmV5Vt7cGMo7nVeUpUJjeMA2kzNWtPZLYqrQMTmREHQkwb",
-    "active": true
+    "active": true,
+    "tx_hash": "637db1f528f184bc268234755b75f85b657fc98c0a34055294f3319e53dac725"
   },
   {
     "id": "chaga_chunks",
     "ipfsCID": "QmZff46WWYo4Z7PKW7iKGo7AVXMJZ5mK4EjSMjVsuSE6nf",
-    "active": true
+    "active": true,
+    "tx_hash": "aeb4f989c91e359cf738387bb695ae2c2db0f8e36715051da10232d0dc4a618f"
   },
   {
     "id": "cordyceps_militaris_powder",
-    "ipfsCID": "QmPvx8iDT8WsMYXjrnzpuMGEbu4fxeUfDUHTUwU7pzveK9",
-    "active": true
+    "ipfsCID": "QmNc36zuqDbywY7cnn9dKcL9Bj1ApPkEQjajf45x4MpTtT",
+    "active": true,
+    "tx_hash": "2e52d71849d073d3e8b6edee1664811931b410ace56475db24092da624a135b3"
   },
   {
     "id": "cordyceps_militaris_dried_bodies",
-    "ipfsCID": "QmVvytDwvijeDPaEtf3dddy4DuiKPumXiBUKwWkiRaQUnv",
-    "active": true
+    "ipfsCID": "QmWBFYt5fZc9sxHu18YfwSZwHxm25AnFxvmCXDumMNivQi",
+    "active": true,
+    "tx_hash": "d8133d31025113fb5fc698b16692e099b583370169fa770835b5d548b42a212f"
   },
   {
     "id": "chanterelle_dried",
     "ipfsCID": "Qmbw9yEByqo9nDCLnYXADSBJG86xTiM5GH8UJsDRHD9m3c",
-    "active": true
+    "active": true,
+    "tx_hash": "3c8e84f5733663dbd4bfe847403bfe7753520b0ed4ca5c3ddc0dfa947d77ec34"
   },
   {
     "id": "chanterelle_powder",
     "ipfsCID": "Qma97b51NoAUQV5age2ThLoAqKcjtHNMjxKCKzsfk8k3U9",
-    "active": true
+    "active": true,
+    "tx_hash": "60ce9f31c23a918a20d0ad6faa7c274ee8477d9a0aeefd249321a5d17b912001"
   },
   {
     "id": "aspen_bark_dried_strips",
     "ipfsCID": "QmbjJfVZqNA1ox5gJsNGkQsyvaEC2mfwReZ4GnevubxdTi",
-    "active": true
+    "active": true,
+    "tx_hash": "b9abb9e3f597518e95959ef9517583f853ab122cce5dc3d1e80e56f10fc6e7bf"
   },
   {
     "id": "lions_mane_powder",
     "ipfsCID": "QmNqWF8AbWaq8zizvo3EhfrVTJxY1yseuq3p9UmWWYUKYp",
-    "active": true
+    "active": true,
+    "tx_hash": "b25e1587713e3ef9489c7df9b9588b7c1e559a134f3dbbe594fee89c480fdc68"
   },
   {
     "id": "Lion's Mane mushroom — whole dried",
     "ipfsCID": "QmdTAvmydVok9HYDz4ivXYCWzbyi5aAZgjxzjhjQGPad5c",
-    "active": true
+    "active": true,
+    "tx_hash": "dcc31951bc2192e6e6a0425da4d85a81eadf25510cf3f49d1487502526212fad"
   }
 ]

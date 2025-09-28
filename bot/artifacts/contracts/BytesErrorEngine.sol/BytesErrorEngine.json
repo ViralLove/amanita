@@ -1,0 +1,52 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "BytesErrorEngine",
+  "sourceName": "contracts/BytesErrorEngine.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "notifySoulCreated",
+      "outputs": [],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "notifySoulRecovered",
+      "outputs": [],
+      "stateMutability": "pure",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608060405234801561001057600080fd5b50610100806100206000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c806329ebf101146037578063eca0395e146044575b600080fd5b60426032366004606a565b005b6042603236600460a1565b80356001600160a01b0381168114606557600080fd5b919050565b600080600060608486031215607e57600080fd5b83359250608c60208501604f565b9150609860408501604f565b90509250925092565b6000806040838503121560b357600080fd5b8235915060c160208401604f565b9050925092905056fea2646970667358221220b91f33ce787d37acab75a2773d6f43e045a873cdb1f081479b050793f118d8a364736f6c63430008140033",
+  "deployedBytecode": "0x6080604052348015600f57600080fd5b506004361060325760003560e01c806329ebf101146037578063eca0395e146044575b600080fd5b60426032366004606a565b005b6042603236600460a1565b80356001600160a01b0381168114606557600080fd5b919050565b600080600060608486031215607e57600080fd5b83359250608c60208501604f565b9150609860408501604f565b90509250925092565b6000806040838503121560b357600080fd5b8235915060c160208401604f565b9050925092905056fea2646970667358221220b91f33ce787d37acab75a2773d6f43e045a873cdb1f081479b050793f118d8a364736f6c63430008140033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

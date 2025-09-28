@@ -3279,3 +3279,1051 @@ AttributeError: 'SignedTransaction' object has no attribute 'rawTransaction'
 2025-06-10 23:56:51,314 - ERROR - __main__ -   - Продукт lions_mane_powder: 'SignedTransaction' object has no attribute 'rawTransaction'
 2025-06-10 23:56:51,314 - ERROR - __main__ -   - Продукт Lion's Mane mushroom — whole dried: 'SignedTransaction' object has no attribute 'rawTransaction'
 2025-06-10 23:56:51,314 - ERROR - __main__ - ❌ Процесс завершился с ошибками
+2025-09-26 23:12:11,369 - INFO - __main__ - 🚀 Запуск пайплайна подготовки каталога
+2025-09-26 23:12:11,370 - INFO - __main__ - 🖼️ Загрузка изображений...
+2025-09-26 23:12:11,372 - INFO - services.core.storage.pinata - Кэш загружен, 8 записей
+2025-09-26 23:12:11,372 - INFO - services.core.ipfs_factory - [IPFSFactory] Установлен Pinata провайдер
+2025-09-26 23:12:11,372 - INFO - services.core.ipfs_factory - [IPFSFactory] Инициализирована фабрика IPFS с типом коммуникации: sync
+2025-09-26 23:12:11,372 - INFO - utility.upload_catalog_images.facade - 🔧 Инициализирован загрузчик: SecurePinataUploader
+2025-09-26 23:12:11,373 - INFO - utility.upload_catalog_images.facade - 📊 Найдено файлов для обработки: 33
+2025-09-26 23:12:11,376 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Lions Main — Powder.jpeg (размер: 229.2KB, тип: image/jpeg)
+2025-09-26 23:12:11,376 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Lions Main — Powder.jpeg
+2025-09-26 23:12:11,377 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 25f70cfefbd4c9da21d5442b30743d1a2daddfb66ed250c7f1f7f7e3268680b5
+2025-09-26 23:12:11,377 - INFO - services.core.storage.pinata - Загружаем файл: Lions Main — Powder.jpeg
+2025-09-26 23:12:11,377 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.92s (базовая: 10.0s + jitter: 0.92s)
+2025-09-26 23:12:24,168 - INFO - services.core.storage.pinata - Метрики сохранены в metrics/pinata_metrics_20250926_231224.json
+2025-09-26 23:12:24,168 - INFO - services.core.storage.pinata - Успешно получен CID: QmTU5LpEp2qDBpCiWnZHEDuUK7BES3gm8wNWihn7ShqjAv
+2025-09-26 23:12:24,170 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:12:24,171 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Lions Main — Powder.jpeg -> QmTU5LpEp2qDBpCiWnZHEDuUK7BES3gm8wNWihn7ShqjAv за 12.8с
+2025-09-26 23:12:24,171 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск orders_cart.json: Недопустимый тип файла: application/json
+2025-09-26 23:12:24,171 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск upload_log.csv: Недопустимый тип файла: text/csv
+2025-09-26 23:12:24,171 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск organic_descriptions.json: Недопустимый тип файла: application/json
+2025-09-26 23:12:24,171 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Amanita — Closed hats.jpeg (размер: 333.8KB, тип: image/jpeg)
+2025-09-26 23:12:24,171 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Amanita — Closed hats.jpeg
+2025-09-26 23:12:24,173 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: d59699ba4c1ee0d608111826d9de0ef10be56c89c5dd163c5e053c9021283d3c
+2025-09-26 23:12:24,173 - INFO - services.core.storage.pinata - Загружаем файл: Amanita — Closed hats.jpeg
+2025-09-26 23:12:24,173 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.48s (базовая: 10.0s + jitter: 1.48s)
+2025-09-26 23:12:36,795 - INFO - services.core.storage.pinata - Успешно получен CID: QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1
+2025-09-26 23:12:36,799 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:12:36,800 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Amanita — Closed hats.jpeg -> QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1 за 12.6с
+2025-09-26 23:12:36,800 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск Iveta_catalog.original.csv: Недопустимый тип файла: text/csv
+2025-09-26 23:12:36,800 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск upload_catalog.log: Недопустимый тип файла: text/plain
+2025-09-26 23:12:36,801 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск product_registry_upload_data.json: Недопустимый тип файла: application/json
+2025-09-26 23:12:36,801 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск catalog2.json: Недопустимый тип файла: application/json
+2025-09-26 23:12:36,801 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск catalog_images.json: Недопустимый тип файла: application/json
+2025-09-26 23:12:36,801 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Blue Lotus.jpeg (размер: 317.3KB, тип: image/jpeg)
+2025-09-26 23:12:36,801 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Blue Lotus.jpeg
+2025-09-26 23:12:36,803 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: ba7c12a6ce8c200e2b634a51406fdca97fc522332a107ff965d37ef88faf0178
+2025-09-26 23:12:36,803 - INFO - services.core.storage.pinata - Загружаем файл: Blue Lotus.jpeg
+2025-09-26 23:12:36,803 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.64s (базовая: 10.0s + jitter: 0.64s)
+2025-09-26 23:12:48,561 - INFO - services.core.storage.pinata - Успешно получен CID: QmT5RC6Q6MRRF3YoDcXmKamKntXT6oSvxk3G2aLDkPc17T
+2025-09-26 23:12:48,563 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:12:48,564 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Blue Lotus.jpeg -> QmT5RC6Q6MRRF3YoDcXmKamKntXT6oSvxk3G2aLDkPc17T за 11.8с
+2025-09-26 23:12:48,565 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Amanita — Powder.jpeg (размер: 287.9KB, тип: image/jpeg)
+2025-09-26 23:12:48,565 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Amanita — Powder.jpeg
+2025-09-26 23:12:48,568 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 9b08c086bc850abd9a14c81de3bea18561dcc1d289b9a6e4260751daf0fb3ffe
+2025-09-26 23:12:48,568 - INFO - services.core.storage.pinata - Загружаем файл: Amanita — Powder.jpeg
+2025-09-26 23:12:48,568 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.56s (базовая: 10.0s + jitter: 0.56s)
+2025-09-26 23:13:00,636 - INFO - services.core.storage.pinata - Успешно получен CID: QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd
+2025-09-26 23:13:00,639 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:13:00,640 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Amanita — Powder.jpeg -> QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd за 12.1с
+2025-09-26 23:13:00,640 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Amanita — Tinctura.jpeg (размер: 220.1KB, тип: image/jpeg)
+2025-09-26 23:13:00,640 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Amanita — Tinctura.jpeg
+2025-09-26 23:13:00,641 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: e2051e155da0732ec02c44bd944f70ad0ceb253896e575fd50e97bfc439b7be6
+2025-09-26 23:13:00,642 - INFO - services.core.storage.pinata - Загружаем файл: Amanita — Tinctura.jpeg
+2025-09-26 23:13:00,642 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.99s (базовая: 10.0s + jitter: 1.99s)
+2025-09-26 23:13:13,806 - INFO - services.core.storage.pinata - Успешно получен CID: QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa
+2025-09-26 23:13:13,809 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:13:13,810 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Amanita — Tinctura.jpeg -> QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa за 13.2с
+2025-09-26 23:13:13,810 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Foxes.jpeg (размер: 271.4KB, тип: image/jpeg)
+2025-09-26 23:13:13,810 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Foxes.jpeg
+2025-09-26 23:13:13,811 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 2e028b389d8a8d09e3878e2ff4282581efefb8586a48cc62981a5b66108027dc
+2025-09-26 23:13:13,811 - INFO - services.core.storage.pinata - Загружаем файл: Foxes.jpeg
+2025-09-26 23:13:13,811 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.05s (базовая: 10.0s + jitter: 1.05s)
+2025-09-26 23:13:26,371 - INFO - services.core.storage.pinata - Успешно получен CID: QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa
+2025-09-26 23:13:26,375 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:13:26,376 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Foxes.jpeg -> QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa за 12.6с
+2025-09-26 23:13:26,377 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск organic_cid_mapping.json: Недопустимый тип файла: application/json
+2025-09-26 23:13:26,377 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Passion Flower.jpeg (размер: 245.6KB, тип: image/jpeg)
+2025-09-26 23:13:26,377 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Passion Flower.jpeg
+2025-09-26 23:13:26,380 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 624c02f4e37646b09d55c03d70a40a6f8ae5861cd07ea6ac2eafd1cdb2157bbd
+2025-09-26 23:13:26,380 - INFO - services.core.storage.pinata - Загружаем файл: Passion Flower.jpeg
+2025-09-26 23:13:26,380 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.02s (базовая: 10.0s + jitter: 1.02s)
+2025-09-26 23:13:38,584 - INFO - services.core.storage.pinata - Успешно получен CID: QmbtaSzChNvcjXEZZc3PpMXpcwVjpgQ5v1qfktbNGwuZZa
+2025-09-26 23:13:38,588 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:13:38,589 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Passion Flower.jpeg -> QmbtaSzChNvcjXEZZc3PpMXpcwVjpgQ5v1qfktbNGwuZZa за 12.2с
+2025-09-26 23:13:38,589 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Amanita — LUX.jpeg (размер: 331.3KB, тип: image/jpeg)
+2025-09-26 23:13:38,589 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Amanita — LUX.jpeg
+2025-09-26 23:13:38,591 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 6e8019587e6e29d45aa9b0f3427ec611f1c00e6892bad4b32873d43384e1c492
+2025-09-26 23:13:38,591 - INFO - services.core.storage.pinata - Загружаем файл: Amanita — LUX.jpeg
+2025-09-26 23:13:38,591 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.07s (базовая: 10.0s + jitter: 1.07s)
+2025-09-26 23:13:50,890 - INFO - services.core.storage.pinata - Успешно получен CID: Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz
+2025-09-26 23:13:50,894 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:13:50,895 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Amanita — LUX.jpeg -> Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz за 12.3с
+2025-09-26 23:13:50,895 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Cordyseps Militaris.jpeg (размер: 274.0KB, тип: image/jpeg)
+2025-09-26 23:13:50,895 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Cordyseps Militaris.jpeg
+2025-09-26 23:13:50,897 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 4de3f0cddf6f4f3bf9a9175e25789c2fe835d68599637381b2709a3e2078bb91
+2025-09-26 23:13:50,897 - INFO - services.core.storage.pinata - Загружаем файл: Cordyseps Militaris.jpeg
+2025-09-26 23:13:50,897 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.07s (базовая: 10.0s + jitter: 1.07s)
+2025-09-26 23:14:03,026 - INFO - services.core.storage.pinata - Успешно получен CID: QmfYLGvSUq2FEszpyLoyu28PLmeTMXk6zikT3c5W43kshP
+2025-09-26 23:14:03,029 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:14:03,029 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Cordyseps Militaris.jpeg -> QmfYLGvSUq2FEszpyLoyu28PLmeTMXk6zikT3c5W43kshP за 12.1с
+2025-09-26 23:14:03,030 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Cordyseps Militaris — Powder.jpeg (размер: 249.8KB, тип: image/jpeg)
+2025-09-26 23:14:03,030 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Cordyseps Militaris — Powder.jpeg
+2025-09-26 23:14:03,033 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 0305cce050a6606ecd874754687c9b79f4d7fe0137431f9b1b63773c7857e2ca
+2025-09-26 23:14:03,033 - INFO - services.core.storage.pinata - Загружаем файл: Cordyseps Militaris — Powder.jpeg
+2025-09-26 23:14:03,033 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.93s (базовая: 10.0s + jitter: 0.93s)
+2025-09-26 23:14:15,143 - INFO - services.core.storage.pinata - Успешно получен CID: QmW25vHA9WA78VENPus3A8Zrn45YeFMjVKWLJwfA5CEfSQ
+2025-09-26 23:14:15,150 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:14:15,150 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Cordyseps Militaris — Powder.jpeg -> QmW25vHA9WA78VENPus3A8Zrn45YeFMjVKWLJwfA5CEfSQ за 12.1с
+2025-09-26 23:14:15,151 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Kora Osiny.jpeg (размер: 287.8KB, тип: image/jpeg)
+2025-09-26 23:14:15,151 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Kora Osiny.jpeg
+2025-09-26 23:14:15,153 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: bfe3190434904552c5f6074d4c56c5cd0cc8b51ff247caf2bf94882434e6c27e
+2025-09-26 23:14:15,153 - INFO - services.core.storage.pinata - Загружаем файл: Kora Osiny.jpeg
+2025-09-26 23:14:15,153 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.38s (базовая: 10.0s + jitter: 1.38s)
+2025-09-26 23:14:28,187 - INFO - services.core.storage.pinata - Успешно получен CID: QmZGLPHZxDJP4VRbZbR8CRBY2widf5wMqMvu3rowhJGvCT
+2025-09-26 23:14:28,189 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:14:28,190 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Kora Osiny.jpeg -> QmZGLPHZxDJP4VRbZbR8CRBY2widf5wMqMvu3rowhJGvCT за 13.0с
+2025-09-26 23:14:28,190 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск Iveta_catalog.csv: Недопустимый тип файла: text/csv
+2025-09-26 23:14:28,190 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Blue Lotus — Tinctura.jpeg (размер: 226.8KB, тип: image/jpeg)
+2025-09-26 23:14:28,190 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Blue Lotus — Tinctura.jpeg
+2025-09-26 23:14:28,191 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 0264e9257e530f766c51f47d83ae78f210bc422eee7b65d687727c94e026be12
+2025-09-26 23:14:28,191 - INFO - services.core.storage.pinata - Загружаем файл: Blue Lotus — Tinctura.jpeg
+2025-09-26 23:14:28,191 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.30s (базовая: 10.0s + jitter: 1.30s)
+2025-09-26 23:14:40,597 - INFO - services.core.storage.pinata - Успешно получен CID: QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW
+2025-09-26 23:14:40,600 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:14:40,601 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Blue Lotus — Tinctura.jpeg -> QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW за 12.4с
+2025-09-26 23:14:40,601 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Amanita — Collapsed hats.jpeg (размер: 356.3KB, тип: image/jpeg)
+2025-09-26 23:14:40,601 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Amanita — Collapsed hats.jpeg
+2025-09-26 23:14:40,603 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 0827e18cbd59367e7870c7f880e5ae1a256f81b2610fc2e99877a70d7703bc23
+2025-09-26 23:14:40,604 - INFO - services.core.storage.pinata - Загружаем файл: Amanita — Collapsed hats.jpeg
+2025-09-26 23:14:40,604 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.78s (базовая: 10.0s + jitter: 1.78s)
+2025-09-26 23:14:53,803 - INFO - services.core.storage.pinata - Успешно получен CID: QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B
+2025-09-26 23:14:53,806 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:14:53,807 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Amanita — Collapsed hats.jpeg -> QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B за 13.2с
+2025-09-26 23:14:53,807 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск catalog1.json: Недопустимый тип файла: application/json
+2025-09-26 23:14:53,807 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск active_catalog.json: Недопустимый тип файла: application/json
+2025-09-26 23:14:53,807 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Amanita — Pantera.jpeg (размер: 274.2KB, тип: image/jpeg)
+2025-09-26 23:14:53,807 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Amanita — Pantera.jpeg
+2025-09-26 23:14:53,809 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 4a03e818b00f335d6069d5f692891d6a9d9beab7dc2a22965111d7aa1f95ac3d
+2025-09-26 23:14:53,809 - INFO - services.core.storage.pinata - Загружаем файл: Amanita — Pantera.jpeg
+2025-09-26 23:14:53,810 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.61s (базовая: 10.0s + jitter: 0.61s)
+2025-09-26 23:15:05,666 - INFO - services.core.storage.pinata - Успешно получен CID: QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn
+2025-09-26 23:15:05,668 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:15:05,668 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Amanita — Pantera.jpeg -> QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn за 11.9с
+2025-09-26 23:15:05,668 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск Iveta_catalog_structured.csv: Недопустимый тип файла: text/csv
+2025-09-26 23:15:05,668 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Chaga.jpeg (размер: 247.6KB, тип: image/jpeg)
+2025-09-26 23:15:05,668 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Chaga.jpeg
+2025-09-26 23:15:05,670 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: c0a10d5cd479c9c6b9cffb57a0ca5193393b74a3653ffbdf8d5049368011106a
+2025-09-26 23:15:05,670 - INFO - services.core.storage.pinata - Загружаем файл: Chaga.jpeg
+2025-09-26 23:15:05,670 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.57s (базовая: 10.0s + jitter: 1.57s)
+2025-09-26 23:15:18,390 - INFO - services.core.storage.pinata - Успешно получен CID: QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c
+2025-09-26 23:15:18,393 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:15:18,393 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Chaga.jpeg -> QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c за 12.7с
+2025-09-26 23:15:18,394 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск images_upload_log.csv: Недопустимый тип файла: text/csv
+2025-09-26 23:15:18,394 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Lions Main.jpeg (размер: 272.7KB, тип: image/jpeg)
+2025-09-26 23:15:18,394 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Lions Main.jpeg
+2025-09-26 23:15:18,396 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: e5cac3ac1c87d3f78d6ec542e1a6098f00f5612e3712ae73025cd9f703ad5505
+2025-09-26 23:15:18,397 - INFO - services.core.storage.pinata - Загружаем файл: Lions Main.jpeg
+2025-09-26 23:15:18,397 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.98s (базовая: 10.0s + jitter: 0.98s)
+2025-09-26 23:15:31,473 - INFO - services.core.storage.pinata - Успешно получен CID: QmXzbH3aeiyYyn5b4YSHe2kvNCQuUXtMngL91MeVjHH3vJ
+2025-09-26 23:15:31,476 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:15:31,477 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Lions Main.jpeg -> QmXzbH3aeiyYyn5b4YSHe2kvNCQuUXtMngL91MeVjHH3vJ за 13.1с
+2025-09-26 23:15:31,477 - WARNING - utility.upload_catalog_images.facade - ⚠️ Пропуск images_upload_log.json: Недопустимый тип файла: application/json
+2025-09-26 23:15:31,477 - INFO - utility.upload_catalog_images.facade - 🚀 Загружаем Amanita — 1 level.jpeg (размер: 314.0KB, тип: image/jpeg)
+2025-09-26 23:15:31,477 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/Amanita — 1 level.jpeg
+2025-09-26 23:15:31,480 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: c86490afb18618a27c6c208a4d13c24056d9fad88dda0c641295b985594fee51
+2025-09-26 23:15:31,480 - INFO - services.core.storage.pinata - Загружаем файл: Amanita — 1 level.jpeg
+2025-09-26 23:15:31,480 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.91s (базовая: 10.0s + jitter: 1.91s)
+2025-09-26 23:15:44,545 - INFO - services.core.storage.pinata - Успешно получен CID: QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj
+2025-09-26 23:15:44,549 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:15:44,550 - INFO - utility.upload_catalog_images.facade - ✅ Загружен Amanita — 1 level.jpeg -> QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj за 13.1с
+2025-09-26 23:15:44,552 - INFO - utility.upload_catalog_images.facade - 
+==================================================
+2025-09-26 23:15:44,552 - INFO - utility.upload_catalog_images.facade - 📊 Итоги загрузки:
+2025-09-26 23:15:44,552 - INFO - utility.upload_catalog_images.facade - ✅ Успешно загружено: 17 файлов
+2025-09-26 23:15:44,552 - INFO - utility.upload_catalog_images.facade - ❌ Ошибок загрузки: 15
+2025-09-26 23:15:44,552 - INFO - utility.upload_catalog_images.facade - 📦 Общий размер: 5.5MB
+2025-09-26 23:15:44,552 - INFO - utility.upload_catalog_images.facade - ⏱️ Общее время: 213.2с
+2025-09-26 23:15:44,552 - INFO - utility.upload_catalog_images.facade - 📈 Средняя скорость: 0.0MB/s
+2025-09-26 23:15:44,552 - INFO - utility.upload_catalog_images.facade - ==================================================
+2025-09-26 23:15:44,554 - INFO - __main__ - 🖼️ Загружены изображения: {'Lions Main — Powder.jpeg': 'QmTU5LpEp2qDBpCiWnZHEDuUK7BES3gm8wNWihn7ShqjAv', 'Amanita — Closed hats.jpeg': 'QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1', 'Blue Lotus.jpeg': 'QmT5RC6Q6MRRF3YoDcXmKamKntXT6oSvxk3G2aLDkPc17T', 'Amanita — Powder.jpeg': 'QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd', 'Amanita — Tinctura.jpeg': 'QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa', 'Foxes.jpeg': 'QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa', 'Passion Flower.jpeg': 'QmbtaSzChNvcjXEZZc3PpMXpcwVjpgQ5v1qfktbNGwuZZa', 'Amanita — LUX.jpeg': 'Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz', 'Cordyseps Militaris.jpeg': 'QmfYLGvSUq2FEszpyLoyu28PLmeTMXk6zikT3c5W43kshP', 'Cordyseps Militaris — Powder.jpeg': 'QmW25vHA9WA78VENPus3A8Zrn45YeFMjVKWLJwfA5CEfSQ', 'Kora Osiny.jpeg': 'QmZGLPHZxDJP4VRbZbR8CRBY2widf5wMqMvu3rowhJGvCT', 'Blue Lotus — Tinctura.jpeg': 'QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW', 'Amanita — Collapsed hats.jpeg': 'QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B', 'Amanita — Pantera.jpeg': 'QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn', 'Chaga.jpeg': 'QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c', 'Lions Main.jpeg': 'QmXzbH3aeiyYyn5b4YSHe2kvNCQuUXtMngL91MeVjHH3vJ', 'Amanita — 1 level.jpeg': 'QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj'}
+2025-09-26 23:15:44,554 - INFO - __main__ - 📝 Загрузка описаний...
+2025-09-26 23:15:44,559 - INFO - services.core.storage.pinata - Кэш загружен, 25 записей
+2025-09-26 23:15:44,559 - INFO - services.core.ipfs_factory - [IPFSFactory] Установлен Pinata провайдер
+2025-09-26 23:15:44,559 - INFO - services.core.ipfs_factory - [IPFSFactory] Инициализирована фабрика IPFS с типом коммуникации: sync
+2025-09-26 23:15:44,559 - INFO - utility.upload_organic_descriptions - Загружаем описания из catalog/organic_descriptions.json
+2025-09-26 23:15:44,559 - INFO - utility.upload_organic_descriptions - Загружено 11 описаний
+2025-09-26 23:15:44,559 - INFO - utility.upload_organic_descriptions - Загружено 11 описаний для обработки
+2025-09-26 23:15:44,559 - INFO - utility.upload_organic_descriptions - Обработка item_id: amanita_muscaria
+2025-09-26 23:15:44,559 - DEBUG - utility.upload_organic_descriptions - Данные для загрузки: {
+  "id": "amanita-muscaria",
+  "title": "Мухомор красный",
+  "scientific_name": "Amanita muscaria",
+  "generic_description": "🔬 Активные компоненты:\n🔹Мусцимол — седатив, диссоциатив, открывает доступ к \"второму телу\", активируя тормозную систему ГАМК.\n🔹Иботеновая кислота — психостимулятор, вызывает возбуждение через NMDA-рецепторы. Преобразуется в мусцимол при сушке.\n🔹Буфотенин — редкий триптаминовый галлюциноген, структурный родственник серотонина и псилоцибина.\n🔹Мускарин — холинергический токсин. В больших дозах вызывает интоксикацию, но в микродозинге стимулирует парасимпатическую активность.\n🔹Микоатропин — антагонист мускарина, холинолитик. Уравновешивает внутренние полюса: яд и противоядие в одном теле.\n🔹Мускаруфин — пигмент и антибиотик. Поддерживает железы внутренней секреции, обладает противоопухолевым потенциалом.\n🔹Мусказон — побочный метаболит, появляется под действием солнечного света. Слабый, но символически значимый \"дух света\".",
+  "effects": "🌿 Целительное действие:\n🔹Нейромодуляция: балансирует возбуждение и торможение, восстанавливает \"зажатые\" контуры ЦНС.\n🔹Антидепрессивное и анксиолитическое: через активацию ГАМК и опосредованное воздействие на серотониновые пути.\n🔹Противовоспалительное: воздействие на микроглию через мусцимол (исследуется в контексте нейродегенеративных заболеваний).\n🔹Гомеопатическое воздействие (в малых дозах): стимуляция желёз, повышение жизненного тонуса, регуляция обмена.",
+  "shamanic": "🌀 Шаманская перспектива:\nМухомор не \"даёт приход\" — он отключает автоматизм. Он может стереть личность, чтобы показать тебе её контур.\nЭто не растение-учитель, а гриб-суровый инициатор. Его сила в разрушении — и последующей сборке новой конфигурации духа.\nВ малых дозах он как разведчик нервной системы — распаковывает зажимы, восстанавливает контакт между телом и полем.\nВ больших — уносит в состояние \"междумирья\", где теряются обычные ориентиры, но появляется глубинное знание.",
+  "warnings": "⚠️ Предостережения:\n🔹Нельзя употреблять в сыром виде — иботеновая кислота активна и может вызвать тяжёлую интоксикацию.\n🔹Сушка активирует трансформацию в мусцимол, а значит — снижает нейротоксичность.\n🔹Чёткое дозирование критично. Больше — не значит глубже.",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": "⚖️ Дозировка и настрой\nМухомор — это не препарат с универсальной нормой, а персональный союзник, к которому подступаются с уважением и наблюдательностью. Его сила раскрывается в диалоге с телом, а не в миллиграммах.\n🔹 Стартовая дозировка: от 0.2 до 0.3 г сушёного гриба (в порошке или шляпках). Это минимальный порог, достаточный для запуска мягкого диалога с нервной системой.\n🔹 Рабочий диапазон: 0.4 – 1.5 г. В этих пределах раскрываются основные свойства: снятие тревожности, расслабление мышц, улучшение сна, восстановление чувствительности к телу и эмоциям.\n🔹 Порог для сильной психики: 2 – 4 г. В этом диапазоне могут начаться дестабилизирующие эффекты: спутанность сознания, тошнота, слабость, потеря ориентации во времени. Подходит лишь для опытных практиков с устойчивой нервной системой и поддержкой пространства.\n⚠️ Мухомор не любит спешки. Дозировка всегда подбирается индивидуально и пошагово, с дневником наблюдений, в безопасной обстановке, никогда не ежедневно.\nЭффект кумулятивен: даже микродозинг в течение 3–5 дней может дать ощутимый \"фон\"."
+    }
+  ]
+}
+2025-09-26 23:15:44,559 - DEBUG - utility.upload_organic_descriptions - Размер JSON данных: 3430 байт
+2025-09-26 23:15:44,559 - INFO - utility.upload_organic_descriptions - Имя файла для загрузки: biounit_amanita-muscaria_description.json
+2025-09-26 23:15:44,559 - INFO - utility.upload_organic_descriptions - Начинаем загрузку в IPFS для amanita_muscaria
+2025-09-26 23:15:44,560 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: {
+  "id": "amanita-muscaria",
+  "title": "Мухомор красный",
+  "scientific_name": "Amanita muscaria",
+  "generic_description": "🔬 Активные компоненты:\n🔹Мусцимол — седатив, диссоциатив, открывает доступ к \"второму телу\", активируя тормозную систему ГАМК.\n🔹Иботеновая кислота — психостимулятор, вызывает возбуждение через NMDA-рецепторы. Преобразуется в мусцимол при сушке.\n🔹Буфотенин — редкий триптаминовый галлюциноген, структурный родственник серотонина и псилоцибина.\n🔹Мускарин — холинергический токсин. В больших дозах вызывает интоксикацию, но в микродозинге стимулирует парасимпатическую активность.\n🔹Микоатропин — антагонист мускарина, холинолитик. Уравновешивает внутренние полюса: яд и противоядие в одном теле.\n🔹Мускаруфин — пигмент и антибиотик. Поддерживает железы внутренней секреции, обладает противоопухолевым потенциалом.\n🔹Мусказон — побочный метаболит, появляется под действием солнечного света. Слабый, но символически значимый \"дух света\".",
+  "effects": "🌿 Целительное действие:\n🔹Нейромодуляция: балансирует возбуждение и торможение, восстанавливает \"зажатые\" контуры ЦНС.\n🔹Антидепрессивное и анксиолитическое: через активацию ГАМК и опосредованное воздействие на серотониновые пути.\n🔹Противовоспалительное: воздействие на микроглию через мусцимол (исследуется в контексте нейродегенеративных заболеваний).\n🔹Гомеопатическое воздействие (в малых дозах): стимуляция желёз, повышение жизненного тонуса, регуляция обмена.",
+  "shamanic": "🌀 Шаманская перспектива:\nМухомор не \"даёт приход\" — он отключает автоматизм. Он может стереть личность, чтобы показать тебе её контур.\nЭто не растение-учитель, а гриб-суровый инициатор. Его сила в разрушении — и последующей сборке новой конфигурации духа.\nВ малых дозах он как разведчик нервной системы — распаковывает зажимы, восстанавливает контакт между телом и полем.\nВ больших — уносит в состояние \"междумирья\", где теряются обычные ориентиры, но появляется глубинное знание.",
+  "warnings": "⚠️ Предостережения:\n🔹Нельзя употреблять в сыром виде — иботеновая кислота активна и может вызвать тяжёлую интоксикацию.\n🔹Сушка активирует трансформацию в мусцимол, а значит — снижает нейротоксичность.\n🔹Чёткое дозирование критично. Больше — не значит глубже.",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": "⚖️ Дозировка и настрой\nМухомор — это не препарат с универсальной нормой, а персональный союзник, к которому подступаются с уважением и наблюдательностью. Его сила раскрывается в диалоге с телом, а не в миллиграммах.\n🔹 Стартовая дозировка: от 0.2 до 0.3 г сушёного гриба (в порошке или шляпках). Это минимальный порог, достаточный для запуска мягкого диалога с нервной системой.\n🔹 Рабочий диапазон: 0.4 – 1.5 г. В этих пределах раскрываются основные свойства: снятие тревожности, расслабление мышц, улучшение сна, восстановление чувствительности к телу и эмоциям.\n🔹 Порог для сильной психики: 2 – 4 г. В этом диапазоне могут начаться дестабилизирующие эффекты: спутанность сознания, тошнота, слабость, потеря ориентации во времени. Подходит лишь для опытных практиков с устойчивой нервной системой и поддержкой пространства.\n⚠️ Мухомор не любит спешки. Дозировка всегда подбирается индивидуально и пошагово, с дневником наблюдений, в безопасной обстановке, никогда не ежедневно.\nЭффект кумулятивен: даже микродозинг в течение 3–5 дней может дать ощутимый \"фон\"."
+    }
+  ]
+}
+2025-09-26 23:15:44,560 - INFO - services.core.storage.pinata - Обнаружены данные вместо пути к файлу, используем upload_text
+2025-09-26 23:15:44,560 - INFO - services.core.storage.pinata - Начинаем загрузку текстовых данных в IPFS
+2025-09-26 23:15:44,560 - INFO - services.core.storage.pinata - Отправляем запрос в Pinata JSON API
+2025-09-26 23:15:44,560 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.76s (базовая: 10.0s + jitter: 0.76s)
+2025-09-26 23:15:56,255 - INFO - services.core.storage.pinata - Метрики сохранены в metrics/pinata_metrics_20250926_231556.json
+2025-09-26 23:15:56,255 - INFO - services.core.storage.pinata - Успешно получен CID: QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG
+2025-09-26 23:15:56,256 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:15:56,256 - INFO - utility.upload_organic_descriptions - ☀️ Ура! Биологическая единица проросла в блокчейн! amanita_muscaria, получен CID: QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG
+2025-09-26 23:15:56,256 - INFO - utility.upload_organic_descriptions - ✅ Успешно добавлен в маппинг: amanita_muscaria -> QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG (biounit_amanita-muscaria_description.json)
+2025-09-26 23:15:56,256 - INFO - utility.upload_organic_descriptions - Обработка item_id: amanita_pantherina
+2025-09-26 23:15:56,257 - DEBUG - utility.upload_organic_descriptions - Данные для загрузки: {
+  "id": "amanita-pantherina",
+  "title": "Мухомор пантерный",
+  "scientific_name": "Amanita pantherina",
+  "generic_description": "Мухомор пантерный — это более тёмный брат красного мухомора, обладающий в 5–10 раз более высокой активностью. Его основной компонент — мусцимол, но в концентрациях, способных вызвать резкое погружение в изменённое состояние сознания даже при малой дозировке. Пантерный мухомор отличается более резким, углубляющим действием на ГАМК-рецепторы, вызывая выраженную диссоциацию, подавление мышечной активности и временную амнезию. Это гриб, с которым не шутят. Даже микродозинг требует большой чёткости и внутреннего фокуса.",
+  "effects": "",
+  "shamanic": "С шаманской точки зрения, пантерный мухомор — испытание на готовность отпустить контроль. Он может унести в мир, где исчезает привычное \"я\", оставляя голое восприятие и хаос. Но тем, кто умеет удерживать внимание в нестабильности, он открывает глубинные слои памяти и первобытные архетипы. Он не лечит — он расчищает. Не восстанавливает, а перекраивает шаблоны. Подходит для опытных практиков, ищущих разрушение старых оболочек.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:15:56,257 - DEBUG - utility.upload_organic_descriptions - Размер JSON данных: 1262 байт
+2025-09-26 23:15:56,257 - INFO - utility.upload_organic_descriptions - Имя файла для загрузки: biounit_amanita-pantherina_description.json
+2025-09-26 23:15:56,257 - INFO - utility.upload_organic_descriptions - Начинаем загрузку в IPFS для amanita_pantherina
+2025-09-26 23:15:56,257 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: {
+  "id": "amanita-pantherina",
+  "title": "Мухомор пантерный",
+  "scientific_name": "Amanita pantherina",
+  "generic_description": "Мухомор пантерный — это более тёмный брат красного мухомора, обладающий в 5–10 раз более высокой активностью. Его основной компонент — мусцимол, но в концентрациях, способных вызвать резкое погружение в изменённое состояние сознания даже при малой дозировке. Пантерный мухомор отличается более резким, углубляющим действием на ГАМК-рецепторы, вызывая выраженную диссоциацию, подавление мышечной активности и временную амнезию. Это гриб, с которым не шутят. Даже микродозинг требует большой чёткости и внутреннего фокуса.",
+  "effects": "",
+  "shamanic": "С шаманской точки зрения, пантерный мухомор — испытание на готовность отпустить контроль. Он может унести в мир, где исчезает привычное \"я\", оставляя голое восприятие и хаос. Но тем, кто умеет удерживать внимание в нестабильности, он открывает глубинные слои памяти и первобытные архетипы. Он не лечит — он расчищает. Не восстанавливает, а перекраивает шаблоны. Подходит для опытных практиков, ищущих разрушение старых оболочек.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:15:56,257 - INFO - services.core.storage.pinata - Обнаружены данные вместо пути к файлу, используем upload_text
+2025-09-26 23:15:56,257 - INFO - services.core.storage.pinata - Начинаем загрузку текстовых данных в IPFS
+2025-09-26 23:15:56,257 - INFO - services.core.storage.pinata - Отправляем запрос в Pinata JSON API
+2025-09-26 23:15:56,257 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.63s (базовая: 10.0s + jitter: 0.63s)
+2025-09-26 23:16:07,723 - INFO - services.core.storage.pinata - Успешно получен CID: Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy
+2025-09-26 23:16:07,726 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:16:07,727 - INFO - utility.upload_organic_descriptions - ☀️ Ура! Биологическая единица проросла в блокчейн! amanita_pantherina, получен CID: Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy
+2025-09-26 23:16:07,727 - INFO - utility.upload_organic_descriptions - ✅ Успешно добавлен в маппинг: amanita_pantherina -> Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy (biounit_amanita-pantherina_description.json)
+2025-09-26 23:16:07,727 - INFO - utility.upload_organic_descriptions - Обработка item_id: blue-lotus
+2025-09-26 23:16:07,727 - DEBUG - utility.upload_organic_descriptions - Данные для загрузки: {
+  "id": "blue-lotus",
+  "title": "Голубой лотос",
+  "scientific_name": "Nymphaea caerulea",
+  "generic_description": "Голубой лотос — цветок древнего Египта, использовавшийся как афродизиак, расслабляющее средство и растительный энтеоген. Его действующие вещества — нуциферин и апоморфин — мягко активируют дофаминовые рецепторы, способствуя состояниям расслабленного транса, эмоционального открытия и глубокого сна. Он снижает тревожность, усиливает телесную чувствительность и часто применяется для усиления сновидений или практик любовной алхимии.",
+  "effects": "",
+  "shamanic": "С шаманской точки зрения, голубой лотос — это растение-нежность, которое растворяет защитные оболочки и открывает пространство любви и сна. Он не ведёт через боль — он приглашает вспомнить тело как храм удовольствия и покоя. Его энергия — водная, лунная, обволакивающая. Особенно подходит тем, кто живёт в режиме напряжения, устал от анализа и нуждается в мягком соединении с собой. Это союзник сердца и чувственности, не уносящий — а возвращающий в себя.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные цветы",
+      "description": ""
+    },
+    {
+      "type": "tincture",
+      "title": "Настойка",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:16:07,727 - DEBUG - utility.upload_organic_descriptions - Размер JSON данных: 1276 байт
+2025-09-26 23:16:07,728 - INFO - utility.upload_organic_descriptions - Имя файла для загрузки: biounit_blue-lotus_description.json
+2025-09-26 23:16:07,728 - INFO - utility.upload_organic_descriptions - Начинаем загрузку в IPFS для blue-lotus
+2025-09-26 23:16:07,728 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: {
+  "id": "blue-lotus",
+  "title": "Голубой лотос",
+  "scientific_name": "Nymphaea caerulea",
+  "generic_description": "Голубой лотос — цветок древнего Египта, использовавшийся как афродизиак, расслабляющее средство и растительный энтеоген. Его действующие вещества — нуциферин и апоморфин — мягко активируют дофаминовые рецепторы, способствуя состояниям расслабленного транса, эмоционального открытия и глубокого сна. Он снижает тревожность, усиливает телесную чувствительность и часто применяется для усиления сновидений или практик любовной алхимии.",
+  "effects": "",
+  "shamanic": "С шаманской точки зрения, голубой лотос — это растение-нежность, которое растворяет защитные оболочки и открывает пространство любви и сна. Он не ведёт через боль — он приглашает вспомнить тело как храм удовольствия и покоя. Его энергия — водная, лунная, обволакивающая. Особенно подходит тем, кто живёт в режиме напряжения, устал от анализа и нуждается в мягком соединении с собой. Это союзник сердца и чувственности, не уносящий — а возвращающий в себя.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные цветы",
+      "description": ""
+    },
+    {
+      "type": "tincture",
+      "title": "Настойка",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:16:07,728 - INFO - services.core.storage.pinata - Обнаружены данные вместо пути к файлу, используем upload_text
+2025-09-26 23:16:07,728 - INFO - services.core.storage.pinata - Начинаем загрузку текстовых данных в IPFS
+2025-09-26 23:16:07,728 - INFO - services.core.storage.pinata - Отправляем запрос в Pinata JSON API
+2025-09-26 23:16:07,728 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 12.00s (базовая: 10.0s + jitter: 2.00s)
+2025-09-26 23:16:20,625 - INFO - services.core.storage.pinata - Успешно получен CID: QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S
+2025-09-26 23:16:20,630 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:16:20,630 - INFO - utility.upload_organic_descriptions - ☀️ Ура! Биологическая единица проросла в блокчейн! blue-lotus, получен CID: QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S
+2025-09-26 23:16:20,630 - INFO - utility.upload_organic_descriptions - ✅ Успешно добавлен в маппинг: blue-lotus -> QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S (biounit_blue-lotus_description.json)
+2025-09-26 23:16:20,630 - INFO - utility.upload_organic_descriptions - Обработка item_id: inonotus_obliquus
+2025-09-26 23:16:20,631 - DEBUG - utility.upload_organic_descriptions - Данные для загрузки: {
+  "id": "chaga",
+  "title": "Чага",
+  "scientific_name": "Inonotus obliquus",
+  "generic_description": "Чага — это древесный гриб, впитавший силу времени, морозов и берёзового сока. Он богат меланином, бетулином, полисахаридами и антиоксидантами, которые способствуют детоксикации, восстановлению печени, укреплению иммунитета и антираковому действию. Чага особенно ценится за способность регулировать воспалительные процессы и сахар в крови, а также за общее тонизирующее действие при хронических заболеваниях и снижении жизненных сил.",
+  "effects": "Многочисленные целебные качества и полезные свойства чаги известны очень давно и широко используются в домашних условиях. Этот не слишком привлекательный гриб помогает лечить многие заболевания. Он подходит к употреблению также и в качестве сильного профилактического средства.\nХимический состав чаги следующий:\n\n- биологически активные флавоноиды, обладающие мочегонным, спазмолитическим, желчегонным и противовоспалительным воздействием;\n\n- алкалоиды, благотворно воздействующие на мышцу миокарда;\n- органические кислоты, способствующие нормализации кислотно-основного состояния;\n- дубильные вещества, характеризующиеся как кровеостанавливающие и противовоспалительные;\n- фитонциды, уничтожающие патогенную микрофлору;\n- меланин, стимулирующий основные обменные процессы;\n - магний, калий, железо, марганец, кобальт, медь, цинк, никель, алюминий.\nЛечебный эффект березовой чаги обусловлен воздействием на организм активных биогенных стимуляторов. Гриб характеризуется тонизирующим, общеукрепляющим, иммуномодулирующим, а также противоопухолевым эффектом. Онкологию он не излечит, но способен существенно замедлять рост злокачественных клеток. Кроме того, при употреблении чаги отмечается снижение аритмии и улучшение процессов метаболизма головного мозга. Также она помогает понизить показатели сахара в крови, стабилизировать артериальное давление и сбалансировать работу ЖКТ.",
+  "shamanic": "С шаманской перспективы чага — это земной адаптоген, который не зовёт в иные миры, а укрепляет связь с этим. Он — как корень, как ствол — стабилизирует, заземляет, алхимизирует тьму в ресурс. Пьющий чагу возвращается в себя, как в старый дом. Это союзник долгожителей, хранитель лесной памяти и алхимик, работающий с медленным временем. Его сила не в вспышках, а в постоянстве и глубине.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": "Порошок —1 гр в день\nЧай лучше всего пить в первой половине дня"
+    }
+  ]
+}
+2025-09-26 23:16:20,631 - DEBUG - utility.upload_organic_descriptions - Размер JSON данных: 2558 байт
+2025-09-26 23:16:20,631 - INFO - utility.upload_organic_descriptions - Имя файла для загрузки: biounit_chaga_description.json
+2025-09-26 23:16:20,631 - INFO - utility.upload_organic_descriptions - Начинаем загрузку в IPFS для inonotus_obliquus
+2025-09-26 23:16:20,631 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: {
+  "id": "chaga",
+  "title": "Чага",
+  "scientific_name": "Inonotus obliquus",
+  "generic_description": "Чага — это древесный гриб, впитавший силу времени, морозов и берёзового сока. Он богат меланином, бетулином, полисахаридами и антиоксидантами, которые способствуют детоксикации, восстановлению печени, укреплению иммунитета и антираковому действию. Чага особенно ценится за способность регулировать воспалительные процессы и сахар в крови, а также за общее тонизирующее действие при хронических заболеваниях и снижении жизненных сил.",
+  "effects": "Многочисленные целебные качества и полезные свойства чаги известны очень давно и широко используются в домашних условиях. Этот не слишком привлекательный гриб помогает лечить многие заболевания. Он подходит к употреблению также и в качестве сильного профилактического средства.\nХимический состав чаги следующий:\n\n- биологически активные флавоноиды, обладающие мочегонным, спазмолитическим, желчегонным и противовоспалительным воздействием;\n\n- алкалоиды, благотворно воздействующие на мышцу миокарда;\n- органические кислоты, способствующие нормализации кислотно-основного состояния;\n- дубильные вещества, характеризующиеся как кровеостанавливающие и противовоспалительные;\n- фитонциды, уничтожающие патогенную микрофлору;\n- меланин, стимулирующий основные обменные процессы;\n - магний, калий, железо, марганец, кобальт, медь, цинк, никель, алюминий.\nЛечебный эффект березовой чаги обусловлен воздействием на организм активных биогенных стимуляторов. Гриб характеризуется тонизирующим, общеукрепляющим, иммуномодулирующим, а также противоопухолевым эффектом. Онкологию он не излечит, но способен существенно замедлять рост злокачественных клеток. Кроме того, при употреблении чаги отмечается снижение аритмии и улучшение процессов метаболизма головного мозга. Также она помогает понизить показатели сахара в крови, стабилизировать артериальное давление и сбалансировать работу ЖКТ.",
+  "shamanic": "С шаманской перспективы чага — это земной адаптоген, который не зовёт в иные миры, а укрепляет связь с этим. Он — как корень, как ствол — стабилизирует, заземляет, алхимизирует тьму в ресурс. Пьющий чагу возвращается в себя, как в старый дом. Это союзник долгожителей, хранитель лесной памяти и алхимик, работающий с медленным временем. Его сила не в вспышках, а в постоянстве и глубине.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": "Порошок —1 гр в день\nЧай лучше всего пить в первой половине дня"
+    }
+  ]
+}
+2025-09-26 23:16:20,631 - INFO - services.core.storage.pinata - Обнаружены данные вместо пути к файлу, используем upload_text
+2025-09-26 23:16:20,631 - INFO - services.core.storage.pinata - Начинаем загрузку текстовых данных в IPFS
+2025-09-26 23:16:20,631 - INFO - services.core.storage.pinata - Отправляем запрос в Pinata JSON API
+2025-09-26 23:16:20,631 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.74s (базовая: 10.0s + jitter: 1.74s)
+2025-09-26 23:16:32,881 - INFO - services.core.storage.pinata - Успешно получен CID: Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93
+2025-09-26 23:16:32,884 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:16:32,884 - INFO - utility.upload_organic_descriptions - ☀️ Ура! Биологическая единица проросла в блокчейн! inonotus_obliquus, получен CID: Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93
+2025-09-26 23:16:32,884 - INFO - utility.upload_organic_descriptions - ✅ Успешно добавлен в маппинг: inonotus_obliquus -> Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93 (biounit_chaga_description.json)
+2025-09-26 23:16:32,884 - INFO - utility.upload_organic_descriptions - Обработка item_id: cordyceps_militaris
+2025-09-26 23:16:32,884 - DEBUG - utility.upload_organic_descriptions - Данные для загрузки: {
+  "id": "cordyceps",
+  "title": "Кордицепс военный",
+  "scientific_name": "Cordyceps militaris",
+  "generic_description": "Кордицепс — гриб-адаптоген, известный своей способностью повышать выносливость, энергию и восстановление после нагрузок. Его активные компоненты — кордицепин, аденозин и полисахариды — улучшают использование кислорода клетками, усиливают митохондриальную активность и поддерживают иммунитет. Он воздействует на надпочечники и HPA-ось, помогая при хронической усталости, а также поддерживает либидо и гормональный баланс.",
+  "effects": "",
+  "shamanic": "С шаманской точки зрения, кордицепс — это дух жизненной силы, заключённый в теле воина. Он не раскрывает сновидения, но встраивает ясность в повседневное усилие. Его энергия направленная, точная, ритмичная — как дыхание во время подъёма в гору. Это союзник тех, кто много действует, сражается с инерцией, выстраивает структуру. Особенно полезен в период восстановления или запуска нового жизненного цикла.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:16:32,884 - DEBUG - utility.upload_organic_descriptions - Размер JSON данных: 1129 байт
+2025-09-26 23:16:32,884 - INFO - utility.upload_organic_descriptions - Имя файла для загрузки: biounit_cordyceps_description.json
+2025-09-26 23:16:32,885 - INFO - utility.upload_organic_descriptions - Начинаем загрузку в IPFS для cordyceps_militaris
+2025-09-26 23:16:32,885 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: {
+  "id": "cordyceps",
+  "title": "Кордицепс военный",
+  "scientific_name": "Cordyceps militaris",
+  "generic_description": "Кордицепс — гриб-адаптоген, известный своей способностью повышать выносливость, энергию и восстановление после нагрузок. Его активные компоненты — кордицепин, аденозин и полисахариды — улучшают использование кислорода клетками, усиливают митохондриальную активность и поддерживают иммунитет. Он воздействует на надпочечники и HPA-ось, помогая при хронической усталости, а также поддерживает либидо и гормональный баланс.",
+  "effects": "",
+  "shamanic": "С шаманской точки зрения, кордицепс — это дух жизненной силы, заключённый в теле воина. Он не раскрывает сновидения, но встраивает ясность в повседневное усилие. Его энергия направленная, точная, ритмичная — как дыхание во время подъёма в гору. Это союзник тех, кто много действует, сражается с инерцией, выстраивает структуру. Особенно полезен в период восстановления или запуска нового жизненного цикла.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:16:32,885 - INFO - services.core.storage.pinata - Обнаружены данные вместо пути к файлу, используем upload_text
+2025-09-26 23:16:32,885 - INFO - services.core.storage.pinata - Начинаем загрузку текстовых данных в IPFS
+2025-09-26 23:16:32,885 - INFO - services.core.storage.pinata - Отправляем запрос в Pinata JSON API
+2025-09-26 23:16:32,885 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.69s (базовая: 10.0s + jitter: 0.69s)
+2025-09-26 23:16:44,483 - INFO - services.core.storage.pinata - Успешно получен CID: QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy
+2025-09-26 23:16:44,484 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:16:44,484 - INFO - utility.upload_organic_descriptions - ☀️ Ура! Биологическая единица проросла в блокчейн! cordyceps_militaris, получен CID: QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy
+2025-09-26 23:16:44,484 - INFO - utility.upload_organic_descriptions - ✅ Успешно добавлен в маппинг: cordyceps_militaris -> QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy (biounit_cordyceps_description.json)
+2025-09-26 23:16:44,484 - INFO - utility.upload_organic_descriptions - Обработка item_id: cantharellus_cibarius
+2025-09-26 23:16:44,485 - DEBUG - utility.upload_organic_descriptions - Данные для загрузки: {
+  "id": "chanterelle",
+  "title": "Лисички",
+  "scientific_name": "Cantharellus cibarius",
+  "generic_description": "Лисички — это не психоактивный гриб, а глубоко функциональный союзник организма, особенно в контексте антипаразитарной защиты. Их природные соединения — в частности траметонолиновая кислота и хиноманноз — создают в кишечнике и печени условия, враждебные для паразитов, включая гельминтов и простейших. Это делает лисичку эффективным компонентом очистительных протоколов. Она также содержит бета-глюканы и другие полисахариды, поддерживающие иммунитет.",
+  "effects": "",
+  "shamanic": "В шаманской перспективе лисичка — это гриб-чистильщик, который не входит в сны, а выгоняет теней. Она возвращает телу чистоту восприятия, особенно в детокс-программах. В ней нет “прихода”, но есть тишина, порядок и границы. Это дух леса, который оберегает внутреннюю территорию и не пускает нежеланных гостей — как на физическом, так и на энергетическом уровне. Подходит для мягкой и глубокой чистки тела.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:16:44,485 - DEBUG - utility.upload_organic_descriptions - Размер JSON данных: 1154 байт
+2025-09-26 23:16:44,485 - INFO - utility.upload_organic_descriptions - Имя файла для загрузки: biounit_chanterelle_description.json
+2025-09-26 23:16:44,485 - INFO - utility.upload_organic_descriptions - Начинаем загрузку в IPFS для cantharellus_cibarius
+2025-09-26 23:16:44,485 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: {
+  "id": "chanterelle",
+  "title": "Лисички",
+  "scientific_name": "Cantharellus cibarius",
+  "generic_description": "Лисички — это не психоактивный гриб, а глубоко функциональный союзник организма, особенно в контексте антипаразитарной защиты. Их природные соединения — в частности траметонолиновая кислота и хиноманноз — создают в кишечнике и печени условия, враждебные для паразитов, включая гельминтов и простейших. Это делает лисичку эффективным компонентом очистительных протоколов. Она также содержит бета-глюканы и другие полисахариды, поддерживающие иммунитет.",
+  "effects": "",
+  "shamanic": "В шаманской перспективе лисичка — это гриб-чистильщик, который не входит в сны, а выгоняет теней. Она возвращает телу чистоту восприятия, особенно в детокс-программах. В ней нет “прихода”, но есть тишина, порядок и границы. Это дух леса, который оберегает внутреннюю территорию и не пускает нежеланных гостей — как на физическом, так и на энергетическом уровне. Подходит для мягкой и глубокой чистки тела.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:16:44,485 - INFO - services.core.storage.pinata - Обнаружены данные вместо пути к файлу, используем upload_text
+2025-09-26 23:16:44,485 - INFO - services.core.storage.pinata - Начинаем загрузку текстовых данных в IPFS
+2025-09-26 23:16:44,485 - INFO - services.core.storage.pinata - Отправляем запрос в Pinata JSON API
+2025-09-26 23:16:44,485 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.77s (базовая: 10.0s + jitter: 1.77s)
+2025-09-26 23:16:57,112 - INFO - services.core.storage.pinata - Успешно получен CID: QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE
+2025-09-26 23:16:57,118 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:16:57,118 - INFO - utility.upload_organic_descriptions - ☀️ Ура! Биологическая единица проросла в блокчейн! cantharellus_cibarius, получен CID: QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE
+2025-09-26 23:16:57,118 - INFO - utility.upload_organic_descriptions - ✅ Успешно добавлен в маппинг: cantharellus_cibarius -> QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE (biounit_chanterelle_description.json)
+2025-09-26 23:16:57,118 - INFO - utility.upload_organic_descriptions - Обработка item_id: populus_tremula
+2025-09-26 23:16:57,119 - DEBUG - utility.upload_organic_descriptions - Данные для загрузки: {
+  "id": "aspen",
+  "title": "Кора осины",
+  "scientific_name": "Populus tremula",
+  "generic_description": "Кора осины содержит гликозиды салицина, действующие как природный анальгетик, жаропонижающее и противовоспалительное средство. Её традиционно используют в народной медицине против паразитов, воспалений мочеполовой системы и суставных болей. Осина регулирует обменные процессы, мягко очищает и снижает уровень сахара в крови. Это одно из главных “деревьев-чистильщиков” в фитоаптеке северной традиции.",
+  "effects": "✅ Кора осины также применяется в терапии онкозаболеваний, тяжелых поражениях организма вирусами и бактериями, мощно повышает иммунитет и излечивает: \n- цистит и простатит, уретрит\n- болезни суставов\n- заболевания печени\n- нарушения поджелудочной железы\n- сифилис\n- туберкулез\n- лишай\n- анемию.",
+  "shamanic": "С шаманской точки зрения, осина — это страж границ, который помогает изгнать то, что поселилось в теле или поле незаметно. Её кора горька, как правда, и действует именно так: отрезает, очищает, завершает. Это не мягкий союзник, а целительная строгость, которая даёт облегчение через честность. Особенно подходит в программах очищения и выхода из застоя (физического или энергетического). Осина не лечит — она завершает болезнь.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушеная кора",
+      "description": "📜ОСИНОВЫЙ ОТВАР\n1 ч. л. коры осины залить 250 мл кипятка, варить на медленном огне 20 минут. Пить по 80 мл трижды в день.  После этого полчаса ничего не есть и не пить\n\n📜ОСИНОВАЯ НАСТОЙКА\n50 г коры осины залить 500 мл водки. Настаивать 14 дней, процедить. Пить по 1 ч. л. натощак трижды в день, запивая теплой водой, либо развести в 100 мл теплой воды. После этого полчаса ничего не есть и не пить\n📜Осиновую настойку или отвар принимать не более 21 дня подряд, потом 7 дней перерыв и продолжать прием, далее снова 7 дней перерыв и при потребности заверить курс\nПорошок 1 гр в день\nКурс 1 месяц, 1 месяц отдых и ещё 1 месяц"
+    }
+  ]
+}
+2025-09-26 23:16:57,119 - DEBUG - utility.upload_organic_descriptions - Размер JSON данных: 2045 байт
+2025-09-26 23:16:57,119 - INFO - utility.upload_organic_descriptions - Имя файла для загрузки: biounit_aspen_description.json
+2025-09-26 23:16:57,119 - INFO - utility.upload_organic_descriptions - Начинаем загрузку в IPFS для populus_tremula
+2025-09-26 23:16:57,119 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: {
+  "id": "aspen",
+  "title": "Кора осины",
+  "scientific_name": "Populus tremula",
+  "generic_description": "Кора осины содержит гликозиды салицина, действующие как природный анальгетик, жаропонижающее и противовоспалительное средство. Её традиционно используют в народной медицине против паразитов, воспалений мочеполовой системы и суставных болей. Осина регулирует обменные процессы, мягко очищает и снижает уровень сахара в крови. Это одно из главных “деревьев-чистильщиков” в фитоаптеке северной традиции.",
+  "effects": "✅ Кора осины также применяется в терапии онкозаболеваний, тяжелых поражениях организма вирусами и бактериями, мощно повышает иммунитет и излечивает: \n- цистит и простатит, уретрит\n- болезни суставов\n- заболевания печени\n- нарушения поджелудочной железы\n- сифилис\n- туберкулез\n- лишай\n- анемию.",
+  "shamanic": "С шаманской точки зрения, осина — это страж границ, который помогает изгнать то, что поселилось в теле или поле незаметно. Её кора горька, как правда, и действует именно так: отрезает, очищает, завершает. Это не мягкий союзник, а целительная строгость, которая даёт облегчение через честность. Особенно подходит в программах очищения и выхода из застоя (физического или энергетического). Осина не лечит — она завершает болезнь.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушеная кора",
+      "description": "📜ОСИНОВЫЙ ОТВАР\n1 ч. л. коры осины залить 250 мл кипятка, варить на медленном огне 20 минут. Пить по 80 мл трижды в день.  После этого полчаса ничего не есть и не пить\n\n📜ОСИНОВАЯ НАСТОЙКА\n50 г коры осины залить 500 мл водки. Настаивать 14 дней, процедить. Пить по 1 ч. л. натощак трижды в день, запивая теплой водой, либо развести в 100 мл теплой воды. После этого полчаса ничего не есть и не пить\n📜Осиновую настойку или отвар принимать не более 21 дня подряд, потом 7 дней перерыв и продолжать прием, далее снова 7 дней перерыв и при потребности заверить курс\nПорошок 1 гр в день\nКурс 1 месяц, 1 месяц отдых и ещё 1 месяц"
+    }
+  ]
+}
+2025-09-26 23:16:57,119 - INFO - services.core.storage.pinata - Обнаружены данные вместо пути к файлу, используем upload_text
+2025-09-26 23:16:57,119 - INFO - services.core.storage.pinata - Начинаем загрузку текстовых данных в IPFS
+2025-09-26 23:16:57,119 - INFO - services.core.storage.pinata - Отправляем запрос в Pinata JSON API
+2025-09-26 23:16:57,120 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.99s (базовая: 10.0s + jitter: 1.99s)
+2025-09-26 23:17:09,588 - INFO - services.core.storage.pinata - Успешно получен CID: QmT1QMFRpSXHQPUv524EdthjxVUeZFgGM3c8FwVvrYbiXJ
+2025-09-26 23:17:09,590 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:17:09,590 - INFO - utility.upload_organic_descriptions - ☀️ Ура! Биологическая единица проросла в блокчейн! populus_tremula, получен CID: QmT1QMFRpSXHQPUv524EdthjxVUeZFgGM3c8FwVvrYbiXJ
+2025-09-26 23:17:09,590 - INFO - utility.upload_organic_descriptions - ✅ Успешно добавлен в маппинг: populus_tremula -> QmT1QMFRpSXHQPUv524EdthjxVUeZFgGM3c8FwVvrYbiXJ (biounit_aspen_description.json)
+2025-09-26 23:17:09,590 - INFO - utility.upload_organic_descriptions - Обработка item_id: lions-mane
+2025-09-26 23:17:09,590 - DEBUG - utility.upload_organic_descriptions - Данные для загрузки: {
+  "id": "lions-mane",
+  "title": "Ежовик гребенчатый",
+  "scientific_name": "Hericium erinaceus",
+  "generic_description": "Lion’s Mane — один из самых изученных нейротропных грибов. Его уникальные соединения, гериценоны и эринацины, стимулируют выработку нейротрофического фактора роста (NGF), способствуя восстановлению нейронов и синапсов. Это делает ежовик незаменимым для поддержки памяти, концентрации, восстановления после травм мозга, а также при профилактике нейродегенеративных состояний. Дополнительно, он поддерживает здоровье ЖКТ и действует как мягкий адаптоген.",
+  "effects": "",
+  "shamanic": "С шаманской точки зрения, ежовик — это гриб-мост, который соединяет части личности, восстанавливает забытые знания и укрепляет каналы между телом и сознанием. Его дух тих и мудр — он не вызывает ярких эффектов, но встраивает ясность, как будто усиливая “сигнал в шуме”. Особенно подходит для тех, кто работает с вниманием, обучением, ментальной нагрузкой или восстановлением после выгорания. Он — архивариус нейронной библиотеки.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:17:09,591 - DEBUG - utility.upload_organic_descriptions - Размер JSON данных: 1186 байт
+2025-09-26 23:17:09,591 - INFO - utility.upload_organic_descriptions - Имя файла для загрузки: biounit_lions-mane_description.json
+2025-09-26 23:17:09,591 - INFO - utility.upload_organic_descriptions - Начинаем загрузку в IPFS для lions-mane
+2025-09-26 23:17:09,591 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: {
+  "id": "lions-mane",
+  "title": "Ежовик гребенчатый",
+  "scientific_name": "Hericium erinaceus",
+  "generic_description": "Lion’s Mane — один из самых изученных нейротропных грибов. Его уникальные соединения, гериценоны и эринацины, стимулируют выработку нейротрофического фактора роста (NGF), способствуя восстановлению нейронов и синапсов. Это делает ежовик незаменимым для поддержки памяти, концентрации, восстановления после травм мозга, а также при профилактике нейродегенеративных состояний. Дополнительно, он поддерживает здоровье ЖКТ и действует как мягкий адаптоген.",
+  "effects": "",
+  "shamanic": "С шаманской точки зрения, ежовик — это гриб-мост, который соединяет части личности, восстанавливает забытые знания и укрепляет каналы между телом и сознанием. Его дух тих и мудр — он не вызывает ярких эффектов, но встраивает ясность, как будто усиливая “сигнал в шуме”. Особенно подходит для тех, кто работает с вниманием, обучением, ментальной нагрузкой или восстановлением после выгорания. Он — архивариус нейронной библиотеки.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные грибы",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:17:09,591 - INFO - services.core.storage.pinata - Обнаружены данные вместо пути к файлу, используем upload_text
+2025-09-26 23:17:09,591 - INFO - services.core.storage.pinata - Начинаем загрузку текстовых данных в IPFS
+2025-09-26 23:17:09,591 - INFO - services.core.storage.pinata - Отправляем запрос в Pinata JSON API
+2025-09-26 23:17:09,591 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.73s (базовая: 10.0s + jitter: 0.73s)
+2025-09-26 23:17:21,145 - INFO - services.core.storage.pinata - Успешно получен CID: QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1
+2025-09-26 23:17:21,149 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:17:21,150 - INFO - utility.upload_organic_descriptions - ☀️ Ура! Биологическая единица проросла в блокчейн! lions-mane, получен CID: QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1
+2025-09-26 23:17:21,150 - INFO - utility.upload_organic_descriptions - ✅ Успешно добавлен в маппинг: lions-mane -> QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1 (biounit_lions-mane_description.json)
+2025-09-26 23:17:21,150 - INFO - utility.upload_organic_descriptions - Обработка item_id: passionflower
+2025-09-26 23:17:21,150 - DEBUG - utility.upload_organic_descriptions - Данные для загрузки: {
+  "id": "passionflower",
+  "title": "Пассифлора",
+  "scientific_name": "Passiflora incarnata",
+  "generic_description": "Пассифлора — классическое растение анксилитического и седативного действия, используемое в фитотерапии для нормализации сна, снятия тревожности и мышечного напряжения. Её активные соединения (в частности, флавоноиды и харминоподобные алкалоиды) модулируют ГАМК-рецепторы, подобно мусцимолу, но мягко и безопасно. Пассифлора также используется для поддержки нервной системы при стрессовых перегрузках и синдроме отмены.",
+  "effects": "",
+  "shamanic": "С шаманской точки зрения, пассифлора — растение распутывания. Она не ломает узлы — она их растворяет, мягко расплетая внутренние конфликты, тревоги и бессонные мысли. Это союзник в моменте внутреннего давления, когда ум слишком громкий, а тело не может отдохнуть. Её дух — это женская, обволакивающая энергия, которая не спорит, а разрешает. Хороша в вечернее время, как напиток, переходящий в сон или глубокое восстановление.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные растения",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:17:21,150 - DEBUG - utility.upload_organic_descriptions - Размер JSON данных: 1149 байт
+2025-09-26 23:17:21,150 - INFO - utility.upload_organic_descriptions - Имя файла для загрузки: biounit_passionflower_description.json
+2025-09-26 23:17:21,150 - INFO - utility.upload_organic_descriptions - Начинаем загрузку в IPFS для passionflower
+2025-09-26 23:17:21,150 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: {
+  "id": "passionflower",
+  "title": "Пассифлора",
+  "scientific_name": "Passiflora incarnata",
+  "generic_description": "Пассифлора — классическое растение анксилитического и седативного действия, используемое в фитотерапии для нормализации сна, снятия тревожности и мышечного напряжения. Её активные соединения (в частности, флавоноиды и харминоподобные алкалоиды) модулируют ГАМК-рецепторы, подобно мусцимолу, но мягко и безопасно. Пассифлора также используется для поддержки нервной системы при стрессовых перегрузках и синдроме отмены.",
+  "effects": "",
+  "shamanic": "С шаманской точки зрения, пассифлора — растение распутывания. Она не ломает узлы — она их растворяет, мягко расплетая внутренние конфликты, тревоги и бессонные мысли. Это союзник в моменте внутреннего давления, когда ум слишком громкий, а тело не может отдохнуть. Её дух — это женская, обволакивающая энергия, которая не спорит, а разрешает. Хороша в вечернее время, как напиток, переходящий в сон или глубокое восстановление.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные растения",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:17:21,151 - INFO - services.core.storage.pinata - Обнаружены данные вместо пути к файлу, используем upload_text
+2025-09-26 23:17:21,151 - INFO - services.core.storage.pinata - Начинаем загрузку текстовых данных в IPFS
+2025-09-26 23:17:21,151 - INFO - services.core.storage.pinata - Отправляем запрос в Pinata JSON API
+2025-09-26 23:17:21,151 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.58s (базовая: 10.0s + jitter: 0.58s)
+2025-09-26 23:17:32,218 - INFO - services.core.storage.pinata - Успешно получен CID: QmYXGiCLB1sPtkoskNWA5dCo8d9uW6RVVS94uq2xf6awQ7
+2025-09-26 23:17:32,220 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:17:32,221 - INFO - utility.upload_organic_descriptions - ☀️ Ура! Биологическая единица проросла в блокчейн! passionflower, получен CID: QmYXGiCLB1sPtkoskNWA5dCo8d9uW6RVVS94uq2xf6awQ7
+2025-09-26 23:17:32,221 - INFO - utility.upload_organic_descriptions - ✅ Успешно добавлен в маппинг: passionflower -> QmYXGiCLB1sPtkoskNWA5dCo8d9uW6RVVS94uq2xf6awQ7 (biounit_passionflower_description.json)
+2025-09-26 23:17:32,221 - INFO - utility.upload_organic_descriptions - Обработка item_id: nettle
+2025-09-26 23:17:32,221 - DEBUG - utility.upload_organic_descriptions - Данные для загрузки: {
+  "id": "nettle",
+  "title": "Крапива двудомная",
+  "scientific_name": "Urtica dioica",
+  "generic_description": "Крапива — это сильное тонизирующее и кровоочищающее растение, содержащее витамины (A, C, K, группа B), минералы (железо, кремний, кальций), хлорофилл и флавоноиды. Она усиливает кроветворение, улучшает обмен веществ, снимает воспаления и укрепляет волосы, кожу, ногти. Также используется при анемии, усталости, аллергиях и как мягкое мочегонное средство.",
+  "effects": "",
+  "shamanic": "С шаманской перспективы, крапива — огненная трава, оживляющая кровь и волю. Она не только насыщает тело, но пробуждает “тёплую решимость” — энергию действия, очищения, жизненной ясности. Её дух — прямой, колючий, но исцеляющий. В чайном виде она возвращает тонус и структуру. Подходит тем, кто ослаб, потерял контакт с телом или нуждается в сборке своей внутренней пружины. Крапива — это трава возвращения к себе.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные растения",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:17:32,221 - DEBUG - utility.upload_organic_descriptions - Размер JSON данных: 1065 байт
+2025-09-26 23:17:32,221 - INFO - utility.upload_organic_descriptions - Имя файла для загрузки: biounit_nettle_description.json
+2025-09-26 23:17:32,221 - INFO - utility.upload_organic_descriptions - Начинаем загрузку в IPFS для nettle
+2025-09-26 23:17:32,222 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: {
+  "id": "nettle",
+  "title": "Крапива двудомная",
+  "scientific_name": "Urtica dioica",
+  "generic_description": "Крапива — это сильное тонизирующее и кровоочищающее растение, содержащее витамины (A, C, K, группа B), минералы (железо, кремний, кальций), хлорофилл и флавоноиды. Она усиливает кроветворение, улучшает обмен веществ, снимает воспаления и укрепляет волосы, кожу, ногти. Также используется при анемии, усталости, аллергиях и как мягкое мочегонное средство.",
+  "effects": "",
+  "shamanic": "С шаманской перспективы, крапива — огненная трава, оживляющая кровь и волю. Она не только насыщает тело, но пробуждает “тёплую решимость” — энергию действия, очищения, жизненной ясности. Её дух — прямой, колючий, но исцеляющий. В чайном виде она возвращает тонус и структуру. Подходит тем, кто ослаб, потерял контакт с телом или нуждается в сборке своей внутренней пружины. Крапива — это трава возвращения к себе.",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные растения",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:17:32,222 - INFO - services.core.storage.pinata - Обнаружены данные вместо пути к файлу, используем upload_text
+2025-09-26 23:17:32,222 - INFO - services.core.storage.pinata - Начинаем загрузку текстовых данных в IPFS
+2025-09-26 23:17:32,222 - INFO - services.core.storage.pinata - Отправляем запрос в Pinata JSON API
+2025-09-26 23:17:32,222 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.00s (базовая: 10.0s + jitter: 1.00s)
+2025-09-26 23:17:43,755 - INFO - services.core.storage.pinata - Успешно получен CID: Qmer3AYuJ5uFksPFpEzcqB52nN4w7vpGbw1hMQqJdXuJ1G
+2025-09-26 23:17:43,758 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:17:43,759 - INFO - utility.upload_organic_descriptions - ☀️ Ура! Биологическая единица проросла в блокчейн! nettle, получен CID: Qmer3AYuJ5uFksPFpEzcqB52nN4w7vpGbw1hMQqJdXuJ1G
+2025-09-26 23:17:43,759 - INFO - utility.upload_organic_descriptions - ✅ Успешно добавлен в маппинг: nettle -> Qmer3AYuJ5uFksPFpEzcqB52nN4w7vpGbw1hMQqJdXuJ1G (biounit_nettle_description.json)
+2025-09-26 23:17:43,759 - INFO - utility.upload_organic_descriptions - Обработка item_id: mint
+2025-09-26 23:17:43,759 - DEBUG - utility.upload_organic_descriptions - Данные для загрузки: {
+  "id": "mint",
+  "title": "Мята перечная",
+  "scientific_name": "Mentha × piperita",
+  "generic_description": "Мята — классическая трава успокоения, пищеварения и ясности ума. Её ключевой компонент, ментол, воздействует на TRPM8-рецепторы, создавая эффект охлаждения, а также помогает при головной боли, тошноте, спазмах и воспалениях. Мята улучшает работу ЖКТ, снижает газообразование и действует как мягкий анальгетик. Её также применяют при простудах и для облегчения дыхания.",
+  "effects": "",
+  "shamanic": "С точки зрения шаманской традиции, мята — это травяной ветер, приносящий ясность, пространство и облегчение. Она охлаждает перегретую психику, успокаивает разогнанный ум и возвращает дыхание в тело. Это союзник в моменты перегрузки, ментального шума и эмоционального жара. Мятный чай — как шепот травы, напоминающий: «не всё нужно решать — иногда нужно просто выдохнуть».",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные растения",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:17:43,759 - DEBUG - utility.upload_organic_descriptions - Размер JSON данных: 1035 байт
+2025-09-26 23:17:43,759 - INFO - utility.upload_organic_descriptions - Имя файла для загрузки: biounit_mint_description.json
+2025-09-26 23:17:43,759 - INFO - utility.upload_organic_descriptions - Начинаем загрузку в IPFS для mint
+2025-09-26 23:17:43,759 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: {
+  "id": "mint",
+  "title": "Мята перечная",
+  "scientific_name": "Mentha × piperita",
+  "generic_description": "Мята — классическая трава успокоения, пищеварения и ясности ума. Её ключевой компонент, ментол, воздействует на TRPM8-рецепторы, создавая эффект охлаждения, а также помогает при головной боли, тошноте, спазмах и воспалениях. Мята улучшает работу ЖКТ, снижает газообразование и действует как мягкий анальгетик. Её также применяют при простудах и для облегчения дыхания.",
+  "effects": "",
+  "shamanic": "С точки зрения шаманской традиции, мята — это травяной ветер, приносящий ясность, пространство и облегчение. Она охлаждает перегретую психику, успокаивает разогнанный ум и возвращает дыхание в тело. Это союзник в моменты перегрузки, ментального шума и эмоционального жара. Мятный чай — как шепот травы, напоминающий: «не всё нужно решать — иногда нужно просто выдохнуть».",
+  "warnings": "",
+  "dosage_instructions": [
+    {
+      "type": "dried",
+      "title": "Сушёные растения",
+      "description": ""
+    }
+  ]
+}
+2025-09-26 23:17:43,759 - INFO - services.core.storage.pinata - Обнаружены данные вместо пути к файлу, используем upload_text
+2025-09-26 23:17:43,759 - INFO - services.core.storage.pinata - Начинаем загрузку текстовых данных в IPFS
+2025-09-26 23:17:43,760 - INFO - services.core.storage.pinata - Отправляем запрос в Pinata JSON API
+2025-09-26 23:17:43,760 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.33s (базовая: 10.0s + jitter: 1.33s)
+2025-09-26 23:17:55,631 - INFO - services.core.storage.pinata - Успешно получен CID: QmR88CGcBUqvHFMavUeuodQEuCDHMP4zKKxdN3QMYz7Ayj
+2025-09-26 23:17:55,635 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:17:55,636 - INFO - utility.upload_organic_descriptions - ☀️ Ура! Биологическая единица проросла в блокчейн! mint, получен CID: QmR88CGcBUqvHFMavUeuodQEuCDHMP4zKKxdN3QMYz7Ayj
+2025-09-26 23:17:55,636 - INFO - utility.upload_organic_descriptions - ✅ Успешно добавлен в маппинг: mint -> QmR88CGcBUqvHFMavUeuodQEuCDHMP4zKKxdN3QMYz7Ayj (biounit_mint_description.json)
+2025-09-26 23:17:55,636 - INFO - utility.upload_organic_descriptions - Всего успешно загружено: 11 из 11
+2025-09-26 23:17:55,638 - INFO - utility.upload_organic_descriptions - Маппинг CID сохранен в catalog/organic_cid_mapping.json
+2025-09-26 23:17:55,638 - INFO - __main__ - 📝 Загружены описания: {'amanita_muscaria': 'QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG', 'amanita_pantherina': 'Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy', 'blue-lotus': 'QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S', 'inonotus_obliquus': 'Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93', 'cordyceps_militaris': 'QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy', 'cantharellus_cibarius': 'QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE', 'populus_tremula': 'QmT1QMFRpSXHQPUv524EdthjxVUeZFgGM3c8FwVvrYbiXJ', 'lions-mane': 'QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1', 'passionflower': 'QmYXGiCLB1sPtkoskNWA5dCo8d9uW6RVVS94uq2xf6awQ7', 'nettle': 'Qmer3AYuJ5uFksPFpEzcqB52nN4w7vpGbw1hMQqJdXuJ1G', 'mint': 'QmR88CGcBUqvHFMavUeuodQEuCDHMP4zKKxdN3QMYz7Ayj'}
+2025-09-26 23:17:55,638 - INFO - __main__ - 🔄 Конвертация каталога...
+2025-09-26 23:17:55,639 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Amanita muscaria — sliced caps and gills (1st grade)
+2025-09-26 23:17:55,639 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Amanita — Closed hat
+2025-09-26 23:17:55,639 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Amanita — Collapsed hats
+2025-09-26 23:17:55,639 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Amanita — LUX
+2025-09-26 23:17:55,639 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Amanita — Pantera
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Amanita — Powder
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Amanita — Tinctura
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Blue Lotus — Tinctura
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Blue Lotus
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Chaga
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: cordyceps_militaris
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: cordyceps_militaris_powder
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Foxes
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Foxes
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Kora Osiny
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Lions Main — Powder
+2025-09-26 23:17:55,640 - INFO - utility.catalog_csv2json - ✨ Обработан продукт: Lions Main
+2025-09-26 23:17:55,643 - INFO - utility.catalog_csv2json - 🎉 Каталог успешно сохранен в catalog/active_catalog.json
+2025-09-26 23:17:55,643 - INFO - __main__ - 🔄 Конвертирован каталог: [{'business_id': 'amanita1', 'title': 'Amanita muscaria — sliced caps and gills (1st grade)', 'organic_components': [{'biounit_id': 'amanita_muscaria', 'description_cid': 'QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG', 'proportion': '100%'}], 'categories': ['mushroom', 'mental health', 'focus', 'ADHD support', 'mental force'], 'cover_image_url': 'QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj', 'forms': ['mixed slices'], 'species': 'Amanita muscaria', 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '80', 'currency': 'EUR'}]}, {'business_id': 'amanita_closed_cups', 'title': 'Amanita — Closed hat', 'organic_components': [{'biounit_id': 'amanita_muscaria', 'description_cid': 'QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG', 'proportion': '100%'}], 'categories': ['mushroom', 'mental health', 'focus', 'ADHD support', 'mental force'], 'cover_image_url': 'QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1', 'forms': ['whole caps'], 'species': 'Amanita muscaria', 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '90', 'currency': 'EUR'}]}, {'business_id': 'amanita_broken_closed_cups', 'title': 'Amanita — Collapsed hats', 'organic_components': [{'biounit_id': 'amanita_muscaria', 'description_cid': 'QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG', 'proportion': '100%'}], 'categories': ['mushroom', 'mental health', 'focus', 'ADHD support', 'mental force'], 'cover_image_url': 'QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B', 'forms': ['broken caps'], 'species': 'Amanita muscaria', 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '60', 'currency': 'EUR'}]}, {'business_id': 'amanita_lux', 'title': 'Amanita — LUX', 'organic_components': [{'biounit_id': 'amanita_muscaria', 'description_cid': 'QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG', 'proportion': '100%'}], 'categories': ['mushroom', 'mental health', 'focus', 'ADHD support', 'mental force'], 'cover_image_url': 'Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz', 'forms': ['premium caps'], 'species': 'Amanita muscaria', 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '90', 'currency': 'EUR'}]}, {'business_id': 'amanita_pantherina_whole', 'title': 'Amanita — Pantera', 'organic_components': [{'biounit_id': 'amanita_pantherina', 'description_cid': 'Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy', 'proportion': '100%'}], 'categories': ['mushroom', 'mental health', 'focus', 'ADHD support', 'mental force'], 'cover_image_url': 'QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn', 'forms': ['unknown'], 'species': 'Amanita pantherina', 'prices': [{'weight': '30', 'weight_unit': 'g', 'price': '60', 'currency': 'EUR'}, {'weight': '50', 'weight_unit': 'g', 'price': '100', 'currency': 'EUR'}, {'weight': '50', 'weight_unit': 'g', 'price': '90', 'currency': 'EUR'}]}, {'business_id': 'amanita_pantherina_powder', 'title': 'Amanita — Powder', 'organic_components': [{'biounit_id': 'amanita_muscaria', 'description_cid': 'QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG', 'proportion': '100%'}], 'categories': ['mushroom', 'mental health', 'focus', 'ADHD support', 'mental force'], 'cover_image_url': 'QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd', 'forms': ['powder'], 'species': 'Amanita muscaria', 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '60', 'currency': 'EUR'}]}, {'business_id': 'amanita_tincture', 'title': 'Amanita — Tinctura', 'organic_components': [{'biounit_id': 'amanita_muscaria', 'description_cid': 'QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG', 'proportion': '100%'}], 'categories': ['mushroom', 'mental health', 'focus', 'ADHD support', 'mental force'], 'cover_image_url': 'QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa', 'forms': ['tincture'], 'species': 'Amanita muscaria', 'prices': [{'volume': '50', 'volume_unit': 'ml', 'price': '15', 'currency': 'EUR'}]}, {'business_id': 'blue_lotus_tincture', 'title': 'Blue Lotus — Tinctura', 'organic_components': [{'biounit_id': 'blue-lotus', 'description_cid': 'QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S', 'proportion': '100%'}], 'categories': ['plant', 'mental health', 'focus', 'ADHD support', 'mental force'], 'cover_image_url': 'QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW', 'forms': ['tincture'], 'species': 'Nymphaea caerulea (Blue Lotus)', 'prices': [{'volume': '50', 'volume_unit': 'ml', 'price': '20', 'currency': 'EUR'}]}, {'business_id': 'blue_lotus_flowers', 'title': 'Blue Lotus', 'organic_components': [{'biounit_id': 'blue-lotus', 'description_cid': 'QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S', 'proportion': '100%'}], 'categories': ['plant', 'mental health', 'focus', 'ADHD support', 'mental force'], 'cover_image_url': 'QmT5RC6Q6MRRF3YoDcXmKamKntXT6oSvxk3G2aLDkPc17T', 'forms': ['flower'], 'species': 'Nymphaea caerulea (Blue Lotus)', 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '30', 'currency': 'EUR'}]}, {'business_id': 'chaga_chunks', 'title': 'Chaga', 'organic_components': [{'biounit_id': 'inonotus_obliquus', 'description_cid': 'Qmb7L2tVDcuJ9My46MpmYsiUSoP9sUkCARkKCdRSesPr93', 'proportion': '100%'}], 'categories': ['mushroom', 'immune system', 'vital force'], 'cover_image_url': 'QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c', 'forms': ['chunks'], 'species': 'Inonotus obliquus (Chaga)', 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '10', 'currency': 'EUR'}, {'weight': '200', 'weight_unit': 'g', 'price': '15', 'currency': 'EUR'}]}, {'business_id': 'cordyceps_militaris_powder', 'title': 'cordyceps_militaris', 'organic_components': [{'biounit_id': 'cordyceps_militaris', 'description_cid': 'QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy', 'proportion': '100%'}], 'categories': ['mushroom', 'immune system', 'vital force'], 'cover_image_url': 'QmW25vHA9WA78VENPus3A8Zrn45YeFMjVKWLJwfA5CEfSQ', 'forms': ['powder'], 'species': 'Cordyceps militaris', 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '40', 'currency': 'EUR'}]}, {'business_id': 'cordyceps_militaris_dried_bodies', 'title': 'cordyceps_militaris_powder', 'organic_components': [{'biounit_id': 'cordyceps_militaris', 'description_cid': 'QmUYCbZXNg1K1sBvBaWEByaYriagVC4VvfGfQQA1itFXHy', 'proportion': '100%'}], 'categories': ['mushroom', 'immune system', 'vital force'], 'cover_image_url': 'QmfYLGvSUq2FEszpyLoyu28PLmeTMXk6zikT3c5W43kshP', 'forms': ['dried whole'], 'species': 'Cordyceps militaris', 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '30', 'currency': 'EUR'}]}, {'business_id': 'chanterelle_dried', 'title': 'Foxes', 'organic_components': [{'biounit_id': 'cantharellus_cibarius', 'description_cid': 'QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE', 'proportion': '100%'}], 'categories': ['mushroom', 'antiparasite', 'immune system', 'vital force'], 'cover_image_url': 'QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa', 'forms': ['dried whole'], 'species': 'Cantharellus cibarius (Chanterelle)', 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '30', 'currency': 'EUR'}]}, {'business_id': 'chanterelle_powder', 'title': 'Foxes', 'organic_components': [{'biounit_id': 'cantharellus_cibarius', 'description_cid': 'QmaPtpqwBLjKNwGLccWqMbDRsceJ52xV97Eh9RkdWbCvvE', 'proportion': '100%'}], 'categories': ['mushroom', 'antiparasite', 'immune system', 'vital force'], 'cover_image_url': 'QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa', 'forms': ['dried powder'], 'species': 'Cantharellus cibarius (Chanterelle)', 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '40', 'currency': 'EUR'}]}, {'business_id': 'aspen_bark_dried_strips', 'title': 'Kora Osiny', 'organic_components': [{'biounit_id': 'populus_tremula', 'description_cid': 'QmT1QMFRpSXHQPUv524EdthjxVUeZFgGM3c8FwVvrYbiXJ', 'proportion': '100%'}], 'categories': ['plant', 'antiparasite', 'immune system', 'vital force'], 'cover_image_url': 'QmZGLPHZxDJP4VRbZbR8CRBY2widf5wMqMvu3rowhJGvCT', 'forms': ['dried strips'], 'species': 'Populus tremula (Aspen)', 'prices': [{'weight': '200', 'weight_unit': 'g', 'price': '10', 'currency': 'EUR'}]}, {'business_id': 'lions_mane_powder', 'title': 'Lions Main — Powder', 'organic_components': [{'biounit_id': 'lions-mane', 'description_cid': 'QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1', 'proportion': '100%'}], 'categories': ['mushroom', 'mental health', 'focus', 'ADHD support', 'mental force'], 'cover_image_url': 'QmTU5LpEp2qDBpCiWnZHEDuUK7BES3gm8wNWihn7ShqjAv', 'forms': ['powder'], 'species': "Hericium erinaceus (Lion's Mane)", 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '40', 'currency': 'EUR'}]}, {'business_id': "Lion's Mane mushroom — whole dried", 'title': 'Lions Main', 'organic_components': [{'biounit_id': 'lions-mane', 'description_cid': 'QmWG6Kc4Uj44LwgnyMxc4LxoBGZgdRbsmM5EZn37MBVmh1', 'proportion': '100%'}], 'categories': ['mushroom', 'mental health', 'focus', 'ADHD support', 'mental force'], 'cover_image_url': 'QmXzbH3aeiyYyn5b4YSHe2kvNCQuUXtMngL91MeVjHH3vJ', 'forms': ['whole dried'], 'species': "Hericium erinaceus (Lion's Mane)", 'prices': [{'weight': '100', 'weight_unit': 'g', 'price': '30', 'currency': 'EUR'}]}]
+2025-09-26 23:17:55,643 - INFO - __main__ - 📦 Подготовка данных для реестра...
+2025-09-26 23:17:55,651 - INFO - services.core.storage.pinata - Кэш загружен, 36 записей
+2025-09-26 23:17:55,651 - INFO - services.core.ipfs_factory - [IPFSFactory] Установлен Pinata провайдер
+2025-09-26 23:17:55,651 - INFO - services.core.ipfs_factory - [IPFSFactory] Инициализирована фабрика IPFS с типом коммуникации: sync
+2025-09-26 23:17:55,652 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/amanita1.json
+2025-09-26 23:17:55,652 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/amanita1.json в IPFS
+2025-09-26 23:17:55,652 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/amanita1.json
+2025-09-26 23:17:55,652 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 9c5adb21f8f97515d9ca8a9f4ec7eec3fbf0cbc4b10236fbf5debf89a703ec6c
+2025-09-26 23:17:55,652 - INFO - services.core.storage.pinata - Загружаем файл: amanita1.json
+2025-09-26 23:17:55,652 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.75s (базовая: 10.0s + jitter: 1.75s)
+2025-09-26 23:18:08,471 - INFO - services.core.storage.pinata - Метрики сохранены в metrics/pinata_metrics_20250926_231808.json
+2025-09-26 23:18:08,472 - INFO - services.core.storage.pinata - Успешно получен CID: QmZVqoSXyKtSuqkFUaXnYRenGXHwhSYLEpMCrwUpSKHr2Q
+2025-09-26 23:18:08,473 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:18:08,474 - INFO - utility.prepare_products_for_registry - ✅ Загружен amanita1: QmZVqoSXyKtSuqkFUaXnYRenGXHwhSYLEpMCrwUpSKHr2Q
+2025-09-26 23:18:08,475 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/amanita_closed_cups.json
+2025-09-26 23:18:08,475 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/amanita_closed_cups.json в IPFS
+2025-09-26 23:18:08,476 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/amanita_closed_cups.json
+2025-09-26 23:18:08,476 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: a1dfec6aa7587e90d36d04212d6af533e76885a6b79253f0df78d06267c6926a
+2025-09-26 23:18:08,476 - INFO - services.core.storage.pinata - Загружаем файл: amanita_closed_cups.json
+2025-09-26 23:18:08,476 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.40s (базовая: 10.0s + jitter: 1.40s)
+2025-09-26 23:18:20,430 - INFO - services.core.storage.pinata - Успешно получен CID: QmdNLN1ZNq3MVkH2iWJUjtsHSme8Lp3VhEd8x44tGU2zP8
+2025-09-26 23:18:20,433 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:18:20,433 - INFO - utility.prepare_products_for_registry - ✅ Загружен amanita_closed_cups: QmdNLN1ZNq3MVkH2iWJUjtsHSme8Lp3VhEd8x44tGU2zP8
+2025-09-26 23:18:20,434 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/amanita_broken_closed_cups.json
+2025-09-26 23:18:20,434 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/amanita_broken_closed_cups.json в IPFS
+2025-09-26 23:18:20,434 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/amanita_broken_closed_cups.json
+2025-09-26 23:18:20,434 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 1fd09a99b848a017efa494369480a4030b1426efaec8b4c5374fee8b13ac0bf8
+2025-09-26 23:18:20,434 - INFO - services.core.storage.pinata - Загружаем файл: amanita_broken_closed_cups.json
+2025-09-26 23:18:20,434 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.89s (базовая: 10.0s + jitter: 0.89s)
+2025-09-26 23:18:31,915 - INFO - services.core.storage.pinata - Успешно получен CID: QmQf2K1gTcc5xFhFvtkw4rbxGNzzrszAZxtxHnTvFRVZKw
+2025-09-26 23:18:31,918 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:18:31,919 - INFO - utility.prepare_products_for_registry - ✅ Загружен amanita_broken_closed_cups: QmQf2K1gTcc5xFhFvtkw4rbxGNzzrszAZxtxHnTvFRVZKw
+2025-09-26 23:18:31,920 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/amanita_lux.json
+2025-09-26 23:18:31,921 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/amanita_lux.json в IPFS
+2025-09-26 23:18:31,921 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/amanita_lux.json
+2025-09-26 23:18:31,921 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 47d4efbf6f7a100569a13566f2e09a17e27933cc18b57be1276b479cd8487b4f
+2025-09-26 23:18:31,921 - INFO - services.core.storage.pinata - Загружаем файл: amanita_lux.json
+2025-09-26 23:18:31,922 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.41s (базовая: 10.0s + jitter: 1.41s)
+2025-09-26 23:18:43,825 - INFO - services.core.storage.pinata - Успешно получен CID: QmQHMTL5ep9pKfs5bnQBwUvz2FGEkN6HAjuBVRwRvQMMD7
+2025-09-26 23:18:43,831 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:18:43,831 - INFO - utility.prepare_products_for_registry - ✅ Загружен amanita_lux: QmQHMTL5ep9pKfs5bnQBwUvz2FGEkN6HAjuBVRwRvQMMD7
+2025-09-26 23:18:43,833 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/amanita_pantherina_whole.json
+2025-09-26 23:18:43,833 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/amanita_pantherina_whole.json в IPFS
+2025-09-26 23:18:43,833 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/amanita_pantherina_whole.json
+2025-09-26 23:18:43,834 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 26214ec12f0af2506a2601134ce9f67c5185ee4308e3f96b850c77772f27577d
+2025-09-26 23:18:43,834 - INFO - services.core.storage.pinata - Загружаем файл: amanita_pantherina_whole.json
+2025-09-26 23:18:43,834 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.05s (базовая: 10.0s + jitter: 1.05s)
+2025-09-26 23:18:55,461 - INFO - services.core.storage.pinata - Успешно получен CID: QmechqN79C7ftRDfQNqTJ58tJEfDQRWSK3UwUEbSe6nHFn
+2025-09-26 23:18:55,465 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:18:55,465 - INFO - utility.prepare_products_for_registry - ✅ Загружен amanita_pantherina_whole: QmechqN79C7ftRDfQNqTJ58tJEfDQRWSK3UwUEbSe6nHFn
+2025-09-26 23:18:55,466 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/amanita_pantherina_powder.json
+2025-09-26 23:18:55,467 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/amanita_pantherina_powder.json в IPFS
+2025-09-26 23:18:55,467 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/amanita_pantherina_powder.json
+2025-09-26 23:18:55,467 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: b718b7b4160c148b36189d94135c7c5118395be2f5593401502bb0dc60908bcd
+2025-09-26 23:18:55,467 - INFO - services.core.storage.pinata - Загружаем файл: amanita_pantherina_powder.json
+2025-09-26 23:18:55,467 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.52s (базовая: 10.0s + jitter: 1.52s)
+2025-09-26 23:19:07,514 - INFO - services.core.storage.pinata - Успешно получен CID: QmZRJW6SDA7pRfBV1vvQ9eFDHgZ2xS71tX4ML1wRryQNKb
+2025-09-26 23:19:07,518 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:19:07,518 - INFO - utility.prepare_products_for_registry - ✅ Загружен amanita_pantherina_powder: QmZRJW6SDA7pRfBV1vvQ9eFDHgZ2xS71tX4ML1wRryQNKb
+2025-09-26 23:19:07,520 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/amanita_tincture.json
+2025-09-26 23:19:07,520 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/amanita_tincture.json в IPFS
+2025-09-26 23:19:07,520 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/amanita_tincture.json
+2025-09-26 23:19:07,520 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: b7f347134be59da7723b8c9b3ec46acc1f839bf8e5cfa6c060089fe7eef6e8a7
+2025-09-26 23:19:07,520 - INFO - services.core.storage.pinata - Загружаем файл: amanita_tincture.json
+2025-09-26 23:19:07,520 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.94s (базовая: 10.0s + jitter: 0.94s)
+2025-09-26 23:19:19,317 - INFO - services.core.storage.pinata - Успешно получен CID: Qmavs8CbZjeGDXL11a2dmdjZTCAXnu4NED6pY4ULEpaYk6
+2025-09-26 23:19:19,319 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:19:19,319 - INFO - utility.prepare_products_for_registry - ✅ Загружен amanita_tincture: Qmavs8CbZjeGDXL11a2dmdjZTCAXnu4NED6pY4ULEpaYk6
+2025-09-26 23:19:19,320 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/blue_lotus_tincture.json
+2025-09-26 23:19:19,320 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/blue_lotus_tincture.json в IPFS
+2025-09-26 23:19:19,320 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/blue_lotus_tincture.json
+2025-09-26 23:19:19,320 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 72493e8c28769eba66b627815bedc3a0c4322c413d1a3178fbe9706c9ae8a5f4
+2025-09-26 23:19:19,321 - INFO - services.core.storage.pinata - Загружаем файл: blue_lotus_tincture.json
+2025-09-26 23:19:19,321 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.70s (базовая: 10.0s + jitter: 0.70s)
+2025-09-26 23:19:30,520 - INFO - services.core.storage.pinata - Успешно получен CID: QmWGkSCke5cpwvUjy9JRnaqxjHAbf2QwmqpaATZHMK9yNT
+2025-09-26 23:19:30,524 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:19:30,524 - INFO - utility.prepare_products_for_registry - ✅ Загружен blue_lotus_tincture: QmWGkSCke5cpwvUjy9JRnaqxjHAbf2QwmqpaATZHMK9yNT
+2025-09-26 23:19:30,525 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/blue_lotus_flowers.json
+2025-09-26 23:19:30,525 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/blue_lotus_flowers.json в IPFS
+2025-09-26 23:19:30,525 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/blue_lotus_flowers.json
+2025-09-26 23:19:30,526 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 047e2af96122c3e70e6ddc676bb3651da352bb3a213b1029a81a727d7cb26229
+2025-09-26 23:19:30,526 - INFO - services.core.storage.pinata - Загружаем файл: blue_lotus_flowers.json
+2025-09-26 23:19:30,526 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.46s (базовая: 10.0s + jitter: 1.46s)
+2025-09-26 23:19:42,597 - INFO - services.core.storage.pinata - Успешно получен CID: QmV5Vt7cGMo7nVeUpUJjeMA2kzNWtPZLYqrQMTmREHQkwb
+2025-09-26 23:19:42,600 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:19:42,601 - INFO - utility.prepare_products_for_registry - ✅ Загружен blue_lotus_flowers: QmV5Vt7cGMo7nVeUpUJjeMA2kzNWtPZLYqrQMTmREHQkwb
+2025-09-26 23:19:42,603 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/chaga_chunks.json
+2025-09-26 23:19:42,603 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/chaga_chunks.json в IPFS
+2025-09-26 23:19:42,603 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/chaga_chunks.json
+2025-09-26 23:19:42,603 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 20347f8f79c1d3d1db522ddf4fa87806c115bfe25bd08645913d6df350bd3219
+2025-09-26 23:19:42,603 - INFO - services.core.storage.pinata - Загружаем файл: chaga_chunks.json
+2025-09-26 23:19:42,603 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.54s (базовая: 10.0s + jitter: 1.54s)
+2025-09-26 23:19:54,645 - INFO - services.core.storage.pinata - Успешно получен CID: QmZff46WWYo4Z7PKW7iKGo7AVXMJZ5mK4EjSMjVsuSE6nf
+2025-09-26 23:19:54,649 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:19:54,650 - INFO - utility.prepare_products_for_registry - ✅ Загружен chaga_chunks: QmZff46WWYo4Z7PKW7iKGo7AVXMJZ5mK4EjSMjVsuSE6nf
+2025-09-26 23:19:54,651 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/cordyceps_militaris_powder.json
+2025-09-26 23:19:54,651 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/cordyceps_militaris_powder.json в IPFS
+2025-09-26 23:19:54,651 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/cordyceps_militaris_powder.json
+2025-09-26 23:19:54,651 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: d151504233e8ff1589ffaa1adab548c8f8b97d4fa2f8acca289c53e725b3bca3
+2025-09-26 23:19:54,651 - INFO - services.core.storage.pinata - Загружаем файл: cordyceps_militaris_powder.json
+2025-09-26 23:19:54,652 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.17s (базовая: 10.0s + jitter: 1.17s)
+2025-09-26 23:20:06,723 - INFO - services.core.storage.pinata - Успешно получен CID: QmNc36zuqDbywY7cnn9dKcL9Bj1ApPkEQjajf45x4MpTtT
+2025-09-26 23:20:06,729 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:20:06,730 - INFO - utility.prepare_products_for_registry - ✅ Загружен cordyceps_militaris_powder: QmNc36zuqDbywY7cnn9dKcL9Bj1ApPkEQjajf45x4MpTtT
+2025-09-26 23:20:06,731 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/cordyceps_militaris_dried_bodies.json
+2025-09-26 23:20:06,732 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/cordyceps_militaris_dried_bodies.json в IPFS
+2025-09-26 23:20:06,732 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/cordyceps_militaris_dried_bodies.json
+2025-09-26 23:20:06,732 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: eb44d8b8b67821fe62e0302d3dec8a0a2cf7b706e7326d2622d6024523c88ace
+2025-09-26 23:20:06,732 - INFO - services.core.storage.pinata - Загружаем файл: cordyceps_militaris_dried_bodies.json
+2025-09-26 23:20:06,732 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.90s (базовая: 10.0s + jitter: 1.90s)
+2025-09-26 23:20:19,579 - INFO - services.core.storage.pinata - Успешно получен CID: QmWBFYt5fZc9sxHu18YfwSZwHxm25AnFxvmCXDumMNivQi
+2025-09-26 23:20:19,586 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:20:19,586 - INFO - utility.prepare_products_for_registry - ✅ Загружен cordyceps_militaris_dried_bodies: QmWBFYt5fZc9sxHu18YfwSZwHxm25AnFxvmCXDumMNivQi
+2025-09-26 23:20:19,588 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/chanterelle_dried.json
+2025-09-26 23:20:19,589 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/chanterelle_dried.json в IPFS
+2025-09-26 23:20:19,589 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/chanterelle_dried.json
+2025-09-26 23:20:19,589 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 47112aabd2e774b341bd8686aa8856ea856927eb1bff39a65660561544a5a422
+2025-09-26 23:20:19,589 - INFO - services.core.storage.pinata - Загружаем файл: chanterelle_dried.json
+2025-09-26 23:20:19,589 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 10.52s (базовая: 10.0s + jitter: 0.52s)
+2025-09-26 23:20:31,109 - INFO - services.core.storage.pinata - Успешно получен CID: Qmbw9yEByqo9nDCLnYXADSBJG86xTiM5GH8UJsDRHD9m3c
+2025-09-26 23:20:31,112 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:20:31,113 - INFO - utility.prepare_products_for_registry - ✅ Загружен chanterelle_dried: Qmbw9yEByqo9nDCLnYXADSBJG86xTiM5GH8UJsDRHD9m3c
+2025-09-26 23:20:31,114 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/chanterelle_powder.json
+2025-09-26 23:20:31,114 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/chanterelle_powder.json в IPFS
+2025-09-26 23:20:31,115 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/chanterelle_powder.json
+2025-09-26 23:20:31,115 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: f64dd083862aeeafb1bf271fd08d6188b41a5a1da43835fad45871980c7573ce
+2025-09-26 23:20:31,115 - INFO - services.core.storage.pinata - Загружаем файл: chanterelle_powder.json
+2025-09-26 23:20:31,115 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.32s (базовая: 10.0s + jitter: 1.32s)
+2025-09-26 23:20:42,940 - INFO - services.core.storage.pinata - Успешно получен CID: Qma97b51NoAUQV5age2ThLoAqKcjtHNMjxKCKzsfk8k3U9
+2025-09-26 23:20:42,942 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:20:42,943 - INFO - utility.prepare_products_for_registry - ✅ Загружен chanterelle_powder: Qma97b51NoAUQV5age2ThLoAqKcjtHNMjxKCKzsfk8k3U9
+2025-09-26 23:20:42,943 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/aspen_bark_dried_strips.json
+2025-09-26 23:20:42,944 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/aspen_bark_dried_strips.json в IPFS
+2025-09-26 23:20:42,944 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/aspen_bark_dried_strips.json
+2025-09-26 23:20:42,944 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 03cd683dee607cb5b3cbd3cfe0a52cff0bff2baf59526aec87e163a61b130836
+2025-09-26 23:20:42,944 - INFO - services.core.storage.pinata - Загружаем файл: aspen_bark_dried_strips.json
+2025-09-26 23:20:42,944 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.60s (базовая: 10.0s + jitter: 1.60s)
+2025-09-26 23:20:55,131 - INFO - services.core.storage.pinata - Успешно получен CID: QmbjJfVZqNA1ox5gJsNGkQsyvaEC2mfwReZ4GnevubxdTi
+2025-09-26 23:20:55,136 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:20:55,137 - INFO - utility.prepare_products_for_registry - ✅ Загружен aspen_bark_dried_strips: QmbjJfVZqNA1ox5gJsNGkQsyvaEC2mfwReZ4GnevubxdTi
+2025-09-26 23:20:55,138 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/lions_mane_powder.json
+2025-09-26 23:20:55,139 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/lions_mane_powder.json в IPFS
+2025-09-26 23:20:55,139 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/lions_mane_powder.json
+2025-09-26 23:20:55,139 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 09b8522fc9495d9e87322563c627103022a6579185cf9b7a55aee31330de3a53
+2025-09-26 23:20:55,139 - INFO - services.core.storage.pinata - Загружаем файл: lions_mane_powder.json
+2025-09-26 23:20:55,139 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.39s (базовая: 10.0s + jitter: 1.39s)
+2025-09-26 23:21:07,118 - INFO - services.core.storage.pinata - Успешно получен CID: QmNqWF8AbWaq8zizvo3EhfrVTJxY1yseuq3p9UmWWYUKYp
+2025-09-26 23:21:07,120 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:21:07,121 - INFO - utility.prepare_products_for_registry - ✅ Загружен lions_mane_powder: QmNqWF8AbWaq8zizvo3EhfrVTJxY1yseuq3p9UmWWYUKYp
+2025-09-26 23:21:07,122 - INFO - utility.prepare_products_for_registry - ☀️ Создан файл catalog/product_jsons/Lion's Mane mushroom — whole dried.json
+2025-09-26 23:21:07,122 - INFO - utility.prepare_products_for_registry - 🔥 Загружаем catalog/product_jsons/Lion's Mane mushroom — whole dried.json в IPFS
+2025-09-26 23:21:07,122 - INFO - services.core.storage.pinata - Начинаем загрузку в IPFS: catalog/product_jsons/Lion's Mane mushroom — whole dried.json
+2025-09-26 23:21:07,122 - DEBUG - services.core.storage.pinata - SHA-256 хеш файла: 176262c91071d84485f2f2d105233d06991e97ecfd24aa7f74e8bc597aaaf9c4
+2025-09-26 23:21:07,122 - INFO - services.core.storage.pinata - Загружаем файл: Lion's Mane mushroom — whole dried.json
+2025-09-26 23:21:07,123 - INFO - services.core.storage.pinata - [Pinata] Rate limiting: ожидание 11.75s (базовая: 10.0s + jitter: 1.75s)
+2025-09-26 23:21:19,442 - INFO - services.core.storage.pinata - Успешно получен CID: QmdTAvmydVok9HYDz4ivXYCWzbyi5aAZgjxzjhjQGPad5c
+2025-09-26 23:21:19,447 - DEBUG - services.core.storage.pinata - Кэш сохранен
+2025-09-26 23:21:19,447 - INFO - utility.prepare_products_for_registry - ✅ Загружен Lion's Mane mushroom — whole dried: QmdTAvmydVok9HYDz4ivXYCWzbyi5aAZgjxzjhjQGPad5c
+2025-09-26 23:21:19,449 - INFO - utility.prepare_products_for_registry - 
+🎉 Все продукты обработаны и готовы для загрузки в контракт!
+2025-09-26 23:21:19,449 - INFO - utility.prepare_products_for_registry - 📝 Итоговый файл: catalog/product_registry_upload_data.json
+2025-09-26 23:21:19,450 - INFO - __main__ - 📦 Подготовлены данные для реестра: [{'id': 'amanita1', 'ipfsCID': 'QmZVqoSXyKtSuqkFUaXnYRenGXHwhSYLEpMCrwUpSKHr2Q', 'active': True}, {'id': 'amanita_closed_cups', 'ipfsCID': 'QmdNLN1ZNq3MVkH2iWJUjtsHSme8Lp3VhEd8x44tGU2zP8', 'active': True}, {'id': 'amanita_broken_closed_cups', 'ipfsCID': 'QmQf2K1gTcc5xFhFvtkw4rbxGNzzrszAZxtxHnTvFRVZKw', 'active': True}, {'id': 'amanita_lux', 'ipfsCID': 'QmQHMTL5ep9pKfs5bnQBwUvz2FGEkN6HAjuBVRwRvQMMD7', 'active': True}, {'id': 'amanita_pantherina_whole', 'ipfsCID': 'QmechqN79C7ftRDfQNqTJ58tJEfDQRWSK3UwUEbSe6nHFn', 'active': True}, {'id': 'amanita_pantherina_powder', 'ipfsCID': 'QmZRJW6SDA7pRfBV1vvQ9eFDHgZ2xS71tX4ML1wRryQNKb', 'active': True}, {'id': 'amanita_tincture', 'ipfsCID': 'Qmavs8CbZjeGDXL11a2dmdjZTCAXnu4NED6pY4ULEpaYk6', 'active': True}, {'id': 'blue_lotus_tincture', 'ipfsCID': 'QmWGkSCke5cpwvUjy9JRnaqxjHAbf2QwmqpaATZHMK9yNT', 'active': True}, {'id': 'blue_lotus_flowers', 'ipfsCID': 'QmV5Vt7cGMo7nVeUpUJjeMA2kzNWtPZLYqrQMTmREHQkwb', 'active': True}, {'id': 'chaga_chunks', 'ipfsCID': 'QmZff46WWYo4Z7PKW7iKGo7AVXMJZ5mK4EjSMjVsuSE6nf', 'active': True}, {'id': 'cordyceps_militaris_powder', 'ipfsCID': 'QmNc36zuqDbywY7cnn9dKcL9Bj1ApPkEQjajf45x4MpTtT', 'active': True}, {'id': 'cordyceps_militaris_dried_bodies', 'ipfsCID': 'QmWBFYt5fZc9sxHu18YfwSZwHxm25AnFxvmCXDumMNivQi', 'active': True}, {'id': 'chanterelle_dried', 'ipfsCID': 'Qmbw9yEByqo9nDCLnYXADSBJG86xTiM5GH8UJsDRHD9m3c', 'active': True}, {'id': 'chanterelle_powder', 'ipfsCID': 'Qma97b51NoAUQV5age2ThLoAqKcjtHNMjxKCKzsfk8k3U9', 'active': True}, {'id': 'aspen_bark_dried_strips', 'ipfsCID': 'QmbjJfVZqNA1ox5gJsNGkQsyvaEC2mfwReZ4GnevubxdTi', 'active': True}, {'id': 'lions_mane_powder', 'ipfsCID': 'QmNqWF8AbWaq8zizvo3EhfrVTJxY1yseuq3p9UmWWYUKYp', 'active': True}, {'id': "Lion's Mane mushroom — whole dried", 'ipfsCID': 'QmdTAvmydVok9HYDz4ivXYCWzbyi5aAZgjxzjhjQGPad5c', 'active': True}]
+2025-09-26 23:21:19,450 - INFO - __main__ - 🚀 Загрузка продуктов в реестр...
+2025-09-26 23:21:19,450 - INFO - __main__ - 📝 Загрузка продуктов в реестр...
+2025-09-26 23:21:19,450 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmZVqoSXyKtSuqkFUaXnYRenGXHwhSYLEpMCrwUpSKHr2Q
+2025-09-26 23:21:19,450 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:19,457 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:19,457 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmZVqoSXyKtSuqkFUaXnYRenGXHwhSYLEpMCrwUpSKHr2Q',), kwargs: {}
+2025-09-26 23:21:19,850 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:19,941 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 144, 'gas': 255458, 'gasPrice': 27994656122, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d5a56716f5358794b745375716b465561586e5952656e475848776853594c45704d4372775570534b48723251000000000000000000000000000000000000'}
+2025-09-26 23:21:19,943 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed81908506849c8d7a8303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d5a56716f5358794b745375716b465561586e5952656e475848776853594c45704d4372775570534b48723251000000000000000000000000000000000000820136a02be88afda15d616c54c6cad6be5bcbf4dd30fb30b5158bdd1571b4ffabbeba6ea03253f47b7d4a3317d3cd8512c5801c9ae756b33c65c701ec0c2dfc933c5e311e'), hash=HexBytes('0x47e257482c250b357beb93c3ebc132d0ee742e619e651166545d0a1a9eba9672'), r=19860320286965097244022218128340116344640815263801368979606820468083442760302, s=22763978090916542671401528131684491606103435281392147111111982624321214230814, v=310), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:19,991 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 47e257482c250b357beb93c3ebc132d0ee742e619e651166545d0a1a9eba9672
+2025-09-26 23:21:21,329 - INFO - services.core.blockchain - [Web3] Транзакция 47e257482c250b357beb93c3ebc132d0ee742e619e651166545d0a1a9eba9672 подтверждена
+2025-09-26 23:21:21,330 - INFO - services.core.blockchain - Created product with CID QmZVqoSXyKtSuqkFUaXnYRenGXHwhSYLEpMCrwUpSKHr2Q, tx_hash: 47e257482c250b357beb93c3ebc132d0ee742e619e651166545d0a1a9eba9672
+2025-09-26 23:21:21,330 - INFO - __main__ - ✅ Продукт amanita1 успешно загружен в смарт контракт. TX: 47e257482c250b357beb93c3ebc132d0ee742e619e651166545d0a1a9eba9672
+2025-09-26 23:21:21,330 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmdNLN1ZNq3MVkH2iWJUjtsHSme8Lp3VhEd8x44tGU2zP8
+2025-09-26 23:21:21,330 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:21,331 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:21,331 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmdNLN1ZNq3MVkH2iWJUjtsHSme8Lp3VhEd8x44tGU2zP8',), kwargs: {}
+2025-09-26 23:21:21,602 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:21,699 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 145, 'gas': 255458, 'gasPrice': 27994656094, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d644e4c4e315a4e71334d566b483269574a556a747348536d65384c70335668456438783434744755327a5038000000000000000000000000000000000000'}
+2025-09-26 23:21:21,700 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed81918506849c8d5e8303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d644e4c4e315a4e71334d566b483269574a556a747348536d65384c70335668456438783434744755327a5038000000000000000000000000000000000000820136a077da16440234dfda7514dca35617b79a3b26d97063a0d66ec87df2079696593ca030280c0bf2c7c512399c13d4787e3f8f06e3d8f2eaeacfce1c13199ecc1b14e5'), hash=HexBytes('0x47bb0039d6286f634e37144a0deb063563d321aa49e40093851a781b44152999'), r=54210555313458766619966731463267434725773128473320050676252261245625979787580, s=21781773757671251957238083171167459146491907305366629885241757991561179370725, v=310), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:21,749 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 47bb0039d6286f634e37144a0deb063563d321aa49e40093851a781b44152999
+2025-09-26 23:21:23,376 - INFO - services.core.blockchain - [Web3] Транзакция 47bb0039d6286f634e37144a0deb063563d321aa49e40093851a781b44152999 подтверждена
+2025-09-26 23:21:23,376 - INFO - services.core.blockchain - Created product with CID QmdNLN1ZNq3MVkH2iWJUjtsHSme8Lp3VhEd8x44tGU2zP8, tx_hash: 47bb0039d6286f634e37144a0deb063563d321aa49e40093851a781b44152999
+2025-09-26 23:21:23,376 - INFO - __main__ - ✅ Продукт amanita_closed_cups успешно загружен в смарт контракт. TX: 47bb0039d6286f634e37144a0deb063563d321aa49e40093851a781b44152999
+2025-09-26 23:21:23,376 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmQf2K1gTcc5xFhFvtkw4rbxGNzzrszAZxtxHnTvFRVZKw
+2025-09-26 23:21:23,376 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:23,377 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:23,377 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmQf2K1gTcc5xFhFvtkw4rbxGNzzrszAZxtxHnTvFRVZKw',), kwargs: {}
+2025-09-26 23:21:23,685 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:23,774 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 146, 'gas': 255458, 'gasPrice': 27994656069, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d5166324b3167546363357846684676746b7734726278474e7a7a72737a415a787478486e54764652565a4b77000000000000000000000000000000000000'}
+2025-09-26 23:21:23,775 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed81928506849c8d458303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d5166324b3167546363357846684676746b7734726278474e7a7a72737a415a787478486e54764652565a4b77000000000000000000000000000000000000820136a0a6ee08e9c74726ba00312495fe89d41f6b8afff27ba683d00a8d585a809a3dd0a03a48ab204b95e4b9eb58c6097f3c66f2a0cb096ea05c6295c9f17ce5036a9633'), hash=HexBytes('0x8d5f90c3686b398c0affa8d211b12214d614f0d7a8e0b1e47769106f73fcaca5'), r=75504503982864239690148650171906216952118739480405037780954499344103829552592, s=26362539275797173201421525561019567068985619147343602304904870221523133830707, v=310), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:23,823 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 8d5f90c3686b398c0affa8d211b12214d614f0d7a8e0b1e47769106f73fcaca5
+2025-09-26 23:21:25,429 - INFO - services.core.blockchain - [Web3] Транзакция 8d5f90c3686b398c0affa8d211b12214d614f0d7a8e0b1e47769106f73fcaca5 подтверждена
+2025-09-26 23:21:25,430 - INFO - services.core.blockchain - Created product with CID QmQf2K1gTcc5xFhFvtkw4rbxGNzzrszAZxtxHnTvFRVZKw, tx_hash: 8d5f90c3686b398c0affa8d211b12214d614f0d7a8e0b1e47769106f73fcaca5
+2025-09-26 23:21:25,431 - INFO - __main__ - ✅ Продукт amanita_broken_closed_cups успешно загружен в смарт контракт. TX: 8d5f90c3686b398c0affa8d211b12214d614f0d7a8e0b1e47769106f73fcaca5
+2025-09-26 23:21:25,431 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmQHMTL5ep9pKfs5bnQBwUvz2FGEkN6HAjuBVRwRvQMMD7
+2025-09-26 23:21:25,431 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:25,432 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:25,432 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmQHMTL5ep9pKfs5bnQBwUvz2FGEkN6HAjuBVRwRvQMMD7',), kwargs: {}
+2025-09-26 23:21:25,738 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:25,842 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 147, 'gas': 255458, 'gasPrice': 27994656031, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d51484d544c35657039704b667335626e51427755767a324647456b4e3648416a75425652775276514d4d4437000000000000000000000000000000000000'}
+2025-09-26 23:21:25,843 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed81938506849c8d1f8303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d51484d544c35657039704b667335626e51427755767a324647456b4e3648416a75425652775276514d4d4437000000000000000000000000000000000000820136a0c6815478cd7994b90195e22fe7d2b31ef80c093614685114634853ce4ec00edba05ef3692079cf39f597550929aeef68ca48b69d0a74fd56513d3d9ec42efb2ece'), hash=HexBytes('0x98e8f5aa6a37915b7aa4649bcba79a7d15822a5dd7e216a67e7b0485e20d6778'), r=89786450294368922234915786027763186755422674778872782126982125141826790756059, s=42947477162480929547005260402093116731106840175504142133771084807653643988686, v=310), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:25,892 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 98e8f5aa6a37915b7aa4649bcba79a7d15822a5dd7e216a67e7b0485e20d6778
+2025-09-26 23:21:27,784 - INFO - services.core.blockchain - [Web3] Транзакция 98e8f5aa6a37915b7aa4649bcba79a7d15822a5dd7e216a67e7b0485e20d6778 подтверждена
+2025-09-26 23:21:27,784 - INFO - services.core.blockchain - Created product with CID QmQHMTL5ep9pKfs5bnQBwUvz2FGEkN6HAjuBVRwRvQMMD7, tx_hash: 98e8f5aa6a37915b7aa4649bcba79a7d15822a5dd7e216a67e7b0485e20d6778
+2025-09-26 23:21:27,784 - INFO - __main__ - ✅ Продукт amanita_lux успешно загружен в смарт контракт. TX: 98e8f5aa6a37915b7aa4649bcba79a7d15822a5dd7e216a67e7b0485e20d6778
+2025-09-26 23:21:27,784 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmechqN79C7ftRDfQNqTJ58tJEfDQRWSK3UwUEbSe6nHFn
+2025-09-26 23:21:27,784 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:27,785 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:27,785 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmechqN79C7ftRDfQNqTJ58tJEfDQRWSK3UwUEbSe6nHFn',), kwargs: {}
+2025-09-26 23:21:28,059 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:28,157 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 148, 'gas': 255458, 'gasPrice': 27994656000, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d656368714e373943376674524466514e71544a3538744a456644515257534b3355775545625365366e48466e000000000000000000000000000000000000'}
+2025-09-26 23:21:28,157 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed81948506849c8d008303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d656368714e373943376674524466514e71544a3538744a456644515257534b3355775545625365366e48466e000000000000000000000000000000000000820136a09552894908b43a06ff2a5b9998065fbaa029998179396434593302c1c02ef69ca036ed95756dd5de27bc75758068075c851f5bec73d8731bc90f9a0045fa469f5b'), hash=HexBytes('0x64058d0f3a77a31a5121e38bf3b74b4a84243b45fa43aa589ed69330661e9249'), r=67540443406460775676640441914027822355948727500189321114012545009907695285916, s=24844668103935313808123807583480284557601044132261506977035327960359979360091, v=310), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:28,206 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 64058d0f3a77a31a5121e38bf3b74b4a84243b45fa43aa589ed69330661e9249
+2025-09-26 23:21:31,783 - INFO - services.core.blockchain - [Web3] Транзакция 64058d0f3a77a31a5121e38bf3b74b4a84243b45fa43aa589ed69330661e9249 подтверждена
+2025-09-26 23:21:31,783 - INFO - services.core.blockchain - Created product with CID QmechqN79C7ftRDfQNqTJ58tJEfDQRWSK3UwUEbSe6nHFn, tx_hash: 64058d0f3a77a31a5121e38bf3b74b4a84243b45fa43aa589ed69330661e9249
+2025-09-26 23:21:31,784 - INFO - __main__ - ✅ Продукт amanita_pantherina_whole успешно загружен в смарт контракт. TX: 64058d0f3a77a31a5121e38bf3b74b4a84243b45fa43aa589ed69330661e9249
+2025-09-26 23:21:31,784 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmZRJW6SDA7pRfBV1vvQ9eFDHgZ2xS71tX4ML1wRryQNKb
+2025-09-26 23:21:31,784 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:31,784 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:31,784 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmZRJW6SDA7pRfBV1vvQ9eFDHgZ2xS71tX4ML1wRryQNKb',), kwargs: {}
+2025-09-26 23:21:31,996 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:32,084 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 149, 'gas': 255458, 'gasPrice': 27994655994, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d5a524a5736534441377052664256317676513965464448675a32785337317458344d4c3177527279514e4b62000000000000000000000000000000000000'}
+2025-09-26 23:21:32,086 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed81958506849c8cfa8303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d5a524a5736534441377052664256317676513965464448675a32785337317458344d4c3177527279514e4b62000000000000000000000000000000000000820135a0d4717dedf8699605f35f91ecdf4b1597673b58d8a14b6d7d7e76566812d26d3ca013dc441c8ba1d856a4213e155cf3473a948b5344994cd0bc4212c39e3bce9d3e'), hash=HexBytes('0x1281531d6d416dd0576ca8413b2086e6ed8cdd55c4b963082f1d8d22369d530f'), r=96090846751934024606054203195924368263461568686122735593733141615078114749756, s=8983120565668382112991333286674763917113222682807428653171089222420264820030, v=309), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:32,136 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 1281531d6d416dd0576ca8413b2086e6ed8cdd55c4b963082f1d8d22369d530f
+2025-09-26 23:21:33,721 - INFO - services.core.blockchain - [Web3] Транзакция 1281531d6d416dd0576ca8413b2086e6ed8cdd55c4b963082f1d8d22369d530f подтверждена
+2025-09-26 23:21:33,721 - INFO - services.core.blockchain - Created product with CID QmZRJW6SDA7pRfBV1vvQ9eFDHgZ2xS71tX4ML1wRryQNKb, tx_hash: 1281531d6d416dd0576ca8413b2086e6ed8cdd55c4b963082f1d8d22369d530f
+2025-09-26 23:21:33,722 - INFO - __main__ - ✅ Продукт amanita_pantherina_powder успешно загружен в смарт контракт. TX: 1281531d6d416dd0576ca8413b2086e6ed8cdd55c4b963082f1d8d22369d530f
+2025-09-26 23:21:33,722 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: Qmavs8CbZjeGDXL11a2dmdjZTCAXnu4NED6pY4ULEpaYk6
+2025-09-26 23:21:33,722 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:33,722 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:33,722 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('Qmavs8CbZjeGDXL11a2dmdjZTCAXnu4NED6pY4ULEpaYk6',), kwargs: {}
+2025-09-26 23:21:34,049 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:34,179 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 150, 'gas': 255458, 'gasPrice': 27994656045, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d6176733843625a6a654744584c31316132646d646a5a544341586e75344e454436705934554c457061596b36000000000000000000000000000000000000'}
+2025-09-26 23:21:34,180 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed81968506849c8d2d8303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d6176733843625a6a654744584c31316132646d646a5a544341586e75344e454436705934554c457061596b36000000000000000000000000000000000000820135a0fafef0e9a74ee5f96392eb05292a7e0c5ae323eb0eabfe5b6e3cfce4c123c39ca040ccf50bce975633bf6cf7456f400de32189c4a8d4bce132af74e825a1794d0c'), hash=HexBytes('0x21f42769451f1d49094049925ceb95df67baca5d8db34a16712e1b63b9b33eb0'), r=113528654018680719496222080118010885338825785313851215354479372708556128371612, s=29310150356714804688172092197531107740266140753034184103271766225851027901708, v=309), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:34,232 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 21f42769451f1d49094049925ceb95df67baca5d8db34a16712e1b63b9b33eb0
+2025-09-26 23:21:35,591 - INFO - services.core.blockchain - [Web3] Транзакция 21f42769451f1d49094049925ceb95df67baca5d8db34a16712e1b63b9b33eb0 подтверждена
+2025-09-26 23:21:35,592 - INFO - services.core.blockchain - Created product with CID Qmavs8CbZjeGDXL11a2dmdjZTCAXnu4NED6pY4ULEpaYk6, tx_hash: 21f42769451f1d49094049925ceb95df67baca5d8db34a16712e1b63b9b33eb0
+2025-09-26 23:21:35,592 - INFO - __main__ - ✅ Продукт amanita_tincture успешно загружен в смарт контракт. TX: 21f42769451f1d49094049925ceb95df67baca5d8db34a16712e1b63b9b33eb0
+2025-09-26 23:21:35,592 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmWGkSCke5cpwvUjy9JRnaqxjHAbf2QwmqpaATZHMK9yNT
+2025-09-26 23:21:35,592 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:35,592 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:35,593 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmWGkSCke5cpwvUjy9JRnaqxjHAbf2QwmqpaATZHMK9yNT',), kwargs: {}
+2025-09-26 23:21:35,870 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:35,971 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 151, 'gas': 255458, 'gasPrice': 27994656021, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d57476b53436b653563707776556a79394a526e6171786a484162663251776d71706141545a484d4b39794e54000000000000000000000000000000000000'}
+2025-09-26 23:21:35,975 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed81978506849c8d158303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d57476b53436b653563707776556a79394a526e6171786a484162663251776d71706141545a484d4b39794e54000000000000000000000000000000000000820136a04ce0fd02af457c672296427bf360fd547c25ab2f5f7f53a1fe589e44f284b6cda069f352d5f3d279430e741b61444aad6ce20b7d96f5c01bbcd52d55b87be97a0a'), hash=HexBytes('0x0c321dd76416da8c90e9da7cce63b1f11af52116532c49f1c492f74138c2290e'), r=34773296449042470856457130327785411273027961969005737034064965008783728490189, s=47922764649330665825746955158123357105515581606170718484761542027079817198090, v=310), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:36,027 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 0c321dd76416da8c90e9da7cce63b1f11af52116532c49f1c492f74138c2290e
+2025-09-26 23:21:37,544 - INFO - services.core.blockchain - [Web3] Транзакция 0c321dd76416da8c90e9da7cce63b1f11af52116532c49f1c492f74138c2290e подтверждена
+2025-09-26 23:21:37,544 - INFO - services.core.blockchain - Created product with CID QmWGkSCke5cpwvUjy9JRnaqxjHAbf2QwmqpaATZHMK9yNT, tx_hash: 0c321dd76416da8c90e9da7cce63b1f11af52116532c49f1c492f74138c2290e
+2025-09-26 23:21:37,544 - INFO - __main__ - ✅ Продукт blue_lotus_tincture успешно загружен в смарт контракт. TX: 0c321dd76416da8c90e9da7cce63b1f11af52116532c49f1c492f74138c2290e
+2025-09-26 23:21:37,544 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmV5Vt7cGMo7nVeUpUJjeMA2kzNWtPZLYqrQMTmREHQkwb
+2025-09-26 23:21:37,545 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:37,545 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:37,546 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmV5Vt7cGMo7nVeUpUJjeMA2kzNWtPZLYqrQMTmREHQkwb',), kwargs: {}
+2025-09-26 23:21:37,831 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:37,931 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 152, 'gas': 255458, 'gasPrice': 27994655990, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d563556743763474d6f376e56655570554a6a654d41326b7a4e5774505a4c597172514d546d524548516b7762000000000000000000000000000000000000'}
+2025-09-26 23:21:37,932 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed81988506849c8cf68303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d563556743763474d6f376e56655570554a6a654d41326b7a4e5774505a4c597172514d546d524548516b7762000000000000000000000000000000000000820135a0f9e46a6a6676314d5729ac44875e908ec23b700a0c22012efb89356d7f67f1aea077180ba3f7320d057ace1da0e15947f26a0257877f3aa4f2b6f27537557edda2'), hash=HexBytes('0x637db1f528f184bc268234755b75f85b657fc98c0a34055294f3319e53dac725'), r=113029474881660384209904030238783929710123131762667405849061657863880016654766, s=53867713650677228655782920010581514604716983195654783474495639332457520487842, v=309), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:37,983 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 637db1f528f184bc268234755b75f85b657fc98c0a34055294f3319e53dac725
+2025-09-26 23:21:40,312 - INFO - services.core.blockchain - [Web3] Транзакция 637db1f528f184bc268234755b75f85b657fc98c0a34055294f3319e53dac725 подтверждена
+2025-09-26 23:21:40,313 - INFO - services.core.blockchain - Created product with CID QmV5Vt7cGMo7nVeUpUJjeMA2kzNWtPZLYqrQMTmREHQkwb, tx_hash: 637db1f528f184bc268234755b75f85b657fc98c0a34055294f3319e53dac725
+2025-09-26 23:21:40,313 - INFO - __main__ - ✅ Продукт blue_lotus_flowers успешно загружен в смарт контракт. TX: 637db1f528f184bc268234755b75f85b657fc98c0a34055294f3319e53dac725
+2025-09-26 23:21:40,313 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmZff46WWYo4Z7PKW7iKGo7AVXMJZ5mK4EjSMjVsuSE6nf
+2025-09-26 23:21:40,313 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:40,314 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:40,314 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmZff46WWYo4Z7PKW7iKGo7AVXMJZ5mK4EjSMjVsuSE6nf',), kwargs: {}
+2025-09-26 23:21:40,536 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:40,644 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 153, 'gas': 255458, 'gasPrice': 27994655958, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d5a666634365757596f345a37504b5737694b476f374156584d4a5a356d4b34456a534d6a5673755345366e66000000000000000000000000000000000000'}
+2025-09-26 23:21:40,646 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed81998506849c8cd68303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d5a666634365757596f345a37504b5737694b476f374156584d4a5a356d4b34456a534d6a5673755345366e66000000000000000000000000000000000000820135a031c0f2c662c209e8ad7fc11d8983453407286740113f7b9add2b199b4cecf270a0539d69c141cb2f96d198dcdd09fe8e92671ced78e03f86244caffa4da0b583da'), hash=HexBytes('0xaeb4f989c91e359cf738387bb695ae2c2db0f8e36715051da10232d0dc4a618f'), r=22504239788103293711368983348026275535813404046572559595760648319564503642736, s=37820091315146321131534559277165615585855982154568429872067531479432901788634, v=309), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:40,700 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: aeb4f989c91e359cf738387bb695ae2c2db0f8e36715051da10232d0dc4a618f
+2025-09-26 23:21:44,078 - INFO - services.core.blockchain - [Web3] Транзакция aeb4f989c91e359cf738387bb695ae2c2db0f8e36715051da10232d0dc4a618f подтверждена
+2025-09-26 23:21:44,078 - INFO - services.core.blockchain - Created product with CID QmZff46WWYo4Z7PKW7iKGo7AVXMJZ5mK4EjSMjVsuSE6nf, tx_hash: aeb4f989c91e359cf738387bb695ae2c2db0f8e36715051da10232d0dc4a618f
+2025-09-26 23:21:44,079 - INFO - __main__ - ✅ Продукт chaga_chunks успешно загружен в смарт контракт. TX: aeb4f989c91e359cf738387bb695ae2c2db0f8e36715051da10232d0dc4a618f
+2025-09-26 23:21:44,079 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmNc36zuqDbywY7cnn9dKcL9Bj1ApPkEQjajf45x4MpTtT
+2025-09-26 23:21:44,079 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:44,079 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:44,079 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmNc36zuqDbywY7cnn9dKcL9Bj1ApPkEQjajf45x4MpTtT',), kwargs: {}
+2025-09-26 23:21:44,368 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:44,477 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 154, 'gas': 255458, 'gasPrice': 27994655980, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d4e6333367a7571446279775937636e6e39644b634c39426a314170506b45516a616a66343578344d70547454000000000000000000000000000000000000'}
+2025-09-26 23:21:44,478 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed819a8506849c8cec8303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d4e6333367a7571446279775937636e6e39644b634c39426a314170506b45516a616a66343578344d70547454000000000000000000000000000000000000820135a0af03593f1466b22197ad9bd097e723603e03bebe9a5b716306752d87eaa4a8d5a055c5f76dad7006f48d9549345b2abea22dc1031034de039c15a93c561bd545a1'), hash=HexBytes('0x2e52d71849d073d3e8b6edee1664811931b410ace56475db24092da624a135b3'), r=79160664999315949954406074171153617266128044509526809214180524984084906420437, s=38796368689585940476313781977405720150077102419763936251203068377873167762849, v=309), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:44,529 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 2e52d71849d073d3e8b6edee1664811931b410ace56475db24092da624a135b3
+2025-09-26 23:21:47,615 - INFO - services.core.blockchain - [Web3] Транзакция 2e52d71849d073d3e8b6edee1664811931b410ace56475db24092da624a135b3 подтверждена
+2025-09-26 23:21:47,615 - INFO - services.core.blockchain - Created product with CID QmNc36zuqDbywY7cnn9dKcL9Bj1ApPkEQjajf45x4MpTtT, tx_hash: 2e52d71849d073d3e8b6edee1664811931b410ace56475db24092da624a135b3
+2025-09-26 23:21:47,615 - INFO - __main__ - ✅ Продукт cordyceps_militaris_powder успешно загружен в смарт контракт. TX: 2e52d71849d073d3e8b6edee1664811931b410ace56475db24092da624a135b3
+2025-09-26 23:21:47,615 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmWBFYt5fZc9sxHu18YfwSZwHxm25AnFxvmCXDumMNivQi
+2025-09-26 23:21:47,616 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:47,616 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:47,616 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmWBFYt5fZc9sxHu18YfwSZwHxm25AnFxvmCXDumMNivQi',), kwargs: {}
+2025-09-26 23:21:47,894 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:47,991 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 155, 'gas': 255458, 'gasPrice': 27994655986, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d574246597435665a6339737848753138596677535a7748786d3235416e4678766d435844756d4d4e69765169000000000000000000000000000000000000'}
+2025-09-26 23:21:47,993 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed819b8506849c8cf28303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d574246597435665a6339737848753138596677535a7748786d3235416e4678766d435844756d4d4e69765169000000000000000000000000000000000000820136a0f0f518febc96aa5eb76c37f5b76705ca26b1effefc2a1461ec7fb848d22e8627a054c5ee2eb22fce605fcfeca027fae84a5ca9da914e39af8b4ae58e04fcce1ffa'), hash=HexBytes('0xd8133d31025113fb5fc698b16692e099b583370169fa770835b5d548b42a212f'), r=108988133700454104828740008318987854767828815646020095276074568072449443661351, s=38343992027309055409137874857870367955249151452931486581315920754905938010106, v=310), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:48,045 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: d8133d31025113fb5fc698b16692e099b583370169fa770835b5d548b42a212f
+2025-09-26 23:21:50,000 - INFO - services.core.blockchain - [Web3] Транзакция d8133d31025113fb5fc698b16692e099b583370169fa770835b5d548b42a212f подтверждена
+2025-09-26 23:21:50,000 - INFO - services.core.blockchain - Created product with CID QmWBFYt5fZc9sxHu18YfwSZwHxm25AnFxvmCXDumMNivQi, tx_hash: d8133d31025113fb5fc698b16692e099b583370169fa770835b5d548b42a212f
+2025-09-26 23:21:50,000 - INFO - __main__ - ✅ Продукт cordyceps_militaris_dried_bodies успешно загружен в смарт контракт. TX: d8133d31025113fb5fc698b16692e099b583370169fa770835b5d548b42a212f
+2025-09-26 23:21:50,000 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: Qmbw9yEByqo9nDCLnYXADSBJG86xTiM5GH8UJsDRHD9m3c
+2025-09-26 23:21:50,000 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:50,001 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:50,001 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('Qmbw9yEByqo9nDCLnYXADSBJG86xTiM5GH8UJsDRHD9m3c',), kwargs: {}
+2025-09-26 23:21:50,283 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:50,387 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 156, 'gas': 255458, 'gasPrice': 27994655959, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d62773979454279716f396e44434c6e5958414453424a4738367854694d35474838554a7344524844396d3363000000000000000000000000000000000000'}
+2025-09-26 23:21:50,389 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed819c8506849c8cd78303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d62773979454279716f396e44434c6e5958414453424a4738367854694d35474838554a7344524844396d3363000000000000000000000000000000000000820136a0d8a1b862b6550ed213adb4d4a3cba013df5ab46d942cee47db789721edc9720fa05db97a4ff39f2b49dbda2f2b3480a736e57f0791a6696ae85c5bc99a9b9ba4d8'), hash=HexBytes('0x3c8e84f5733663dbd4bfe847403bfe7753520b0ed4ca5c3ddc0dfa947d77ec34'), r=97985310254019270481527501444857606209421682549519228638531337139333056000527, s=42392805793774235616942674156683898086361832240422169453044238485880989000920, v=310), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:50,442 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 3c8e84f5733663dbd4bfe847403bfe7753520b0ed4ca5c3ddc0dfa947d77ec34
+2025-09-26 23:21:51,436 - INFO - services.core.blockchain - [Web3] Транзакция 3c8e84f5733663dbd4bfe847403bfe7753520b0ed4ca5c3ddc0dfa947d77ec34 подтверждена
+2025-09-26 23:21:51,436 - INFO - services.core.blockchain - Created product with CID Qmbw9yEByqo9nDCLnYXADSBJG86xTiM5GH8UJsDRHD9m3c, tx_hash: 3c8e84f5733663dbd4bfe847403bfe7753520b0ed4ca5c3ddc0dfa947d77ec34
+2025-09-26 23:21:51,436 - INFO - __main__ - ✅ Продукт chanterelle_dried успешно загружен в смарт контракт. TX: 3c8e84f5733663dbd4bfe847403bfe7753520b0ed4ca5c3ddc0dfa947d77ec34
+2025-09-26 23:21:51,436 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: Qma97b51NoAUQV5age2ThLoAqKcjtHNMjxKCKzsfk8k3U9
+2025-09-26 23:21:51,436 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:51,436 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:51,436 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('Qma97b51NoAUQV5age2ThLoAqKcjtHNMjxKCKzsfk8k3U9',), kwargs: {}
+2025-09-26 23:21:51,711 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:51,817 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 157, 'gas': 255458, 'gasPrice': 27994655963, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d6139376235314e6f41555156356167653254684c6f41714b636a74484e4d6a784b434b7a73666b386b335539000000000000000000000000000000000000'}
+2025-09-26 23:21:51,819 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed819d8506849c8cdb8303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d6139376235314e6f41555156356167653254684c6f41714b636a74484e4d6a784b434b7a73666b386b335539000000000000000000000000000000000000820136a007249ce4bd0157b838636ea2a4a3b0e49215711f7bf372fd21d5772328b5d198a003271857663476c4720ceb0571331c9f22fc31351f9ea4df1b5c913edd645fe2'), hash=HexBytes('0x60ce9f31c23a918a20d0ad6faa7c274ee8477d9a0aeefd249321a5d17b912001'), r=3230879273617401454250828982436530282031628137679710402426768242015292739992, s=1426013579467275330845962241735436044507851825744471189177081993773480959970, v=310), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:51,871 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: 60ce9f31c23a918a20d0ad6faa7c274ee8477d9a0aeefd249321a5d17b912001
+2025-09-26 23:21:53,679 - INFO - services.core.blockchain - [Web3] Транзакция 60ce9f31c23a918a20d0ad6faa7c274ee8477d9a0aeefd249321a5d17b912001 подтверждена
+2025-09-26 23:21:53,679 - INFO - services.core.blockchain - Created product with CID Qma97b51NoAUQV5age2ThLoAqKcjtHNMjxKCKzsfk8k3U9, tx_hash: 60ce9f31c23a918a20d0ad6faa7c274ee8477d9a0aeefd249321a5d17b912001
+2025-09-26 23:21:53,679 - INFO - __main__ - ✅ Продукт chanterelle_powder успешно загружен в смарт контракт. TX: 60ce9f31c23a918a20d0ad6faa7c274ee8477d9a0aeefd249321a5d17b912001
+2025-09-26 23:21:53,679 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmbjJfVZqNA1ox5gJsNGkQsyvaEC2mfwReZ4GnevubxdTi
+2025-09-26 23:21:53,679 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:53,680 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:53,680 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmbjJfVZqNA1ox5gJsNGkQsyvaEC2mfwReZ4GnevubxdTi',), kwargs: {}
+2025-09-26 23:21:53,966 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:54,069 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 158, 'gas': 255458, 'gasPrice': 27994655928, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d626a4a66565a714e41316f7835674a734e476b51737976614543326d667752655a34476e6576756278645469000000000000000000000000000000000000'}
+2025-09-26 23:21:54,070 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed819e8506849c8cb88303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d626a4a66565a714e41316f7835674a734e476b51737976614543326d667752655a34476e6576756278645469000000000000000000000000000000000000820136a0b87d28bfe7202b88361b9ba3456ebc28a179ed50159a6cfb796ca1e4a806c9ffa0336a1b9a211785b9f3639d28d8ec74cdad9bc5ece9e41c5b1c41ec857ae19a98'), hash=HexBytes('0xb9abb9e3f597518e95959ef9517583f853ab122cce5dc3d1e80e56f10fc6e7bf'), r=83446701265962371915456995223487872792538888034011055530306852212116482869759, s=23255431569081226798654726189341144585845008486115627114146202447852630809240, v=310), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:54,126 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: b9abb9e3f597518e95959ef9517583f853ab122cce5dc3d1e80e56f10fc6e7bf
+2025-09-26 23:21:55,360 - INFO - services.core.blockchain - [Web3] Транзакция b9abb9e3f597518e95959ef9517583f853ab122cce5dc3d1e80e56f10fc6e7bf подтверждена
+2025-09-26 23:21:55,360 - INFO - services.core.blockchain - Created product with CID QmbjJfVZqNA1ox5gJsNGkQsyvaEC2mfwReZ4GnevubxdTi, tx_hash: b9abb9e3f597518e95959ef9517583f853ab122cce5dc3d1e80e56f10fc6e7bf
+2025-09-26 23:21:55,360 - INFO - __main__ - ✅ Продукт aspen_bark_dried_strips успешно загружен в смарт контракт. TX: b9abb9e3f597518e95959ef9517583f853ab122cce5dc3d1e80e56f10fc6e7bf
+2025-09-26 23:21:55,361 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmNqWF8AbWaq8zizvo3EhfrVTJxY1yseuq3p9UmWWYUKYp
+2025-09-26 23:21:55,361 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:55,361 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:55,362 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmNqWF8AbWaq8zizvo3EhfrVTJxY1yseuq3p9UmWWYUKYp',), kwargs: {}
+2025-09-26 23:21:55,647 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:55,755 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 159, 'gas': 255458, 'gasPrice': 27994655916, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d4e715746384162576171387a697a766f334568667256544a7859317973657571337039556d575759554b5970000000000000000000000000000000000000'}
+2025-09-26 23:21:55,758 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed819f8506849c8cac8303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d4e715746384162576171387a697a766f334568667256544a7859317973657571337039556d575759554b5970000000000000000000000000000000000000820136a0a89cf287d26c9fd712bb4b229d082d5056593886b0137ac528163a5ef8b9a338a0061143286fb12a3c7e33caf29013c098f6c726f4e00fffa74ff033995d0ef72b'), hash=HexBytes('0xb25e1587713e3ef9489c7df9b9588b7c1e559a134f3dbbe594fee89c480fdc68'), r=76265860588463171310536274739146420377351556575322573035032116742922058703672, s=2744376998766478340631956797204548560025353109742527782458636362093043840811, v=310), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:55,808 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: b25e1587713e3ef9489c7df9b9588b7c1e559a134f3dbbe594fee89c480fdc68
+2025-09-26 23:21:57,649 - INFO - services.core.blockchain - [Web3] Транзакция b25e1587713e3ef9489c7df9b9588b7c1e559a134f3dbbe594fee89c480fdc68 подтверждена
+2025-09-26 23:21:57,649 - INFO - services.core.blockchain - Created product with CID QmNqWF8AbWaq8zizvo3EhfrVTJxY1yseuq3p9UmWWYUKYp, tx_hash: b25e1587713e3ef9489c7df9b9588b7c1e559a134f3dbbe594fee89c480fdc68
+2025-09-26 23:21:57,650 - INFO - __main__ - ✅ Продукт lions_mane_powder успешно загружен в смарт контракт. TX: b25e1587713e3ef9489c7df9b9588b7c1e559a134f3dbbe594fee89c480fdc68
+2025-09-26 23:21:57,650 - INFO - services.product.registry - [ProductRegistry] Создание продукта в смарт-контракте с CID: QmdTAvmydVok9HYDz4ivXYCWzbyi5aAZgjxzjhjQGPad5c
+2025-09-26 23:21:57,650 - INFO - services.product.registry - [ProductRegistry] Продукт успешно создан. Хэш транзакции: <coroutine object BlockchainService.create_product at 0x104016b40>
+2025-09-26 23:21:57,651 - INFO - services.core.blockchain - [Web3] [TX] account.address: 0x21d994213d88b4ccDA265036557788B9B910610D
+2025-09-26 23:21:57,651 - INFO - services.core.blockchain - [Web3] [TX] func: <Function createProduct>, args: ('QmdTAvmydVok9HYDz4ivXYCWzbyi5aAZgjxzjhjQGPad5c',), kwargs: {}
+2025-09-26 23:21:57,874 - INFO - services.core.blockchain - [Web3] [GAS] estimated: 212882, with multiplier (1.2): 255458
+2025-09-26 23:21:57,984 - INFO - services.core.blockchain - [Web3] [TX] txn (build_transaction): {'value': 0, 'chainId': 137, 'from': '0x21d994213d88b4ccDA265036557788B9B910610D', 'nonce': 160, 'gas': 255458, 'gasPrice': 27994655875, 'to': '0x1F3870c0513bb839472365e003865A655D5b0C61', 'data': '0x02ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d645441766d7964566f6b394859447a346976585943577a6279693561415a676a787a6a686a51475061643563000000000000000000000000000000000000'}
+2025-09-26 23:21:57,986 - INFO - services.core.blockchain - [Web3] [TX] signed_txn: SignedTransaction(raw_transaction=HexBytes('0xf8ed81a08506849c8c838303e5e2941f3870c0513bb839472365e003865a655d5b0c6180b88402ec06be0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e516d645441766d7964566f6b394859447a346976585943577a6279693561415a676a787a6a686a51475061643563000000000000000000000000000000000000820135a0b3e8d9d75415c2ca3ac67cbc3b44fd0ae5673e78f4b136030b4e4c40054d439ea05917c99fa8a5a11fcbe384da7ee3bb68790dc0216cb04446a4a9986e89139a75'), hash=HexBytes('0xdcc31951bc2192e6e6a0425da4d85a81eadf25510cf3f49d1487502526212fad'), r=81375411899634240087498822859466022772645410124847766062945763025682843911070, s=40297872561808437365000991949951585039123839316396424153266086999519065774709, v=309), type: <class 'eth_account.datastructures.SignedTransaction'>
+2025-09-26 23:21:58,039 - INFO - services.core.blockchain - [Web3] Транзакция ProductRegistry.createProduct отправлена: dcc31951bc2192e6e6a0425da4d85a81eadf25510cf3f49d1487502526212fad
+2025-09-26 23:21:59,562 - INFO - services.core.blockchain - [Web3] Транзакция dcc31951bc2192e6e6a0425da4d85a81eadf25510cf3f49d1487502526212fad подтверждена
+2025-09-26 23:21:59,562 - INFO - services.core.blockchain - Created product with CID QmdTAvmydVok9HYDz4ivXYCWzbyi5aAZgjxzjhjQGPad5c, tx_hash: dcc31951bc2192e6e6a0425da4d85a81eadf25510cf3f49d1487502526212fad
+2025-09-26 23:21:59,562 - INFO - __main__ - ✅ Продукт Lion's Mane mushroom — whole dried успешно загружен в смарт контракт. TX: dcc31951bc2192e6e6a0425da4d85a81eadf25510cf3f49d1487502526212fad
+2025-09-26 23:21:59,563 - INFO - __main__ - 🚀 Загружены продукты в реестр: [{'id': 'amanita1', 'ipfsCID': 'QmZVqoSXyKtSuqkFUaXnYRenGXHwhSYLEpMCrwUpSKHr2Q', 'active': True, 'tx_hash': '47e257482c250b357beb93c3ebc132d0ee742e619e651166545d0a1a9eba9672'}, {'id': 'amanita_closed_cups', 'ipfsCID': 'QmdNLN1ZNq3MVkH2iWJUjtsHSme8Lp3VhEd8x44tGU2zP8', 'active': True, 'tx_hash': '47bb0039d6286f634e37144a0deb063563d321aa49e40093851a781b44152999'}, {'id': 'amanita_broken_closed_cups', 'ipfsCID': 'QmQf2K1gTcc5xFhFvtkw4rbxGNzzrszAZxtxHnTvFRVZKw', 'active': True, 'tx_hash': '8d5f90c3686b398c0affa8d211b12214d614f0d7a8e0b1e47769106f73fcaca5'}, {'id': 'amanita_lux', 'ipfsCID': 'QmQHMTL5ep9pKfs5bnQBwUvz2FGEkN6HAjuBVRwRvQMMD7', 'active': True, 'tx_hash': '98e8f5aa6a37915b7aa4649bcba79a7d15822a5dd7e216a67e7b0485e20d6778'}, {'id': 'amanita_pantherina_whole', 'ipfsCID': 'QmechqN79C7ftRDfQNqTJ58tJEfDQRWSK3UwUEbSe6nHFn', 'active': True, 'tx_hash': '64058d0f3a77a31a5121e38bf3b74b4a84243b45fa43aa589ed69330661e9249'}, {'id': 'amanita_pantherina_powder', 'ipfsCID': 'QmZRJW6SDA7pRfBV1vvQ9eFDHgZ2xS71tX4ML1wRryQNKb', 'active': True, 'tx_hash': '1281531d6d416dd0576ca8413b2086e6ed8cdd55c4b963082f1d8d22369d530f'}, {'id': 'amanita_tincture', 'ipfsCID': 'Qmavs8CbZjeGDXL11a2dmdjZTCAXnu4NED6pY4ULEpaYk6', 'active': True, 'tx_hash': '21f42769451f1d49094049925ceb95df67baca5d8db34a16712e1b63b9b33eb0'}, {'id': 'blue_lotus_tincture', 'ipfsCID': 'QmWGkSCke5cpwvUjy9JRnaqxjHAbf2QwmqpaATZHMK9yNT', 'active': True, 'tx_hash': '0c321dd76416da8c90e9da7cce63b1f11af52116532c49f1c492f74138c2290e'}, {'id': 'blue_lotus_flowers', 'ipfsCID': 'QmV5Vt7cGMo7nVeUpUJjeMA2kzNWtPZLYqrQMTmREHQkwb', 'active': True, 'tx_hash': '637db1f528f184bc268234755b75f85b657fc98c0a34055294f3319e53dac725'}, {'id': 'chaga_chunks', 'ipfsCID': 'QmZff46WWYo4Z7PKW7iKGo7AVXMJZ5mK4EjSMjVsuSE6nf', 'active': True, 'tx_hash': 'aeb4f989c91e359cf738387bb695ae2c2db0f8e36715051da10232d0dc4a618f'}, {'id': 'cordyceps_militaris_powder', 'ipfsCID': 'QmNc36zuqDbywY7cnn9dKcL9Bj1ApPkEQjajf45x4MpTtT', 'active': True, 'tx_hash': '2e52d71849d073d3e8b6edee1664811931b410ace56475db24092da624a135b3'}, {'id': 'cordyceps_militaris_dried_bodies', 'ipfsCID': 'QmWBFYt5fZc9sxHu18YfwSZwHxm25AnFxvmCXDumMNivQi', 'active': True, 'tx_hash': 'd8133d31025113fb5fc698b16692e099b583370169fa770835b5d548b42a212f'}, {'id': 'chanterelle_dried', 'ipfsCID': 'Qmbw9yEByqo9nDCLnYXADSBJG86xTiM5GH8UJsDRHD9m3c', 'active': True, 'tx_hash': '3c8e84f5733663dbd4bfe847403bfe7753520b0ed4ca5c3ddc0dfa947d77ec34'}, {'id': 'chanterelle_powder', 'ipfsCID': 'Qma97b51NoAUQV5age2ThLoAqKcjtHNMjxKCKzsfk8k3U9', 'active': True, 'tx_hash': '60ce9f31c23a918a20d0ad6faa7c274ee8477d9a0aeefd249321a5d17b912001'}, {'id': 'aspen_bark_dried_strips', 'ipfsCID': 'QmbjJfVZqNA1ox5gJsNGkQsyvaEC2mfwReZ4GnevubxdTi', 'active': True, 'tx_hash': 'b9abb9e3f597518e95959ef9517583f853ab122cce5dc3d1e80e56f10fc6e7bf'}, {'id': 'lions_mane_powder', 'ipfsCID': 'QmNqWF8AbWaq8zizvo3EhfrVTJxY1yseuq3p9UmWWYUKYp', 'active': True, 'tx_hash': 'b25e1587713e3ef9489c7df9b9588b7c1e559a134f3dbbe594fee89c480fdc68'}, {'id': "Lion's Mane mushroom — whole dried", 'ipfsCID': 'QmdTAvmydVok9HYDz4ivXYCWzbyi5aAZgjxzjhjQGPad5c', 'active': True, 'tx_hash': 'dcc31951bc2192e6e6a0425da4d85a81eadf25510cf3f49d1487502526212fad'}]
+2025-09-26 23:21:59,567 - INFO - __main__ - ✅ Процесс успешно завершен!
+2025-09-26 23:21:59,567 - INFO - __main__ - ✨ Процесс успешно завершен

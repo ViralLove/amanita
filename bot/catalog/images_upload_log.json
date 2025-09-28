@@ -4,8 +4,16 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 2.104671001434326,
+    "upload_time": 12.798089027404785,
     "cid": "QmTU5LpEp2qDBpCiWnZHEDuUK7BES3gm8wNWihn7ShqjAv"
+  },
+  "orders_cart.json": {
+    "size": 289,
+    "mime_type": "application/json",
+    "status": "failed",
+    "error": "Недопустимый тип файла: application/json",
+    "upload_time": 0,
+    "cid": null
   },
   "upload_log.csv": {
     "size": 1409,
@@ -28,7 +36,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 1.3926539421081543,
+    "upload_time": 12.628530979156494,
     "cid": "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1"
   },
   "Iveta_catalog.original.csv": {
@@ -40,7 +48,7 @@
     "cid": null
   },
   "upload_catalog.log": {
-    "size": 76278,
+    "size": 788967,
     "mime_type": "text/plain",
     "status": "failed",
     "error": "Недопустимый тип файла: text/plain",
@@ -76,7 +84,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 2.244898796081543,
+    "upload_time": 11.76327395439148,
     "cid": "QmT5RC6Q6MRRF3YoDcXmKamKntXT6oSvxk3G2aLDkPc17T"
   },
   "Amanita — Powder.jpeg": {
@@ -84,7 +92,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 1.75374174118042,
+    "upload_time": 12.075058937072754,
     "cid": "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd"
   },
   "Amanita — Tinctura.jpeg": {
@@ -92,7 +100,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 2.0799689292907715,
+    "upload_time": 13.169613122940063,
     "cid": "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa"
   },
   "Foxes.jpeg": {
@@ -100,7 +108,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 1.9618570804595947,
+    "upload_time": 12.566503763198853,
     "cid": "QmNULQzUp3TGVR6mbSEH9WBjbrGGgN3dy6wZF8KYAKNvGa"
   },
   "organic_cid_mapping.json": {
@@ -116,7 +124,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 1.9796421527862549,
+    "upload_time": 12.211564779281616,
     "cid": "QmbtaSzChNvcjXEZZc3PpMXpcwVjpgQ5v1qfktbNGwuZZa"
   },
   "Amanita — LUX.jpeg": {
@@ -124,7 +132,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 3.1732449531555176,
+    "upload_time": 12.305954933166504,
     "cid": "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz"
   },
   "Cordyseps Militaris.jpeg": {
@@ -132,7 +140,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 1.5185961723327637,
+    "upload_time": 12.134245157241821,
     "cid": "QmfYLGvSUq2FEszpyLoyu28PLmeTMXk6zikT3c5W43kshP"
   },
   "Cordyseps Militaris — Powder.jpeg": {
@@ -140,7 +148,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 1.8355259895324707,
+    "upload_time": 12.120792150497437,
     "cid": "QmW25vHA9WA78VENPus3A8Zrn45YeFMjVKWLJwfA5CEfSQ"
   },
   "Kora Osiny.jpeg": {
@@ -148,7 +156,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 1.8822882175445557,
+    "upload_time": 13.039031982421875,
     "cid": "QmZGLPHZxDJP4VRbZbR8CRBY2widf5wMqMvu3rowhJGvCT"
   },
   "Iveta_catalog.csv": {
@@ -164,7 +172,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 2.1018428802490234,
+    "upload_time": 12.410582780838013,
     "cid": "QmeR4vHpCm6eiWnMkJGARA8WLUNc8jWWEq3L5bhJGNfWFW"
   },
   "Amanita — Collapsed hats.jpeg": {
@@ -172,7 +180,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 2.193471908569336,
+    "upload_time": 13.205536842346191,
     "cid": "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B"
   },
   "catalog1.json": {
@@ -184,7 +192,7 @@
     "cid": null
   },
   "active_catalog.json": {
-    "size": 9509,
+    "size": 12213,
     "mime_type": "application/json",
     "status": "failed",
     "error": "Недопустимый тип файла: application/json",
@@ -196,7 +204,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 1.851717233657837,
+    "upload_time": 11.860943078994751,
     "cid": "QmQxwESeMcEAc8VcYjd5ZQQwkaubp11vKo3kkJkx8SsTfn"
   },
   "Iveta_catalog_structured.csv": {
@@ -212,7 +220,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 2.0939548015594482,
+    "upload_time": 12.725052118301392,
     "cid": "QmaUhzH11vG9aEH9MTpLHaVuBFMDPTXC9AcwcGBVoy2S5c"
   },
   "images_upload_log.csv": {
@@ -228,11 +236,11 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 2.344325065612793,
+    "upload_time": 13.082517147064209,
     "cid": "QmXzbH3aeiyYyn5b4YSHe2kvNCQuUXtMngL91MeVjHH3vJ"
   },
   "images_upload_log.json": {
-    "size": 6990,
+    "size": 6986,
     "mime_type": "application/json",
     "status": "failed",
     "error": "Недопустимый тип файла: application/json",
@@ -244,7 +252,7 @@
     "mime_type": "image/jpeg",
     "status": "success",
     "error": null,
-    "upload_time": 1.5948851108551025,
+    "upload_time": 13.072366952896118,
     "cid": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj"
   }
 }

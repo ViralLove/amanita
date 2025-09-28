@@ -248,6 +248,27 @@ npx hardhat run scripts/deploy_full.js --network localhost 5 SoulMetadata
 npx hardhat run scripts/deploy_full.js --network localhost 5 SoulIdentity
 ```
 
+#### `10` - Диагностика состояния селлера
+```bash
+# Способ 1 - через переменную окружения (использует SELLER_ADDRESS)
+DEPLOY_ACTION=10 npx hardhat run scripts/deploy_full.js --network polygon
+
+# Способ 2 - через аргументы командной строки
+npx hardhat run scripts/deploy_full.js --network polygon 10
+```
+**Описание:** Полная диагностика состояния селлера из .env
+**Функциональность:**
+- Проверка активации пользователя в SpiralEngine
+- Проверка ролей (SELLER_ROLE, ACTIVATOR_ROLE)
+- Получение и сохранение инвайтов селлера в файл
+- Проверка каталога продуктов (количество, активность)
+- Итоговая оценка готовности селлера (0-100%)
+**Результат:** 
+- Подробный отчет о состоянии селлера
+- Сохранение инвайтов в `bot/flowers/{SELLER_ADDRESS}_invites.txt`
+- Оценка готовности к работе
+**Использование:** Диагностика проблем, проверка готовности селлера
+
 #### `11` - Генерация инвайтов для активного селлера
 ```bash
 # Способ 1 - через переменную окружения (12 инвайтов по умолчанию)
@@ -285,6 +306,29 @@ npx hardhat run scripts/deploy_full.js --network localhost 12 <SELLER_ADDRESS>
 **Результат:** Сохраняет данные в `bot/catalog_data/catalog_{SELLER_ADDRESS}_{timestamp}.json`
 **Использование:** Отладка проблем валидации, анализ данных каталога
 
+#### `13` - Диагностика состояния селлера
+```bash
+# Способ 1 - через переменную окружения (использует SELLER_ADDRESS)
+DEPLOY_ACTION=13 npx hardhat run scripts/deploy_full.js --network polygon
+
+# Способ 2 - через аргументы командной строки (указать адрес продавца)
+npx hardhat run scripts/deploy_full.js --network polygon 13 <SELLER_ADDRESS>
+```
+**Описание:** Полная диагностика состояния селлера из .env
+**Параметры:**
+- `SELLER_ADDRESS`: адрес продавца (если не указан, используется SELLER_ADDRESS из .env)
+**Функциональность:**
+- Проверка активации пользователя в SpiralEngine
+- Проверка ролей (SELLER_ROLE, ACTIVATOR_ROLE)
+- Получение и сохранение инвайтов селлера в файл
+- Проверка каталога продуктов (количество, активность)
+- Итоговая оценка готовности селлера (0-100%)
+**Результат:** 
+- Подробный отчет о состоянии селлера
+- Сохранение инвайтов в `bot/flowers/{SELLER_ADDRESS}_invites.txt`
+- Оценка готовности к работе
+**Использование:** Диагностика проблем, проверка готовности селлера
+
 ### Действия с каталогом
 
 #### `40` - Создание каталога (альтернатива action 4)
@@ -312,6 +356,8 @@ npx hardhat run scripts/deploy_full.js --network localhost 41
 ```bash
 # Способ 1 - через переменные окружения (рекомендуется)
 DEPLOY_ACTION=888 DEPLOYER_INVITE=<deployerInvite> SELLER_ADDRESS=<sellerAddress> npx hardhat run scripts/deploy_full.js --network localhost
+
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-NYIP-9NBN npx hardhat run scripts/deploy_full.js --network polygon
 
 # Способ 2 - через аргументы командной строки
 npx hardhat run scripts/deploy_full.js --network localhost 888 <deployerInvite> <sellerAddress> [catalogData]
