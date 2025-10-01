@@ -32,11 +32,17 @@ AMANITA_REGISTRY_CONTRACT_ADDRESS=0x...
 INVITE_NFT_CONTRACT_ADDRESS=0x...
 PRODUCT_REGISTRY_CONTRACT_ADDRESS=0x...
 
-# SBT экосистема (новая)
+# SBT экосистема
 SOULBOUND_CORE_CONTRACT_ADDRESS=0x...
 SOUL_METADATA_CONTRACT_ADDRESS=0x...
 SOUL_RECOVERY_CONTRACT_ADDRESS=0x...
 SOUL_INTEGRATION_CONTRACT_ADDRESS=0x...
+SOUL_IDENTITY_CONTRACT_ADDRESS=0x...
+
+# Localization System (3-Contract Architecture)
+AMANITA_INTERNATIONAL_PROXY_ADDRESS=0x...      # Точка входа (используйте этот!)
+AMANITA_INTERNATIONAL_STORAGE_ADDRESS=0x...    # Хранилище данных
+AMANITA_INTERNATIONAL_LOGIC_V1_ADDRESS=0x...   # Текущая логика
 
 # Экосистема Amanita
 LOVE_DO_POST_NFT_CONTRACT_ADDRESS=0x...
@@ -139,12 +145,13 @@ npx hardhat run scripts/deploy_full.js --network localhost 1
 ```
 **Описание:** Деплоит все контракты и настраивает связи между ними
 **Включает:**
-- AmanitaRegistry
-- SpiralEngine (заменил InviteNFT)
-- ProductRegistry
-- SoulIdentity (SBT мост)
-- Настройка ролей
-- Регистрация в реестре
+- AmanitaRegistry (реестр контрактов)
+- SpiralEngine (система инвайтов)
+- ProductRegistry (каталог продуктов)
+- SBT экосистема (5 контрактов: Core, Metadata, Recovery, Integration, Identity)
+- **AmanitaInternational (3-контрактная архитектура для локализации)**
+- Настройка ролей и связей
+- Регистрация всех контрактов в реестре
 
 #### `2` - Деплой контрактов с обновлением реестра
 ```bash
@@ -219,6 +226,11 @@ npx hardhat run scripts/deploy_full.js --network localhost 5 <CONTRACT_NAME>
 - `SoulRecovery` - Система восстановления SBT
 - `SoulIntegration` - Интеграция с SpiralEngine
 - `SoulIdentity` - Мост между SpiralEngine и SBT экосистемой
+
+#### Localization System (3-Contract Architecture)
+- `AmanitaInternationalProxy` - Точка входа для мультиязычной системы (фиксированный адрес)
+- `AmanitaInternationalStorage` - Персистентное хранилище CID маппингов
+- `AmanitaInternationalLogicV1` - Бизнес-логика управления переводами
 
 #### Mock контракты для тестирования
 - `MockSpiralEngine` - Mock для тестирования интеграции
@@ -357,7 +369,7 @@ npx hardhat run scripts/deploy_full.js --network localhost 41
 # Способ 1 - через переменные окружения (рекомендуется)
 DEPLOY_ACTION=888 DEPLOYER_INVITE=<deployerInvite> SELLER_ADDRESS=<sellerAddress> npx hardhat run scripts/deploy_full.js --network localhost
 
-DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-NYIP-9NBN npx hardhat run scripts/deploy_full.js --network polygon
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-EMW4-GA76 npx hardhat run scripts/deploy_full.js --network polygon
 
 # Способ 2 - через аргументы командной строки
 npx hardhat run scripts/deploy_full.js --network localhost 888 <deployerInvite> <sellerAddress> [catalogData]
@@ -430,6 +442,17 @@ npx hardhat run scripts/deploy_full.js --network localhost 888 AMANITA-29NV-YTBS
 | `SoulMetadata` | SoulboundCore | Нет | Динамические метаданные SBT |
 | `SoulRecovery` | SoulboundCore | Нет | Система восстановления SBT |
 | `SoulIntegration` | SoulboundCore | Нет | Интеграция с SpiralEngine |
+| `SoulIdentity` | SoulboundCore, SoulMetadata | Да | Мост между SpiralEngine и SBT |
+
+##### Localization System (3-Contract Architecture)
+
+| Контракт | Зависимости | Настройка ролей | Описание |
+|----------|-------------|-----------------|----------|
+| `AmanitaInternationalProxy` | Storage, LogicV1 | Да (ADMIN_ROLE, UPGRADER_ROLE) | Точка входа (фиксированный адрес) |
+| `AmanitaInternationalStorage` | Нет | Да (PROXY_ROLE для Proxy) | Персистентное хранилище CID |
+| `AmanitaInternationalLogicV1` | Storage | Нет (stateless) | Бизнес-логика управления переводами |
+
+**⚠️ Важно:** Все 3 контракта деплоятся автоматически через `AmanitaInternationalProxy`!
 
 ##### Mock контракты
 
@@ -484,6 +507,19 @@ node deploy_full.js 5 SoulRecovery
 
 # Деплой интеграции с SpiralEngine (требует SoulboundCore)
 node deploy_full.js 5 SoulIntegration
+
+# Деплой SoulIdentity (мост с SpiralEngine)
+node deploy_full.js 5 SoulIdentity
+```
+
+##### Localization System (3-Contract Architecture)
+
+```bash
+# Деплой AmanitaInternational (деплоит все 3 контракта автоматически!)
+node deploy_full.js 5 AmanitaInternationalProxy
+
+# ПРИМЕЧАНИЕ: Storage и LogicV1 НЕ деплоятся отдельно!
+# Они автоматически создаются при деплое Proxy
 ```
 
 ##### Mock контракты для тестирования
@@ -632,7 +668,34 @@ DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost Soulb
 # npx hardhat run scripts/deploy_full.js --network localhost 5 SoulboundCore
 ```
 
-### Сценарий 5: Деплой mock контрактов для тестирования
+### Сценарий 5: Деплой AmanitaInternational (Localization System)
+```bash
+# Полный деплой экосистемы (включая AmanitaInternational)
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network polygon
+
+# ИЛИ отдельный деплой AmanitaInternational
+CONTRACT_NAME=AmanitaInternationalProxy npx hardhat run scripts/deploy_full.js 5 --network polygon
+
+# Результат в логах:
+# === 🌐 Деплой AmanitaInternational (3-контрактная архитектура) ===
+# 📦 Шаг 1/4: Деплой AmanitaInternationalStorage...
+# ✅ Storage deployed: 0xBBBB...
+# ⚙️ Шаг 2/4: Деплой AmanitaInternationalLogicV1...
+# ✅ LogicV1 deployed: 0xCCCC...
+# 🔗 Шаг 3/4: Деплой AmanitaInternationalProxy...
+# ✅ Proxy deployed: 0xAAAA...
+# 🔐 Шаг 4/4: Авторизация Proxy в Storage...
+# ✅ Proxy authorized in Storage with PROXY_ROLE
+# 📝 AmanitaInternational (Proxy) зарегистрирован в реестре
+```
+
+**Важно:**
+- Все 3 контракта деплоятся автоматически одной командой
+- Proxy получает PROXY_ROLE в Storage для записи данных
+- В MagicRegistry регистрируется только Proxy (точка входа)
+- Используйте только AMANITA_INTERNATIONAL_PROXY_ADDRESS для работы
+
+### Сценарий 6: Деплой mock контрактов для тестирования
 ```bash
 # Деплой mock контрактов (способ 1 - через переменную окружения)
 DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost MockSpiralEngine

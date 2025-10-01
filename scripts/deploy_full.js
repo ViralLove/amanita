@@ -396,8 +396,13 @@ async function main(action) {
       console.log("\n🔷 Обрабатываем ProductRegistry...");
       productRegistry = await deploySingleContract("ProductRegistry", magicRegistry);
       
+      // Деплой AmanitaInternational (3-contract architecture)
+      console.log("\n🔷 Обрабатываем AmanitaInternational...");
+      const amanitaInternational = await deployAmanitaInternational();
+      
       console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
       console.log("☀️ Адрес ProductRegistry:", productRegistry.options.address);
+      console.log("☀️ Адрес AmanitaInternational Proxy:", amanitaInternational.proxy.options.address);
       
     }
     
@@ -683,6 +688,29 @@ async function main(action) {
       } catch (error) {
         // Игнорируем ошибки если SBT контракты не задеплоены
       }
+      
+      // Добавляем AmanitaInternational адреса если они были задеплоены
+      try {
+        const amanitaInternationalAddress = await magicRegistry.methods.get("AmanitaInternational").call();
+        
+        if (amanitaInternationalAddress !== "0x0000000000000000000000000000000000000000") {
+          console.log("\n🌐 Localization System (3-Contract Architecture):");
+          console.log("AMANITA_INTERNATIONAL_PROXY_ADDRESS=" + amanitaInternationalAddress);
+          
+          // Пытаемся получить адреса Storage и Logic из Proxy
+          const proxyContract = await loadContract("AmanitaInternationalProxy", amanitaInternationalAddress);
+          try {
+            const storageAddress = await proxyContract.methods.storageContract().call();
+            const logicAddress = await proxyContract.methods.currentLogic().call();
+            console.log("AMANITA_INTERNATIONAL_STORAGE_ADDRESS=" + storageAddress);
+            console.log("AMANITA_INTERNATIONAL_LOGIC_V1_ADDRESS=" + logicAddress);
+          } catch (e) {
+            console.log("⚠️ Не удалось получить адреса Storage/Logic из Proxy");
+          }
+        }
+      } catch (error) {
+        // Игнорируем ошибки если AmanitaInternational не задеплоен
+      }
     }
     
     // Выводим адрес задеплоенного контракта для action 5
@@ -755,6 +783,20 @@ const SUPPORTED_CONTRACTS = {
     'SoulIdentity': {
         dependencies: ['SoulboundCore', 'SoulMetadata'],
         needsSetup: true
+    },
+    // 🌐 Localization System (3-contract architecture)
+    'AmanitaInternationalProxy': {
+        dependencies: ['AmanitaInternationalStorage', 'AmanitaInternationalLogicV1'],
+        needsSetup: true,
+        is3ContractArchitecture: true
+    },
+    'AmanitaInternationalStorage': {
+        dependencies: [],
+        needsSetup: false
+    },
+    'AmanitaInternationalLogicV1': {
+        dependencies: ['AmanitaInternationalStorage'],
+        needsSetup: false
     }
 };
 
@@ -772,8 +814,71 @@ const CONTRACT_ENV_MAPPING = {
     'SoulMetadata': 'SOUL_METADATA_CONTRACT_ADDRESS',
     'SoulRecovery': 'SOUL_RECOVERY_CONTRACT_ADDRESS',
     'SoulIntegration': 'SOUL_INTEGRATION_CONTRACT_ADDRESS',
-    'SoulIdentity': 'SOUL_IDENTITY_CONTRACT_ADDRESS'
+    'SoulIdentity': 'SOUL_IDENTITY_CONTRACT_ADDRESS',
+    // 🌐 Localization System (3-contract architecture)
+    'AmanitaInternationalProxy': 'AMANITA_INTERNATIONAL_PROXY_ADDRESS',
+    'AmanitaInternationalStorage': 'AMANITA_INTERNATIONAL_STORAGE_ADDRESS',
+    'AmanitaInternationalLogicV1': 'AMANITA_INTERNATIONAL_LOGIC_V1_ADDRESS'
 };
+
+/**
+ * Деплой 3-контрактной архитектуры AmanitaInternational
+ * @returns {Object} { proxy, logic, storage } - Экземпляры всех 3 контрактов
+ */
+async function deployAmanitaInternational() {
+    console.log("\n=== 🌐 Деплой AmanitaInternational (3-контрактная архитектура) ===");
+    
+    // Шаг 1: Деплой Storage
+    console.log("\n📦 Шаг 1/4: Деплой AmanitaInternationalStorage...");
+    const storage = await deployContract("AmanitaInternationalStorage", [deployerAccount.address]);
+    console.log(`✅ Storage deployed: ${storage.options.address}`);
+    
+    // Шаг 2: Деплой Logic с immutable storage адресом
+    console.log("\n⚙️ Шаг 2/4: Деплой AmanitaInternationalLogicV1...");
+    const logic = await deployContract("AmanitaInternationalLogicV1", [storage.options.address]);
+    console.log(`✅ LogicV1 deployed: ${logic.options.address}`);
+    
+    // Шаг 3: Деплой Proxy
+    console.log("\n🔗 Шаг 3/4: Деплой AmanitaInternationalProxy...");
+    const proxy = await deployContract("AmanitaInternationalProxy", [
+        deployerAccount.address,  // admin
+        logic.options.address,    // initialLogic
+        storage.options.address   // storageContract
+    ]);
+    console.log(`✅ Proxy deployed: ${proxy.options.address}`);
+    
+    // Шаг 4: Авторизация Proxy в Storage
+    console.log("\n🔐 Шаг 4/4: Авторизация Proxy в Storage...");
+    const gasPrice = network === 'polygon' ? 
+        web3.utils.toWei('100', 'gwei') : 
+        await web3.eth.getGasPrice();
+    
+    await storage.methods.authorizeProxyContract(proxy.options.address).send({
+        from: deployerAccount.address,
+        gas: network === 'polygon' ? 500000 : 300000,
+        gasPrice: gasPrice
+    });
+    console.log(`✅ Proxy authorized in Storage with PROXY_ROLE`);
+    
+    // Регистрация в MagicRegistry (только Proxy - точка входа)
+    if (magicRegistry) {
+        console.log("\n📝 Регистрируем AmanitaInternational в MagicRegistry...");
+        await registerContractInRegistry("AmanitaInternational", proxy);
+        console.log(`✅ AmanitaInternational (Proxy) зарегистрирован в реестре`);
+    }
+    
+    // Итоговая информация
+    console.log("\n=== ✅ AmanitaInternational 3-Contract Architecture Deployed ===");
+    console.log(`📍 Proxy (Entry Point): ${proxy.options.address}`);
+    console.log(`⚙️ Logic V1: ${logic.options.address}`);
+    console.log(`📦 Storage: ${storage.options.address}`);
+    console.log("\n⭐️ Для .env добавьте:");
+    console.log(`AMANITA_INTERNATIONAL_PROXY_ADDRESS=${proxy.options.address}`);
+    console.log(`AMANITA_INTERNATIONAL_STORAGE_ADDRESS=${storage.options.address}`);
+    console.log(`AMANITA_INTERNATIONAL_LOGIC_V1_ADDRESS=${logic.options.address}`);
+    
+    return { proxy, logic, storage };
+}
 
 /**
  * Проверяет существование контракта в .env и валидирует его
@@ -953,10 +1058,18 @@ async function deploySingleContract(contractName, registryInstance = null) {
             soulboundCore.options.address,
             soulMetadata.options.address
         ]);
+    } else if (contractName === 'AmanitaInternationalProxy') {
+        // 🌐 Специальная обработка для 3-контрактной архитектуры
+        console.log("🌐 Деплой 3-контрактной архитектуры AmanitaInternational...");
+        const result = await deployAmanitaInternational();
+        contractInstance = result.proxy; // Возвращаем Proxy как основной контракт
+    } else if (contractName === 'AmanitaInternationalStorage' || contractName === 'AmanitaInternationalLogicV1') {
+        // Эти контракты не деплоятся отдельно - только через AmanitaInternationalProxy
+        throw new Error(`${contractName} не может быть задеплоен отдельно. Используйте AmanitaInternationalProxy для деплоя всей архитектуры.`);
     }
     
-    // 6. Регистрация в реестре (кроме самого реестра)
-    if (contractName !== 'MagicRegistry') {
+    // 6. Регистрация в реестре (кроме самого реестра и компонентов 3-контрактной архитектуры)
+    if (contractName !== 'MagicRegistry' && contractName !== 'AmanitaInternationalProxy') {
         await registerContractInRegistry(contractName, contractInstance, registryInstance);
         console.log(`📝 Контракт ${contractName} доступен в реестре под ключом "${contractName}"`);
     }
