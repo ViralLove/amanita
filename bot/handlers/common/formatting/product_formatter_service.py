@@ -1,11 +1,12 @@
 """
 Сервис форматирования продуктов для Telegram.
-Реализует интерфейс IProductFormatter с поддержкой конфигурации.
+Реализует интерфейс IProductFormatter с поддержкой конфигурации и мультиязычности.
 """
 
 import logging
 from typing import Dict, Any, Optional, List
 from services.common.localization import Localization
+from services.common.localization_service import LocalizationService
 from .product_formatter_interface import IProductFormatter
 from .product_formatter_config import ProductFormatterConfig
 from .section_tracker import SectionTracker, SectionTypes
@@ -22,14 +23,16 @@ class ProductFormatterService(IProductFormatter):
     - Расширяемость для различных стратегий
     """
     
-    def __init__(self, config: Optional[ProductFormatterConfig] = None):
+    def __init__(self, config: Optional[ProductFormatterConfig] = None, localization_service: Optional[LocalizationService] = None):
         """
         Инициализация сервиса форматирования.
         
         Args:
             config: Конфигурация форматирования (если не указана, используется по умолчанию)
+            localization_service: Сервис локализации для мультиязычности
         """
         self.config = config or ProductFormatterConfig()
+        self.localization_service = localization_service
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(self.config.logging_level)
         
@@ -712,3 +715,133 @@ class ProductFormatterService(IProductFormatter):
         """
         from dataclasses import replace
         return replace(self.config, **kwargs)
+    
+    def _get_localized_text(self, key: str, default: str = None, **kwargs) -> str:
+        """
+        Получает локализованный текст с поддержкой мультиязычности
+        
+        Args:
+            key: Ключ перевода
+            default: Значение по умолчанию
+            **kwargs: Параметры для подстановки
+            
+        Returns:
+            str: Локализованный текст
+        """
+        try:
+            if self.localization_service:
+                return self.localization_service.t(key, default, **kwargs)
+            else:
+                # Fallback на базовую локализацию
+                return default or key
+        except Exception as e:
+            self.logger.error(f"[ProductFormatterService] Ошибка получения локализации для ключа '{key}': {e}")
+            return default or key
+    
+    def _get_product_title(self, product: Any, loc: Localization) -> str:
+        """
+        Получает локализованное название продукта
+        
+        Args:
+            product: Объект продукта
+            loc: Объект локализации
+            
+        Returns:
+            str: Локализованное название
+        """
+        try:
+            business_id = getattr(product, 'business_id', getattr(product, 'id', 'unknown'))
+            
+            # Пытаемся получить локализованное название
+            if self.localization_service:
+                localized_title = self.localization_service.t(f'product.{business_id}.title', **kwargs)
+                if localized_title and localized_title != f'product.{business_id}.title':
+                    return localized_title
+            
+            # Fallback на оригинальное название
+            return getattr(product, 'title', 'Продукт')
+            
+        except Exception as e:
+            self.logger.error(f"[ProductFormatterService] Ошибка получения названия продукта: {e}")
+            return getattr(product, 'title', 'Продукт')
+    
+    def _get_product_description(self, product: Any, loc: Localization) -> str:
+        """
+        Получает локализованное описание продукта
+        
+        Args:
+            product: Объект продукта
+            loc: Объект локализации
+            
+        Returns:
+            str: Локализованное описание
+        """
+        try:
+            business_id = getattr(product, 'business_id', getattr(product, 'id', 'unknown'))
+            
+            # Пытаемся получить локализованное описание
+            if self.localization_service:
+                localized_description = self.localization_service.t(f'product.{business_id}.description', **kwargs)
+                if localized_description and localized_description != f'product.{business_id}.description':
+                    return localized_description
+            
+            # Fallback на оригинальное описание
+            return getattr(product, 'description', 'Описание недоступно')
+            
+        except Exception as e:
+            self.logger.error(f"[ProductFormatterService] Ошибка получения описания продукта: {e}")
+            return getattr(product, 'description', 'Описание недоступно')
+    
+    def _get_component_name(self, component: Any, loc: Localization) -> str:
+        """
+        Получает локализованное название компонента
+        
+        Args:
+            component: Объект компонента
+            loc: Объект локализации
+            
+        Returns:
+            str: Локализованное название
+        """
+        try:
+            biounit_id = getattr(component, 'biounit_id', getattr(component, 'id', 'unknown'))
+            
+            # Пытаемся получить локализованное название
+            if self.localization_service:
+                localized_name = self.localization_service.t(f'component.{biounit_id}.name', **kwargs)
+                if localized_name and localized_name != f'component.{biounit_id}.name':
+                    return localized_name
+            
+            # Fallback на оригинальное название
+            return getattr(component, 'name', 'Компонент')
+            
+        except Exception as e:
+            self.logger.error(f"[ProductFormatterService] Ошибка получения названия компонента: {e}")
+            return getattr(component, 'name', 'Компонент')
+    
+    def _get_component_description(self, component: Any, loc: Localization) -> str:
+        """
+        Получает локализованное описание компонента
+        
+        Args:
+            component: Объект компонента
+            loc: Объект локализации
+            
+        Returns:
+            str: Локализованное описание
+        """
+        try:
+            biounit_id = getattr(component, 'biounit_id', getattr(component, 'id', 'unknown'))
+            
+            # Пытаемся получить локализованное описание
+            if self.localization_service:
+                localized_description = self.localization_service.t(f'component.{biounit_id}.description', **kwargs)
+                if localized_description and localized_description != f'component.{biounit_id}.description':
+                    return localized_description
+            
+            # Fallback на оригинальное описание
+            return getattr(component, 'description', 'Описание недоступно')
+            
+        except Exception as e:
+            self.logger.error(f"[ProductFormatterService] Ошибка получения описания компонента: {e}")
+            return getattr(component, 'description', 'Описание недоступно')

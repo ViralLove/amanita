@@ -1,0 +1,81 @@
+acceptance_criteria:
+  - name: "localization_service_creation"
+    description: "Создан LocalizationService как универсальный сервис локализации"
+    test: "Создан класс LocalizationService в bot/services/common/localization_service.py"
+    priority: "high"
+    quality_gates:
+      - "Класс наследуется от существующего Localization"
+      - "Поддерживает интерфейсные переводы (существующая функциональность)"
+      - "Поддерживает переводы продуктов (новая функциональность)"
+      - "Поддерживает переводы компонентов (новая функциональность)"
+      - "Имеет универсальный метод t() для всех типов переводов"
+
+  - name: "interface_localization_preservation"
+    description: "Сохранена существующая функциональность интерфейсных переводов"
+    test: "Все существующие тесты локализации проходят без изменений"
+    priority: "high"
+    quality_gates:
+      - "Метод t() работает с существующими ключами интерфейса"
+      - "Загрузка JSON файлов из bot/templates/ работает"
+      - "Fallback на ключ при отсутствии перевода работает"
+      - "Логирование работает как раньше"
+
+  - name: "product_localization_support"
+    description: "Добавлена поддержка локализации продуктов"
+    test: "LocalizationService может получать переводы продуктов по business_id"
+    priority: "high"
+    quality_gates:
+      - "Метод get_product_translation(business_id, language, field) работает"
+      - "Поддерживает ключи типа 'product.{business_id}.{field}'"
+      - "Возвращает fallback при отсутствии перевода"
+      - "Интегрируется с ProductFormatterService"
+
+  - name: "component_localization_support"
+    description: "Добавлена поддержка локализации компонентов"
+    test: "LocalizationService может получать переводы компонентов по biounit_id"
+    priority: "high"
+    quality_gates:
+      - "Метод get_component_translation(biounit_id, language, field) работает"
+      - "Поддерживает ключи типа 'component.{biounit_id}.{field}'"
+      - "Возвращает fallback при отсутствии перевода"
+      - "Интегрируется с ProductFormatterService"
+
+  - name: "unified_translation_api"
+    description: "Создан универсальный API для всех типов переводов"
+    test: "Метод t() работает с ключами interface.*, product.*, component.*"
+    priority: "high"
+    quality_gates:
+      - "Автоматическое определение типа перевода по префиксу ключа"
+      - "Единообразное поведение для всех типов переводов"
+      - "Поддержка параметров в переводах (kwargs)"
+      - "Логирование всех запросов переводов"
+
+  - name: "backward_compatibility"
+    description: "Обеспечена обратная совместимость с существующим кодом"
+    test: "Все существующие вызовы loc.t() работают без изменений"
+    priority: "high"
+    quality_gates:
+      - "Существующий код не требует изменений"
+      - "API LocalizationService совместим с Localization"
+      - "Производительность не хуже существующей"
+      - "Логирование работает как раньше"
+
+  - name: "error_handling"
+    description: "Реализована обработка ошибок и fallback стратегии"
+    test: "Система gracefully обрабатывает ошибки загрузки переводов"
+    priority: "medium"
+    quality_gates:
+      - "При ошибке загрузки продукта возвращается fallback"
+      - "При ошибке загрузки компонента возвращается fallback"
+      - "Логируются все ошибки с контекстом"
+      - "Система не падает при отсутствии переводов"
+
+  - name: "performance_requirements"
+    description: "Обеспечена производительность не хуже существующей"
+    test: "Время отклика t() не превышает 10ms для интерфейсных переводов"
+    priority: "medium"
+    quality_gates:
+      - "Интерфейсные переводы загружаются < 1ms"
+      - "Продукты и компоненты загружаются < 10ms"
+      - "Кэширование работает эффективно"
+      - "Память используется оптимально"
