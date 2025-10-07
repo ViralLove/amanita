@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./AmanitaInternationalStorage.sol";
 
 /**
@@ -15,23 +16,48 @@ import "./AmanitaInternationalStorage.sol";
  * - AccessControl роли проверяются в Proxy через delegatecall контекст
  * - При обновлении меняется только Logic, Storage остается
  * 
- * Версия: 1.0.0
+ * Версия: 1.0.1
  * - Базовые операции: set/get/remove/batch
  * - Управление простыми и сложными полями
  * - Интеграция со Storage через LOGIC_ROLE
+ * - Security: ReentrancyGuard добавлен (v1.0.1)
  */
-contract AmanitaInternationalLogicV1 {
+contract AmanitaInternationalLogicV1 is ReentrancyGuard {
     
     // === ВЕРСИОНИРОВАНИЕ ===
     
     /// @notice Версия Logic контракта
-    string public constant VERSION = "1.0.0";
+    string public constant VERSION = "1.0.1";
     uint256 public constant LOGIC_VERSION = 1;
     
     // === РОЛИ (для совместимости с Proxy) ===
     
     /// @notice Роль администратора для управления переводами
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    
+    // === CUSTOM ERRORS ===
+    // Custom errors для экономии gas и улучшения читаемости
+    
+    /// @notice Ошибка: field key пустой
+    error EmptyFieldKey();
+    
+    /// @notice Ошибка: CID пустой
+    error EmptyCID();
+    
+    /// @notice Ошибка: class name пустой
+    error EmptyClassName();
+    
+    /// @notice Ошибка: language код пустой
+    error EmptyLanguage();
+    
+    /// @notice Ошибка: длины массивов не совпадают
+    error ArrayLengthMismatch();
+    
+    /// @notice Ошибка: поле не существует
+    error FieldDoesNotExist();
+    
+    /// @notice Ошибка: передан нулевой адрес
+    error ZeroAddress();
     
     // === ССЫЛКИ НА STORAGE ===
     
@@ -78,6 +104,25 @@ contract AmanitaInternationalLogicV1 {
         storageContract = _storageContract;
     }
     
+    // === VALIDATION HELPERS ===
+    // Функции валидации с custom errors (для будущего использования)
+    
+    /**
+     * @dev Проверка ненулевого адреса
+     * @param addr адрес для проверки
+     */
+    function _requireNonZero(address addr) internal pure {
+        if (addr == address(0)) revert ZeroAddress();
+    }
+    
+    /**
+     * @dev Проверка непустой строки
+     * @param str строка для проверки
+     */
+    function _requireNonEmptyString(string memory str) internal pure {
+        if (bytes(str).length == 0) revert EmptyFieldKey();
+    }
+    
     // === ФУНКЦИИ ДЛЯ ПРОСТЫХ ПОЛЕЙ ===
     
     /**
@@ -87,9 +132,9 @@ contract AmanitaInternationalLogicV1 {
      * @dev Роль ADMIN_ROLE проверяется в Proxy через delegatecall
      */
     function setSimpleFieldCID(
-        string memory fieldKey,
-        string memory cid
-    ) external {
+        string calldata fieldKey,
+        string calldata cid
+    ) external nonReentrant {
         require(bytes(fieldKey).length > 0, "AmanitaInternationalLogic: empty field key");
         require(bytes(cid).length > 0, "AmanitaInternationalLogic: empty CID");
         
@@ -104,7 +149,7 @@ contract AmanitaInternationalLogicV1 {
      * @return CID строка
      */
     function getSimpleFieldCID(
-        string memory fieldKey
+        string calldata fieldKey
     ) external view returns (string memory) {
         return AmanitaInternationalStorage(storageContract).getSimpleFieldCID(fieldKey);
     }
@@ -122,7 +167,7 @@ contract AmanitaInternationalLogicV1 {
      * @param fieldKey Ключ поля
      * @return true если поле зарегистрировано
      */
-    function simpleFieldExist(string memory fieldKey) external view returns (bool) {
+    function simpleFieldExist(string calldata fieldKey) external view returns (bool) {
         return AmanitaInternationalStorage(storageContract).simpleFieldExist(fieldKey);
     }
     
@@ -132,8 +177,8 @@ contract AmanitaInternationalLogicV1 {
      * @dev Роль ADMIN_ROLE проверяется в Proxy через delegatecall
      */
     function removeSimpleField(
-        string memory fieldKey
-    ) external {
+        string calldata fieldKey
+    ) external nonReentrant {
         require(
             AmanitaInternationalStorage(storageContract).simpleFieldExist(fieldKey),
             "AmanitaInternationalLogic: field does not exist"
@@ -154,10 +199,10 @@ contract AmanitaInternationalLogicV1 {
      * @dev Роль ADMIN_ROLE проверяется в Proxy через delegatecall
      */
     function setComplexFieldCID(
-        string memory className,
-        string memory language,
-        string memory cid
-    ) external {
+        string calldata className,
+        string calldata language,
+        string calldata cid
+    ) external nonReentrant {
         require(bytes(className).length > 0, "AmanitaInternationalLogic: empty class name");
         require(bytes(language).length > 0, "AmanitaInternationalLogic: empty language");
         require(bytes(cid).length > 0, "AmanitaInternationalLogic: empty CID");
@@ -174,8 +219,8 @@ contract AmanitaInternationalLogicV1 {
      * @return CID строка
      */
     function getComplexFieldCID(
-        string memory className,
-        string memory language
+        string calldata className,
+        string calldata language
     ) external view returns (string memory) {
         return AmanitaInternationalStorage(storageContract).getComplexFieldCID(className, language);
     }
@@ -186,7 +231,7 @@ contract AmanitaInternationalLogicV1 {
      * @return Массив языковых кодов
      */
     function getComplexFieldLanguages(
-        string memory className
+        string calldata className
     ) external view returns (string[] memory) {
         return AmanitaInternationalStorage(storageContract).getComplexFieldLanguages(className);
     }
@@ -206,8 +251,8 @@ contract AmanitaInternationalLogicV1 {
      * @return true если поле зарегистрировано
      */
     function complexFieldExist(
-        string memory className,
-        string memory language
+        string calldata className,
+        string calldata language
     ) external view returns (bool) {
         return AmanitaInternationalStorage(storageContract).complexFieldExist(className, language);
     }
@@ -219,9 +264,9 @@ contract AmanitaInternationalLogicV1 {
      * @dev Роль ADMIN_ROLE проверяется в Proxy через delegatecall
      */
     function removeComplexField(
-        string memory className,
-        string memory language
-    ) external {
+        string calldata className,
+        string calldata language
+    ) external nonReentrant {
         require(
             AmanitaInternationalStorage(storageContract).complexFieldExist(className, language),
             "AmanitaInternationalLogic: field does not exist"
@@ -243,19 +288,22 @@ contract AmanitaInternationalLogicV1 {
     function batchSetSimpleFields(
         string[] memory fieldKeys,
         string[] memory cids
-    ) external {
+    ) external nonReentrant {
         require(fieldKeys.length == cids.length, "AmanitaInternationalLogic: arrays length mismatch");
         require(fieldKeys.length > 0, "AmanitaInternationalLogic: empty arrays");
         
         AmanitaInternationalStorage storage_ = AmanitaInternationalStorage(storageContract);
         
-        for (uint256 i = 0; i < fieldKeys.length; i++) {
+        // Газовая оптимизация: unchecked безопасен для инкремента счетчика цикла
+        for (uint256 i = 0; i < fieldKeys.length;) {
             require(bytes(fieldKeys[i]).length > 0, "AmanitaInternationalLogic: empty field key");
             require(bytes(cids[i]).length > 0, "AmanitaInternationalLogic: empty CID");
             
             storage_.setSimpleFieldCID(fieldKeys[i], cids[i]);
             
             emit SimpleFieldRegistered(fieldKeys[i], cids[i], msg.sender);
+            
+            unchecked { ++i; }
         }
     }
     
@@ -270,7 +318,7 @@ contract AmanitaInternationalLogicV1 {
         string[] memory classNames,
         string[] memory languages,
         string[] memory cids
-    ) external {
+    ) external nonReentrant {
         require(
             classNames.length == languages.length && languages.length == cids.length,
             "AmanitaInternationalLogic: arrays length mismatch"
@@ -279,7 +327,8 @@ contract AmanitaInternationalLogicV1 {
         
         AmanitaInternationalStorage storage_ = AmanitaInternationalStorage(storageContract);
         
-        for (uint256 i = 0; i < classNames.length; i++) {
+        // Газовая оптимизация: unchecked безопасен для инкремента счетчика цикла
+        for (uint256 i = 0; i < classNames.length;) {
             require(bytes(classNames[i]).length > 0, "AmanitaInternationalLogic: empty class name");
             require(bytes(languages[i]).length > 0, "AmanitaInternationalLogic: empty language");
             require(bytes(cids[i]).length > 0, "AmanitaInternationalLogic: empty CID");
@@ -287,6 +336,8 @@ contract AmanitaInternationalLogicV1 {
             storage_.setComplexFieldCID(classNames[i], languages[i], cids[i]);
             
             emit ComplexFieldRegistered(classNames[i], languages[i], cids[i], msg.sender);
+            
+            unchecked { ++i; }
         }
     }
     
