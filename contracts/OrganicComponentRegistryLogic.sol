@@ -298,15 +298,19 @@ contract OrganicComponentRegistryLogic is
 
     /// @notice Модификатор: валидация business_id
     modifier validBusinessId(string memory businessId) {
-        require(bytes(businessId).length > 0, "OrganicComponentRegistryLogic: business ID cannot be empty");
-        require(bytes(businessId).length <= MAX_BUSINESS_ID_LENGTH, "OrganicComponentRegistryLogic: business ID too long");
+        // Газовая оптимизация: кэшируем bytes().length
+        uint256 len = bytes(businessId).length;
+        require(len > 0, "OrganicComponentRegistryLogic: business ID cannot be empty");
+        require(len <= MAX_BUSINESS_ID_LENGTH, "OrganicComponentRegistryLogic: business ID too long");
         _;
     }
 
     /// @notice Модификатор: валидация IPFS CID
     modifier validCID(string memory cid) {
-        require(bytes(cid).length > 0, "OrganicComponentRegistryLogic: CID cannot be empty");
-        require(bytes(cid).length <= MAX_CID_LENGTH, "OrganicComponentRegistryLogic: CID too long");
+        // Газовая оптимизация: кэшируем bytes().length
+        uint256 len = bytes(cid).length;
+        require(len > 0, "OrganicComponentRegistryLogic: CID cannot be empty");
+        require(len <= MAX_CID_LENGTH, "OrganicComponentRegistryLogic: CID too long");
         _;
     }
 
@@ -380,8 +384,8 @@ contract OrganicComponentRegistryLogic is
      * @return componentId Уникальный ID созданного компонента в блокчейне.
      */
     function createComponent(
-        string memory businessId,
-        string memory rootMetadataCID
+        string calldata businessId,
+        string calldata rootMetadataCID
     ) external whenNotPaused nonReentrant onlyActivatedUser onlySeller validBusinessId(businessId) validCID(rootMetadataCID) returns (uint256 componentId) {
 
         // Проверяем уникальность business_id
@@ -393,7 +397,10 @@ contract OrganicComponentRegistryLogic is
         // Проверяем лимит компонентов на пользователя
         require(getCreatorComponentCount(realUser) < MAX_COMPONENTS_PER_USER, "OrganicComponentRegistryLogic: component limit exceeded");
 
-        componentId = ++totalComponents;
+        // Газовая оптимизация: unchecked безопасен, т.к. переполнение uint256 невозможно
+        unchecked {
+            componentId = ++totalComponents;
+        }
 
         // Сохраняем данные напрямую (при delegatecall это данные Proxy)
         components[componentId] = Component({
@@ -420,7 +427,7 @@ contract OrganicComponentRegistryLogic is
      */
     function updateComponent(
         uint256 componentId,
-        string memory newRootMetadataCID
+        string calldata newRootMetadataCID
     ) external whenNotPaused nonReentrant onlyComponentCreator(componentId) validCID(newRootMetadataCID) {
         require(componentId > 0 && componentId <= totalComponents, "OrganicComponentRegistryLogic: component not found");
 
@@ -447,7 +454,7 @@ contract OrganicComponentRegistryLogic is
      * @param businessId Уникальный текстовый ID компонента.
      * @return Component Структура компонента.
      */
-    function getComponentByBusinessId(string memory businessId) external view returns (Component memory) {
+    function getComponentByBusinessId(string calldata businessId) external view returns (Component memory) {
         uint256 componentId = businessIdToComponentId[businessId];
         require(componentId > 0, "OrganicComponentRegistryLogic: component not found");
         return components[componentId];
@@ -458,7 +465,7 @@ contract OrganicComponentRegistryLogic is
      * @param businessId Уникальный текстовый ID компонента.
      * @return bool True, если компонент существует.
      */
-    function componentExists(string memory businessId) external view returns (bool) {
+    function componentExists(string calldata businessId) external view returns (bool) {
         return businessIdToComponentId[businessId] > 0;
     }
 
@@ -557,8 +564,8 @@ contract OrganicComponentRegistryLogic is
     // TODO: Реализовать полную функциональность в следующих итерациях
 
     function updateShareableData(
-        string memory featuresCID,
-        string memory componentFormsCID,
+        string calldata featuresCID,
+        string calldata componentFormsCID,
         uint256 featuresVersion,
         uint256 formsVersion
     ) external onlyRole(ADMIN_ROLE) nonReentrant validCID(featuresCID) validCID(componentFormsCID) {
@@ -602,15 +609,18 @@ contract OrganicComponentRegistryLogic is
         revert("OrganicComponentRegistryLogic: validateComponentUpdate not implemented yet");
     }
 
-    function incrementUsageCount(string memory businessId) external nonReentrant {
+    function incrementUsageCount(string calldata businessId) external nonReentrant {
         uint256 componentId = businessIdToComponentId[businessId];
         require(componentId > 0, "OrganicComponentRegistryLogic: component not found");
         
-        componentUsageCount[componentId]++;
+        // Газовая оптимизация: unchecked безопасен, т.к. переполнение uint256 невозможно
+        unchecked {
+            componentUsageCount[componentId]++;
+        }
         emit ComponentUsageIncremented(componentId, businessId, componentUsageCount[componentId]);
     }
 
-    function addComponentUser(string memory businessId, address user) external nonReentrant {
+    function addComponentUser(string calldata businessId, address user) external nonReentrant {
         uint256 componentId = businessIdToComponentId[businessId];
         require(componentId > 0, "OrganicComponentRegistryLogic: component not found");
         require(user != address(0), "OrganicComponentRegistryLogic: invalid user address");
@@ -618,11 +628,13 @@ contract OrganicComponentRegistryLogic is
         // Проверяем, что пользователь еще не добавлен
         uint256[] memory userComponents = componentsByUser[user];
         bool alreadyAdded = false;
-        for (uint256 i = 0; i < userComponents.length; i++) {
+        // Газовая оптимизация: unchecked безопасен для инкремента счетчика цикла
+        for (uint256 i = 0; i < userComponents.length;) {
             if (userComponents[i] == componentId) {
                 alreadyAdded = true;
                 break;
             }
+            unchecked { ++i; }
         }
         
         require(!alreadyAdded, "OrganicComponentRegistryLogic: user already added to component");

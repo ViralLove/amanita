@@ -16,13 +16,27 @@ const POLYGON_MUMBAI_RPC = process.env.POLYGON_MUMBAI_RPC;
 module.exports = {
   defaultNetwork: 'hardhat', // Используем встроенную сеть Hardhat
   solidity: {
-    version: "0.8.20",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 1
+    compilers: [
+      {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1
+          }
+        }
+      },
+      {
+        version: "0.8.22",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200
+          },
+          viaIR: true // Включаем IR-based code generator для решения "Stack too deep"
+        }
       }
-    }
+    ]
   },
   networks: {
     localhost: {
