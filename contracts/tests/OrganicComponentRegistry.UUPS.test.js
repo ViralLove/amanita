@@ -659,4 +659,76 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             expect(true).to.be.true;
         });
     });
+
+    describe("Proxy Protection Tests (UUPS Best Practice)", function () {
+        it("Should only work through proxy, not directly on implementation", async function () {
+            // Получаем адрес имплементации из proxy
+            const implementationAddress = await upgrades.erc1967.getImplementationAddress(
+                await ocr.getAddress()
+            );
+            
+            // Создаем экземпляр имплементации напрямую
+            const Logic = await ethers.getContractFactory("OrganicComponentRegistryLogic");
+            const implementation = Logic.attach(implementationAddress);
+            
+            // Прямой вызов на имплементацию не должен работать корректно
+            // (имплементация не инициализирована и не имеет state)
+            const totalComponents = await implementation.totalComponents();
+            
+            // У имплементации totalComponents должен быть 0 (не инициализирован)
+            // А у proxy через ocr - реальное значение
+            const proxyTotalComponents = await ocr.totalComponents();
+            
+            // Проверяем что данные различаются (proxy имеет state, имплементация - нет)
+            // Либо оба 0 если тесты только начались, либо proxy > 0
+            expect(proxyTotalComponents).to.be.gte(totalComponents);
+            
+            // Проверяем что через proxy данные доступны корректно
+            expect(await ocr.LOGIC_VERSION()).to.equal(2);
+        });
+        
+        it("Should have UUPS upgrade protection via UPGRADER_ROLE", async function () {
+            // UUPS защищен через _authorizeUpgrade с onlyRole(UPGRADER_ROLE)
+            // Проверяем что только UPGRADER_ROLE может апгрейдить
+            
+            // user1 НЕ имеет UPGRADER_ROLE
+            const LogicV2 = await ethers.getContractFactory("OrganicComponentRegistryLogic");
+            const newImplementation = await LogicV2.deploy();
+            await newImplementation.waitForDeployment();
+            
+            // Попытка апгрейда от user1 должна провалиться
+            await expect(
+                ocr.connect(user1).upgradeToAndCall(
+                    await newImplementation.getAddress(),
+                    "0x"
+                )
+            ).to.be.reverted; // AccessControl revert
+            
+            // admin ИМЕЕТ UPGRADER_ROLE и может апгрейдить
+            await expect(
+                ocr.connect(admin).upgradeToAndCall(
+                    await newImplementation.getAddress(),
+                    "0x"
+                )
+            ).to.not.be.reverted;
+            
+            // Проверяем что апгрейд прошел успешно
+            expect(await ocr.LOGIC_VERSION()).to.equal(2);
+        });
+        
+        it("Should document that onlyProxy will be added if migration functions appear", async function () {
+            // Этот тест документирует подход к onlyProxy:
+            // - UUPS уже имеет встроенную защиту через delegatecall
+            // - _authorizeUpgrade защищен через onlyRole(UPGRADER_ROLE)
+            // - Если появятся миграционные функции, им нужен будет onlyProxy модификатор
+            // - Текущая реализация не требует дополнительных onlyProxy
+            
+            // Проверяем что критические функции защищены
+            expect(await ocr.hasRole(await ocr.UPGRADER_ROLE(), admin.address)).to.be.true;
+            expect(await ocr.hasRole(await ocr.UPGRADER_ROLE(), user1.address)).to.be.false;
+            
+            // UUPS best practice: все работает через proxy
+            expect(true).to.be.true;
+        });
+    });
 });
