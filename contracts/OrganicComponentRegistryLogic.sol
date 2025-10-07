@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/ISpiralEngine.sol";
 import "./interfaces/IAmanitaInternational.sol";
 import "./interfaces/IProductRegistry.sol";
@@ -29,6 +30,7 @@ contract OrganicComponentRegistryLogic is
     UUPSUpgradeable, 
     AccessControlUpgradeable,
     PausableUpgradeable,
+    ReentrancyGuardUpgradeable,
     IOrganicComponentRegistry 
 {
     // === КОНСТАНТЫ ===
@@ -201,6 +203,7 @@ contract OrganicComponentRegistryLogic is
         __AccessControl_init();
         __UUPSUpgradeable_init();
         __Pausable_init();
+        __ReentrancyGuard_init();
         
         // Выдаем роли админу
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -246,7 +249,7 @@ contract OrganicComponentRegistryLogic is
      * @dev Поставить контракт на паузу
      * @notice Доступно только ADMIN_ROLE
      */
-    function pause() external onlyRole(ADMIN_ROLE) {
+    function pause() external onlyRole(ADMIN_ROLE) nonReentrant {
         _pause();
     }
 
@@ -254,7 +257,7 @@ contract OrganicComponentRegistryLogic is
      * @dev Снять контракт с паузы
      * @notice Доступно только ADMIN_ROLE
      */
-    function unpause() external onlyRole(ADMIN_ROLE) {
+    function unpause() external onlyRole(ADMIN_ROLE) nonReentrant {
         _unpause();
     }
 
@@ -379,7 +382,7 @@ contract OrganicComponentRegistryLogic is
     function createComponent(
         string memory businessId,
         string memory rootMetadataCID
-    ) external whenNotPaused onlyActivatedUser onlySeller validBusinessId(businessId) validCID(rootMetadataCID) returns (uint256 componentId) {
+    ) external whenNotPaused nonReentrant onlyActivatedUser onlySeller validBusinessId(businessId) validCID(rootMetadataCID) returns (uint256 componentId) {
 
         // Проверяем уникальность business_id
         require(!_componentExists(businessId), "OrganicComponentRegistryLogic: component with this business ID already exists");
@@ -418,7 +421,7 @@ contract OrganicComponentRegistryLogic is
     function updateComponent(
         uint256 componentId,
         string memory newRootMetadataCID
-    ) external whenNotPaused onlyComponentCreator(componentId) validCID(newRootMetadataCID) {
+    ) external whenNotPaused nonReentrant onlyComponentCreator(componentId) validCID(newRootMetadataCID) {
         require(componentId > 0 && componentId <= totalComponents, "OrganicComponentRegistryLogic: component not found");
 
         // Обновляем данные напрямую
@@ -527,7 +530,7 @@ contract OrganicComponentRegistryLogic is
      * @dev Установить адрес SpiralEngine в Proxy storage
      * @param _spiralEngine Адрес контракта SpiralEngine
      */
-    function setSpiralEngine(address _spiralEngine) external onlyRole(ADMIN_ROLE) {
+    function setSpiralEngine(address _spiralEngine) external onlyRole(ADMIN_ROLE) nonReentrant {
         _requireNonZero(_spiralEngine);
         spiralEngine = _spiralEngine;
     }
@@ -536,7 +539,7 @@ contract OrganicComponentRegistryLogic is
      * @dev Установить адрес AmanitaInternational
      * @param _amanitaInternational Адрес контракта AmanitaInternational
      */
-    function setAmanitaInternational(address _amanitaInternational) external onlyRole(ADMIN_ROLE) {
+    function setAmanitaInternational(address _amanitaInternational) external onlyRole(ADMIN_ROLE) nonReentrant {
         _requireNonZero(_amanitaInternational);
         amanitaInternational = _amanitaInternational;
     }
@@ -545,7 +548,7 @@ contract OrganicComponentRegistryLogic is
      * @dev Установить адрес ProductRegistry
      * @param _productRegistry Адрес контракта ProductRegistry
      */
-    function setProductRegistry(address _productRegistry) external onlyRole(ADMIN_ROLE) {
+    function setProductRegistry(address _productRegistry) external onlyRole(ADMIN_ROLE) nonReentrant {
         _requireNonZero(_productRegistry);
         productRegistry = _productRegistry;
     }
@@ -558,7 +561,7 @@ contract OrganicComponentRegistryLogic is
         string memory componentFormsCID,
         uint256 featuresVersion,
         uint256 formsVersion
-    ) external onlyRole(ADMIN_ROLE) validCID(featuresCID) validCID(componentFormsCID) {
+    ) external onlyRole(ADMIN_ROLE) nonReentrant validCID(featuresCID) validCID(componentFormsCID) {
         IOrganicComponentRegistry.ShareableData storage data = shareableData;
         data.features_cid = featuresCID;
         data.component_forms_cid = componentFormsCID;
@@ -599,7 +602,7 @@ contract OrganicComponentRegistryLogic is
         revert("OrganicComponentRegistryLogic: validateComponentUpdate not implemented yet");
     }
 
-    function incrementUsageCount(string memory businessId) external {
+    function incrementUsageCount(string memory businessId) external nonReentrant {
         uint256 componentId = businessIdToComponentId[businessId];
         require(componentId > 0, "OrganicComponentRegistryLogic: component not found");
         
@@ -607,7 +610,7 @@ contract OrganicComponentRegistryLogic is
         emit ComponentUsageIncremented(componentId, businessId, componentUsageCount[componentId]);
     }
 
-    function addComponentUser(string memory businessId, address user) external {
+    function addComponentUser(string memory businessId, address user) external nonReentrant {
         uint256 componentId = businessIdToComponentId[businessId];
         require(componentId > 0, "OrganicComponentRegistryLogic: component not found");
         require(user != address(0), "OrganicComponentRegistryLogic: invalid user address");
