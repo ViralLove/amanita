@@ -56,6 +56,51 @@ contract OrganicComponentRegistryLogic is
     /// @notice Роль для создания и редактирования компонентов
     bytes32 public constant CONTRIBUTOR_ROLE = keccak256("CONTRIBUTOR_ROLE");
 
+    // === CUSTOM ERRORS ===
+    // Custom errors для экономии gas и улучшения читаемости
+
+    /// @notice Ошибка: вызывающий не является создателем компонента
+    error NotComponentCreator();
+
+    /// @notice Ошибка: business ID пустой
+    error BusinessIdEmpty();
+
+    /// @notice Ошибка: business ID слишком длинный
+    /// @param max максимальная разрешенная длина
+    error BusinessIdTooLong(uint256 max);
+
+    /// @notice Ошибка: CID пустой
+    error CIDEmpty();
+
+    /// @notice Ошибка: CID слишком длинный
+    /// @param max максимальная разрешенная длина
+    error CIDTooLong(uint256 max);
+
+    /// @notice Ошибка: компонент с таким business ID уже существует
+    error ComponentAlreadyExists();
+
+    /// @notice Ошибка: превышен лимит компонентов на пользователя
+    /// @param max максимальное количество компонентов
+    error ComponentLimitExceeded(uint256 max);
+
+    /// @notice Ошибка: передан нулевой адрес
+    error ZeroAddress();
+
+    /// @notice Ошибка: компонент не найден
+    error ComponentNotFound();
+
+    /// @notice Ошибка: пользователь уже добавлен к компоненту
+    error UserAlreadyAdded();
+
+    /// @notice Ошибка: SpiralEngine не установлен
+    error SpiralEngineNotSet();
+
+    /// @notice Ошибка: пользователь не активирован
+    error UserNotActivated();
+
+    /// @notice Ошибка: недопустимый адрес (legacy совместимость)
+    error InvalidAddress();
+
     // === СТАТУСЫ КОМПОНЕНТОВ ===
     // ComponentStatus определен в IOrganicComponentRegistry
 
@@ -284,6 +329,45 @@ contract OrganicComponentRegistryLogic is
         return componentsByCreator[creator].length;
     }
 
+    // === VALIDATION HELPERS ===
+    // Функции валидации для переиспользования
+
+    /**
+     * @dev Проверка ненулевого адреса (новый стиль с custom error)
+     * @param addr адрес для проверки
+     */
+    function _requireNonZero(address addr) internal pure {
+        if (addr == address(0)) revert ZeroAddress();
+    }
+
+    /**
+     * @dev Проверка CID (legacy для совместимости с тестами)
+     * @param cid IPFS CID для проверки
+     */
+    function _requireCIDNonEmptyLegacy(string memory cid) internal pure {
+        uint256 len = bytes(cid).length;
+        if (len == 0) {
+            revert("OrganicComponentRegistryLogic: CID cannot be empty");
+        }
+        if (len > MAX_CID_LENGTH) {
+            revert("OrganicComponentRegistryLogic: CID too long");
+        }
+    }
+
+    /**
+     * @dev Проверка business ID (legacy для совместимости с тестами)
+     * @param businessId business ID для проверки
+     */
+    function _requireBusinessIdValidLegacy(string memory businessId) internal pure {
+        uint256 len = bytes(businessId).length;
+        if (len == 0) {
+            revert("OrganicComponentRegistryLogic: business ID cannot be empty");
+        }
+        if (len > MAX_BUSINESS_ID_LENGTH) {
+            revert("OrganicComponentRegistryLogic: business ID too long");
+        }
+    }
+
     // === ФУНКЦИИ УПРАВЛЕНИЯ КОМПОНЕНТАМИ ===
 
     /**
@@ -444,7 +528,7 @@ contract OrganicComponentRegistryLogic is
      * @param _spiralEngine Адрес контракта SpiralEngine
      */
     function setSpiralEngine(address _spiralEngine) external onlyRole(ADMIN_ROLE) {
-        require(_spiralEngine != address(0), "OrganicComponentRegistryLogic: invalid address");
+        _requireNonZero(_spiralEngine);
         spiralEngine = _spiralEngine;
     }
 
@@ -453,7 +537,7 @@ contract OrganicComponentRegistryLogic is
      * @param _amanitaInternational Адрес контракта AmanitaInternational
      */
     function setAmanitaInternational(address _amanitaInternational) external onlyRole(ADMIN_ROLE) {
-        require(_amanitaInternational != address(0), "OrganicComponentRegistryLogic: invalid address");
+        _requireNonZero(_amanitaInternational);
         amanitaInternational = _amanitaInternational;
     }
 
@@ -462,7 +546,7 @@ contract OrganicComponentRegistryLogic is
      * @param _productRegistry Адрес контракта ProductRegistry
      */
     function setProductRegistry(address _productRegistry) external onlyRole(ADMIN_ROLE) {
-        require(_productRegistry != address(0), "OrganicComponentRegistryLogic: invalid address");
+        _requireNonZero(_productRegistry);
         productRegistry = _productRegistry;
     }
 

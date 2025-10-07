@@ -384,18 +384,18 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
         });
 
         it("Should reject zero addresses for integrations", async function () {
-            // Попытка установить нулевой адрес должна провалиться
+            // Попытка установить нулевой адрес должна провалиться с custom error
             await expect(
                 ocr.connect(admin).setSpiralEngine(ethers.ZeroAddress)
-            ).to.be.revertedWith("OrganicComponentRegistryLogic: invalid address");
+            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
             
             await expect(
                 ocr.connect(admin).setAmanitaInternational(ethers.ZeroAddress)
-            ).to.be.revertedWith("OrganicComponentRegistryLogic: invalid address");
+            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
             
             await expect(
                 ocr.connect(admin).setProductRegistry(ethers.ZeroAddress)
-            ).to.be.revertedWith("OrganicComponentRegistryLogic: invalid address");
+            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
         });
     });
 
@@ -515,6 +515,41 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             // admin МОЖЕТ выдавать роли
             await ocr.connect(admin).grantRole(await ocr.CONTRIBUTOR_ROLE(), user3.address);
             expect(await ocr.hasRole(await ocr.CONTRIBUTOR_ROLE(), user3.address)).to.be.true;
+        });
+    });
+
+    describe("Custom Errors Tests", function () {
+        it("Should revert with ZeroAddress error for integration setters", async function () {
+            // setSpiralEngine должен отклонять нулевой адрес
+            await expect(
+                ocr.connect(admin).setSpiralEngine(ethers.ZeroAddress)
+            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
+            
+            // setAmanitaInternational должен отклонять нулевой адрес
+            await expect(
+                ocr.connect(admin).setAmanitaInternational(ethers.ZeroAddress)
+            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
+            
+            // setProductRegistry должен отклонять нулевой адрес
+            await expect(
+                ocr.connect(admin).setProductRegistry(ethers.ZeroAddress)
+            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
+        });
+        
+        it("Should support both custom errors and legacy string reverts", async function () {
+            // Custom error для новых путей (integration setters)
+            await expect(
+                ocr.connect(admin).setSpiralEngine(ethers.ZeroAddress)
+            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
+            
+            // Legacy string для существующих путей (где тесты проверяют)
+            await expect(
+                ocr.connect(user1).createComponent("", "QmTest")
+            ).to.be.revertedWith("OrganicComponentRegistryLogic: business ID cannot be empty");
+            
+            await expect(
+                ocr.connect(user1).createComponent("test", "")
+            ).to.be.revertedWith("OrganicComponentRegistryLogic: CID cannot be empty");
         });
     });
 });
