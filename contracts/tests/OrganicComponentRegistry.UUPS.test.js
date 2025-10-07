@@ -552,4 +552,77 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             ).to.be.revertedWith("OrganicComponentRegistryLogic: CID cannot be empty");
         });
     });
+
+    describe("Event Filtering Tests", function () {
+        it("Should filter ComponentCreated by componentId", async function () {
+            // Создаем несколько компонентов
+            await ocr.connect(user1).createComponent("filter_comp1", "QmFilterCID1");
+            await ocr.connect(user1).createComponent("filter_comp2", "QmFilterCID2");
+            await ocr.connect(user2).createComponent("filter_comp3", "QmFilterCID3");
+            
+            // Получаем ID первого компонента
+            const componentId1 = await ocr.businessIdToComponentId("filter_comp1");
+            
+            // Фильтруем по componentId
+            const filter = ocr.filters.ComponentCreated(componentId1);
+            const logs = await ocr.queryFilter(filter);
+            
+            // Проверяем что нашли нужное событие
+            const relevantLogs = logs.filter(log => log.args.businessId === "filter_comp1");
+            expect(relevantLogs.length).to.be.greaterThan(0);
+            expect(relevantLogs[0].args.componentId).to.equal(componentId1);
+            expect(relevantLogs[0].args.businessId).to.equal("filter_comp1");
+        });
+        
+        it("Should filter ComponentCreated by creator", async function () {
+            // Создаем компоненты от разных пользователей
+            await ocr.connect(user1).createComponent("creator_comp1", "QmCreatorCID1");
+            await ocr.connect(user1).createComponent("creator_comp2", "QmCreatorCID2");
+            await ocr.connect(user2).createComponent("creator_comp3", "QmCreatorCID3");
+            
+            // Фильтруем по creator = user1
+            const filter = ocr.filters.ComponentCreated(null, null, user1.address);
+            const logs = await ocr.queryFilter(filter);
+            
+            // Проверяем что все найденные события от user1
+            const user1Logs = logs.filter(log => log.args.creator === user1.address);
+            expect(user1Logs.length).to.be.greaterThan(1); // как минимум 2 компонента
+            user1Logs.forEach(log => {
+                expect(log.args.creator).to.equal(user1.address);
+            });
+        });
+        
+        it("Should filter ComponentUserAdded by user", async function () {
+            // Создаем компонент и добавляем пользователя
+            await ocr.connect(user1).createComponent("user_add_comp", "QmUserAddCID");
+            await ocr.connect(admin).addComponentUser("user_add_comp", user3.address);
+            
+            // Фильтруем по user = user3
+            const filter = ocr.filters.ComponentUserAdded(null, null, user3.address);
+            const logs = await ocr.queryFilter(filter);
+            
+            // Проверяем что нашли событие с user3
+            const relevantLogs = logs.filter(log => log.args.user === user3.address);
+            expect(relevantLogs.length).to.be.greaterThan(0);
+            expect(relevantLogs[0].args.user).to.equal(user3.address);
+        });
+        
+        it("Should filter ShareableDataUpdated by version", async function () {
+            // Обновляем shareable data несколько раз
+            await ocr.connect(admin).updateShareableData("QmFeatures1", "QmForms1", 1, 1);
+            await ocr.connect(admin).updateShareableData("QmFeatures2", "QmForms2", 2, 2);
+            
+            // Получаем текущие версии
+            const shareableData = await ocr.shareableData();
+            const currentFeaturesVersion = shareableData.features_version;
+            
+            // Фильтруем по featuresVersion = 2
+            const filter = ocr.filters.ShareableDataUpdated(null, null, 2n);
+            const logs = await ocr.queryFilter(filter);
+            
+            // Проверяем что нашли событие с версией 2
+            expect(logs.length).to.be.greaterThan(0);
+            expect(logs[logs.length - 1].args.featuresVersion).to.equal(2n);
+        });
+    });
 });
