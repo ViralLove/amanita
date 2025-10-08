@@ -2,55 +2,58 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 
 /**
- * Тесты для upgradeable SpiralEngine контракта
+ * Тесты для upgradeable SpiralEngine UUPS контракта
  * 
  * Покрывает:
- * - Деплой proxy контракта
- * - Обновление implementation
+ * - Деплой UUPS proxy контракта
+ * - Обновление Logic implementation
  * - Сохранение данных при upgrade
  * - Совместимость с существующими функциями
+ * - UUPS-специфичные проверки
  */
-describe("SpiralEngine Upgrade Tests", function () {
+describe("SpiralEngine UUPS Upgrade Tests", function () {
     let spiralEngine;
     let spiralEngineV2;
     let deployer, activator, seller, user;
-    let proxyAddress, implementationAddress;
+    let proxyAddress, logicAddress;
 
     beforeEach(async function () {
         // Получаем аккаунты
         [deployer, activator, seller, user] = await ethers.getSigners();
         
-        console.log("🔧 Настройка тестовой среды для upgrade tests...");
+        console.log("🔧 Настройка тестовой среды для UUPS upgrade tests...");
     });
 
-    describe("P0: Proxy Deployment", function () {
-        it("Should deploy SpiralEngine as upgradeable proxy", async function () {
-            console.log("📦 Тестируем деплой SpiralEngine как upgradeable proxy...");
+    describe("P0: UUPS Proxy Deployment", function () {
+        it("Should deploy SpiralEngine as UUPS upgradeable proxy", async function () {
+            console.log("📦 Тестируем деплой SpiralEngine как UUPS proxy...");
             
-            // Получаем фабрику контракта
-            const SpiralEngine = await ethers.getContractFactory("SpiralEngine");
+            // 1. Deploy Logic implementation
+            const Logic = await ethers.getContractFactory("SpiralEngineLogic");
+            const logicImpl = await Logic.connect(deployer).deploy();
+            await logicImpl.waitForDeployment();
+            logicAddress = await logicImpl.getAddress();
             
-            // Деплоим как upgradeable proxy
-            spiralEngine = await upgrades.deployProxy(
-                SpiralEngine,
-                [], // Пустой массив аргументов
-                {
-                    initializer: false,
-                    kind: 'transparent'
-                }
-            );
+            // 2. Encode initialize(admin) calldata
+            const initCalldata = logicImpl.interface.encodeFunctionData("initialize", [
+                deployer.address
+            ]);
             
-            await spiralEngine.waitForDeployment();
+            // 3. Deploy Proxy with implementation and init data
+            const Proxy = await ethers.getContractFactory("SpiralEngineProxy");
+            const proxy = await Proxy.connect(deployer).deploy(logicAddress, initCalldata);
+            await proxy.waitForDeployment();
+            proxyAddress = await proxy.getAddress();
             
-            proxyAddress = await spiralEngine.getAddress();
-            implementationAddress = await upgrades.erc1967.getImplementationAddress(proxyAddress);
+            // 4. Attach Logic ABI to proxy address
+            spiralEngine = Logic.attach(proxyAddress);
             
             console.log("✅ Proxy адрес:", proxyAddress);
-            console.log("✅ Implementation адрес:", implementationAddress);
+            console.log("✅ Logic адрес:", logicAddress);
             
             // Проверяем, что proxy работает
             expect(proxyAddress).to.not.equal(ethers.ZeroAddress);
-            expect(implementationAddress).to.not.equal(ethers.ZeroAddress);
+            expect(logicAddress).to.not.equal(ethers.ZeroAddress);
             
             // Проверяем базовую функциональность
             const name = await spiralEngine.name();
@@ -59,7 +62,10 @@ describe("SpiralEngine Upgrade Tests", function () {
             expect(name).to.equal("SpiralInvite");
             expect(symbol).to.equal("SPIRAL");
             
-            console.log("✅ Proxy контракт работает корректно");
+            // Проверяем LOGIC_VERSION
+            expect(await spiralEngine.LOGIC_VERSION()).to.equal(1);
+            
+            console.log("✅ UUPS Proxy контракт работает корректно");
         });
 
         it("Should have correct roles assigned to deployer", async function () {
@@ -83,12 +89,22 @@ describe("SpiralEngine Upgrade Tests", function () {
 
     describe("P1: Data Persistence", function () {
         beforeEach(async function () {
-            // Деплоим proxy для тестов данных
-            const SpiralEngine = await ethers.getContractFactory("SpiralEngine");
-            spiralEngine = await upgrades.deployProxy(SpiralEngine, [], { initializer: false });
-            await spiralEngine.waitForDeployment();
+            // Деплоим UUPS proxy для тестов данных
+            const Logic = await ethers.getContractFactory("SpiralEngineLogic");
+            const logicImpl = await Logic.connect(deployer).deploy();
+            await logicImpl.waitForDeployment();
             
-            proxyAddress = await spiralEngine.getAddress();
+            const initCalldata = logicImpl.interface.encodeFunctionData("initialize", [deployer.address]);
+            
+            const Proxy = await ethers.getContractFactory("SpiralEngineProxy");
+            const proxy = await Proxy.connect(deployer).deploy(
+                await logicImpl.getAddress(),
+                initCalldata
+            );
+            await proxy.waitForDeployment();
+            
+            spiralEngine = Logic.attach(await proxy.getAddress());
+            proxyAddress = await proxy.getAddress();
         });
 
         it("Should preserve data after upgrade", async function () {
@@ -104,6 +120,10 @@ describe("SpiralEngine Upgrade Tests", function () {
             // Создаем инвайт
             await spiralEngine.connect(activator).mintInvite("UPGRADE_TEST_INVITE", 0);
             const tokenId = await spiralEngine.inviteCodeToTokenId("UPGRADE_TEST_INVITE");
+            
+            // Даем activator роль ACTIVATOR_ROLE для активации
+            const ACTIVATOR_ROLE = await spiralEngine.ACTIVATOR_ROLE();
+            await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, activator.address);
             
             // Активируем пользователя
             const newCodes = Array.from({length: 12}, (_, i) => `UPGRADE_NEW_${i + 1}`);
@@ -129,15 +149,20 @@ describe("SpiralEngine Upgrade Tests", function () {
             console.log("   - User used invite:", usedInviteBefore.toString());
             console.log("   - User has seller role:", hasSellerRoleBefore);
             
-            // Создаем SpiralEngineV2 (пока используем тот же контракт)
-            console.log("🔄 Выполняем upgrade...");
-            const SpiralEngineV2 = await ethers.getContractFactory("SpiralEngine");
+            // Создаем LogicV2 (пока используем тот же контракт)
+            console.log("🔄 Выполняем UUPS upgrade...");
+            const LogicV2 = await ethers.getContractFactory("SpiralEngineLogic");
+            const logicV2 = await LogicV2.connect(deployer).deploy();
+            await logicV2.waitForDeployment();
             
-            // Выполняем upgrade
-            await upgrades.upgradeProxy(proxyAddress, SpiralEngineV2);
+            // Выполняем upgrade через upgradeToAndCall
+            await spiralEngine.connect(deployer).upgradeToAndCall(
+                await logicV2.getAddress(),
+                "0x" // Нет миграции данных
+            );
             
-            // Получаем обновленный контракт
-            const upgradedEngine = await ethers.getContractAt("SpiralEngine", proxyAddress);
+            // Получаем обновленный контракт (ABI остаётся тот же, адрес Proxy тот же)
+            const upgradedEngine = spiralEngine;
             
             // Проверяем состояние после upgrade
             const totalInvitesMintedAfter = await upgradedEngine.totalInvitesMinted();
@@ -180,11 +205,17 @@ describe("SpiralEngine Upgrade Tests", function () {
             console.log("   - Invite exists:", inviteExistsBefore);
             console.log("   - Is used:", isUsedBefore);
             
-            // Выполняем upgrade
-            const SpiralEngineV2 = await ethers.getContractFactory("SpiralEngine");
-            await upgrades.upgradeProxy(proxyAddress, SpiralEngineV2);
+            // Выполняем UUPS upgrade
+            const LogicV2 = await ethers.getContractFactory("SpiralEngineLogic");
+            const logicV2 = await LogicV2.connect(deployer).deploy();
+            await logicV2.waitForDeployment();
             
-            const upgradedEngine = await ethers.getContractAt("SpiralEngine", proxyAddress);
+            await spiralEngine.connect(deployer).upgradeToAndCall(
+                await logicV2.getAddress(),
+                "0x"
+            );
+            
+            const upgradedEngine = spiralEngine;
             
             // Проверяем маппинги после upgrade
             const tokenIdAfter = await upgradedEngine.inviteCodeToTokenId("MAPPING_TEST_INVITE");
@@ -210,22 +241,38 @@ describe("SpiralEngine Upgrade Tests", function () {
 
     describe("P2: Function Compatibility", function () {
         beforeEach(async function () {
-            // Деплоим proxy для тестов совместимости
-            const SpiralEngine = await ethers.getContractFactory("SpiralEngine");
-            spiralEngine = await upgrades.deployProxy(SpiralEngine, [], { initializer: false });
-            await spiralEngine.waitForDeployment();
+            // Деплоим UUPS proxy для тестов совместимости
+            const Logic = await ethers.getContractFactory("SpiralEngineLogic");
+            const logicImpl = await Logic.connect(deployer).deploy();
+            await logicImpl.waitForDeployment();
             
-            proxyAddress = await spiralEngine.getAddress();
+            const initCalldata = logicImpl.interface.encodeFunctionData("initialize", [deployer.address]);
+            
+            const Proxy = await ethers.getContractFactory("SpiralEngineProxy");
+            const proxy = await Proxy.connect(deployer).deploy(
+                await logicImpl.getAddress(),
+                initCalldata
+            );
+            await proxy.waitForDeployment();
+            
+            spiralEngine = Logic.attach(await proxy.getAddress());
+            proxyAddress = await proxy.getAddress();
         });
 
         it("Should maintain all existing functions after upgrade", async function () {
-            console.log("🔧 Тестируем совместимость функций после upgrade...");
+            console.log("🔧 Тестируем совместимость функций после UUPS upgrade...");
             
-            // Выполняем upgrade
-            const SpiralEngineV2 = await ethers.getContractFactory("SpiralEngine");
-            await upgrades.upgradeProxy(proxyAddress, SpiralEngineV2);
+            // Выполняем UUPS upgrade
+            const LogicV2 = await ethers.getContractFactory("SpiralEngineLogic");
+            const logicV2 = await LogicV2.connect(deployer).deploy();
+            await logicV2.waitForDeployment();
             
-            const upgradedEngine = await ethers.getContractAt("SpiralEngine", proxyAddress);
+            await spiralEngine.connect(deployer).upgradeToAndCall(
+                await logicV2.getAddress(),
+                "0x"
+            );
+            
+            const upgradedEngine = spiralEngine;
             
             // Проверяем основные функции
             console.log("🔍 Проверяем основные функции...");
@@ -246,11 +293,12 @@ describe("SpiralEngine Upgrade Tests", function () {
             console.log("🔍 Проверяем функции диагностики...");
             
             const publicInfo = await upgradedEngine.getSellerPublicInfo(deployer.address);
-            expect(publicInfo.isActivated).to.be.a("boolean");
-            expect(publicInfo.hasSellerRole).to.be.a("boolean");
-            expect(publicInfo.hasActivatorRole).to.be.a("boolean");
-            expect(publicInfo.inviteCount).to.be.a("bigint");
-            expect(publicInfo.userTotalInvites).to.be.a("bigint");
+            // В UUPS версии возвращаемые значения: isActivated, hasSellerRole_, hasActivatorRole_, inviteCount, userTotalInvites
+            expect(publicInfo[0]).to.be.a("boolean"); // isActivated
+            expect(publicInfo[1]).to.be.a("boolean"); // hasSellerRole_
+            expect(publicInfo[2]).to.be.a("boolean"); // hasActivatorRole_
+            expect(publicInfo[3]).to.be.a("bigint");  // inviteCount
+            expect(publicInfo[4]).to.be.a("bigint");  // userTotalInvites
             
             console.log("✅ Функции диагностики работают");
             
@@ -269,13 +317,19 @@ describe("SpiralEngine Upgrade Tests", function () {
         });
 
         it("Should maintain role system after upgrade", async function () {
-            console.log("👑 Тестируем систему ролей после upgrade...");
+            console.log("👑 Тестируем систему ролей после UUPS upgrade...");
             
-            // Выполняем upgrade
-            const SpiralEngineV2 = await ethers.getContractFactory("SpiralEngine");
-            await upgrades.upgradeProxy(proxyAddress, SpiralEngineV2);
+            // Выполняем UUPS upgrade
+            const LogicV2 = await ethers.getContractFactory("SpiralEngineLogic");
+            const logicV2 = await LogicV2.connect(deployer).deploy();
+            await logicV2.waitForDeployment();
             
-            const upgradedEngine = await ethers.getContractAt("SpiralEngine", proxyAddress);
+            await spiralEngine.connect(deployer).upgradeToAndCall(
+                await logicV2.getAddress(),
+                "0x"
+            );
+            
+            const upgradedEngine = spiralEngine;
             
             // Проверяем роли
             const DEFAULT_ADMIN_ROLE = await upgradedEngine.DEFAULT_ADMIN_ROLE();
@@ -294,60 +348,113 @@ describe("SpiralEngine Upgrade Tests", function () {
         });
     });
 
-    describe("P3: Upgrade Validation", function () {
+    describe("P3: UUPS Upgrade Validation", function () {
         beforeEach(async function () {
-            // Деплоим proxy для тестов валидации
-            const SpiralEngine = await ethers.getContractFactory("SpiralEngine");
-            spiralEngine = await upgrades.deployProxy(SpiralEngine, [], { initializer: false });
-            await spiralEngine.waitForDeployment();
+            // Деплоим UUPS proxy для тестов валидации
+            const Logic = await ethers.getContractFactory("SpiralEngineLogic");
+            const logicImpl = await Logic.connect(deployer).deploy();
+            await logicImpl.waitForDeployment();
             
-            proxyAddress = await spiralEngine.getAddress();
+            const initCalldata = logicImpl.interface.encodeFunctionData("initialize", [deployer.address]);
+            
+            const Proxy = await ethers.getContractFactory("SpiralEngineProxy");
+            const proxy = await Proxy.connect(deployer).deploy(
+                await logicImpl.getAddress(),
+                initCalldata
+            );
+            await proxy.waitForDeployment();
+            
+            spiralEngine = Logic.attach(await proxy.getAddress());
+            proxyAddress = await proxy.getAddress();
         });
 
-        it("Should validate proxy structure", async function () {
-            console.log("🔍 Тестируем структуру proxy...");
+        it("Should validate UUPS proxy structure", async function () {
+            console.log("🔍 Тестируем структуру UUPS proxy...");
             
-            // Проверяем, что контракт является proxy
+            // Проверяем, что контракт является ERC1967 proxy
             const implementationAddress = await upgrades.erc1967.getImplementationAddress(proxyAddress);
-            const adminAddress = await upgrades.erc1967.getAdminAddress(proxyAddress);
             
             expect(implementationAddress).to.not.equal(ethers.ZeroAddress);
-            expect(adminAddress).to.not.equal(ethers.ZeroAddress);
             
-            console.log("✅ Implementation адрес:", implementationAddress);
-            console.log("✅ Admin адрес:", adminAddress);
+            console.log("✅ Logic implementation адрес:", implementationAddress);
             
-            // Проверяем, что proxy адрес не изменился
+            // Проверяем, что proxy адрес корректен
             const currentProxyAddress = await spiralEngine.getAddress();
             expect(currentProxyAddress).to.equal(proxyAddress);
             
-            console.log("✅ Proxy структура валидна");
+            // Проверяем UUPS-специфичные функции
+            expect(await spiralEngine.LOGIC_VERSION()).to.equal(1);
+            
+            console.log("✅ UUPS Proxy структура валидна");
         });
 
-        it("Should validate upgrade process", async function () {
-            console.log("🔄 Тестируем процесс upgrade...");
+        it("Should validate UUPS upgrade process", async function () {
+            console.log("🔄 Тестируем процесс UUPS upgrade...");
             
             // Получаем текущий implementation
             const currentImplementation = await upgrades.erc1967.getImplementationAddress(proxyAddress);
-            console.log("📋 Текущий implementation:", currentImplementation);
+            console.log("📋 Текущий Logic implementation:", currentImplementation);
             
-            // Выполняем upgrade
-            const SpiralEngineV2 = await ethers.getContractFactory("SpiralEngine");
-            await upgrades.upgradeProxy(proxyAddress, SpiralEngineV2);
+            // Выполняем UUPS upgrade
+            const LogicV2 = await ethers.getContractFactory("SpiralEngineLogic");
+            const logicV2 = await LogicV2.connect(deployer).deploy();
+            await logicV2.waitForDeployment();
+            
+            await spiralEngine.connect(deployer).upgradeToAndCall(
+                await logicV2.getAddress(),
+                "0x"
+            );
             
             // Проверяем новый implementation
             const newImplementation = await upgrades.erc1967.getImplementationAddress(proxyAddress);
-            console.log("📋 Новый implementation:", newImplementation);
+            console.log("📋 Новый Logic implementation:", newImplementation);
             
-            // Implementation должен измениться
+            // Logic implementation должен измениться
             expect(newImplementation).to.not.equal(currentImplementation);
+            expect(newImplementation).to.equal(await logicV2.getAddress());
             
             // Proxy адрес должен остаться прежним
-            const upgradedEngine = await ethers.getContractAt("SpiralEngine", proxyAddress);
-            const proxyAddressAfter = await upgradedEngine.getAddress();
+            const proxyAddressAfter = await spiralEngine.getAddress();
             expect(proxyAddressAfter).to.equal(proxyAddress);
             
-            console.log("✅ Процесс upgrade валиден");
+            console.log("✅ UUPS upgrade процесс валиден");
+        });
+        
+        it("Should restrict upgrades to UPGRADER_ROLE only", async function () {
+            console.log("🔒 Тестируем защиту UPGRADER_ROLE...");
+            
+            // Создаём пользователя без UPGRADER_ROLE
+            const unauthorized = ethers.Wallet.createRandom().connect(ethers.provider);
+            await deployer.sendTransaction({
+                to: unauthorized.address,
+                value: ethers.parseEther("1.0")
+            });
+            
+            // Деплоим новую Logic
+            const LogicV2 = await ethers.getContractFactory("SpiralEngineLogic");
+            const logicV2 = await LogicV2.connect(deployer).deploy();
+            await logicV2.waitForDeployment();
+            
+            // Попытка upgrade без UPGRADER_ROLE должна провалиться
+            const unauthorizedEngine = await ethers.getContractAt(
+                "SpiralEngineLogic",
+                proxyAddress
+            );
+            
+            await expect(
+                unauthorizedEngine.connect(unauthorized).upgradeToAndCall(
+                    await logicV2.getAddress(),
+                    "0x"
+                )
+            ).to.be.reverted;
+            
+            // Admin с UPGRADER_ROLE может выполнить upgrade
+            await spiralEngine.connect(deployer).upgradeToAndCall(
+                await logicV2.getAddress(),
+                "0x"
+            );
+            
+            console.log("✅ UPGRADER_ROLE защита работает");
         });
     });
 });

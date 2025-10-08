@@ -396,22 +396,24 @@ async function main(action) {
       console.log("\n🔷 Обрабатываем ProductRegistry...");
       productRegistry = await deploySingleContract("ProductRegistry", magicRegistry);
       
-      // Деплой AmanitaInternational (3-contract architecture)
-      console.log("\n🔷 Обрабатываем AmanitaInternational...");
-      const amanitaInternational = await deployAmanitaInternational();
+      // TODO: Деплой AmanitaInternational (UUPS) - требует адаптации под UUPS
+      // AmanitaInternationalLogic + AmanitaInternationalProxy уже UUPS
+      // Но deployAmanitaInternational() использует старую 3-контрактную архитектуру
+      console.log("\n⚠️ Пропускаем AmanitaInternational (требует UUPS адаптации)...");
+      // const amanitaInternational = await deployAmanitaInternational();
       
       console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
       console.log("☀️ Адрес ProductRegistry:", productRegistry.options.address);
-      console.log("☀️ Адрес AmanitaInternational Proxy:", amanitaInternational.proxy.options.address);
+      // console.log("☀️ Адрес AmanitaInternational Proxy:", amanitaInternational.proxy.options.address);
       
     }
     
     if (action === 3 || action === 4 || action === 40 || action === 41) {
 
-      spiralEngine = await loadContract("SpiralEngine");
+      spiralEngine = await loadUUPSContract("SpiralEngine");
       console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
 
-      productRegistry = await loadContract("ProductRegistry");
+      productRegistry = await loadUUPSContract("ProductRegistry");
       console.log("☀️ Адрес ProductRegistry:", productRegistry.options.address);
       
     }
@@ -423,19 +425,37 @@ async function main(action) {
     
     // Action 777: Генерация 12 инвайтов для деплоера (production)
     if (action === 777) {
-      console.log("\n🎲 Action 777: Генерация инвайтов для деплоера...");
+      console.log("\n" + "=".repeat(60));
+      console.log("🎲 Action 777: Генерация инвайтов для деплоера");
+      console.log("=".repeat(60));
       
-      // Загружаем SpiralEngine
-      const spiralEngine = await loadContract("SpiralEngine");
-      console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
+      // Загружаем SpiralEngine (UUPS)
+      console.log("\n📦 Шаг 1/4: Загрузка SpiralEngine...");
+      const spiralEngine = await loadUUPSContract("SpiralEngine");
+      console.log("✅ SpiralEngine загружен:", spiralEngine.options.address);
+      
+      // Проверяем общее состояние
+      const totalInvites = await spiralEngine.methods.totalInvitesMinted().call();
+      console.log(`📊 Текущее количество инвайтов: ${totalInvites}`);
       
       // Проверяем права деплоера
+      console.log("\n🔐 Шаг 2/4: Проверка прав деплоера...");
       await validateDeployerAccess(spiralEngine);
+      console.log("✅ Деплоер имеет необходимые права");
       
       // Генерируем 12 инвайтов для деплоера
+      console.log("\n🎲 Шаг 3/4: Генерация и минтинг инвайтов...");
       await creatingInvitesForDeployer(spiralEngine);
       
+      // Финальная проверка
+      console.log("\n📊 Шаг 4/4: Финальная проверка...");
+      const totalInvitesAfter = await spiralEngine.methods.totalInvitesMinted().call();
+      console.log(`✅ Инвайтов после генерации: ${totalInvitesAfter}`);
+      console.log(`✅ Создано новых инвайтов: ${totalInvitesAfter - totalInvites}`);
+      
+      console.log("\n" + "=".repeat(60));
       console.log("✅ Action 777 завершен успешно!");
+      console.log("=".repeat(60));
     }
     
     // Action 888: Полная инициализация селлера
@@ -609,8 +629,8 @@ async function main(action) {
       
       console.log(`\n🎲 Action 11: Генерируем ${inviteCount} инвайтов для селлера ${sellerAddress}...`);
       
-      // Загружаем SpiralEngine
-      const spiralEngine = await loadContract("SpiralEngine");
+      // Загружаем SpiralEngine (UUPS)
+      const spiralEngine = await loadUUPSContract("SpiralEngine");
       console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
       
       // Проверяем что селлер активирован и имеет роль SELLER_ROLE
@@ -631,8 +651,8 @@ async function main(action) {
       
       console.log(`\n📋 Action 12: Получаем полный каталог для продавца ${sellerAddress}...`);
       
-      // Загружаем ProductRegistry
-      const productRegistry = await loadContract("ProductRegistry");
+      // Загружаем ProductRegistry (UUPS)
+      const productRegistry = await loadUUPSContract("ProductRegistry");
       console.log("📦 Адрес ProductRegistry:", productRegistry.options.address);
       
       // Получаем полный каталог с загрузкой данных
@@ -650,9 +670,9 @@ async function main(action) {
       
       console.log(`\n🔍 Action 13: Диагностика состояния селлера ${sellerAddress}...`);
       
-      // Загружаем контракты
-      const spiralEngine = await loadContract("SpiralEngine");
-      const productRegistry = await loadContract("ProductRegistry");
+      // Загружаем контракты (UUPS)
+      const spiralEngine = await loadUUPSContract("SpiralEngine");
+      const productRegistry = await loadUUPSContract("ProductRegistry");
       
       console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
       console.log("📦 Адрес ProductRegistry:", productRegistry.options.address);
@@ -736,13 +756,46 @@ const SUPPORTED_CONTRACTS = {
         dependencies: [],
         needsSetup: false
     },
+    // === 🔄 UUPS Контракты (Upgradeable) ===
+    
+    // SpiralEngine (UUPS Architecture)
+    'SpiralEngineLogic': {
+        dependencies: [],
+        needsSetup: false,
+        isUUPSLogic: true
+    },
+    'SpiralEngineProxy': {
+        dependencies: ['SpiralEngineLogic'],
+        needsSetup: false,
+        isUUPSProxy: true,
+        logicContract: 'SpiralEngineLogic'
+    },
     'SpiralEngine': {
         dependencies: [],
-        needsSetup: true
+        needsSetup: true,
+        isUUPSDeployment: true,
+        logicContract: 'SpiralEngineLogic',
+        proxyContract: 'SpiralEngineProxy'
+    },
+    
+    // ProductRegistry (UUPS Architecture)
+    'ProductRegistryLogic': {
+        dependencies: [],
+        needsSetup: false,
+        isUUPSLogic: true
+    },
+    'ProductRegistryProxy': {
+        dependencies: ['ProductRegistryLogic', 'SpiralEngine'],
+        needsSetup: false,
+        isUUPSProxy: true,
+        logicContract: 'ProductRegistryLogic'
     },
     'ProductRegistry': {
         dependencies: ['SpiralEngine'],
-        needsSetup: true
+        needsSetup: true,
+        isUUPSDeployment: true,
+        logicContract: 'ProductRegistryLogic',
+        proxyContract: 'ProductRegistryProxy'
     },
     'LoveDoPostNFT': {
         dependencies: ['SpiralEngine', 'MagicRegistry'],
@@ -784,27 +837,41 @@ const SUPPORTED_CONTRACTS = {
         dependencies: ['SoulboundCore', 'SoulMetadata'],
         needsSetup: true
     },
-    // 🌐 Localization System (3-contract architecture)
-    'AmanitaInternationalProxy': {
-        dependencies: ['AmanitaInternationalStorage', 'AmanitaInternationalLogicV1'],
-        needsSetup: true,
-        is3ContractArchitecture: true
-    },
-    'AmanitaInternationalStorage': {
+    // 🌐 Localization System (UUPS Architecture)
+    'AmanitaInternationalLogic': {
         dependencies: [],
-        needsSetup: false
+        needsSetup: false,
+        isUUPSLogic: true
     },
-    'AmanitaInternationalLogicV1': {
-        dependencies: ['AmanitaInternationalStorage'],
-        needsSetup: false
+    'AmanitaInternationalProxy': {
+        dependencies: ['AmanitaInternationalLogic'],
+        needsSetup: false,
+        isUUPSProxy: true,
+        logicContract: 'AmanitaInternationalLogic'
+    },
+    'AmanitaInternational': {
+        dependencies: [],
+        needsSetup: true,
+        isUUPSDeployment: true,
+        logicContract: 'AmanitaInternationalLogic',
+        proxyContract: 'AmanitaInternationalProxy'
     }
 };
 
 // Маппинг контрактов на переменные окружения .env
 const CONTRACT_ENV_MAPPING = {
     'MagicRegistry': 'MAGIC_REGISTRY_CONTRACT_ADDRESS',
-    'SpiralEngine': 'SPIRAL_ENGINE_CONTRACT_ADDRESS', 
-    'ProductRegistry': 'PRODUCT_REGISTRY_CONTRACT_ADDRESS',
+    
+    // === 🔄 UUPS Контракты (Upgradeable) ===
+    'SpiralEngineLogic': 'SPIRAL_ENGINE_LOGIC_ADDRESS',
+    'SpiralEngineProxy': 'SPIRAL_ENGINE_PROXY_ADDRESS',
+    'SpiralEngine': 'SPIRAL_ENGINE_PROXY_ADDRESS',  // Алиас для Proxy (обратная совместимость)
+    
+    'ProductRegistryLogic': 'PRODUCT_REGISTRY_LOGIC_ADDRESS',
+    'ProductRegistryProxy': 'PRODUCT_REGISTRY_PROXY_ADDRESS',
+    'ProductRegistry': 'PRODUCT_REGISTRY_PROXY_ADDRESS',  // Алиас для Proxy (обратная совместимость)
+    
+    // === Остальные контракты ===
     'LoveDoPostNFT': 'LOVE_DO_POST_NFT_CONTRACT_ADDRESS',
     'LoveEmissionEngine': 'LOVE_EMISSION_ENGINE_CONTRACT_ADDRESS',
     'AmanitaToken': 'AMANITA_TOKEN_CONTRACT_ADDRESS',
@@ -815,11 +882,212 @@ const CONTRACT_ENV_MAPPING = {
     'SoulRecovery': 'SOUL_RECOVERY_CONTRACT_ADDRESS',
     'SoulIntegration': 'SOUL_INTEGRATION_CONTRACT_ADDRESS',
     'SoulIdentity': 'SOUL_IDENTITY_CONTRACT_ADDRESS',
-    // 🌐 Localization System (3-contract architecture)
+    
+    // 🌐 Localization System (UUPS Architecture)
+    'AmanitaInternationalLogic': 'AMANITA_INTERNATIONAL_LOGIC_ADDRESS',
     'AmanitaInternationalProxy': 'AMANITA_INTERNATIONAL_PROXY_ADDRESS',
-    'AmanitaInternationalStorage': 'AMANITA_INTERNATIONAL_STORAGE_ADDRESS',
-    'AmanitaInternationalLogicV1': 'AMANITA_INTERNATIONAL_LOGIC_V1_ADDRESS'
+    'AmanitaInternational': 'AMANITA_INTERNATIONAL_PROXY_ADDRESS'  // Алиас для Proxy (обратная совместимость)
 };
+
+// ====================================================================
+// 🔷 UUPS HELPER FUNCTIONS
+// ====================================================================
+
+/**
+ * Получить аргументы конструктора для Logic контракта UUPS
+ * @param {string} contractName - Название контракта ('SpiralEngine', 'ProductRegistry', etc.)
+ * @returns {Array} Массив аргументов для constructor (всегда [] для UUPS Logic)
+ */
+function getLogicConstructorArgs(contractName) {
+    // UUPS Logic контракты не имеют параметров в constructor
+    // Все параметры передаются через initialize()
+    
+    if (contractName === 'SpiralEngine' || contractName === 'SpiralEngineLogic') {
+        return [];  // SpiralEngineLogic: constructor пустой
+    }
+    
+    if (contractName === 'ProductRegistry' || contractName === 'ProductRegistryLogic') {
+        return [];  // ProductRegistryLogic: constructor пустой
+    }
+    
+    if (contractName === 'AmanitaInternational' || contractName === 'AmanitaInternationalLogic') {
+        return [];  // AmanitaInternationalLogic: constructor пустой
+    }
+    
+    // Fallback для будущих UUPS контрактов
+    return [];
+}
+
+/**
+ * Подготовить calldata для initialize() функции UUPS контракта
+ * @param {string} contractName - Название контракта
+ * @param {Object} logicInstance - Web3 контракт Logic (не используется, но оставлен для совместимости)
+ * @returns {string} Закодированная calldata для initialize()
+ */
+async function prepareInitializeCalldata(contractName, logicInstance = null) {
+    console.log(`⚙️ Подготовка initialize() calldata для ${contractName}...`);
+    
+    // Получаем Logic contract name
+    const contractInfo = SUPPORTED_CONTRACTS[contractName];
+    if (!contractInfo || !contractInfo.isUUPSDeployment) {
+        throw new Error(`${contractName} не является UUPS контрактом`);
+    }
+    
+    const logicContractName = contractInfo.logicContract;
+    const artifact = await loadContractArtifact(logicContractName);
+    const web3Contract = new web3.eth.Contract(artifact.abi);
+    
+    // SpiralEngine: initialize(address admin)
+    if (contractName === 'SpiralEngine') {
+        console.log(`   → initialize(admin: ${deployerAccount.address})`);
+        return web3Contract.methods.initialize(deployerAccount.address).encodeABI();
+    }
+    
+    // ProductRegistry: initialize(address admin, address _spiralEngine)
+    if (contractName === 'ProductRegistry') {
+        // Получаем адрес SpiralEngine Proxy из .env или MagicRegistry
+        let spiralEngineProxyAddress = process.env[CONTRACT_ENV_MAPPING['SpiralEngine']];
+        
+        if (!spiralEngineProxyAddress || spiralEngineProxyAddress === 'undefined') {
+            // Пробуем загрузить из MagicRegistry
+            if (magicRegistry) {
+                try {
+                    spiralEngineProxyAddress = await magicRegistry.methods.get('SpiralEngine').call();
+                    console.log(`   ℹ️ SpiralEngine Proxy адрес загружен из MagicRegistry: ${spiralEngineProxyAddress}`);
+                } catch (error) {
+                    throw new Error('SpiralEngine Proxy адрес не найден ни в .env, ни в MagicRegistry! Задеплойте SpiralEngine сначала.');
+                }
+            } else {
+                throw new Error('SpiralEngine Proxy адрес не найден в .env и MagicRegistry недоступен! Задеплойте SpiralEngine сначала.');
+            }
+        }
+        
+        console.log(`   → initialize(admin: ${deployerAccount.address}, spiralEngine: ${spiralEngineProxyAddress})`);
+        return web3Contract.methods.initialize(
+            deployerAccount.address,
+            spiralEngineProxyAddress
+        ).encodeABI();
+    }
+    
+    // AmanitaInternational: initialize(address admin)
+    if (contractName === 'AmanitaInternational') {
+        console.log(`   → initialize(admin: ${deployerAccount.address})`);
+        return web3Contract.methods.initialize(deployerAccount.address).encodeABI();
+    }
+    
+    throw new Error(`Неизвестный UUPS контракт для initialize: ${contractName}`);
+}
+
+/**
+ * Загрузить UUPS контракт (Logic ABI + Proxy address)
+ * @param {string} contractName - Название контракта ('SpiralEngine', 'ProductRegistry')
+ * @returns {Object} Web3 Contract instance с Logic ABI на Proxy адресе
+ */
+async function loadUUPSContract(contractName) {
+    const contractInfo = SUPPORTED_CONTRACTS[contractName];
+    
+    // Fallback для не-UUPS контрактов
+    if (!contractInfo || !contractInfo.isUUPSDeployment) {
+        console.log(`   ℹ️ ${contractName} не является UUPS, используем loadContract()`);
+        return await loadContract(contractName);
+    }
+    
+    // Получаем Proxy адрес из .env или MagicRegistry
+    const envVar = CONTRACT_ENV_MAPPING[contractName];
+    let proxyAddress = process.env[envVar];
+    
+    // Если адрес не найден в .env, пробуем загрузить из MagicRegistry
+    if (!proxyAddress || proxyAddress === 'undefined') {
+        if (magicRegistry) {
+            try {
+                proxyAddress = await magicRegistry.methods.get(contractName).call();
+                console.log(`   ℹ️ ${contractName} Proxy адрес загружен из MagicRegistry: ${proxyAddress}`);
+            } catch (error) {
+                // Если не найден в MagicRegistry, выдаём ошибку
+                throw new Error(`Proxy адрес не найден ни в .env (${envVar}), ни в MagicRegistry для ${contractName}`);
+            }
+        } else {
+            throw new Error(`Proxy адрес не найден: ${envVar} не установлен в .env, и MagicRegistry недоступен`);
+        }
+    }
+    
+    console.log(`🔷 Загружаем UUPS контракт ${contractName}`);
+    console.log(`   → Proxy: ${proxyAddress}`);
+    
+    // Загружаем Logic ABI (для взаимодействия с Proxy)
+    const logicContractName = contractInfo.logicContract;
+    const artifact = await loadContractArtifact(logicContractName);
+    
+    console.log(`   → Logic ABI: ${logicContractName}`);
+    
+    // Создаем Web3 контракт с Logic ABI на Proxy адресе
+    return new web3.eth.Contract(artifact.abi, proxyAddress);
+}
+
+/**
+ * Деплой UUPS контракта (Logic + Proxy паттерн)
+ * @param {string} contractName - Название контракта ('SpiralEngine', 'ProductRegistry')
+ * @param {Object} contractInfo - Информация из SUPPORTED_CONTRACTS
+ * @param {Object} registryInstance - Экземпляр MagicRegistry (опционально)
+ * @returns {Object} Web3 Contract instance Proxy
+ */
+async function deployUUPSContract(contractName, contractInfo, registryInstance = null) {
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`🔷 UUPS Deployment: ${contractName}`);
+    console.log(`${'='.repeat(60)}`);
+    
+    // Шаг 1: Deploy Logic Implementation
+    console.log(`\n📦 Шаг 1/4: Деплой ${contractInfo.logicContract}...`);
+    const logicArgs = getLogicConstructorArgs(contractName);
+    console.log(`   → Constructor аргументы: ${logicArgs.length > 0 ? JSON.stringify(logicArgs) : '[]'}`);
+    
+    const logic = await deployContract(contractInfo.logicContract, logicArgs);
+    console.log(`✅ Logic deployed: ${logic.options.address}`);
+    
+    // Шаг 2: Prepare initialize() calldata
+    console.log(`\n⚙️ Шаг 2/4: Подготовка initialize() calldata...`);
+    const initCalldata = await prepareInitializeCalldata(contractName, logic);
+    console.log(`✅ Initialize calldata prepared (${initCalldata.length} bytes)`);
+    
+    // Шаг 3: Deploy Proxy with Logic + initData
+    console.log(`\n🔗 Шаг 3/4: Деплой ${contractInfo.proxyContract}...`);
+    console.log(`   → Logic address: ${logic.options.address}`);
+    console.log(`   → Initialize calldata: ${initCalldata.substring(0, 10)}...`);
+    
+    const proxyDeployed = await deployContract(
+        contractInfo.proxyContract,
+        [logic.options.address, initCalldata]
+    );
+    console.log(`✅ Proxy deployed: ${proxyDeployed.options.address}`);
+    
+    // ВАЖНО: Создаём Proxy instance с Logic ABI для правильного взаимодействия
+    console.log(`🔧 Создаём Proxy instance с Logic ABI...`);
+    const logicArtifact = await loadContractArtifact(contractInfo.logicContract);
+    const proxy = new web3.eth.Contract(logicArtifact.abi, proxyDeployed.options.address);
+    console.log(`✅ Proxy instance готов с Logic ABI`);
+    
+    // Шаг 4: Регистрация в MagicRegistry (ТОЛЬКО Proxy!)
+    if (registryInstance) {
+        console.log(`\n📝 Шаг 4/4: Регистрация в MagicRegistry...`);
+        console.log(`   → Регистрируем ${contractName} → ${proxy.options.address}`);
+        await registerContractInRegistry(contractName, proxy, registryInstance);
+        console.log(`✅ ${contractName} зарегистрирован в реестре`);
+    } else {
+        console.log(`\n⚠️ Шаг 4/4: Пропускаем регистрацию (MagicRegistry не предоставлен)`);
+    }
+    
+    // Финальный summary
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`✅ UUPS Deployment Complete: ${contractName}`);
+    console.log(`${'='.repeat(60)}`);
+    console.log(`📍 Proxy (Entry Point): ${proxy.options.address}`);
+    console.log(`⚙️ Logic Implementation: ${logic.options.address}`);
+    console.log(`🔄 Upgradeable: YES (через UPGRADER_ROLE)`);
+    console.log(`${'='.repeat(60)}\n`);
+    
+    // ВАЖНО: Возвращаем Proxy с Logic ABI!
+    return proxy;
+}
 
 /**
  * Деплой 3-контрактной архитектуры AmanitaInternational
@@ -988,7 +1256,15 @@ async function deploySingleContract(contractName, registryInstance = null) {
         throw new Error(`Неподдерживаемый контракт: ${contractName}. Доступные: ${Object.keys(SUPPORTED_CONTRACTS).join(', ')}`);
     }
     
-    // 2. Проверяем существующий контракт
+    const contractInfo = SUPPORTED_CONTRACTS[contractName];
+    
+    // 2. НОВАЯ ЛОГИКА: Проверка UUPS deployment
+    if (contractInfo.isUUPSDeployment) {
+        console.log(`🔷 Обнаружен UUPS контракт, используем специальный deployment паттерн...`);
+        return await deployUUPSContract(contractName, contractInfo, registryInstance);
+    }
+    
+    // 3. Проверяем существующий контракт (для не-UUPS)
     let contractInstance = await checkExistingContract(contractName);
     
     if (contractInstance) {
@@ -998,35 +1274,57 @@ async function deploySingleContract(contractName, registryInstance = null) {
         return contractInstance;
     }
     
-    // 3. Деплоим новый контракт
+    // 4. Деплоим новый контракт
     console.log(`🚀 Деплоим новый контракт ${contractName}`);
     
-    const contractInfo = SUPPORTED_CONTRACTS[contractName];
     console.log(`📋 Зависимости: ${contractInfo.dependencies.length > 0 ? contractInfo.dependencies.join(', ') : 'нет'}`);
     
-    // 4. Проверка зависимостей
+    // 5. Проверка зависимостей
     for (const dep of contractInfo.dependencies) {
         await ensureContractExists(dep, registryInstance);
     }
     
-    // 5. Деплой контракта
+    // 6. Деплой контракта
     console.log(`🚀 Создаем экземпляр ${contractName}...`);
     
-    if (contractName === 'MagicRegistry') {
+    // === UUPS Logic/Proxy контракты (деплоятся отдельно) ===
+    if (contractName === 'SpiralEngineLogic') {
+        contractInstance = await deployContract("SpiralEngineLogic", []);
+    } else if (contractName === 'SpiralEngineProxy') {
+        const logic = await loadContract("SpiralEngineLogic");
+        const initData = await prepareInitializeCalldata('SpiralEngine', logic);
+        contractInstance = await deployContract("SpiralEngineProxy", [logic.options.address, initData]);
+    } else if (contractName === 'ProductRegistryLogic') {
+        contractInstance = await deployContract("ProductRegistryLogic", []);
+    } else if (contractName === 'ProductRegistryProxy') {
+        const logic = await loadContract("ProductRegistryLogic");
+        const initData = await prepareInitializeCalldata('ProductRegistry', logic);
+        contractInstance = await deployContract("ProductRegistryProxy", [logic.options.address, initData]);
+    } else if (contractName === 'AmanitaInternationalLogic') {
+        contractInstance = await deployContract("AmanitaInternationalLogic", []);
+    } else if (contractName === 'AmanitaInternationalProxy') {
+        const logic = await loadContract("AmanitaInternationalLogic");
+        const initData = await prepareInitializeCalldata('AmanitaInternational', logic);
+        contractInstance = await deployContract("AmanitaInternationalProxy", [logic.options.address, initData]);
+    
+    // === Обычные контракты ===
+    } else if (contractName === 'MagicRegistry') {
         contractInstance = await deployContract("MagicRegistry");
     } else if (contractName === 'SpiralEngine') {
+        // ⚠️ DEPRECATED: Старый не-UUPS контракт (используйте SpiralEngineLogic + SpiralEngineProxy)
         contractInstance = await deployContract("SpiralEngine");
     } else if (contractName === 'ProductRegistry') {
-        const spiralEngine = await loadContract("SpiralEngine");
+        // ⚠️ DEPRECATED: Старый не-UUPS контракт (используйте ProductRegistryLogic + ProductRegistryProxy)
+        const spiralEngine = await loadUUPSContract("SpiralEngine");
         contractInstance = await deployContract("ProductRegistry", [spiralEngine.options.address]);
     } else if (contractName === 'LoveDoPostNFT') {
-        const spiralEngine = await loadContract("SpiralEngine");
+        const spiralEngine = await loadUUPSContract("SpiralEngine");
         contractInstance = await deployContract("LoveDoPostNFT", [deployerAccount.address, spiralEngine.options.address, magicRegistry.options.address]);
     } else if (contractName === 'LoveEmissionEngine') {
         const amanitaToken = await loadContract("AmanitaToken");
         const agovToken = await loadContract("AmanitaGovToken");
         const loveDo = await loadContract("LoveDoPostNFT");
-        const spiralEngine = await loadContract("SpiralEngine");
+        const spiralEngine = await loadUUPSContract("SpiralEngine");
         contractInstance = await deployContract("LoveEmissionEngine", [amanitaToken.options.address, agovToken.options.address, loveDo.options.address, spiralEngine.options.address, deployerAccount.address]);
     } else if (contractName === 'AmanitaToken') {
         contractInstance = await deployContract("AmanitaToken", [deployerAccount.address]);
@@ -1045,7 +1343,7 @@ async function deploySingleContract(contractName, registryInstance = null) {
         contractInstance = await deployContract("SoulRecovery", [soulboundCore.options.address]);
     } else if (contractName === 'SoulIntegration') {
         const soulboundCore = await loadContract("SoulboundCore");
-        const spiralEngine = await loadContract("SpiralEngine");
+        const spiralEngine = await loadUUPSContract("SpiralEngine");
         contractInstance = await deployContract("SoulIntegration", [spiralEngine.options.address, soulboundCore.options.address]);
     } else if (contractName === 'SoulIdentity') {
         console.log("🔷 Загружаем зависимости для SoulIdentity...");
@@ -1068,13 +1366,13 @@ async function deploySingleContract(contractName, registryInstance = null) {
         throw new Error(`${contractName} не может быть задеплоен отдельно. Используйте AmanitaInternationalProxy для деплоя всей архитектуры.`);
     }
     
-    // 6. Регистрация в реестре (кроме самого реестра и компонентов 3-контрактной архитектуры)
+    // 7. Регистрация в реестре (кроме самого реестра и компонентов 3-контрактной архитектуры)
     if (contractName !== 'MagicRegistry' && contractName !== 'AmanitaInternationalProxy') {
         await registerContractInRegistry(contractName, contractInstance, registryInstance);
         console.log(`📝 Контракт ${contractName} доступен в реестре под ключом "${contractName}"`);
     }
     
-    // 7. Настройка ролей (если необходимо)
+    // 8. Настройка ролей (если необходимо)
     if (contractInfo.needsSetup) {
         console.log(`⚙️ Настраиваем роли для ${contractName}...`);
         await setupContractRoles(contractName, contractInstance);
@@ -1332,8 +1630,8 @@ async function activateSeller(inviteCode, sellerAddress) {
     console.log(`\n🎯 Активируем продавца: ${sellerAddress}`);
     console.log(`📋 Используем инвайт-код: ${inviteCode}`);
     
-    // 1. Загружаем контракт SpiralEngine
-    const spiralEngine = await loadContract("SpiralEngine");
+    // 1. Загружаем контракт SpiralEngine (UUPS)
+    const spiralEngine = await loadUUPSContract("SpiralEngine");
     
     // 2. Проверяем права деплоера (админа)
     await validateDeployerAccess(spiralEngine);
@@ -1440,9 +1738,9 @@ async function clearSellerCatalog(sellerAddress, sellerPrivateKey) {
         throw error;
     }
     
-    // 2. Загружаем контракты
-    const productRegistry = await loadContract("ProductRegistry");
-    const spiralEngine = await loadContract("SpiralEngine");
+    // 2. Загружаем контракты (UUPS)
+    const productRegistry = await loadUUPSContract("ProductRegistry");
+    const spiralEngine = await loadUUPSContract("SpiralEngine");
     
     // 3. Проверяем права доступа
     await validateSellerAccess(sellerAddress, spiralEngine);
@@ -1983,8 +2281,8 @@ async function createFirstSeller(inviteCode) {
     console.log("⚠️ ВАЖНО: Сохраните приватный ключ в безопасном месте!");
   }
   
-  // 2. Загружаем контракт
-  const spiralEngine = await loadContract("SpiralEngine");
+  // 2. Загружаем контракт (UUPS)
+  const spiralEngine = await loadUUPSContract("SpiralEngine");
   
   // 3. Используем переданный инвайт-код
   console.log(`📋 Используем инвайт-код: ${inviteCode}`);
@@ -2040,8 +2338,8 @@ async function activateUser(inviteCode, userAddress) {
   console.log(`\n👤 Активируем пользователя: ${userAddress}`);
   console.log(`📋 Используем инвайт-код: ${inviteCode}`);
   
-  // 1. Загружаем контракт
-  const spiralEngine = await loadContract("SpiralEngine");
+  // 1. Загружаем контракт (UUPS)
+  const spiralEngine = await loadUUPSContract("SpiralEngine");
   
   // 2. Проверяем права активатора
   await validateActivatorAccess(spiralEngine);
@@ -2085,8 +2383,8 @@ async function activateUser(inviteCode, userAddress) {
 async function grantSellerRole(userAddress) {
   console.log(`\n🏪 Назначаем роль SELLER_ROLE пользователю: ${userAddress}`);
   
-  // 1. Загружаем контракт
-  const spiralEngine = await loadContract("SpiralEngine");
+  // 1. Загружаем контракт (UUPS)
+  const spiralEngine = await loadUUPSContract("SpiralEngine");
   
   // 2. Проверяем, активирован ли пользователь
   const usedInvite = await spiralEngine.methods.usedInviteByUser(userAddress).call();
@@ -2359,24 +2657,40 @@ async function loadContractsFor888() {
 // Валидация деплоер инвайта для селлера
 async function validateDeployerInviteForSeller(spiralEngine, deployerInvite) {
     try {
-        console.log(`🔍 Проверяем инвайт ${deployerInvite} в SpiralEngine ${spiralEngine.options.address}...`);
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`🔍 ДИАГНОСТИКА ИНВАЙТА: ${deployerInvite}`);
+        console.log(`${'='.repeat(60)}`);
+        console.log(`📍 SpiralEngine Proxy: ${spiralEngine.options.address}`);
         
-        // Проверяем, что методы существуют в ABI
-        console.log(`🔍 Доступные методы в SpiralEngine:`, Object.keys(spiralEngine.methods));
+        // Проверяем общее количество инвайтов
+        const totalInvites = await spiralEngine.methods.totalInvitesMinted().call();
+        console.log(`📊 Всего инвайтов в контракте: ${totalInvites}`);
         
-        // Пробуем вызвать метод с обработкой ошибок
-        let inviteExists;
-        try {
-            inviteExists = await spiralEngine.methods.inviteCodeExists(deployerInvite).call();
-            console.log(`🔍 inviteExists: ${inviteExists}`);
-        } catch (methodError) {
-            console.error(`❌ Ошибка при вызове inviteCodeExists:`, methodError.message);
-            throw new Error(`Метод inviteCodeExists не найден в SpiralEngine или ABI не соответствует`);
+        if (totalInvites === '0' || totalInvites === 0) {
+            console.log(`⚠️ В контракте НЕТ инвайтов!`);
+            console.log(`💡 Решение: Сначала выполните Action 777 для генерации инвайтов деплоера:`);
+            console.log(`   DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost`);
+            throw new Error(`Action 888: В SpiralEngine нет инвайтов. Выполните Action 777 сначала.`);
         }
+        
+        // Проверяем существование конкретного инвайта
+        console.log(`🔍 Проверяем существование инвайта ${deployerInvite}...`);
+        const inviteExists = await spiralEngine.methods.inviteCodeExists(deployerInvite).call();
+        console.log(`   → inviteExists: ${inviteExists}`);
         
         if (!inviteExists) {
-            throw new Error(`Action 888: инвайт ${deployerInvite} не существует`);
+            console.log(`\n❌ Инвайт ${deployerInvite} НЕ НАЙДЕН в контракте`);
+            console.log(`📋 Возможные причины:`);
+            console.log(`   1. Инвайт из старой сессии blockchain (нода была перезапущена)`);
+            console.log(`   2. Инвайт ещё не создан`);
+            console.log(`   3. Опечатка в коде инвайта`);
+            console.log(`\n💡 Решение: Выполните Action 777 для генерации новых инвайтов:`);
+            console.log(`   DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost`);
+            console.log(`   Затем используйте инвайт из bot/flowers/deployer_invites_localhost.txt`);
+            throw new Error(`Action 888: инвайт ${deployerInvite} не существует в текущей сессии blockchain`);
         }
+        
+        console.log(`✅ Инвайт найден!`);
         
         const tokenId = await spiralEngine.methods.inviteCodeToTokenId(deployerInvite).call();
         console.log(`🔍 tokenId: ${tokenId}`);
@@ -2662,8 +2976,8 @@ function generateInviteCodes(count) {
 async function grantActivatorRoleToSellerOnly(sellerAddress) {
     console.log(`🔷 Загружаем SpiralEngine для назначения роли ACTIVATOR_ROLE...`);
     
-    // Загружаем SpiralEngine
-    const spiralEngine = await loadContract("SpiralEngine");
+    // Загружаем SpiralEngine (UUPS)
+    const spiralEngine = await loadUUPSContract("SpiralEngine");
     console.log(`✅ SpiralEngine загружен: ${spiralEngine.options.address}`);
     
     // Проверяем, активирован ли пользователь

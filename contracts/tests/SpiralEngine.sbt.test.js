@@ -71,10 +71,23 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
         await soulIdentity.waitForDeployment();
         console.log(`   SoulIdentity: ${await soulIdentity.getAddress()}`);
 
-        // Деплой контракта SpiralEngine
-        const SpiralEngineFactory = await ethers.getContractFactory("SpiralEngine");
-        spiralEngine = await SpiralEngineFactory.deploy();
-        await spiralEngine.waitForDeployment();
+        // Деплой контракта SpiralEngine (UUPS архитектура)
+        console.log("🔷 Deploying SpiralEngine UUPS contract...");
+        
+        const Logic = await ethers.getContractFactory("SpiralEngineLogic");
+        const logicImpl = await Logic.connect(deployer).deploy();
+        await logicImpl.waitForDeployment();
+        
+        const initCalldata = logicImpl.interface.encodeFunctionData("initialize", [deployer.address]);
+        
+        const Proxy = await ethers.getContractFactory("SpiralEngineProxy");
+        const proxy = await Proxy.connect(deployer).deploy(
+            await logicImpl.getAddress(),
+            initCalldata
+        );
+        await proxy.waitForDeployment();
+        
+        spiralEngine = Logic.attach(await proxy.getAddress());
 
         // Устанавливаем ссылку на SoulIdentity
         await spiralEngine.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
@@ -101,7 +114,7 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
             // P0: Критическая проверка - transferFrom должен ревертиться
             await expect(
                 spiralEngine.connect(user1).transferFrom(user1.address, user2.address, tokenId)
-            ).to.be.revertedWith("SpiralEngine: transfers not allowed");
+            ).to.be.revertedWithCustomError(spiralEngine, "TransfersNotAllowed");
         });
 
         it("Should enforce non-transferability (safeTransferFrom)", async function () {
@@ -115,7 +128,7 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
             // P0: Критическая проверка - safeTransferFrom должен ревертиться
             await expect(
                 spiralEngine.connect(user1).safeTransferFrom(user1.address, user2.address, tokenId)
-            ).to.be.revertedWith("SpiralEngine: transfers not allowed");
+            ).to.be.revertedWithCustomError(spiralEngine, "TransfersNotAllowed");
         });
 
         it("Should block approval delegation (approve)", async function () {
@@ -129,7 +142,7 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
             // P0: Критическая проверка - approve должен ревертиться
             await expect(
                 spiralEngine.connect(user1).approve(user2.address, tokenId)
-            ).to.be.revertedWith("SpiralEngine: approvals not allowed");
+            ).to.be.revertedWithCustomError(spiralEngine, "ApprovalsNotAllowed");
         });
 
         it("Should block global approval delegation (setApprovalForAll)", async function () {
@@ -141,7 +154,7 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
             // P0: Критическая проверка - setApprovalForAll должен ревертиться
             await expect(
                 spiralEngine.connect(user1).setApprovalForAll(user2.address, true)
-            ).to.be.revertedWith("SpiralEngine: approvals not allowed");
+            ).to.be.revertedWithCustomError(spiralEngine, "ApprovalsNotAllowed");
         });
 
         it("Should return zero address for getApproved", async function () {

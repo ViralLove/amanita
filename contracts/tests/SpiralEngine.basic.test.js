@@ -119,11 +119,31 @@ describe("SpiralEngine - Basic Functionality", function () {
         );
         await soulIdentity.waitForDeployment();
 
-        // Деплоим контракт SpiralEngine
-        console.log("🔷 Deploying SpiralEngine contract...");
-        const SpiralEngine = await ethers.getContractFactory("SpiralEngine");
-        spiralEngine = await SpiralEngine.connect(deployer).deploy();
-        await spiralEngine.waitForDeployment();
+        // Деплоим контракт SpiralEngine (UUPS архитектура)
+        console.log("🔷 Deploying SpiralEngine UUPS contract...");
+        
+        // 1. Deploy Logic implementation
+        const Logic = await ethers.getContractFactory("SpiralEngineLogic");
+        const logicImpl = await Logic.connect(deployer).deploy();
+        await logicImpl.waitForDeployment();
+        console.log(`   ✅ Logic deployed: ${await logicImpl.getAddress()}`);
+        
+        // 2. Encode initialize(admin) calldata
+        const initCalldata = logicImpl.interface.encodeFunctionData("initialize", [
+            deployer.address
+        ]);
+        
+        // 3. Deploy Proxy with implementation and init data
+        const Proxy = await ethers.getContractFactory("SpiralEngineProxy");
+        const proxy = await Proxy.connect(deployer).deploy(
+            await logicImpl.getAddress(),
+            initCalldata
+        );
+        await proxy.waitForDeployment();
+        console.log(`   ✅ Proxy deployed: ${await proxy.getAddress()}`);
+        
+        // 4. Attach Logic ABI to proxy address (ABI-translator)
+        spiralEngine = Logic.attach(await proxy.getAddress());
 
         // Устанавливаем ссылку на SoulIdentity
         await spiralEngine.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
@@ -270,7 +290,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             await expect(
                 spiralEngine.connect(seller).mintInvite("", 0)
-            ).to.be.revertedWith("SpiralEngine: empty invite code");
+            ).to.be.revertedWithCustomError(spiralEngine, "EmptyInviteCode");
             
             console.log("✅ Empty invite code correctly rejected");
         });
@@ -283,7 +303,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             await expect(
                 spiralEngine.connect(seller).mintInvite(inviteCode, 0)
-            ).to.be.revertedWith("SpiralEngine: invite code already exists");
+            ).to.be.revertedWithCustomError(spiralEngine, "InviteCodeAlreadyExists");
             
             console.log("✅ Duplicate invite code correctly rejected");
         });
@@ -391,7 +411,7 @@ describe("SpiralEngine - Basic Functionality", function () {
                     wrongInviteCodes,
                     0
                 )
-            ).to.be.revertedWith("SpiralEngine: must provide exactly 12 invite codes");
+            ).to.be.revertedWithCustomError(spiralEngine, "InvalidInviteCount");
             
             console.log("✅ Wrong number of codes correctly rejected");
         });
@@ -427,7 +447,7 @@ describe("SpiralEngine - Basic Functionality", function () {
                     secondNewInviteCodes,
                     0
                 )
-            ).to.be.revertedWith("SpiralEngine: user already activated");
+            ).to.be.revertedWithCustomError(spiralEngine, "UserAlreadyActivated");
             
             console.log("✅ Double activation prevented");
         });
@@ -503,7 +523,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             await expect(
                 spiralEngine.connect(activator).grantSellerRole(newUser.address)
-            ).to.be.revertedWith("SpiralEngine: user not activated");
+            ).to.be.revertedWithCustomError(spiralEngine, "UserNotActivated");
             
             console.log("✅ Non-activated user correctly rejected");
         });
@@ -534,14 +554,25 @@ describe("SpiralEngine - Basic Functionality", function () {
         it("Should revert when SoulIdentity not set", async function () {
             console.log("Testing SoulIdentity not set scenario...");
             
-            // Создаем новый SpiralEngine без SoulIdentity
-            const SpiralEngine = await ethers.getContractFactory("SpiralEngine");
-            const newSpiralEngine = await SpiralEngine.connect(deployer).deploy();
-            await newSpiralEngine.waitForDeployment();
+            // Создаем новый SpiralEngine без SoulIdentity (UUPS)
+            const Logic = await ethers.getContractFactory("SpiralEngineLogic");
+            const logicImpl = await Logic.connect(deployer).deploy();
+            await logicImpl.waitForDeployment();
+            
+            const initCalldata = logicImpl.interface.encodeFunctionData("initialize", [deployer.address]);
+            
+            const Proxy = await ethers.getContractFactory("SpiralEngineProxy");
+            const proxy = await Proxy.connect(deployer).deploy(
+                await logicImpl.getAddress(),
+                initCalldata
+            );
+            await proxy.waitForDeployment();
+            
+            const newSpiralEngine = Logic.attach(await proxy.getAddress());
             
             await expect(
                 newSpiralEngine.getSoulLevel(user.address)
-            ).to.be.revertedWith("SpiralEngine: soul identity not set");
+            ).to.be.revertedWithCustomError(newSpiralEngine, "SoulIdentityNotSet");
             
             console.log("✅ SoulIdentity not set correctly handled");
         });
@@ -560,7 +591,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             await expect(
                 spiralEngine.connect(seller).transferFrom(seller.address, user.address, tokenId)
-            ).to.be.revertedWith("SpiralEngine: transfers not allowed");
+            ).to.be.revertedWithCustomError(spiralEngine, "TransfersNotAllowed");
             
             console.log("✅ Token transfers correctly prevented");
         });
@@ -641,7 +672,7 @@ describe("SpiralEngine - Basic Functionality", function () {
                     newInviteCodes,
                     expiry
                 )
-            ).to.be.revertedWith("SpiralEngine: invalid user address");
+            ).to.be.revertedWithCustomError(spiralEngine, "InvalidUserAddress");
             
             console.log("✅ Zero address edge cases handled correctly");
         });
@@ -670,7 +701,7 @@ describe("SpiralEngine - Basic Functionality", function () {
                     newInviteCodes,
                     0
                 )
-            ).to.be.revertedWith("SpiralEngine: invite expired");
+            ).to.be.revertedWithCustomError(spiralEngine, "InviteExpired");
             
             console.log("✅ Expired invite edge cases handled correctly");
         });

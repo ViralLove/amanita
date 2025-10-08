@@ -734,7 +734,7 @@ npx hardhat run scripts/migration/snapshot-old-data.js --network polygon
     "Description.ru": "QmZzZ...",
     "Description.en": "QmAaA...",
     ...
-  }
+    }
 }
 ```
 
@@ -824,40 +824,40 @@ class LocalizationService(Localization):
         
         return cid
     
-    async def set_translation_cid(
-        self,
-        field_key: str,
-        cid: str,
-        language: str = None,
-        signer_private_key: str = None
-    ):
+async def set_translation_cid(
+    self, 
+    field_key: str, 
+    cid: str, 
+    language: str = None,
+    signer_private_key: str = None
+):
         """Установить CID перевода (только ADMIN_ROLE)"""
-        account = web3.eth.account.from_key(signer_private_key)
-        
-        if language:
-            tx = await self.contract.functions.setComplexFieldCID(
+    account = web3.eth.account.from_key(signer_private_key)
+    
+    if language:
+        tx = await self.contract.functions.setComplexFieldCID(
                 field_key, language, cid
-            ).build_transaction({
-                'from': account.address,
-                'nonce': await web3.eth.get_transaction_count(account.address),
+        ).build_transaction({
+            'from': account.address,
+            'nonce': await web3.eth.get_transaction_count(account.address),
                 'gas': 150000,
-                'gasPrice': await web3.eth.gas_price
-            })
-        else:
-            tx = await self.contract.functions.setSimpleFieldCID(
+            'gasPrice': await web3.eth.gas_price
+        })
+    else:
+        tx = await self.contract.functions.setSimpleFieldCID(
                 field_key, cid
-            ).build_transaction({
-                'from': account.address,
-                'nonce': await web3.eth.get_transaction_count(account.address),
+        ).build_transaction({
+            'from': account.address,
+            'nonce': await web3.eth.get_transaction_count(account.address),
                 'gas': 100000,
-                'gasPrice': await web3.eth.gas_price
-            })
-        
-        signed = web3.eth.account.sign_transaction(tx, signer_private_key)
-        tx_hash = await web3.eth.send_raw_transaction(signed.rawTransaction)
-        receipt = await web3.eth.wait_for_transaction_receipt(tx_hash)
-        
-        return receipt
+            'gasPrice': await web3.eth.gas_price
+        })
+    
+    signed = web3.eth.account.sign_transaction(tx, signer_private_key)
+    tx_hash = await web3.eth.send_raw_transaction(signed.rawTransaction)
+    receipt = await web3.eth.wait_for_transaction_receipt(tx_hash)
+    
+    return receipt
 ```
 
 ---

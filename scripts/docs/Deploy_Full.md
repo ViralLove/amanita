@@ -4,9 +4,120 @@
 
 `deploy_full.js` - это универсальный скрипт для развертывания и управления контрактами экосистемы Amanita. Скрипт поддерживает различные сценарии деплоя от полной инициализации экосистемы до обновления отдельных контрактов.
 
-**Версия документации**: 2.0  
-**Дата обновления**: 17 сентября 2025  
-**Статус**: Актуализировано с поддержкой SBT экосистемы
+**Версия документации**: 3.0  
+**Дата обновления**: 8 января 2025  
+**Статус**: Актуализировано с поддержкой UUPS архитектуры
+
+## 🔷 UUPS Архитектура (Upgradeable Contracts)
+
+### Обзор UUPS паттерна
+
+С версии 3.0 ключевые контракты экосистемы Amanita используют **UUPS (Universal Upgradeable Proxy Standard)** - паттерн для создания обновляемых смарт-контрактов.
+
+**Ключевые преимущества:**
+- ✅ **Обновляемость** - можно улучшать логику без изменения адреса
+- ✅ **State сохраняется** - все данные остаются при upgrade
+- ✅ **Минимальный Proxy** - экономия gas на взаимодействиях
+- ✅ **Централизованный контроль** - upgrade через UPGRADER_ROLE
+
+### UUPS Контракты
+
+#### SpiralEngine (UUPS Upgradeable)
+
+**Назначение:** Система инвайт-кодов для онбординга пользователей
+
+**Компоненты:**
+- **Logic:** `SpiralEngineLogic.sol` (809 строк)
+  - Содержит всю бизнес-логику
+  - Может быть обновлён через UPGRADER_ROLE
+  - Адрес меняется при каждом upgrade
+- **Proxy:** `SpiralEngineProxy.sol` (50 строк)
+  - Точка входа для всех взаимодействий
+  - Адрес фиксирован (никогда не меняется)
+  - Хранит весь state контракта
+- **Interface:** `ISpiralEngine.sol`
+  - Стандартный интерфейс для взаимодействия
+
+**Entry Point (используйте этот адрес):**
+```bash
+SPIRAL_ENGINE_PROXY_ADDRESS=0x...  # Основной адрес для взаимодействия
+```
+
+---
+
+#### ProductRegistry (UUPS Upgradeable)
+
+**Назначение:** Каталог продуктов продавцов с IPFS интеграцией
+
+**Компоненты:**
+- **Logic:** `ProductRegistryLogic.sol` (587 строк)
+  - Содержит всю бизнес-логику каталога
+  - Может быть обновлён через UPGRADER_ROLE
+  - Адрес меняется при каждом upgrade
+- **Proxy:** `ProductRegistryProxy.sol` (59 строк)
+  - Точка входа для всех взаимодействий
+  - Адрес фиксирован (никогда не меняется)
+  - Хранит весь state контракта
+- **Interface:** `IProductRegistry.sol`
+  - Стандартный интерфейс для взаимодействия
+
+**Entry Point (используйте этот адрес):**
+```bash
+PRODUCT_REGISTRY_PROXY_ADDRESS=0x...  # Основной адрес для взаимодействия
+```
+
+---
+
+### UUPS Deployment Pattern
+
+При деплое UUPS контракта через `deploy_full.js` автоматически выполняются следующие шаги:
+
+```
+1. Deploy Logic Implementation
+   ↓ Деплоится Logic контракт с бизнес-логикой
+   
+2. Prepare initialize() calldata
+   ↓ Подготавливаются параметры для инициализации
+   
+3. Deploy Proxy with Logic + initData
+   ↓ Деплоится Proxy с указанием Logic и данными для initialize()
+   
+4. Register Proxy в MagicRegistry
+   ↓ Регистрируется ТОЛЬКО Proxy адрес (Logic остаётся внутренним)
+   
+5. Return Proxy instance
+   ↓ Все взаимодействия через Proxy адрес
+```
+
+**Важно:** 
+- 🔸 **Всегда используйте Proxy адрес** для взаимодействия с контрактом
+- 🔸 **Logic адрес** нужен только для upgrade операций
+- 🔸 **State хранится в Proxy**, не в Logic!
+- 🔸 **MagicRegistry** содержит только Proxy адреса
+
+---
+
+### Upgrade Process
+
+Для обновления UUPS контракта:
+
+```bash
+# 1. Деплой новой версии Logic
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngineLogic
+
+# 2. Вызов upgradeToAndCall на Proxy (требуется UPGRADER_ROLE)
+# (реализуется через отдельный скрипт upgrade-implementation.js)
+npx hardhat run scripts/upgrade-implementation.js --network localhost SpiralEngine <NEW_LOGIC_ADDRESS>
+
+# 3. Proxy теперь использует новую Logic
+# Адрес Proxy не изменился, state сохранён
+```
+
+**Роли для upgrade:**
+- `UPGRADER_ROLE` - может обновлять Logic implementation
+- `DEFAULT_ADMIN_ROLE` - может назначать UPGRADER_ROLE
+
+---
 
 ## Установка и настройка
 
@@ -18,21 +129,35 @@
 - Запущенная локальная нода Hardhat (для localhost) или доступ к RPC
 
 ### Переменные окружения (.env)
+
 ```bash
 # Приватные ключи
 DEPLOYER_PRIVATE_KEY=0x...
 SELLER_PRIVATE_KEY=0x...
+SELLER_ADDRESS=0x...
 
 # RPC URLs
 POLYGON_MAINNET_RPC=https://polygon-rpc.com
 POLYGON_MUMBAI_RPC=https://rpc-mumbai.maticvigil.com
 
-# Адреса контрактов (заполняются автоматически)
-AMANITA_REGISTRY_CONTRACT_ADDRESS=0x...
-INVITE_NFT_CONTRACT_ADDRESS=0x...
-PRODUCT_REGISTRY_CONTRACT_ADDRESS=0x...
+# === 🔷 UUPS Контракты (Upgradeable) ===
 
-# SBT экосистема
+# SpiralEngine UUPS (Система инвайт-кодов)
+SPIRAL_ENGINE_PROXY_ADDRESS=0x...     # ← Основной адрес (для взаимодействия)
+SPIRAL_ENGINE_LOGIC_ADDRESS=0x...     # Logic адрес (для upgrade)
+SPIRAL_ENGINE_CONTRACT_ADDRESS=0x...  # Алиас → PROXY (обратная совместимость)
+
+# ProductRegistry UUPS (Каталог продуктов)
+PRODUCT_REGISTRY_PROXY_ADDRESS=0x...     # ← Основной адрес (для взаимодействия)
+PRODUCT_REGISTRY_LOGIC_ADDRESS=0x...     # Logic адрес (для upgrade)
+PRODUCT_REGISTRY_CONTRACT_ADDRESS=0x...  # Алиас → PROXY (обратная совместимость)
+
+# === Остальные контракты ===
+
+# Центральный реестр
+MAGIC_REGISTRY_CONTRACT_ADDRESS=0x...
+
+# SBT экосистема (Soulbound Tokens)
 SOULBOUND_CORE_CONTRACT_ADDRESS=0x...
 SOUL_METADATA_CONTRACT_ADDRESS=0x...
 SOUL_RECOVERY_CONTRACT_ADDRESS=0x...
@@ -51,6 +176,12 @@ AMANITA_TOKEN_CONTRACT_ADDRESS=0x...
 AMANITA_GOV_TOKEN_CONTRACT_ADDRESS=0x...
 AMANITA_PAYMENT_ROUTER_CONTRACT_ADDRESS=0x...
 ```
+
+**Важно для UUPS контрактов:**
+- ✅ **Используйте `*_PROXY_ADDRESS`** для всех взаимодействий
+- ✅ **`*_LOGIC_ADDRESS`** нужен только для upgrade операций
+- ✅ **`*_CONTRACT_ADDRESS`** - алиас для Proxy (обратная совместимость со старым кодом)
+- 🔸 После деплоя скрипт автоматически обновит `.env` с правильными адресами
 
 ### Выбор сети (Network Profiles)
 
@@ -143,15 +274,31 @@ DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
 # Способ 2 - через аргументы командной строки
 npx hardhat run scripts/deploy_full.js --network localhost 1
 ```
-**Описание:** Деплоит все контракты и настраивает связи между ними
+**Описание:** Деплоит все контракты и настраивает связи между ними. С версии 3.0 автоматически использует UUPS архитектуру для SpiralEngine и ProductRegistry.
+
 **Включает:**
-- AmanitaRegistry (реестр контрактов)
-- SpiralEngine (система инвайтов)
-- ProductRegistry (каталог продуктов)
+- MagicRegistry (реестр контрактов)
+- **SpiralEngine (UUPS)** - Logic + Proxy автоматически
+- **ProductRegistry (UUPS)** - Logic + Proxy автоматически  
 - SBT экосистема (5 контрактов: Core, Metadata, Recovery, Integration, Identity)
 - **AmanitaInternational (3-контрактная архитектура для локализации)**
 - Настройка ролей и связей
-- Регистрация всех контрактов в реестре
+- Регистрация Proxy адресов в реестре
+
+**UUPS Deployment Process:**
+```
+SpiralEngine:
+  1. Deploy SpiralEngineLogic
+  2. Prepare initialize(admin) calldata
+  3. Deploy SpiralEngineProxy(logic, initData)
+  4. Register Proxy → MagicRegistry
+
+ProductRegistry:
+  1. Deploy ProductRegistryLogic
+  2. Prepare initialize(admin, spiralEngine) calldata
+  3. Deploy ProductRegistryProxy(logic, initData)
+  4. Register Proxy → MagicRegistry
+```
 
 #### `2` - Деплой контрактов с обновлением реестра
 ```bash
@@ -211,9 +358,13 @@ npx hardhat run scripts/deploy_full.js --network localhost 5 <CONTRACT_NAME>
 **Поддерживаемые контракты:**
 
 #### Основная экосистема Amanita
-- `AmanitaRegistry` - Центральный реестр контрактов
-- `SpiralEngine` - Система инвайт-кодов (заменил InviteNFT)
-- `ProductRegistry` - Реестр продуктов
+- `MagicRegistry` - Центральный реестр контрактов
+- **`SpiralEngine` (UUPS)** - Система инвайт-кодов (автоматически деплоит Logic + Proxy)
+  - `SpiralEngineLogic` - Logic implementation (можно деплоить отдельно)
+  - `SpiralEngineProxy` - Proxy entry point (можно деплоить отдельно)
+- **`ProductRegistry` (UUPS)** - Реестр продуктов (автоматически деплоит Logic + Proxy)
+  - `ProductRegistryLogic` - Logic implementation (можно деплоить отдельно)
+  - `ProductRegistryProxy` - Proxy entry point (можно деплоить отдельно)
 - `LoveDoPostNFT` - NFT для постов о любви
 - `LoveEmissionEngine` - Движок эмиссии любви
 - `Lovecoin` - Основной токен экосистемы (заменил AmanitaToken)
@@ -239,9 +390,18 @@ npx hardhat run scripts/deploy_full.js --network localhost 5 <CONTRACT_NAME>
 
 **Примеры:**
 ```bash
-# Основная экосистема (способ 1 - через переменную окружения)
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost ProductRegistry
+# UUPS Контракты (автоматический деплой Logic + Proxy)
 DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngine
+# ✅ Результат: SpiralEngineLogic + SpiralEngineProxy задеплоены автоматически
+
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost ProductRegistry
+# ✅ Результат: ProductRegistryLogic + ProductRegistryProxy задеплоены автоматически
+
+# UUPS Контракты (отдельный деплой компонентов - для upgrade)
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngineLogic
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngineProxy
+
+# Основная экосистема (способ 1 - через переменную окружения)
 DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost Lovecoin
 
 # Основная экосистема (способ 2 - через аргументы командной строки)
@@ -369,7 +529,7 @@ npx hardhat run scripts/deploy_full.js --network localhost 41
 # Способ 1 - через переменные окружения (рекомендуется)
 DEPLOY_ACTION=888 DEPLOYER_INVITE=<deployerInvite> SELLER_ADDRESS=<sellerAddress> npx hardhat run scripts/deploy_full.js --network localhost
 
-DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-EMW4-GA76 npx hardhat run scripts/deploy_full.js --network polygon
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-42PC-IZ3I npx hardhat run scripts/deploy_full.js --network localhost
 
 # Способ 2 - через аргументы командной строки
 npx hardhat run scripts/deploy_full.js --network localhost 888 <deployerInvite> <sellerAddress> [catalogData]
@@ -581,32 +741,42 @@ node deploy_full.js 5 BytesErrorEngine
 
 ## Примеры полных сценариев
 
-### Сценарий 1: Первоначальная настройка основной экосистемы
+### Сценарий 1: Первоначальная настройка с UUPS (v3.0)
 ```bash
 # 1. Запуск локальной ноды
 npx hardhat node
 
-# 2. Деплой реестра (способ 1 - через переменную окружения)
-DEPLOY_ACTION=0 npx hardhat run scripts/deploy_full.js --network localhost
-
-# 3. Полный деплой экосистемы (способ 1 - через переменную окружения)
+# 2. Полный деплой экосистемы с UUPS
 DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
 
-# 4. Минтинг инвайтов для деплоера (способ 1 - через переменную окружения)
+# Результат:
+# ✅ MagicRegistry задеплоен
+# ✅ SpiralEngine (UUPS): Logic + Proxy задеплоены
+#    - SPIRAL_ENGINE_LOGIC_ADDRESS=0x...
+#    - SPIRAL_ENGINE_PROXY_ADDRESS=0x... ← используйте этот!
+# ✅ ProductRegistry (UUPS): Logic + Proxy задеплоены
+#    - PRODUCT_REGISTRY_LOGIC_ADDRESS=0x...
+#    - PRODUCT_REGISTRY_PROXY_ADDRESS=0x... ← используйте этот!
+# ✅ SBT экосистема задеплоена (5 контрактов)
+# ✅ AmanitaInternational задеплоен
+# ✅ Все Proxy адреса зарегистрированы в MagicRegistry
+
+# 3. Минтинг инвайтов для деплоера
 DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
+# ℹ️ Автоматически использует SPIRAL_ENGINE_PROXY_ADDRESS
 
-# 5. Создание каталога (способ 1 - через переменную окружения)
-DEPLOY_ACTION=4 npx hardhat run scripts/deploy_full.js --network localhost
+# 4. Полная инициализация селлера
+DEPLOY_ACTION=888 \
+  DEPLOYER_INVITE=AMANITA-XXXX-YYYY \
+  SELLER_ADDRESS=0x... \
+  npx hardhat run scripts/deploy_full.js --network localhost
 
-# 6. Активация продуктов (способ 1 - через переменную окружения)
-DEPLOY_ACTION=41 npx hardhat run scripts/deploy_full.js --network localhost
-
-# Альтернативно - через аргументы командной строки:
-# npx hardhat run scripts/deploy_full.js --network localhost 0
-# npx hardhat run scripts/deploy_full.js --network localhost 1
-# npx hardhat run scripts/deploy_full.js --network localhost 777
-# npx hardhat run scripts/deploy_full.js --network localhost 4
-# npx hardhat run scripts/deploy_full.js --network localhost 41
+# Результат:
+# ✅ Селлер активирован через SpiralEngine Proxy
+# ✅ Роли назначены
+# ✅ SBT токен создан
+# ✅ Каталог загружен через ProductRegistry Proxy
+# ✅ 12 инвайтов сгенерировано
 ```
 
 ### Сценарий 2: Деплой SBT экосистемы
@@ -655,17 +825,26 @@ DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost Amani
 # npx hardhat run scripts/deploy_full.js --network localhost 5 AmanitaGovToken
 ```
 
-### Сценарий 4: Обновление контракта
+### Сценарий 4: UUPS Upgrade (v3.0)
 ```bash
-# Обновление ProductRegistry (способ 1 - через переменную окружения)
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost ProductRegistry
+# Шаг 1: Деплой новой версии Logic
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngineLogic
+# Результат: Новый Logic задеплоен по адресу 0xNEW_LOGIC...
 
-# Обновление SBT контракта (способ 1 - через переменную окружения)
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SoulboundCore
+# Шаг 2: Вызов upgradeToAndCall на Proxy (через отдельный скрипт)
+npx hardhat run scripts/upgrade-implementation.js --network localhost \
+  SpiralEngine \
+  0xNEW_LOGIC_ADDRESS
 
-# Альтернативно - через аргументы командной строки:
-# npx hardhat run scripts/deploy_full.js --network localhost 5 ProductRegistry
-# npx hardhat run scripts/deploy_full.js --network localhost 5 SoulboundCore
+# Результат:
+# ✅ Proxy теперь использует новую Logic
+# ✅ Адрес Proxy не изменился
+# ✅ State сохранён
+# ✅ MagicRegistry не требует обновления
+
+# Аналогично для ProductRegistry:
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost ProductRegistryLogic
+npx hardhat run scripts/upgrade-implementation.js --network localhost ProductRegistry 0xNEW_LOGIC...
 ```
 
 ### Сценарий 5: Деплой AmanitaInternational (Localization System)
@@ -751,6 +930,25 @@ console.log('ProductRegistry:', await registry.getAddress('ProductRegistry'));
 "
 ```
 
+## Новые возможности в версии 3.0
+
+### 🔷 UUPS Архитектура (Upgradeable Contracts)
+**Главное нововведение версии 3.0:**
+- ✅ **SpiralEngine** теперь UUPS upgradeable (Logic + Proxy)
+- ✅ **ProductRegistry** теперь UUPS upgradeable (Logic + Proxy)
+- ✅ Автоматический деплой Logic + Proxy через Action 1 и Action 5
+- ✅ Отдельный деплой компонентов для upgrade (SpiralEngineLogic, SpiralEngineProxy)
+- ✅ Полная обратная совместимость со старыми .env переменными
+- ✅ State сохраняется при upgrade
+- ✅ Адрес Proxy фиксирован (никогда не меняется)
+- ✅ MagicRegistry регистрирует только Proxy адреса
+
+**Преимущества UUPS:**
+- 📈 Можно обновлять логику без изменения адреса контракта
+- 💾 Все данные сохраняются при upgrade
+- ⚡ Минимальный Proxy для экономии gas
+- 🔒 Централизованный контроль через UPGRADER_ROLE
+
 ## Новые возможности в версии 2.0
 
 ### Поддержка SBT экосистемы
@@ -787,3 +985,4 @@ console.log('ProductRegistry:', await registry.getAddress('ProductRegistry'));
 - ✅ Production-ready качество кода
 - ✅ Comprehensive error handling
 - ✅ Полная документация и готовность к использованию
+- ✅ **UUPS upgradeable contracts (v3.0)** для долгосрочной эволюции экосистемы

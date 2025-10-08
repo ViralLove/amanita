@@ -87,17 +87,43 @@ describe("SpiralEngine - Sanctions System", function () {
             value: ethers.parseEther("1.0")
         });
 
-        // Деплоим контракт SoulIdentity
-        console.log("🔷 Deploying SoulIdentity contract...");
+        // Деплоим SBT экосистему
+        console.log("🔷 Deploying SBT ecosystem...");
+        
+        const SoulboundCore = await ethers.getContractFactory("SoulboundCore");
+        const soulboundCore = await SoulboundCore.connect(deployer).deploy("Amanita Soul", "ASOUL");
+        await soulboundCore.waitForDeployment();
+        
+        const SoulMetadata = await ethers.getContractFactory("SoulMetadata");
+        const soulMetadata = await SoulMetadata.connect(deployer).deploy(await soulboundCore.getAddress());
+        await soulMetadata.waitForDeployment();
+        
+        await soulboundCore.connect(deployer).setMetadataContract(await soulMetadata.getAddress());
+        
         const SoulIdentity = await ethers.getContractFactory("SoulIdentity");
-        const soulIdentity = await SoulIdentity.connect(deployer).deploy();
+        const soulIdentity = await SoulIdentity.connect(deployer).deploy(
+            await soulboundCore.getAddress(),
+            await soulMetadata.getAddress()
+        );
         await soulIdentity.waitForDeployment();
 
-        // Деплоим контракт SpiralEngine
-        console.log("🔷 Deploying SpiralEngine contract...");
-        const SpiralEngine = await ethers.getContractFactory("SpiralEngine");
-        spiralEngine = await SpiralEngine.connect(deployer).deploy();
-        await spiralEngine.waitForDeployment();
+        // Деплоим контракт SpiralEngine (UUPS архитектура)
+        console.log("🔷 Deploying SpiralEngine UUPS contract...");
+        
+        const Logic = await ethers.getContractFactory("SpiralEngineLogic");
+        const logicImpl = await Logic.connect(deployer).deploy();
+        await logicImpl.waitForDeployment();
+        
+        const initCalldata = logicImpl.interface.encodeFunctionData("initialize", [deployer.address]);
+        
+        const Proxy = await ethers.getContractFactory("SpiralEngineProxy");
+        const proxy = await Proxy.connect(deployer).deploy(
+            await logicImpl.getAddress(),
+            initCalldata
+        );
+        await proxy.waitForDeployment();
+        
+        spiralEngine = Logic.attach(await proxy.getAddress());
 
         // Устанавливаем ссылку на SoulIdentity
         await spiralEngine.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
@@ -293,7 +319,7 @@ describe("SpiralEngine - Sanctions System", function () {
             const newCodes2 = Array.from({length: 12}, (_, i) => `NEW-2-${i + 1}`);
             await expect(
                 spiralEngine.connect(activator1).activateUser("SUSPEND-EFFECT-TEST-INVITE", user1.address, newCodes2, 0)
-            ).to.be.revertedWith("SpiralEngine: user already activated");
+            ).to.be.revertedWithCustomError(spiralEngine, "UserAlreadyActivated");
             
             console.log("✅ Suspended user cannot be reactivated");
         });
@@ -343,7 +369,7 @@ describe("SpiralEngine - Sanctions System", function () {
             const newCodes2 = Array.from({length: 12}, (_, i) => `NEW-2-${i + 1}`);
             await expect(
                 spiralEngine.connect(activator1).activateUser("SUSPEND-ACTIVATION-TEST-INVITE-2", user1.address, newCodes2, 0)
-            ).to.be.revertedWith("SpiralEngine: user already activated");
+            ).to.be.revertedWithCustomError(spiralEngine, "UserAlreadyActivated");
             
             console.log("✅ Suspended user correctly prevented from being activated again");
         });
@@ -365,7 +391,7 @@ describe("SpiralEngine - Sanctions System", function () {
             const newCodes2 = Array.from({length: 12}, (_, i) => `NEW-2-${i + 1}`);
             await expect(
                 spiralEngine.connect(activator1).activateUser("ENFORCEMENT-SUSPEND-TEST-INVITE-2", user1.address, newCodes2, 0)
-            ).to.be.revertedWith("SpiralEngine: user already activated");
+            ).to.be.revertedWithCustomError(spiralEngine, "UserAlreadyActivated");
             
             console.log("✅ Suspension restrictions working correctly");
         });
@@ -421,7 +447,7 @@ describe("SpiralEngine - Sanctions System", function () {
             // Попытка приостановить неактивированного пользователя должна провалиться
             await expect(
                 spiralEngine.connect(deployer).suspendUser(user1.address, 3600, "Non-activated user suspension")
-            ).to.be.revertedWith("SpiralEngine: user not activated");
+            ).to.be.revertedWithCustomError(spiralEngine, "UserNotActivated");
             
             console.log("✅ Non-activated user suspension correctly prevented");
         });
@@ -434,7 +460,7 @@ describe("SpiralEngine - Sanctions System", function () {
             // Попытка приостановить нулевой адрес должна провалиться
             await expect(
                 spiralEngine.connect(deployer).suspendUser(zeroAddress, 3600, "Zero address suspension")
-            ).to.be.revertedWith("SpiralEngine: invalid user address");
+            ).to.be.revertedWithCustomError(spiralEngine, "InvalidUserAddress");
             
             console.log("✅ Zero address suspension correctly prevented");
         });

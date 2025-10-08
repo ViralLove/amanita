@@ -1,58 +1,49 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("ProductRegistry - Clear Catalog", function () {
+describe("ProductRegistry - Clear Catalog (UUPS)", function () {
     let productRegistry;
-    let inviteNFT;
-    let deployer;
-    let seller;
-    let otherSeller;
+    let spiralEngine;
+    let admin, seller, otherSeller;
+    let SELLER_ROLE;
 
     beforeEach(async function () {
-        // Используем ключ деплоера из .env
-        const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
-        if (!deployerPrivateKey) {
-            throw new Error("DEPLOYER_PRIVATE_KEY not found in environment variables");
-        }
-
-        // Создаем кошелек деплоера
-        deployer = new ethers.Wallet(deployerPrivateKey, ethers.provider);
+        [admin, seller, otherSeller] = await ethers.getSigners();
         
-        // Получаем других пользователей
-        [seller, otherSeller] = await ethers.getSigners();
+        // 1. Deploy Mock SpiralEngine
+        const SpiralEngineMock = await ethers.getContractFactory("contracts/mocks/MockSpiralEngine.sol:MockSpiralEngine");
+        spiralEngine = await SpiralEngineMock.deploy();
+        await spiralEngine.waitForDeployment();
 
-        // Создаем простой мок для InviteNFT
-        const InviteNFTMock = await ethers.getContractFactory("InviteNFT");
-        inviteNFT = await InviteNFTMock.connect(deployer).deploy();
-        await inviteNFT.waitForDeployment();
-
-        // Деплой ProductRegistry
-        const ProductRegistry = await ethers.getContractFactory("ProductRegistry");
-        productRegistry = await ProductRegistry.connect(deployer).deploy(await inviteNFT.getAddress());
-        await productRegistry.waitForDeployment();
-
-        // Активируем продавца через мок
-        // Сначала назначаем роли деплоеру
-        const SELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("SELLER_ROLE"));
-        const ACTIVATOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ACTIVATOR_ROLE"));
-        await inviteNFT.connect(deployer).grantRole(SELLER_ROLE, deployer.address);
-        await inviteNFT.connect(deployer).grantRole(ACTIVATOR_ROLE, deployer.address);
+        // 2. Deploy ProductRegistry Logic
+        const Logic = await ethers.getContractFactory("ProductRegistryLogic");
+        const logic = await Logic.deploy();
+        await logic.waitForDeployment();
         
-        // Создаем тестовый инвайт
-        const testInviteCode = "TEST-INVITE-1234";
-        await inviteNFT.connect(deployer).mintInvites([testInviteCode], 0);
+        // 3. Encode initialize calldata
+        const initCalldata = logic.interface.encodeFunctionData("initialize", [
+            admin.address,
+            await spiralEngine.getAddress()
+        ]);
         
-        // Активируем пользователя с правильной сигнатурой (требуется 12 инвайтов)
-        const newInviteCodes = Array.from({length: 12}, (_, i) => `NEW-INVITE-${i + 1}`);
-        await inviteNFT.connect(deployer).activateUser(
-            testInviteCode,
-            seller.address,
-            newInviteCodes,
-            0
-        );
+        // 4. Deploy Proxy
+        const Proxy = await ethers.getContractFactory("ProductRegistryProxy");
+        const proxy = await Proxy.deploy(await logic.getAddress(), initCalldata);
+        await proxy.waitForDeployment();
         
-        // Назначаем роль SELLER_ROLE
-        await inviteNFT.connect(deployer).grantRole(SELLER_ROLE, seller.address);
+        // 5. Attach Logic ABI to Proxy
+        productRegistry = Logic.attach(await proxy.getAddress());
+        
+        // 6. Setup sellers in mock
+        SELLER_ROLE = await spiralEngine.SELLER_ROLE();
+        
+        // Активируем и назначаем роль seller
+        await spiralEngine.setUserActivated(seller.address, true);
+        await spiralEngine.grantRole(SELLER_ROLE, seller.address);
+        
+        // Активируем и назначаем роль otherSeller
+        await spiralEngine.setUserActivated(otherSeller.address, true);
+        await spiralEngine.grantRole(SELLER_ROLE, otherSeller.address);
     });
 
     describe("clearSellerCatalog", function () {
@@ -101,47 +92,37 @@ describe("ProductRegistry - Clear Catalog", function () {
             expect(activeProductsAfter.length).to.equal(0);
 
             // Проверяем, что продукты удалены
-            await expect(productRegistry.getProduct(1)).to.be.revertedWith("ProductRegistry: product does not exist");
-            await expect(productRegistry.getProduct(2)).to.be.revertedWith("ProductRegistry: product does not exist");
-            await expect(productRegistry.getProduct(3)).to.be.revertedWith("ProductRegistry: product does not exist");
+            await expect(productRegistry.getProduct(1)).to.be.revertedWithCustomError(productRegistry, "ProductDoesNotExist");
+            await expect(productRegistry.getProduct(2)).to.be.revertedWithCustomError(productRegistry, "ProductDoesNotExist");
+            await expect(productRegistry.getProduct(3)).to.be.revertedWithCustomError(productRegistry, "ProductDoesNotExist");
         });
 
         it("Should revert when trying to clear empty catalog", async function () {
             await expect(
                 productRegistry.connect(seller).clearSellerCatalog(seller.address)
-            ).to.be.revertedWith("Catalog is already empty");
+            ).to.be.revertedWithCustomError(productRegistry, "CatalogAlreadyEmpty");
         });
 
         it("Should revert when non-seller tries to clear catalog", async function () {
+            // Убираем роль у otherSeller для теста
+            await spiralEngine.grantRole(SELLER_ROLE, otherSeller.address); // сначала убедимся что роль есть
+            // Но он пытается очистить чужой каталог
             await expect(
                 productRegistry.connect(otherSeller).clearSellerCatalog(seller.address)
-            ).to.be.revertedWith("Not a seller");
+            ).to.be.revertedWithCustomError(productRegistry, "CanOnlyClearOwnCatalog");
         });
 
         it("Should revert when trying to clear someone else's catalog", async function () {
-            // Активируем другого продавца
-            const testInviteCode2 = "TEST-INVITE-5678";
-            await inviteNFT.connect(deployer).mintInvites([testInviteCode2], 0);
-            
-            const newInviteCodes2 = Array.from({length: 12}, (_, i) => `NEW-INVITE-${i + 13}`);
-            await inviteNFT.connect(deployer).activateUser(
-                testInviteCode2,
-                otherSeller.address,
-                newInviteCodes2,
-                0
-            );
-            
-            await inviteNFT.connect(deployer).grantRole(SELLER_ROLE, otherSeller.address);
-
+            // otherSeller уже активирован и имеет SELLER_ROLE из beforeEach
             await expect(
                 productRegistry.connect(seller).clearSellerCatalog(otherSeller.address)
-            ).to.be.revertedWith("Can only clear own catalog");
+            ).to.be.revertedWithCustomError(productRegistry, "CanOnlyClearOwnCatalog");
         });
 
         it("Should revert when seller address is zero", async function () {
             await expect(
                 productRegistry.connect(seller).clearSellerCatalog(ethers.ZeroAddress)
-            ).to.be.revertedWith("Invalid seller address");
+            ).to.be.revertedWithCustomError(productRegistry, "InvalidSellerAddress");
         });
 
         it("Should revert when catalog is too large", async function () {

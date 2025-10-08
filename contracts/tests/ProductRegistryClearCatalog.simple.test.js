@@ -1,89 +1,52 @@
 const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("ProductRegistry - Clear Catalog (Simple)", function () {
+describe("ProductRegistry - Clear Catalog Simple (UUPS)", function () {
     let productRegistry;
-    let deployer;
-    let seller;
+    let spiralEngine;
+    let admin, seller;
+    let SELLER_ROLE;
 
     beforeEach(async function () {
-        // Используем ключ деплоера из .env
-        const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
-        if (!deployerPrivateKey) {
-            throw new Error("DEPLOYER_PRIVATE_KEY not found in environment variables");
-        }
-
-        // Создаем кошелек деплоера
-        deployer = new ethers.Wallet(deployerPrivateKey, ethers.provider);
+        [admin, seller] = await ethers.getSigners();
         
-        // Получаем продавца
-        [seller] = await ethers.getSigners();
+        // 1. Deploy Mock SpiralEngine
+        const SpiralEngineMock = await ethers.getContractFactory("contracts/mocks/MockSpiralEngine.sol:MockSpiralEngine");
+        spiralEngine = await SpiralEngineMock.deploy();
+        await spiralEngine.waitForDeployment();
 
-        // Подключаемся к существующему контракту ProductRegistry
-        const productRegistryAddress = process.env.PRODUCT_REGISTRY_CONTRACT_ADDRESS;
-        if (!productRegistryAddress) {
-            throw new Error("PRODUCT_REGISTRY_CONTRACT_ADDRESS not found in environment variables");
-        }
-
-        const ProductRegistry = await ethers.getContractFactory("ProductRegistry");
-        productRegistry = ProductRegistry.attach(productRegistryAddress);
-
-        // Подключаемся к InviteNFT для активации продавца
-        const inviteNFTAddress = process.env.INVITE_NFT_CONTRACT_ADDRESS;
-        if (!inviteNFTAddress) {
-            throw new Error("INVITE_NFT_CONTRACT_ADDRESS not found in environment variables");
-        }
-
-        const InviteNFT = await ethers.getContractFactory("InviteNFT");
-        const inviteNFT = InviteNFT.attach(inviteNFTAddress);
-
-        // Активируем продавца (назначаем роль SELLER_ROLE)
-        console.log("🔷 Активируем продавца...");
-        const SELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("SELLER_ROLE"));
+        // 2. Deploy ProductRegistry Logic
+        const Logic = await ethers.getContractFactory("ProductRegistryLogic");
+        const logic = await Logic.deploy();
+        await logic.waitForDeployment();
         
-        try {
-            // Проверяем, есть ли уже роль
-            const hasRole = await inviteNFT.hasRole(SELLER_ROLE, seller.address);
-            if (!hasRole) {
-                // Назначаем роль SELLER_ROLE
-                await inviteNFT.connect(deployer).grantRole(SELLER_ROLE, seller.address);
-                console.log("✅ Роль SELLER_ROLE назначена продавцу");
-            } else {
-                console.log("✅ Продавец уже имеет роль SELLER_ROLE");
-            }
-
-            // Также нужно активировать пользователя (создать инвайт и использовать его)
-            const isActivated = await inviteNFT.isUserActivated(seller.address);
-            if (!isActivated) {
-                console.log("🔷 Активируем пользователя через инвайт...");
-                
-                // Создаем тестовый инвайт
-                const testInviteCode = "TEST-INVITE-1234";
-                await inviteNFT.connect(deployer).mintInvites([testInviteCode], 0);
-                console.log("✅ Тестовый инвайт создан");
-                
-                // Активируем пользователя через activateUser (требуется 12 инвайтов)
-                const newInviteCodes = Array.from({length: 12}, (_, i) => `NEW-INVITE-${i + 1}`);
-                await inviteNFT.connect(deployer).activateUser(
-                    testInviteCode,
-                    seller.address,
-                    newInviteCodes,
-                    0
-                );
-                console.log("✅ Пользователь активирован через инвайт");
-            } else {
-                console.log("✅ Пользователь уже активирован");
-            }
-        } catch (error) {
-            console.log("⚠️ Ошибка при активации (возможно, уже активирован):", error.message);
-        }
+        // 3. Encode initialize calldata
+        const initCalldata = logic.interface.encodeFunctionData("initialize", [
+            admin.address,
+            await spiralEngine.getAddress()
+        ]);
+        
+        // 4. Deploy Proxy
+        const Proxy = await ethers.getContractFactory("ProductRegistryProxy");
+        const proxy = await Proxy.deploy(await logic.getAddress(), initCalldata);
+        await proxy.waitForDeployment();
+        
+        // 5. Attach Logic ABI to Proxy
+        productRegistry = Logic.attach(await proxy.getAddress());
+        
+        // 6. Setup seller in mock
+        SELLER_ROLE = await spiralEngine.SELLER_ROLE();
+        await spiralEngine.setUserActivated(seller.address, true);
+        await spiralEngine.grantRole(SELLER_ROLE, seller.address);
+        
+        console.log("✅ ProductRegistry UUPS deployed and seller activated");
     });
 
     describe("clearSellerCatalog", function () {
         it("Should clear seller's catalog successfully", async function () {
             console.log("Testing clearSellerCatalog function...");
             console.log("Seller address:", seller.address);
-            console.log("Deployer address:", deployer.address);
+            console.log("Admin address:", admin.address);
 
             // Проверяем, что функция существует
             expect(typeof productRegistry.clearSellerCatalog).to.equal("function");
@@ -131,9 +94,9 @@ describe("ProductRegistry - Clear Catalog (Simple)", function () {
                 });
                 assert(catalogClearedEvent !== undefined, "CatalogCleared event should be emitted");
                 
-                const parsedCatalogCleared = productRegistry.interface.parseLog(catalogClearedEvent);
-                assert(parsedCatalogCleared.args.seller === seller.address, "Event should contain correct seller address");
-                assert(parsedCatalogCleared.args.productsCleared.toNumber() === productsBefore.length, "Event should contain correct number of cleared products");
+            const parsedCatalogCleared = productRegistry.interface.parseLog(catalogClearedEvent);
+            assert(parsedCatalogCleared.args.seller === seller.address, "Event should contain correct seller address");
+            assert(Number(parsedCatalogCleared.args.productsCleared) === productsBefore.length, "Event should contain correct number of cleared products");
                 
                 // ===== ПРОВЕРКА ОЧИСТКИ КАТАЛОГА =====
                 console.log("🔍 Checking catalog after clearing...");
@@ -170,21 +133,21 @@ describe("ProductRegistry - Clear Catalog (Simple)", function () {
                     await productRegistry.getProduct(1);
                     assert.fail("Product 1 should not exist after clearing");
                 } catch (error) {
-                    assert(error.message.includes("product does not exist"), "Product 1 should be deleted");
+                    assert(error.message.includes("ProductDoesNotExist"), "Product 1 should be deleted");
                 }
                 
                 try {
                     await productRegistry.getProduct(2);
                     assert.fail("Product 2 should not exist after clearing");
                 } catch (error) {
-                    assert(error.message.includes("product does not exist"), "Product 2 should be deleted");
+                    assert(error.message.includes("ProductDoesNotExist"), "Product 2 should be deleted");
                 }
                 
                 try {
                     await productRegistry.getProduct(3);
                     assert.fail("Product 3 should not exist after clearing");
                 } catch (error) {
-                    assert(error.message.includes("product does not exist"), "Product 3 should be deleted");
+                    assert(error.message.includes("ProductDoesNotExist"), "Product 3 should be deleted");
                 }
                 
                 // ===== ДЕТАЛЬНОЕ СРАВНЕНИЕ ДО И ПОСЛЕ =====
@@ -201,12 +164,11 @@ describe("ProductRegistry - Clear Catalog (Simple)", function () {
                 
             } catch (error) {
                 console.log("Expected error (seller not activated):", error.message);
-                // Это ожидаемо, если продавец не активирован в InviteNFT
-                // Проверяем различные возможные ошибки
+                // Проверяем различные возможные custom errors
                 const errorMessage = error.message;
-                const isExpectedError = errorMessage.includes("Not a seller") || 
-                                      errorMessage.includes("Not product seller") ||
-                                      errorMessage.includes("Not activated");
+                const isExpectedError = errorMessage.includes("NotASeller") || 
+                                      errorMessage.includes("NotProductSeller") ||
+                                      errorMessage.includes("NotActivatedUser");
                 
                 if (isExpectedError) {
                     console.log("✅ Expected error received - seller not properly activated");
@@ -243,20 +205,15 @@ describe("ProductRegistry - Clear Catalog (Simple)", function () {
 
         it("Should have proper access control", async function () {
             // Проверяем, что функция требует правильные модификаторы
-            try {
-                await productRegistry.connect(seller).clearSellerCatalog(seller.address);
-                // Если не упало с ошибкой, значит что-то не так
-                expect.fail("Function should require seller role");
-            } catch (error) {
-                // Проверяем различные возможные ошибки доступа
-                const errorMessage = error.message;
-                const isExpectedError = errorMessage.includes("Not a seller") || 
-                                      errorMessage.includes("Not product seller") ||
-                                      errorMessage.includes("Not activated") ||
-                                      errorMessage.includes("Catalog is already empty") ||
-                                      errorMessage.includes("Function should require seller role");
-                expect(isExpectedError).to.be.true;
-            }
+            // Seller уже активирован, поэтому попытка очистить пустой каталог вернёт CatalogAlreadyEmpty
+            await expect(
+                productRegistry.connect(seller).clearSellerCatalog(seller.address)
+            ).to.be.revertedWithCustomError(productRegistry, "CatalogAlreadyEmpty");
+            
+            // Admin не имеет SELLER_ROLE, поэтому получит NotASeller
+            await expect(
+                productRegistry.connect(admin).clearSellerCatalog(seller.address)
+            ).to.be.revertedWithCustomError(productRegistry, "NotASeller");
         });
 
         it("Should validate input parameters", async function () {
@@ -273,15 +230,25 @@ describe("ProductRegistry - Clear Catalog (Simple)", function () {
 
     describe("Contract compilation and deployment", function () {
         it("Should compile without errors", async function () {
-            // Проверяем, что контракт скомпилирован
-            const ProductRegistry = await ethers.getContractFactory("ProductRegistry");
-            expect(ProductRegistry).to.not.be.undefined;
+            // Проверяем, что контракты скомпилированы
+            const Logic = await ethers.getContractFactory("ProductRegistryLogic");
+            const Proxy = await ethers.getContractFactory("ProductRegistryProxy");
+            
+            expect(Logic).to.not.be.undefined;
+            expect(Proxy).to.not.be.undefined;
+            
+            // Интерфейс нельзя deploy, но можно проверить его через productRegistry
+            const interfaceFragment = productRegistry.interface.fragments;
+            expect(interfaceFragment.length).to.be.greaterThan(0);
         });
 
-        it("Should have correct contract address", async function () {
-            const productRegistryAddress = process.env.PRODUCT_REGISTRY_CONTRACT_ADDRESS;
-            expect(productRegistryAddress).to.not.be.undefined;
-            expect(productRegistryAddress).to.match(/^0x[a-fA-F0-9]{40}$/);
+        it("Should have correct UUPS architecture", async function () {
+            // Проверяем версию Logic
+            expect(await productRegistry.LOGIC_VERSION()).to.equal(1);
+            
+            // Проверяем, что Proxy делегирует к Logic
+            const proxyAddress = await productRegistry.getAddress();
+            expect(proxyAddress).to.match(/^0x[a-fA-F0-9]{40}$/);
         });
     });
 });

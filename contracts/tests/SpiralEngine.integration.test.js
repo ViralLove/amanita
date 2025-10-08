@@ -117,11 +117,23 @@ describe("SpiralEngine - Integration Tests", function () {
         await soulIdentity.waitForDeployment();
         console.log(`   SoulIdentity: ${await soulIdentity.getAddress()}`);
 
-        // Деплоим контракт SpiralEngine
-        console.log("🔷 Deploying SpiralEngine contract...");
-        const SpiralEngine = await ethers.getContractFactory("SpiralEngine");
-        spiralEngine = await SpiralEngine.connect(deployer).deploy();
-        await spiralEngine.waitForDeployment();
+        // Деплоим контракт SpiralEngine (UUPS архитектура)
+        console.log("🔷 Deploying SpiralEngine UUPS contract...");
+        
+        const Logic = await ethers.getContractFactory("SpiralEngineLogic");
+        const logicImpl = await Logic.connect(deployer).deploy();
+        await logicImpl.waitForDeployment();
+        
+        const initCalldata = logicImpl.interface.encodeFunctionData("initialize", [deployer.address]);
+        
+        const Proxy = await ethers.getContractFactory("SpiralEngineProxy");
+        const proxy = await Proxy.connect(deployer).deploy(
+            await logicImpl.getAddress(),
+            initCalldata
+        );
+        await proxy.waitForDeployment();
+        
+        spiralEngine = Logic.attach(await proxy.getAddress());
 
         // Устанавливаем ссылку на SoulIdentity
         await spiralEngine.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
@@ -304,7 +316,7 @@ describe("SpiralEngine - Integration Tests", function () {
             
             await expect(
                 spiralEngine.connect(user1).activateUser("PRE-SUSPENSION-INVITE", suspendedUser.address, suspendedCodes, 0)
-            ).to.be.revertedWith("SpiralEngine: invite not from activator");
+            ).to.be.revertedWithCustomError(spiralEngine, "InviteNotFromActivator");
             
             console.log("✅ Suspension effects verified");
 
@@ -370,7 +382,7 @@ describe("SpiralEngine - Integration Tests", function () {
             
             await expect(
                 spiralEngine.connect(activators[0]).activateUser("EXTRA-INVITE", extraUser.address, extraCodes, 0)
-            ).to.be.revertedWith("SpiralEngine: activator circle limit reached");
+            ).to.be.revertedWithCustomError(spiralEngine, "CircleLimitReached");
 
             console.log("✅ Complex multi-activator scenario test passed");
         });
@@ -636,7 +648,7 @@ describe("SpiralEngine - Integration Tests", function () {
             const failedCodes = Array.from({length: 12}, (_, i) => `FAILED-${i + 1}`);
             await expect(
                 spiralEngine.connect(user1).activateUser("FAILED-HIERARCHY-INVITE", user1.address, failedCodes, 0)
-            ).to.be.revertedWith("SpiralEngine: user already activated");
+            ).to.be.revertedWithCustomError(spiralEngine, "UserAlreadyActivated");
             
             // user2 все еще может работать
             const finalMintTx = await spiralEngine.connect(seller).mintInvite("USER2-HIERARCHY-INVITE", 0);
@@ -763,7 +775,7 @@ describe("SpiralEngine - Integration Tests", function () {
             const extraCodes = Array.from({length: 12}, (_, i) => `EXTRA-${i + 1}`);
             await expect(
                 spiralEngine.connect(activator).activateUser("EXTRA-INVITE", extraUser.address, extraCodes, 0)
-            ).to.be.revertedWith("SpiralEngine: activator circle limit reached");
+            ).to.be.revertedWithCustomError(spiralEngine, "CircleLimitReached");
             console.log("✅ Circle limit enforced correctly");
             
             // Проверяем, что размер круга не изменился

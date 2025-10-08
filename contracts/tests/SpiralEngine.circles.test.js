@@ -92,17 +92,47 @@ describe("SpiralEngine - Circle Management", function () {
             value: ethers.parseEther("1.0")
         });
 
-        // Деплоим контракт SoulIdentity
-        console.log("🔷 Deploying SoulIdentity contract...");
+        // Деплоим SBT экосистему
+        console.log("🔷 Deploying SBT ecosystem...");
+        
+        // 1. SoulboundCore
+        const SoulboundCore = await ethers.getContractFactory("SoulboundCore");
+        const soulboundCore = await SoulboundCore.connect(deployer).deploy("Amanita Soul", "ASOUL");
+        await soulboundCore.waitForDeployment();
+        
+        // 2. SoulMetadata
+        const SoulMetadata = await ethers.getContractFactory("SoulMetadata");
+        const soulMetadata = await SoulMetadata.connect(deployer).deploy(await soulboundCore.getAddress());
+        await soulMetadata.waitForDeployment();
+        
+        // Подключаем SoulMetadata к SoulboundCore
+        await soulboundCore.connect(deployer).setMetadataContract(await soulMetadata.getAddress());
+        
+        // 3. SoulIdentity (мост)
         const SoulIdentity = await ethers.getContractFactory("SoulIdentity");
-        soulIdentity = await SoulIdentity.connect(deployer).deploy();
+        soulIdentity = await SoulIdentity.connect(deployer).deploy(
+            await soulboundCore.getAddress(),
+            await soulMetadata.getAddress()
+        );
         await soulIdentity.waitForDeployment();
 
-        // Деплоим контракт SpiralEngine
-        console.log("🔷 Deploying SpiralEngine contract...");
-        const SpiralEngine = await ethers.getContractFactory("SpiralEngine");
-        spiralEngine = await SpiralEngine.connect(deployer).deploy();
-        await spiralEngine.waitForDeployment();
+        // Деплоим контракт SpiralEngine (UUPS архитектура)
+        console.log("🔷 Deploying SpiralEngine UUPS contract...");
+        
+        const Logic = await ethers.getContractFactory("SpiralEngineLogic");
+        const logicImpl = await Logic.connect(deployer).deploy();
+        await logicImpl.waitForDeployment();
+        
+        const initCalldata = logicImpl.interface.encodeFunctionData("initialize", [deployer.address]);
+        
+        const Proxy = await ethers.getContractFactory("SpiralEngineProxy");
+        const proxy = await Proxy.connect(deployer).deploy(
+            await logicImpl.getAddress(),
+            initCalldata
+        );
+        await proxy.waitForDeployment();
+        
+        spiralEngine = Logic.attach(await proxy.getAddress());
 
         // Устанавливаем ссылку на SoulIdentity
         await spiralEngine.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
@@ -284,7 +314,7 @@ describe("SpiralEngine - Circle Management", function () {
             
             await expect(
                 spiralEngine.connect(activator1).activateUser("LIMIT-TEST-INVITE-13", user13.address, newCodes13, 0)
-            ).to.be.revertedWith("SpiralEngine: activator circle limit reached");
+            ).to.be.revertedWithCustomError(spiralEngine, "CircleLimitReached");
             
             console.log("✅ 13th user activation correctly rejected");
         });
@@ -323,7 +353,7 @@ describe("SpiralEngine - Circle Management", function () {
             const newCodes13 = Array.from({length: 12}, (_, i) => `NEW-13-${i + 1}`);
             await expect(
                 spiralEngine.connect(activator1).activateUser("ENFORCEMENT-TEST-INVITE-13", user13.address, newCodes13, 0)
-            ).to.be.revertedWith("SpiralEngine: activator circle limit reached");
+            ).to.be.revertedWithCustomError(spiralEngine, "CircleLimitReached");
             
             console.log("✅ Circle limit enforcement working correctly");
         });
@@ -428,7 +458,7 @@ describe("SpiralEngine - Circle Management", function () {
             
             await expect(
                 spiralEngine.connect(activator2).activateUser("CROSS-CIRCLE-INVITE", user1.address, newCodes2, 0)
-            ).to.be.revertedWith("SpiralEngine: user already activated");
+            ).to.be.revertedWithCustomError(spiralEngine, "UserAlreadyActivated");
             
             console.log("✅ Cross-circle activation correctly prevented");
         });
