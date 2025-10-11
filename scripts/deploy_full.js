@@ -143,13 +143,17 @@ async function deployContract(contractName, constructorArgs = [], options = {}) 
     const balanceBeforeDeploy = await web3.eth.getBalance(deployerAccount.address);
     console.log(`💰 Баланс до деплоя: ${web3.utils.fromWei(balanceBeforeDeploy, 'ether')} MATIC`);
     
+    // Получаем актуальный nonce для предотвращения "Nonce too low"
+    const nonce = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
+    
     instance = await contract.deploy({
       data: artifact.bytecode,
       arguments: constructorArgs
     }).send({
       from: deployerAccount.address,
       gas: gasLimit,
-      gasPrice: gasPrice
+      gasPrice: gasPrice,
+      nonce: nonce
     });
     
     // Получаем баланс после деплоя
@@ -177,10 +181,14 @@ async function deployContract(contractName, constructorArgs = [], options = {}) 
       const balanceBefore = await web3.eth.getBalance(deployerAccount.address);
       console.log(`💰 Баланс до регистрации: ${web3.utils.fromWei(balanceBefore, 'ether')} MATIC`);
       
+      // Получаем актуальный nonce для предотвращения "Nonce too low"
+      const nonce = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
+      
       const tx = await magicRegistry.methods.set(contractName, instance.options.address).send({
         from: deployerAccount.address,
-        gas: network === 'polygon' ? 500000 : 200000, // Увеличиваем газ для Polygon
-        gasPrice: gasPrice
+        gas: network === 'polygon' ? 500000 : 200000,
+        gasPrice: gasPrice,
+        nonce: nonce
       });
       
       // Получаем баланс после транзакции
@@ -282,9 +290,8 @@ async function main(action) {
     if (action === 0) {
       console.log("\n🔷 Деплоим MagicRegistry...");
       magicRegistry = await deployContract("MagicRegistry");
-      console.log("\n⭐️ ВАЖНО! Адрес реестра для .env:");
+      console.log("");
       console.log("MAGIC_REGISTRY_CONTRACT_ADDRESS=" + magicRegistry.options.address);
-      console.log("⭐️ Скопируйте этот адрес в bot/.env\n");
     } else if (action === 1) {
       // Для action 1 — умная логика загрузки реестра
       console.log("\n🔷 Обрабатываем MagicRegistry...");
@@ -298,9 +305,8 @@ async function main(action) {
         // Если адреса нет - деплоим новый (чистый старт)
         console.log("📋 Адрес реестра не найден в .env, деплоим новый...");
         magicRegistry = await deployContract("MagicRegistry");
-        console.log("\n⭐️ ВАЖНО! Адрес реестра для .env:");
+        console.log("");
         console.log("MAGIC_REGISTRY_CONTRACT_ADDRESS=" + magicRegistry.options.address);
-        console.log("⭐️ Скопируйте этот адрес в .env\n");
       }
      } else if (action === 888) {
        // Для action 888 - инициализация селлера (критическое действие)
@@ -356,37 +362,45 @@ async function main(action) {
       
       // Подключаем SoulMetadata к SoulboundCore
       console.log("🔗 Подключаем SoulMetadata к SoulboundCore...");
+      const nonce2 = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
       await soulboundCore.methods.setMetadataContract(soulMetadata.options.address).send({
         from: deployerAccount.address,
         gas: gasLimit,
-        gasPrice: gasPrice
+        gasPrice: gasPrice,
+        nonce: nonce2
       });
       console.log("✅ SoulMetadata подключен к SoulboundCore");
       
       // Подключаем SoulRecovery к SoulboundCore
       console.log("🔗 Подключаем SoulRecovery к SoulboundCore...");
+      const nonce3 = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
       await soulboundCore.methods.setRecoveryContract(soulRecovery.options.address).send({
         from: deployerAccount.address,
         gas: gasLimit,
-        gasPrice: gasPrice
+        gasPrice: gasPrice,
+        nonce: nonce3
       });
       console.log("✅ SoulRecovery подключен к SoulboundCore");
       
       // Подключаем SoulIntegration к SoulboundCore
       console.log("🔗 Подключаем SoulIntegration к SoulboundCore...");
+      const nonce4 = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
       await soulboundCore.methods.setIntegrationContract(soulIntegration.options.address).send({
         from: deployerAccount.address,
         gas: gasLimit,
-        gasPrice: gasPrice
+        gasPrice: gasPrice,
+        nonce: nonce4
       });
       console.log("✅ SoulIntegration подключен к SoulboundCore");
       
       // Подключаем SoulIdentity к SpiralEngine
       console.log("🔗 Подключаем SoulIdentity к SpiralEngine...");
+      const nonce5 = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
       await spiralEngine.methods.setSoulIdentity(soulIdentity.options.address).send({
         from: deployerAccount.address,
         gas: gasLimit,
-        gasPrice: gasPrice
+        gasPrice: gasPrice,
+        nonce: nonce5
       });
       console.log("✅ SoulIdentity подключен к SpiralEngine");
       
@@ -396,15 +410,33 @@ async function main(action) {
       console.log("\n🔷 Обрабатываем ProductRegistry...");
       productRegistry = await deploySingleContract("ProductRegistry", magicRegistry);
       
-      // TODO: Деплой AmanitaInternational (UUPS) - требует адаптации под UUPS
-      // AmanitaInternationalLogic + AmanitaInternationalProxy уже UUPS
-      // Но deployAmanitaInternational() использует старую 3-контрактную архитектуру
-      console.log("\n⚠️ Пропускаем AmanitaInternational (требует UUPS адаптации)...");
-      // const amanitaInternational = await deployAmanitaInternational();
+      // Деплой AmanitaInternational (UUPS) с проверкой существования
+      console.log("\n🔷 Обрабатываем AmanitaInternational...");
+      const amanitaInternational = await deploySingleContract("AmanitaInternational", magicRegistry);
+      
+      // Деплой OrganicComponentRegistry (UUPS) с проверкой существования
+      console.log("\n🔷 Обрабатываем OrganicComponentRegistry...");
+      const organicComponentRegistry = await deploySingleContract("OrganicComponentRegistry", magicRegistry);
+      
+      // Настройка связей OrganicComponentRegistry
+      console.log("\n🔷 Настраиваем связи OrganicComponentRegistry...");
+      
+      console.log("🔗 Подключаем SpiralEngine к OrganicComponentRegistry...");
+      const nonce1 = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
+      await organicComponentRegistry.methods.setSpiralEngine(spiralEngine.options.address).send({
+        from: deployerAccount.address,
+        gas: gasLimit,
+        gasPrice: gasPrice,
+        nonce: nonce1
+      });
+      console.log("✅ SpiralEngine подключен к OrganicComponentRegistry");
+      
+      console.log("\n✅ OrganicComponentRegistry полностью настроен!");
       
       console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
       console.log("☀️ Адрес ProductRegistry:", productRegistry.options.address);
-      // console.log("☀️ Адрес AmanitaInternational Proxy:", amanitaInternational.proxy.options.address);
+      console.log("☀️ Адрес AmanitaInternational:", amanitaInternational.options.address);
+      console.log("☀️ Адрес OrganicComponentRegistry:", organicComponentRegistry.options.address);
       
     }
     
@@ -415,6 +447,12 @@ async function main(action) {
 
       productRegistry = await loadUUPSContract("ProductRegistry");
       console.log("☀️ Адрес ProductRegistry:", productRegistry.options.address);
+      
+      const amanitaInternational = await loadUUPSContract("AmanitaInternational");
+      console.log("☀️ Адрес AmanitaInternational:", amanitaInternational.options.address);
+      
+      const organicComponentRegistry = await loadUUPSContract("OrganicComponentRegistry");
+      console.log("☀️ Адрес OrganicComponentRegistry:", organicComponentRegistry.options.address);
       
     }
 
@@ -685,7 +723,7 @@ async function main(action) {
 
     // Выводим адреса контрактов только если они были задействованы
     if (action <= 2) {
-      console.log("\n⭐️ ВАЖНО! Адреса контрактов для .env:");
+      console.log("");
       console.log("MAGIC_REGISTRY_CONTRACT_ADDRESS=" + magicRegistry.options.address);
       if (spiralEngine) console.log("SPIRAL_ENGINE_CONTRACT_ADDRESS=" + spiralEngine.options.address);
       if (productRegistry) console.log("PRODUCT_REGISTRY_CONTRACT_ADDRESS=" + productRegistry.options.address);
@@ -714,22 +752,49 @@ async function main(action) {
         const amanitaInternationalAddress = await magicRegistry.methods.get("AmanitaInternational").call();
         
         if (amanitaInternationalAddress !== "0x0000000000000000000000000000000000000000") {
-          console.log("\n🌐 Localization System (3-Contract Architecture):");
+          console.log("");
           console.log("AMANITA_INTERNATIONAL_PROXY_ADDRESS=" + amanitaInternationalAddress);
           
-          // Пытаемся получить адреса Storage и Logic из Proxy
-          const proxyContract = await loadContract("AmanitaInternationalProxy", amanitaInternationalAddress);
+          // Для UUPS используем стандартный EIP-1967 storage slot
           try {
-            const storageAddress = await proxyContract.methods.storageContract().call();
-            const logicAddress = await proxyContract.methods.currentLogic().call();
-            console.log("AMANITA_INTERNATIONAL_STORAGE_ADDRESS=" + storageAddress);
-            console.log("AMANITA_INTERNATIONAL_LOGIC_V1_ADDRESS=" + logicAddress);
+            const EIP1967_IMPLEMENTATION_SLOT = '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc';
+            const implementationAddress = await web3.eth.getStorageAt(
+              amanitaInternationalAddress,
+              EIP1967_IMPLEMENTATION_SLOT
+            );
+            const logicAddress = '0x' + implementationAddress.slice(-40);
+            console.log("AMANITA_INTERNATIONAL_LOGIC_ADDRESS=" + logicAddress);
           } catch (e) {
-            console.log("⚠️ Не удалось получить адреса Storage/Logic из Proxy");
+            console.log("# ERROR: Не удалось получить адрес Logic из UUPS Proxy");
           }
         }
       } catch (error) {
         // Игнорируем ошибки если AmanitaInternational не задеплоен
+      }
+      
+      // Добавляем OrganicComponentRegistry адреса если они были задеплоены
+      try {
+        const organicComponentRegistryAddress = await magicRegistry.methods.get("OrganicComponentRegistry").call();
+        
+        if (organicComponentRegistryAddress !== "0x0000000000000000000000000000000000000000") {
+          console.log("");
+          console.log("ORGANIC_COMPONENT_REGISTRY_PROXY_ADDRESS=" + organicComponentRegistryAddress);
+          
+          // Для UUPS используем стандартный EIP-1967 storage slot
+          try {
+            const EIP1967_IMPLEMENTATION_SLOT = '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc';
+            const implementationAddress = await web3.eth.getStorageAt(
+              organicComponentRegistryAddress,
+              EIP1967_IMPLEMENTATION_SLOT
+            );
+            const logicAddress = '0x' + implementationAddress.slice(-40);
+            console.log("ORGANIC_COMPONENT_REGISTRY_LOGIC_ADDRESS=" + logicAddress);
+          } catch (e) {
+            console.log("# ERROR: Не удалось получить адрес Logic из UUPS Proxy");
+          }
+        }
+      } catch (error) {
+        // Игнорируем ошибки если OrganicComponentRegistry не задеплоен
       }
     }
     
@@ -737,7 +802,7 @@ async function main(action) {
     if (action === 5) {
       const contractName = args[1] || process.env.CONTRACT_NAME;
       const contractAddress = await magicRegistry.methods.get(contractName).call();
-      console.log(`\n⭐️ ВАЖНО! Адрес контракта ${contractName}:`);
+      console.log("");
       console.log(`${contractName.toUpperCase()}_CONTRACT_ADDRESS=${contractAddress}`);
     }
 
@@ -855,6 +920,25 @@ const SUPPORTED_CONTRACTS = {
         isUUPSDeployment: true,
         logicContract: 'AmanitaInternationalLogic',
         proxyContract: 'AmanitaInternationalProxy'
+    },
+    // 🌿 Organic Components Registry (UUPS Architecture)
+    'OrganicComponentRegistryLogic': {
+        dependencies: [],
+        needsSetup: false,
+        isUUPSLogic: true
+    },
+    'OrganicComponentRegistryProxy': {
+        dependencies: ['OrganicComponentRegistryLogic'],
+        needsSetup: false,
+        isUUPSProxy: true,
+        logicContract: 'OrganicComponentRegistryLogic'
+    },
+    'OrganicComponentRegistry': {
+        dependencies: [],
+        needsSetup: true,
+        isUUPSDeployment: true,
+        logicContract: 'OrganicComponentRegistryLogic',
+        proxyContract: 'OrganicComponentRegistryProxy'
     }
 };
 
@@ -886,7 +970,12 @@ const CONTRACT_ENV_MAPPING = {
     // 🌐 Localization System (UUPS Architecture)
     'AmanitaInternationalLogic': 'AMANITA_INTERNATIONAL_LOGIC_ADDRESS',
     'AmanitaInternationalProxy': 'AMANITA_INTERNATIONAL_PROXY_ADDRESS',
-    'AmanitaInternational': 'AMANITA_INTERNATIONAL_PROXY_ADDRESS'  // Алиас для Proxy (обратная совместимость)
+    'AmanitaInternational': 'AMANITA_INTERNATIONAL_PROXY_ADDRESS',  // Алиас для Proxy (обратная совместимость)
+    
+    // 🌿 Organic Components Registry (UUPS Architecture)
+    'OrganicComponentRegistryLogic': 'ORGANIC_COMPONENT_REGISTRY_LOGIC_ADDRESS',
+    'OrganicComponentRegistryProxy': 'ORGANIC_COMPONENT_REGISTRY_PROXY_ADDRESS',
+    'OrganicComponentRegistry': 'ORGANIC_COMPONENT_REGISTRY_PROXY_ADDRESS'  // Алиас для Proxy (обратная совместимость)
 };
 
 // ====================================================================
@@ -912,6 +1001,10 @@ function getLogicConstructorArgs(contractName) {
     
     if (contractName === 'AmanitaInternational' || contractName === 'AmanitaInternationalLogic') {
         return [];  // AmanitaInternationalLogic: constructor пустой
+    }
+    
+    if (contractName === 'OrganicComponentRegistry' || contractName === 'OrganicComponentRegistryLogic') {
+        return [];  // OrganicComponentRegistryLogic: constructor пустой
     }
     
     // Fallback для будущих UUPS контрактов
@@ -971,6 +1064,12 @@ async function prepareInitializeCalldata(contractName, logicInstance = null) {
     
     // AmanitaInternational: initialize(address admin)
     if (contractName === 'AmanitaInternational') {
+        console.log(`   → initialize(admin: ${deployerAccount.address})`);
+        return web3Contract.methods.initialize(deployerAccount.address).encodeABI();
+    }
+    
+    // OrganicComponentRegistry: initialize(address admin)
+    if (contractName === 'OrganicComponentRegistry') {
         console.log(`   → initialize(admin: ${deployerAccount.address})`);
         return web3Contract.methods.initialize(deployerAccount.address).encodeABI();
     }
@@ -1090,62 +1189,24 @@ async function deployUUPSContract(contractName, contractInfo, registryInstance =
 }
 
 /**
- * Деплой 3-контрактной архитектуры AmanitaInternational
- * @returns {Object} { proxy, logic, storage } - Экземпляры всех 3 контрактов
+ * @deprecated Эта функция использовалась для деплоя AmanitaInternational 
+ * в старой 3-контрактной архитектуре (Storage + Logic + Proxy).
+ * 
+ * С переходом на UUPS архитектуру (Logic + Proxy) используйте:
+ *   await deploySingleContract("AmanitaInternational", magicRegistry);
+ * 
+ * @throws {Error} Всегда выбрасывает ошибку с объяснением
  */
 async function deployAmanitaInternational() {
-    console.log("\n=== 🌐 Деплой AmanitaInternational (3-контрактная архитектура) ===");
-    
-    // Шаг 1: Деплой Storage
-    console.log("\n📦 Шаг 1/4: Деплой AmanitaInternationalStorage...");
-    const storage = await deployContract("AmanitaInternationalStorage", [deployerAccount.address]);
-    console.log(`✅ Storage deployed: ${storage.options.address}`);
-    
-    // Шаг 2: Деплой Logic с immutable storage адресом
-    console.log("\n⚙️ Шаг 2/4: Деплой AmanitaInternationalLogicV1...");
-    const logic = await deployContract("AmanitaInternationalLogicV1", [storage.options.address]);
-    console.log(`✅ LogicV1 deployed: ${logic.options.address}`);
-    
-    // Шаг 3: Деплой Proxy
-    console.log("\n🔗 Шаг 3/4: Деплой AmanitaInternationalProxy...");
-    const proxy = await deployContract("AmanitaInternationalProxy", [
-        deployerAccount.address,  // admin
-        logic.options.address,    // initialLogic
-        storage.options.address   // storageContract
-    ]);
-    console.log(`✅ Proxy deployed: ${proxy.options.address}`);
-    
-    // Шаг 4: Авторизация Proxy в Storage
-    console.log("\n🔐 Шаг 4/4: Авторизация Proxy в Storage...");
-    const gasPrice = network === 'polygon' ? 
-        web3.utils.toWei('100', 'gwei') : 
-        await web3.eth.getGasPrice();
-    
-    await storage.methods.authorizeProxyContract(proxy.options.address).send({
-        from: deployerAccount.address,
-        gas: network === 'polygon' ? 500000 : 300000,
-        gasPrice: gasPrice
-    });
-    console.log(`✅ Proxy authorized in Storage with PROXY_ROLE`);
-    
-    // Регистрация в MagicRegistry (только Proxy - точка входа)
-    if (magicRegistry) {
-        console.log("\n📝 Регистрируем AmanitaInternational в MagicRegistry...");
-        await registerContractInRegistry("AmanitaInternational", proxy);
-        console.log(`✅ AmanitaInternational (Proxy) зарегистрирован в реестре`);
-    }
-    
-    // Итоговая информация
-    console.log("\n=== ✅ AmanitaInternational 3-Contract Architecture Deployed ===");
-    console.log(`📍 Proxy (Entry Point): ${proxy.options.address}`);
-    console.log(`⚙️ Logic V1: ${logic.options.address}`);
-    console.log(`📦 Storage: ${storage.options.address}`);
-    console.log("\n⭐️ Для .env добавьте:");
-    console.log(`AMANITA_INTERNATIONAL_PROXY_ADDRESS=${proxy.options.address}`);
-    console.log(`AMANITA_INTERNATIONAL_STORAGE_ADDRESS=${storage.options.address}`);
-    console.log(`AMANITA_INTERNATIONAL_LOGIC_V1_ADDRESS=${logic.options.address}`);
-    
-    return { proxy, logic, storage };
+    throw new Error(
+        "DEPRECATED: deployAmanitaInternational() больше не поддерживается.\n\n" +
+        "AmanitaInternational теперь использует UUPS архитектуру (2 контракта):\n" +
+        "  - AmanitaInternationalLogic.sol (Logic контракт с state)\n" +
+        "  - AmanitaInternationalProxy.sol (ERC1967Proxy)\n\n" +
+        "Используйте вместо этого:\n" +
+        "  await deploySingleContract('AmanitaInternational', magicRegistry);\n\n" +
+        "Старая 3-контрактная архитектура (Storage + Logic + Proxy) больше не используется."
+    );
 }
 
 /**
@@ -1219,10 +1280,14 @@ async function registerContractInRegistry(contractName, contractInstance, regist
             web3.utils.toWei('100', 'gwei') : // 100 Gwei для Polygon mainnet
             await web3.eth.getGasPrice(); // Текущая цена для других сетей
         
+        // Получаем актуальный nonce для предотвращения "Nonce too low"
+        const nonce = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
+        
         await magicRegistry.methods.set(contractName, contractInstance.options.address).send({
             from: deployerAccount.address,
-            gas: network === 'polygon' ? 1000000 : 500000, // Увеличиваем газ для Polygon и других сетей
-            gasPrice: gasPrice
+            gas: network === 'polygon' ? 1000000 : 500000,
+            gasPrice: gasPrice,
+            nonce: nonce
         });
         
         // Получаем баланс после транзакции
@@ -1306,6 +1371,12 @@ async function deploySingleContract(contractName, registryInstance = null) {
         const logic = await loadContract("AmanitaInternationalLogic");
         const initData = await prepareInitializeCalldata('AmanitaInternational', logic);
         contractInstance = await deployContract("AmanitaInternationalProxy", [logic.options.address, initData]);
+    } else if (contractName === 'OrganicComponentRegistryLogic') {
+        contractInstance = await deployContract("OrganicComponentRegistryLogic", []);
+    } else if (contractName === 'OrganicComponentRegistryProxy') {
+        const logic = await loadContract("OrganicComponentRegistryLogic");
+        const initData = await prepareInitializeCalldata('OrganicComponentRegistry', logic);
+        contractInstance = await deployContract("OrganicComponentRegistryProxy", [logic.options.address, initData]);
     
     // === Обычные контракты ===
     } else if (contractName === 'MagicRegistry') {
@@ -2458,10 +2529,12 @@ async function setupSoulIdentityFor888(soulIdentity, sellerAddress) {
     // Создаем SBT токен через существующую систему
     console.log("🏷️ Создаем SBT токен для селлера через SoulboundCore...");
     
+    const nonceMintSoul = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
     const mintTx = await soulboundCore.methods.mintSoul(sellerAddress).send({
       from: deployerAccount.address,
       gas: network === 'polygon' ? 500000 : 300000,
-      gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
+      gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice(),
+      nonce: nonceMintSoul
     });
     
     console.log(`✅ SBT токен создан, tx: ${mintTx.transactionHash}`);
@@ -2750,10 +2823,12 @@ async function activateSellerInSpiralEngine(spiralEngine, sellerAddress, deploye
     
     if (!hasActivatorRole) {
         console.log(`🔷 Предоставляем роль ACTIVATOR_ROLE деплоеру...`);
+        const nonceGrant = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
         await spiralEngine.methods.grantRole(ACTIVATOR_ROLE, deployerAccount.address).send({
             from: deployerAccount.address,
             gas: 100000,
-            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
+            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice(),
+            nonce: nonceGrant
         });
         console.log(`✅ Роль ACTIVATOR_ROLE предоставлена деплоеру`);
     }
@@ -2777,15 +2852,17 @@ async function activateSellerInSpiralEngine(spiralEngine, sellerAddress, deploye
     // Активируем селлера - передаем сам инвайт код, а не tokenId!
     console.log(`🔷 Вызываем activateUser с параметрами: inviteCode=${deployerInvite}, seller=${sellerAddress}`);
     try {
+        const nonceActivate = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
         const activateTx = await spiralEngine.methods.activateUser(
             deployerInvite, // Передаем сам инвайт код!
             sellerAddress,
             newInviteCodes,
-            0 // nonce
+            0 // contract nonce parameter, не путать с tx nonce
         ).send({
             from: deployerAccount.address, // Деплоер с ролью ACTIVATOR_ROLE активирует
             gas: 5000000, // Максимальный лимит газа
-            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
+            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice(),
+            nonce: nonceActivate
         });
         console.log(`✅ Селлер активирован, tx: ${activateTx.transactionHash}`);
     } catch (error) {
@@ -2809,10 +2886,12 @@ async function grantSellerRoleToUser(spiralEngine, sellerAddress) {
     }
     
     try {
+        const nonceSeller = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
         const grantTx = await spiralEngine.methods.grantSellerRole(sellerAddress).send({
             from: deployerAccount.address,
             gas: network === 'polygon' ? 500000 : 300000,
-            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
+            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice(),
+            nonce: nonceSeller
         });
         console.log(`✅ Роль SELLER_ROLE назначена, tx: ${grantTx.transactionHash}`);
     } catch (error) {
@@ -2836,10 +2915,12 @@ async function grantActivatorRoleToSeller(spiralEngine, sellerAddress) {
     }
     
     try {
+        const nonceActivator = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
         const grantTx = await spiralEngine.methods.grantRole(ACTIVATOR_ROLE, sellerAddress).send({
             from: deployerAccount.address,
             gas: network === 'polygon' ? 500000 : 300000,
-            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
+            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice(),
+            nonce: nonceActivator
         });
         console.log(`✅ Роль ACTIVATOR_ROLE назначена селлеру, tx: ${grantTx.transactionHash}`);
         console.log(`✅ Теперь селлер может активировать пользователей через SpiralEngine.activateUser`);
@@ -2876,10 +2957,12 @@ async function loadSellerCatalog(productRegistry, sellerAddress, catalogData, de
             const sellerWallet = web3.eth.accounts.privateKeyToAccount(SELLER_PRIVATE_KEY);
             web3.eth.accounts.wallet.add(sellerWallet);
             
+            const nonceClear = await web3.eth.getTransactionCount(sellerAddress, 'pending');
             const clearTx = await productRegistry.methods.clearSellerCatalog(sellerAddress).send({
                 from: sellerAddress, // ✅ Используем адрес продавца
                 gas: network === 'polygon' ? 500000 : 300000,
-                gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : undefined
+                gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : undefined,
+                nonce: nonceClear
             });
         
             // Ждем подтверждения транзакции (только для mainnet)
@@ -2935,10 +3018,12 @@ async function generateInvitesForSeller(spiralEngine, sellerAddress) {
     for (let i = 0; i < 12; i++) {
         const inviteCode = inviteCodes[i];
         
+        const nonceMintInvite = await web3.eth.getTransactionCount(sellerAddress, 'pending');
         const mintTx = await spiralEngine.methods.mintInvite(inviteCode, 0).send({
             from: sellerAddress,
             gas: 500000,
-            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
+            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice(),
+            nonce: nonceMintInvite
         });
         
         console.log(`✅ Инвайт ${inviteCode} создан, tx: ${mintTx.transactionHash}`);
@@ -3049,10 +3134,12 @@ async function generateInvitesForSellerAction11(spiralEngine, sellerAddress, inv
     for (let i = 0; i < inviteCount; i++) {
         const inviteCode = inviteCodes[i];
         
+        const nonceMintInviteAction11 = await web3.eth.getTransactionCount(sellerAddress, 'pending');
         const mintTx = await spiralEngine.methods.mintInvite(inviteCode, 0).send({
             from: sellerAddress,
             gas: 500000,
-            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice()
+            gasPrice: network === 'polygon' ? web3.utils.toWei('100', 'gwei') : await web3.eth.getGasPrice(),
+            nonce: nonceMintInviteAction11
         });
         
         console.log(`✅ Инвайт ${inviteCode} создан, tx: ${mintTx.transactionHash}`);
