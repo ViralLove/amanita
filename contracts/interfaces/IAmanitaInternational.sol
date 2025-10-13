@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import "./ISpiralEngine.sol";
+
 /**
  * @title IAmanitaInternational
  * @author Amanita Decentralization Team
@@ -53,6 +55,25 @@ interface IAmanitaInternational {
 
     /// @notice Событие снятия паузы контракта
     event Unpaused(address account);
+    
+    /// @notice Событие установки глобального поля
+    event GlobalFieldSet(
+        string indexed fieldKey,
+        bool isGlobal,
+        address indexed admin
+    );
+    
+    /// @notice Событие обновления адреса SpiralEngine
+    event SpiralEngineUpdated(
+        address indexed oldSpiralEngine,
+        address indexed newSpiralEngine,
+        address indexed admin
+    );
+    
+    // === CUSTOM ERRORS ===
+    
+    /// @notice Ошибка: несанкционированный доступ к полю
+    error UnauthorizedFieldAccess(address caller, string fieldKey);
 
     // === SIMPLE FIELDS FUNCTIONS ===
 
@@ -127,6 +148,47 @@ interface IAmanitaInternational {
 
     /// @notice Получение всех классов со сложными полями
     function getAllComplexClasses() external view returns (string[] memory);
+    
+    // === OWNERSHIP & GLOBAL FIELDS FUNCTIONS ===
+    
+    /// @notice Пометить поле как глобальное
+    function setGlobalField(
+        string memory fieldKey,
+        bool isGlobal
+    ) external;
+    
+    /// @notice Получение владельца простого поля
+    function getSimpleFieldOwner(
+        string memory fieldKey
+    ) external view returns (address);
+    
+    /// @notice Получение владельца сложного поля
+    function getComplexFieldOwner(
+        string memory className,
+        string memory language
+    ) external view returns (address);
+    
+    /// @notice Проверка является ли поле глобальным
+    function isFieldGlobal(
+        string memory fieldKey
+    ) external view returns (bool);
+    
+    /// @notice Получение адреса контракта SpiralEngine
+    /// @return ISpiralEngine адрес интегрированного SpiralEngine
+    function spiralEngine() external view returns (ISpiralEngine);
+    
+    /// @notice Обновление адреса контракта SpiralEngine (только ADMIN_ROLE)
+    /// @param _spiralEngine Новый адрес SpiralEngine
+    function setSpiralEngine(address _spiralEngine) external;
+    
+    /// @notice Публичный маппинг владельцев простых полей
+    function simpleFieldOwner(string memory fieldKey) external view returns (address);
+    
+    /// @notice Публичный маппинг владельцев сложных полей
+    function complexFieldOwner(string memory key) external view returns (address);
+    
+    /// @notice Публичный маппинг глобальных полей
+    function isGlobalField(string memory fieldKey) external view returns (bool);
 
     // === PAUSE FUNCTIONS ===
 

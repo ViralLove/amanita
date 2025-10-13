@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "./interfaces/ISpiralEngine.sol";
 
 /**
  * @title AmanitaInternationalLogic
@@ -52,6 +53,9 @@ contract AmanitaInternationalLogic is
     
     /// @notice Роль администратора для управления переводами
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    
+    /// @notice Роль продавца для управления переводами своих компонентов
+    bytes32 public constant SELLER_ROLE = keccak256("SELLER_ROLE");
 
     // === CUSTOM ERRORS ===
     // Custom errors для экономии gas и улучшения читаемости (M1)
@@ -76,6 +80,11 @@ contract AmanitaInternationalLogic is
 
     /// @notice Ошибка: нулевой адрес
     error ZeroAddress();
+    
+    /// @notice Ошибка: несанкционированный доступ к полю
+    /// @param caller Адрес вызывающего
+    /// @param fieldKey Ключ поля
+    error UnauthorizedFieldAccess(address caller, string fieldKey);
 
     // === STATE VARIABLES ===
     // Консолидация из AmanitaInternationalStorage
@@ -107,10 +116,31 @@ contract AmanitaInternationalLogic is
     
     /// @notice Маппинг для проверки существования класса
     mapping(string => bool) private classExists;
+    
+    /// @notice Маппинг владельцев простых полей: "fieldKey" → owner address
+    /// @dev Владелец может обновлять свои поля, admin может обновлять любые
+    mapping(string => address) public simpleFieldOwner;
+    
+    /// @notice Маппинг владельцев сложных полей: "className.language" → owner address
+    /// @dev Владелец может обновлять свои поля, admin может обновлять любые
+    mapping(string => address) public complexFieldOwner;
+    
+    /// @notice Маппинг глобальных полей: "fieldKey" → isGlobal
+    /// @dev Глобальные поля (features, forms) могут изменять только admin
+    mapping(string => bool) public isGlobalField;
+    
+    /// @notice Адрес контракта SpiralEngine для проверки SELLER_ROLE
+    /// @dev SpiralEngine = Single Source of Truth для управления ролями sellers
+    /// @dev AmanitaInternational делегирует проверку SELLER_ROLE этому контракту
+    /// @dev Обновлено в версии 2.1.0 для интеграции с SpiralEngine
+    ISpiralEngine public spiralEngine;
 
     // === STORAGE GAP ===
     // Резерв для будущих переменных в апгрейдах
-    uint256[50] private __gap;
+    // Уменьшено с 50 до 46 из-за добавления:
+    // - 3 mappings (ownership: simpleFieldOwner, complexFieldOwner, isGlobalField)
+    // - 1 interface reference (spiralEngine)
+    uint256[46] private __gap;
 
     // === СОБЫТИЯ ===
 
@@ -134,6 +164,26 @@ contract AmanitaInternationalLogic is
         string indexed language,
         string cid,
         address indexed updater
+    );
+    
+    /// @notice Событие установки глобального поля
+    /// @param fieldKey Ключ поля
+    /// @param isGlobal true если поле глобальное
+    /// @param admin Адрес администратора
+    event GlobalFieldSet(
+        string indexed fieldKey,
+        bool isGlobal,
+        address indexed admin
+    );
+    
+    /// @notice Событие обновления адреса SpiralEngine
+    /// @param oldSpiralEngine Старый адрес контракта SpiralEngine
+    /// @param newSpiralEngine Новый адрес контракта SpiralEngine
+    /// @param admin Адрес администратора, выполнившего обновление
+    event SpiralEngineUpdated(
+        address indexed oldSpiralEngine,
+        address indexed newSpiralEngine,
+        address indexed admin
     );
 
     /// @notice Событие удаления простого поля
@@ -171,12 +221,15 @@ contract AmanitaInternationalLogic is
 
     // === ИНИЦИАЛИЗАЦИЯ ===
 
-    /// @notice Инициализация контракта (вызывается один раз при deploy)
+    /// @notice Инициализация контракта с ролями и интеграцией SpiralEngine
     /// @param admin Адрес администратора
+    /// @param _spiralEngine Адрес контракта SpiralEngine для проверки SELLER_ROLE
     /// @dev Заменяет constructor для upgradeable контрактов
-    function initialize(address admin) public initializer {
+    /// @dev SpiralEngine = Single Source of Truth для управления ролями sellers
+    function initialize(address admin, address _spiralEngine) public initializer {
         // Проверка входных параметров
         if (admin == address(0)) revert ZeroAddress();
+        if (_spiralEngine == address(0)) revert ZeroAddress();
 
         // Инициализация модулей OpenZeppelin
         __AccessControl_init();
@@ -188,6 +241,9 @@ contract AmanitaInternationalLogic is
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
         _grantRole(ADMIN_ROLE, admin);
+        
+        // Интеграция с SpiralEngine
+        spiralEngine = ISpiralEngine(_spiralEngine);
     }
 
     // === UUPS UPGRADE ===
@@ -197,7 +253,7 @@ contract AmanitaInternationalLogic is
     /// @dev Только UPGRADER_ROLE может обновлять контракт
     function _authorizeUpgrade(
         address newImplementation
-    ) internal override onlyRole(UPGRADER_ROLE) {
+    ) internal view override onlyRole(UPGRADER_ROLE) {
         // Дополнительные проверки можно добавить здесь
         require(newImplementation != address(0), "Invalid implementation");
     }
@@ -215,26 +271,95 @@ contract AmanitaInternationalLogic is
     function unpause() external onlyRole(ADMIN_ROLE) nonReentrant {
         _unpause();
     }
+    
+    // === HELPER FUNCTIONS ===
+    
+    /**
+     * @notice Проверяет, имеет ли account SELLER_ROLE
+     * @dev Проверяет роль в ДВУХ местах для гибкости:
+     *      1. Локально в этом контракте (для обратной совместимости или manual grants)
+     *      2. В контракте SpiralEngine (основной источник истины)
+     * 
+     * Архитектурный принцип:
+     * - SpiralEngine = Single Source of Truth для управления sellers
+     * - AmanitaInternational делегирует проверку SELLER_ROLE
+     * - Обратная совместимость с локальными ролями сохранена
+     * 
+     * @param account Адрес для проверки
+     * @return bool true если account имеет SELLER_ROLE в любом из контрактов
+     * 
+     * @custom:security try-catch для устойчивости к ошибкам SpiralEngine
+     * @custom:gas-optimization Проверка локальной роли первой (дешевле)
+     */
+    function _hasSellerRole(address account) internal view returns (bool) {
+        // Проверка 1: Локальная роль (для обратной совместимости или manual grants)
+        if (hasRole(SELLER_ROLE, account)) {
+            return true;
+        }
+        
+        // Проверка 2: Роль в SpiralEngine (основной источник истины)
+        if (address(spiralEngine) != address(0)) {
+            try spiralEngine.hasRole(spiralEngine.SELLER_ROLE(), account) returns (bool hasSpiralRole) {
+                return hasSpiralRole;
+            } catch {
+                // Если SpiralEngine недоступен или возникла ошибка, возвращаем false
+                // Это безопасное поведение: в случае проблем доступ запрещается
+                return false;
+            }
+        }
+        
+        return false;
+    }
 
     // === SIMPLE FIELDS FUNCTIONS ===
 
     /// @notice Установка CID для простого поля
     /// @param fieldKey Ключ поля (например: "product.forms")
     /// @param cid IPFS CID с мультиязычными переводами
-    /// @dev Только ADMIN_ROLE может устанавливать переводы
+    /// @dev Права доступа:
+    ///      - ADMIN_ROLE: может устанавливать любые поля
+    ///      - SELLER_ROLE: может создавать новые поля (становится owner)
+    ///      - Owner поля: может обновлять свои поля
+    ///      - Глобальные поля (isGlobalField=true): только ADMIN_ROLE
     /// @dev Gas optimization: calldata вместо memory (M1)
     function setSimpleFieldCID(
         string calldata fieldKey,
         string calldata cid
-    ) external onlyRole(ADMIN_ROLE) whenNotPaused nonReentrant {
+    ) external whenNotPaused nonReentrant {
         // Валидация входных данных
         if (bytes(fieldKey).length == 0) revert EmptyFieldKey();
         if (bytes(cid).length == 0) revert EmptyCID();
-
-        // Если поле новое - добавляем в массив
-        if (!simpleFieldExists[fieldKey]) {
-            simpleFieldKeys.push(fieldKey);
+        
+        address owner = simpleFieldOwner[fieldKey];
+        bool isGlobal = isGlobalField[fieldKey];
+        
+        // Проверка прав доступа
+        if (owner == address(0)) {
+            // НОВОЕ ПОЛЕ - может создать ADMIN или SELLER
+            // ✅ Интеграция с SpiralEngine: _hasSellerRole() проверяет роль в SpiralEngine
+            if (!hasRole(ADMIN_ROLE, msg.sender) && !_hasSellerRole(msg.sender)) {
+                revert UnauthorizedFieldAccess(msg.sender, fieldKey);
+            }
+            
+            // Запоминаем владельца
+            simpleFieldOwner[fieldKey] = msg.sender;
             simpleFieldExists[fieldKey] = true;
+            simpleFieldKeys.push(fieldKey);
+            
+        } else {
+            // СУЩЕСТВУЮЩЕЕ ПОЛЕ
+            
+            // Глобальные поля - только ADMIN
+            if (isGlobal) {
+                if (!hasRole(ADMIN_ROLE, msg.sender)) {
+                    revert UnauthorizedFieldAccess(msg.sender, fieldKey);
+                }
+            } else {
+                // Обычные поля - owner или ADMIN
+                if (owner != msg.sender && !hasRole(ADMIN_ROLE, msg.sender)) {
+                    revert UnauthorizedFieldAccess(msg.sender, fieldKey);
+                }
+            }
         }
 
         // Сохраняем CID
@@ -328,13 +453,17 @@ contract AmanitaInternationalLogic is
     /// @param className Имя класса (например: "Description")
     /// @param language Код языка (например: "ru")
     /// @param cid IPFS CID с переводами этого класса на этом языке
-    /// @dev Только ADMIN_ROLE может устанавливать переводы
+    /// @dev Права доступа:
+    ///      - ADMIN_ROLE: может устанавливать любые поля
+    ///      - SELLER_ROLE: может создавать новые поля (становится owner)
+    ///      - Owner поля: может обновлять свои поля
+    ///      - Глобальные поля (isGlobalField=true): только ADMIN_ROLE
     /// @dev Gas optimization: calldata вместо memory (M1)
     function setComplexFieldCID(
         string calldata className,
         string calldata language,
         string calldata cid
-    ) external onlyRole(ADMIN_ROLE) whenNotPaused nonReentrant {
+    ) external whenNotPaused nonReentrant {
         // Валидация входных данных
         if (bytes(className).length == 0) revert EmptyClassName();
         if (bytes(language).length == 0) revert EmptyLanguage();
@@ -342,17 +471,47 @@ contract AmanitaInternationalLogic is
 
         // Создаем составной ключ
         string memory key = string(abi.encodePacked(className, ".", language));
-
-        // Если класс новый - добавляем в массив
-        if (!classExists[className]) {
-            complexFieldClasses.push(className);
-            classExists[className] = true;
-        }
-
-        // Если это новый язык для этого класса - добавляем
-        if (!complexFieldExists[key]) {
-            complexFieldLanguages[className].push(language);
-            complexFieldExists[key] = true;
+        
+        address owner = complexFieldOwner[key];
+        bool isGlobal = isGlobalField[key];
+        
+        // Проверка прав доступа
+        if (owner == address(0)) {
+            // НОВОЕ ПОЛЕ - может создать ADMIN или SELLER
+            // ✅ Интеграция с SpiralEngine: _hasSellerRole() проверяет роль в SpiralEngine
+            if (!hasRole(ADMIN_ROLE, msg.sender) && !_hasSellerRole(msg.sender)) {
+                revert UnauthorizedFieldAccess(msg.sender, key);
+            }
+            
+            // Запоминаем владельца
+            complexFieldOwner[key] = msg.sender;
+            
+            // Если класс новый - добавляем в массив
+            if (!classExists[className]) {
+                complexFieldClasses.push(className);
+                classExists[className] = true;
+            }
+            
+            // Если это новый язык для этого класса - добавляем
+            if (!complexFieldExists[key]) {
+                complexFieldLanguages[className].push(language);
+                complexFieldExists[key] = true;
+            }
+            
+        } else {
+            // СУЩЕСТВУЮЩЕЕ ПОЛЕ
+            
+            // Глобальные поля - только ADMIN
+            if (isGlobal) {
+                if (!hasRole(ADMIN_ROLE, msg.sender)) {
+                    revert UnauthorizedFieldAccess(msg.sender, key);
+                }
+            } else {
+                // Обычные поля - owner или ADMIN
+                if (owner != msg.sender && !hasRole(ADMIN_ROLE, msg.sender)) {
+                    revert UnauthorizedFieldAccess(msg.sender, key);
+                }
+            }
         }
 
         // Сохраняем CID
@@ -472,6 +631,74 @@ contract AmanitaInternationalLogic is
     /// @return Массив всех зарегистрированных классов
     function getAllComplexClasses() external view returns (string[] memory) {
         return complexFieldClasses;
+    }
+    
+    // === OWNERSHIP & GLOBAL FIELDS FUNCTIONS ===
+    
+    /// @notice Пометить поле как глобальное (только ADMIN может изменять)
+    /// @param fieldKey Ключ поля (для simple) или "className.language" (для complex)
+    /// @param isGlobal true если поле глобальное
+    /// @dev Только ADMIN_ROLE может помечать поля как глобальные
+    /// @dev Примеры глобальных полей: "features", "component_forms"
+    function setGlobalField(
+        string calldata fieldKey,
+        bool isGlobal
+    ) external onlyRole(ADMIN_ROLE) whenNotPaused {
+        if (bytes(fieldKey).length == 0) revert EmptyFieldKey();
+        
+        isGlobalField[fieldKey] = isGlobal;
+        
+        emit GlobalFieldSet(fieldKey, isGlobal, msg.sender);
+    }
+    
+    /// @notice Получение владельца простого поля
+    /// @param fieldKey Ключ поля
+    /// @return Адрес владельца (address(0) если поле не существует)
+    function getSimpleFieldOwner(
+        string calldata fieldKey
+    ) external view returns (address) {
+        return simpleFieldOwner[fieldKey];
+    }
+    
+    /// @notice Получение владельца сложного поля
+    /// @param className Имя класса
+    /// @param language Код языка
+    /// @return Адрес владельца (address(0) если поле не существует)
+    function getComplexFieldOwner(
+        string calldata className,
+        string calldata language
+    ) external view returns (address) {
+        string memory key = string(abi.encodePacked(className, ".", language));
+        return complexFieldOwner[key];
+    }
+    
+    /// @notice Проверка является ли поле глобальным
+    /// @param fieldKey Ключ поля
+    /// @return true если поле глобальное
+    function isFieldGlobal(
+        string calldata fieldKey
+    ) external view returns (bool) {
+        return isGlobalField[fieldKey];
+    }
+    
+    /**
+     * @notice Обновляет адрес контракта SpiralEngine
+     * @param _spiralEngine Новый адрес контракта SpiralEngine
+     * @dev Только ADMIN_ROLE может вызвать эту функцию
+     * @dev Используется для обновления интеграции или миграции SpiralEngine
+     * 
+     * Примеры использования:
+     * - Обновление SpiralEngine при апгрейде
+     * - Миграция на новую версию SpiralEngine
+     * - Экстренное изменение интеграции
+     */
+    function setSpiralEngine(address _spiralEngine) external onlyRole(ADMIN_ROLE) {
+        if (_spiralEngine == address(0)) revert ZeroAddress();
+        
+        address oldSpiralEngine = address(spiralEngine);
+        spiralEngine = ISpiralEngine(_spiralEngine);
+        
+        emit SpiralEngineUpdated(oldSpiralEngine, _spiralEngine, msg.sender);
     }
 
     // === STATISTICS FUNCTIONS ===

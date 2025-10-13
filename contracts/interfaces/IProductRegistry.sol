@@ -25,13 +25,15 @@ interface IProductRegistry {
      * @notice Структура товара
      * @param id Уникальный идентификатор товара
      * @param seller Адрес продавца (владельца товара)
-     * @param ipfsCID IPFS CID с метаданными товара
+     * @param componentIds Массив businessId компонентов из OrganicComponentRegistry
+     * @param metadataCID IPFS CID с метаданными товара (БЕЗ компонентов внутри)
      * @param active Активен ли товар в каталоге
      */
     struct Product {
         uint256 id;
         address seller;
-        string ipfsCID;
+        string[] componentIds;
+        string metadataCID;
         bool active;
     }
     
@@ -43,13 +45,15 @@ interface IProductRegistry {
      * @notice Событие создания нового продукта
      * @param seller Адрес продавца
      * @param productId ID созданного продукта
-     * @param ipfsCID IPFS CID с метаданными
+     * @param componentIds Массив businessId компонентов
+     * @param metadataCID IPFS CID с метаданными
      * @param status Статус продукта (0 - неактивный, 1 - активный)
      */
     event ProductCreated(
         address indexed seller,
         uint256 productId,
-        string ipfsCID,
+        string[] componentIds,
+        string metadataCID,
         uint256 status
     );
     
@@ -99,18 +103,34 @@ interface IProductRegistry {
         address indexed newSpiralEngine
     );
     
+    /**
+     * @notice Событие обновления адреса OrganicComponentRegistry контракта
+     * @param oldRegistry Старый адрес OrganicComponentRegistry
+     * @param newRegistry Новый адрес OrganicComponentRegistry
+     */
+    event ComponentRegistryUpdated(
+        address indexed oldRegistry,
+        address indexed newRegistry
+    );
+    
     // ================================
     // ======= ОСНОВНЫЕ ФУНКЦИИ =======
     // ================================
     
     /**
-     * @notice Создать новый продукт
-     * @param ipfsCID IPFS CID с метаданными товара
+     * @notice Создать новый продукт с компонентами
+     * @param componentIds Массив businessId компонентов из OrganicComponentRegistry
+     * @param metadataCID IPFS CID с метаданными товара (БЕЗ компонентов)
      * @return productId ID созданного продукта
      * @dev Требует: активированный продавец с SELLER_ROLE
+     * @dev Требует: componentRegistry установлен
+     * @dev Требует: все компоненты существуют и ACTIVE
      * @dev Создаёт продукт в неактивном состоянии
      */
-    function createProduct(string calldata ipfsCID) external returns (uint256 productId);
+    function createProduct(
+        string[] calldata componentIds,
+        string calldata metadataCID
+    ) external returns (uint256 productId);
     
     /**
      * @notice Обновить существующий продукт
@@ -196,6 +216,17 @@ interface IProductRegistry {
      */
     function getProductsBySellerFull() external view returns (Product[] memory products);
     
+    /**
+     * @notice Получить список компонентов продукта
+     * @param productId ID продукта
+     * @return componentIds Массив businessId компонентов
+     * @dev Ревертится если продукт не существует
+     */
+    function getProductComponents(uint256 productId) 
+        external 
+        view 
+        returns (string[] memory componentIds);
+    
     // ================================
     // ======= ADMIN ФУНКЦИИ ==========
     // ================================
@@ -207,4 +238,12 @@ interface IProductRegistry {
      * @dev Эмитирует событие SpiralEngineUpdated
      */
     function setSpiralEngine(address _spiralEngine) external;
+    
+    /**
+     * @notice Установить адрес OrganicComponentRegistry контракта
+     * @param _componentRegistry Адрес контракта OrganicComponentRegistry
+     * @dev Требует: ADMIN_ROLE
+     * @dev Эмитирует событие ComponentRegistryUpdated
+     */
+    function setOrganicComponentRegistry(address _componentRegistry) external;
 }

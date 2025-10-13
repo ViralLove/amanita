@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/IProductRegistry.sol";
 import "./interfaces/ISpiralEngine.sol";
+import "./interfaces/IOrganicComponentRegistry.sol";
 
 /**
  * @title ProductRegistryLogic
@@ -60,6 +61,9 @@ contract ProductRegistryLogic is
     
     /// @notice Максимальное количество продуктов для очистки за одну транзакцию
     uint256 public constant MAX_PRODUCTS_PER_CLEAR = 10000;
+    
+    /// @notice Максимальное количество компонентов в одном продукте
+    uint256 public constant MAX_COMPONENTS_PER_PRODUCT = 20;
     
     // ================================
     // ======== CUSTOM ERRORS =========
@@ -114,6 +118,23 @@ contract ProductRegistryLogic is
     /// @notice Ошибка: пользователь не активирован в SpiralEngine
     error NotActivatedUser();
     
+    /// @notice Ошибка: компоненты не предоставлены
+    error NoComponentsProvided();
+    
+    /// @notice Ошибка: слишком много компонентов
+    error TooManyComponents();
+    
+    /// @notice Ошибка: OrganicComponentRegistry не установлен
+    error ComponentRegistryNotSet();
+    
+    /// @notice Ошибка: компонент не найден
+    /// @param businessId ID компонента
+    error ComponentNotFound(string businessId);
+    
+    /// @notice Ошибка: компонент не активен
+    /// @param businessId ID компонента
+    error ComponentNotActive(string businessId);
+    
     // ================================
     // ====== STATE VARIABLES =========
     // ================================
@@ -141,14 +162,17 @@ contract ProductRegistryLogic is
     /// Для эффективного получения каталога активных товаров
     uint256[] private activeProductIds;
     
+    /// @notice Адрес контракта OrganicComponentRegistry для валидации компонентов
+    IOrganicComponentRegistry public componentRegistry;
+    
     // ================================
     // ======== STORAGE GAP ===========
     // ================================
     // Резервируем слоты для будущих переменных в апгрейдах
     // При добавлении новых state variables уменьшайте размер gap
     
-    /// @dev Резерв для будущих обновлений (50 слотов)
-    uint256[50] private __gap;
+    /// @dev Резерв для будущих обновлений (49 слотов, было 50)
+    uint256[49] private __gap;
     
     // ================================
     // ======== ИНИЦИАЛИЗАЦИЯ =========
@@ -254,14 +278,20 @@ contract ProductRegistryLogic is
     // ================================
     
     /**
-     * @notice Создать новый продукт
-     * @param ipfsCID IPFS CID с метаданными товара
+     * @notice Создать новый продукт с компонентами
+     * @param componentIds Массив businessId компонентов из OrganicComponentRegistry
+     * @param metadataCID IPFS CID с метаданными товара (БЕЗ компонентов)
      * @return productId ID созданного продукта
      * @dev Требует: активированный продавец с SELLER_ROLE
+     * @dev Требует: componentRegistry установлен
+     * @dev Требует: все компоненты существуют в OrganicComponentRegistry
      * @dev Создаёт продукт в неактивном состоянии
-     * @dev Gas optimized: unchecked для счётчика, calldata для string
+     * @dev Gas optimized: unchecked для счётчика, calldata для arrays
      */
-    function createProduct(string calldata ipfsCID) 
+    function createProduct(
+        string[] calldata componentIds,
+        string calldata metadataCID
+    ) 
         external 
         whenNotPaused 
         nonReentrant 
@@ -269,7 +299,14 @@ contract ProductRegistryLogic is
         override 
         returns (uint256 productId) 
     {
-        if (bytes(ipfsCID).length == 0) revert EmptyCID();
+        // Валидация входных данных
+        if (bytes(metadataCID).length == 0) revert EmptyCID();
+        if (componentIds.length == 0) revert NoComponentsProvided();
+        if (componentIds.length > MAX_COMPONENTS_PER_PRODUCT) revert TooManyComponents();
+        if (address(componentRegistry) == address(0)) revert ComponentRegistryNotSet();
+        
+        // Валидация компонентов
+        _validateComponents(componentIds);
         
         // Газовая оптимизация: unchecked безопасен для uint256
         unchecked {
@@ -280,7 +317,8 @@ contract ProductRegistryLogic is
         products[productId] = Product({
             id: productId,
             seller: msg.sender,
-            ipfsCID: ipfsCID,
+            componentIds: componentIds,
+            metadataCID: metadataCID,
             active: false
         });
         
@@ -292,22 +330,26 @@ contract ProductRegistryLogic is
             catalogVersion[msg.sender]++;
         }
         
+        // Уведомление OrganicComponentRegistry
+        _trackComponentUsage(componentIds, msg.sender);
+        
         // Эмитим события
-        emit ProductCreated(msg.sender, productId, ipfsCID, 0);
+        emit ProductCreated(msg.sender, productId, componentIds, metadataCID, 0);
         emit CatalogUpdated(msg.sender, catalogVersion[msg.sender]);
     }
     
     /**
      * @notice Обновить существующий продукт
      * @param productId ID продукта для обновления
-     * @param newIpfsCID Новый IPFS CID с метаданными
+     * @param newMetadataCID Новый IPFS CID с метаданными
      * @param newPrice Новая цена (для совместимости с событием)
      * @dev Требует: msg.sender = seller продукта
      * @dev Продукт должен быть активным
+     * @dev Обновляет только metadataCID, компоненты остаются неизменными
      */
     function updateProduct(
         uint256 productId,
-        string calldata newIpfsCID,
+        string calldata newMetadataCID,
         uint256 newPrice
     ) 
         external 
@@ -316,19 +358,19 @@ contract ProductRegistryLogic is
         onlyOwnSellerProduct(productId) 
         override 
     {
-        if (bytes(newIpfsCID).length == 0) revert EmptyCID();
+        if (bytes(newMetadataCID).length == 0) revert EmptyCID();
         if (newPrice == 0) revert InvalidPrice();
         
         Product storage product = products[productId];
         if (!product.active) revert ProductNotActive();
         
-        product.ipfsCID = newIpfsCID;
+        product.metadataCID = newMetadataCID;
         
         unchecked {
             catalogVersion[msg.sender]++;
         }
         
-        emit ProductUpdated(msg.sender, productId, newIpfsCID, newPrice, 1);
+        emit ProductUpdated(msg.sender, productId, newMetadataCID, newPrice, 1);
         emit CatalogUpdated(msg.sender, catalogVersion[msg.sender]);
     }
     
@@ -386,7 +428,7 @@ contract ProductRegistryLogic is
             catalogVersion[msg.sender]++;
         }
         
-        emit ProductUpdated(msg.sender, productId, product.ipfsCID, 0, 1);
+        emit ProductUpdated(msg.sender, productId, product.metadataCID, 0, 1);
         emit CatalogUpdated(msg.sender, catalogVersion[msg.sender]);
     }
     
@@ -466,6 +508,68 @@ contract ProductRegistryLogic is
                 activeProductIds.pop();
                 break;
             }
+            unchecked { ++i; }
+        }
+    }
+    
+    /**
+     * @dev Валидация массива компонентов
+     * @param componentIds Массив businessId для проверки
+     * @notice Проверяет что все компоненты существуют в OrganicComponentRegistry
+     * @notice Gas optimization: не проверяем статус (ACTIVE) для экономии ~5000 gas на компонент
+     */
+    function _validateComponents(string[] calldata componentIds) private view {
+        // Gas optimization: кэшируем длину
+        uint256 len = componentIds.length;
+        
+        for (uint256 i = 0; i < len;) {
+            string calldata compId = componentIds[i];
+            
+            // Проверка существования
+            if (!componentRegistry.componentExists(compId)) {
+                revert ComponentNotFound(compId);
+            }
+            
+            // Примечание: проверка статуса закомментирована для экономии gas
+            // Можно раскомментировать если критично валидировать ACTIVE статус
+            /*
+            IOrganicComponentRegistry.ComponentStatus status = 
+                componentRegistry.getComponentStatus(compId);
+            if (status != IOrganicComponentRegistry.ComponentStatus.ACTIVE) {
+                revert ComponentNotActive(compId);
+            }
+            */
+            
+            unchecked { ++i; }
+        }
+    }
+    
+    /**
+     * @dev Уведомление OrganicComponentRegistry об использовании компонентов
+     * @param componentIds Массив businessId использованных компонентов
+     * @param seller Адрес продавца
+     * @notice Инкрементирует счётчик использования и пытается добавить пользователя
+     */
+    function _trackComponentUsage(
+        string[] memory componentIds,
+        address seller
+    ) private {
+        uint256 len = componentIds.length;
+        
+        for (uint256 i = 0; i < len;) {
+            string memory compId = componentIds[i];
+            
+            // Инкремент счётчика использования (всегда успешен)
+            componentRegistry.incrementUsageCount(compId);
+            
+            // Попытка добавить пользователя (игнорируем если уже добавлен)
+            // Используем try-catch для обработки дубликатов
+            try componentRegistry.addComponentUser(compId, seller) {
+                // Успешно добавлен
+            } catch {
+                // Пользователь уже добавлен - игнорируем ошибку
+            }
+            
             unchecked { ++i; }
         }
     }
@@ -559,6 +663,22 @@ contract ProductRegistryLogic is
         return sellerProducts;
     }
     
+    /**
+     * @notice Получить список компонентов продукта
+     * @param productId ID продукта
+     * @return componentIds Массив businessId компонентов
+     * @dev Ревертится если продукт не существует
+     */
+    function getProductComponents(uint256 productId) 
+        external 
+        view 
+        override 
+        returns (string[] memory componentIds) 
+    {
+        if (products[productId].id == 0) revert ProductDoesNotExist();
+        return products[productId].componentIds;
+    }
+    
     // ================================
     // ======= ADMIN ФУНКЦИИ ==========
     // ================================
@@ -582,6 +702,27 @@ contract ProductRegistryLogic is
         spiralEngine = ISpiralEngine(_spiralEngine);
         
         emit SpiralEngineUpdated(oldSpiralEngine, _spiralEngine);
+    }
+    
+    /**
+     * @notice Установить адрес OrganicComponentRegistry контракта
+     * @param _componentRegistry Адрес контракта OrganicComponentRegistry
+     * @dev Требует: ADMIN_ROLE
+     * @dev Эмитирует событие ComponentRegistryUpdated
+     */
+    function setOrganicComponentRegistry(address _componentRegistry) 
+        external 
+        whenNotPaused 
+        nonReentrant 
+        onlyRole(ADMIN_ROLE) 
+        override 
+    {
+        if (_componentRegistry == address(0)) revert ZeroAddress();
+        
+        address oldRegistry = address(componentRegistry);
+        componentRegistry = IOrganicComponentRegistry(_componentRegistry);
+        
+        emit ComponentRegistryUpdated(oldRegistry, _componentRegistry);
     }
 }
 
