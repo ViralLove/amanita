@@ -37,3 +37,20 @@ bot/.env.production
 /bot/__pycache__
 bot/tests/__pycache__/test_blockchain.cpython-311-pytest-8.3.5.pyc
 /bot/catalog
+/bot/catalog
+/bot/catalog
+/scripts/organic_components
+/bot/catalog_data
+scripts/docs/AIJournal.md
+contracts/docs/AIjournal.md
+bot/docs/AIJournal.md
+contracts/docs/bridge-prompt.md
+contracts/docs/UUPS-Strategy-Analysis.md
+
+# Data directory (not in Git)
+data/
+
+# Backup directories
+scripts_backup_*/
+scripts_structure_before_*.txt
+*.backup

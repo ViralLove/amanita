@@ -4,9 +4,9 @@
 
 `deploy_full.js` - это универсальный скрипт для развертывания и управления контрактами экосистемы Amanita. Скрипт поддерживает различные сценарии деплоя от полной инициализации экосистемы до обновления отдельных контрактов.
 
-**Версия документации**: 3.0  
-**Дата обновления**: 8 января 2025  
-**Статус**: Актуализировано с поддержкой UUPS архитектуры
+**Версия документации**: 3.1  
+**Дата обновления**: 12 января 2025  
+**Статус**: Актуализировано с component-based архитектурой и Action 555
 
 ## 🔷 UUPS Архитектура (Upgradeable Contracts)
 
@@ -337,14 +337,32 @@ npx hardhat run scripts/deploy_full.js --network localhost 777
 
 #### `4` - Создание каталога (неактивные продукты)
 ```bash
-# Способ 1 - через переменную окружения
 DEPLOY_ACTION=4 npx hardhat run scripts/deploy_full.js --network localhost
-
-# Способ 2 - через аргументы командной строки
-npx hardhat run scripts/deploy_full.js --network localhost 4
 ```
-**Описание:** Загружает каталог продуктов из `product_registry_upload_data.json`
-**Требования:** Существующие контракты ProductRegistry и SpiralEngine
+**Описание:** Загружает каталог продуктов из `product_registry_upload_data.json` с привязкой к компонентам
+
+**Требования:**
+- Существующие контракты ProductRegistry, SpiralEngine и OrganicComponentRegistry
+- **Компоненты должны быть предварительно загружены** (используйте Action 555)
+- Seller активирован с ролью SELLER_ROLE
+- SELLER_ADDRESS и SELLER_PRIVATE_KEY в .env
+
+**Процесс:**
+1. Загружает JSON файл с продуктами (включает componentIds и metadataCID)
+2. Создает продукты в ProductRegistry с привязкой к компонентам
+3. Продукты создаются неактивными (требуют активации через Action 41)
+
+**Формат данных (product_registry_upload_data.json):**
+```json
+{
+  "id": "amanita_lux",
+  "componentIds": ["amanita_muscaria"],
+  "metadataCID": "QmQHMTL5ep9pKfs5...",
+  "active": true
+}
+```
+
+**Важно:** С версии 3.1 продукты создаются с массивом componentIds, которые должны существовать в OrganicComponentRegistry
 
 #### `5` - Параметризуемый деплой контракта
 ```bash
@@ -515,65 +533,174 @@ npx hardhat run scripts/deploy_full.js --network localhost 40
 
 #### `41` - Активация существующих продуктов
 ```bash
-# Способ 1 - через переменную окружения
 DEPLOY_ACTION=41 npx hardhat run scripts/deploy_full.js --network localhost
-
-# Способ 2 - через аргументы командной строки
-npx hardhat run scripts/deploy_full.js --network localhost 41
 ```
 **Описание:** Активирует все неактивные продукты в каталоге
-**Требования:** Существующий каталог с неактивными продуктами
+**Требования:** 
+- Существующий каталог с неактивными продуктами
+- SELLER_ADDRESS и SELLER_PRIVATE_KEY в .env
 
-#### `888` - Полная инициализация селлера
+#### `555` - Базовая активация seller + загрузка компонентов
 ```bash
-# Способ 1 - через переменные окружения (рекомендуется)
-DEPLOY_ACTION=888 DEPLOYER_INVITE=<deployerInvite> SELLER_ADDRESS=<sellerAddress> npx hardhat run scripts/deploy_full.js --network localhost
+# Обычный режим (рекомендуется для development)
+DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-XXXX-YYYY npx hardhat run scripts/deploy_full.js --network localhost
 
-DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-42PC-IZ3I npx hardhat run scripts/deploy_full.js --network localhost
-
-# Способ 2 - через аргументы командной строки
-npx hardhat run scripts/deploy_full.js --network localhost 888 <deployerInvite> <sellerAddress> [catalogData]
+# Dry-run режим (тестирование без регистрации)
+DRY_RUN=true DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-BU7J-ZNA5 npx hardhat run scripts/deploy_full.js --network localhost
 ```
-**Описание:** Полная инициализация селлера от активации до готовности к работе
+
+**Описание:** Автоматизированная активация seller и быстрая регистрация компонентов в OrganicComponentRegistry
+
 **Параметры:**
-- `deployerInvite`: инвайт код деплоера для активации селлера (обязательный)
-- `sellerAddress`: адрес селлера для инициализации (обязательный)
-- `catalogData`: путь к JSON файлу с каталогом (опционально)
+- `DEPLOYER_INVITE` - рутовый инвайт-код из Action 777 (обязательный)
+- `SELLER_ADDRESS` - адрес seller (берется из .env)
+- `SELLER_PRIVATE_KEY` - приватный ключ seller (берется из .env)
+- `DRY_RUN` - режим симуляции без реальной регистрации (опционально)
 
 **Процесс:**
-1. Валидация входных параметров
-2. Загрузка контрактов (SpiralEngine, ProductRegistry, SoulIdentity)
-3. Валидация деплоер инвайта
-4. Активация селлера в SpiralEngine
-5. Назначение роли SELLER_ROLE
-6. Создание SBT токена в SoulIdentity
-7. Загрузка каталога продуктов
-8. Генерация 12 инвайтов для селлера
+1. **Загрузка контрактов:** SpiralEngine, OrganicComponentRegistry, AmanitaInternational
+2. **Активация seller (если не активирован):**
+   - Проверка статуса активации
+   - Валидация рутового инвайта
+   - Вызов `activateUser()` с генерацией 12 новых инвайтов
+   - Назначение `SELLER_ROLE` через `grantSellerRole()`
+   - Сохранение сгенерированных инвайтов в `bot/flowers/{SELLER_ADDRESS}_invites.txt`
+3. **Регистрация компонентов:**
+   - Автообнаружение компонентов в `data/components/` (новая структура после миграции)
+   - Валидация JSON файлов компонентов
+   - Проверка существующих регистраций (skip если уже зарегистрирован)
+   - Вызов `createComponent()` для каждого компонента
+   - Задержка 2 секунды между компонентами на Polygon mainnet
+
+**⚠️ ВАЖНО: Пути**
+
+Компоненты находятся в:
+```
+data/components/{component_id}/{component_id}.json
+```
+
+Action 555 автоматически использует правильный путь (`../data/components/`).
+
+Если нужно указать кастомный путь:
+```bash
+# Относительный путь (от корня проекта)
+COMPONENTS_DIR="../data/components/" DEPLOY_ACTION=555 node scripts/deploy_full.js 555
+
+# Абсолютный путь
+COMPONENTS_DIR="/absolute/path/to/components" DEPLOY_ACTION=555 node scripts/deploy_full.js 555
+```
+
+**Формат компонента (data/components/{component_id}/{component_id}.json):**
+```json
+{
+  "business_id": "amanita_muscaria",
+  "metadata_cid": "QmPlaceholder",
+  "translation_cid": "QmPlaceholder"
+}
+```
+
+**Результат:**
+- ✅ Seller активирован в SpiralEngine (если требовалось)
+- ✅ Seller имеет роль SELLER_ROLE
+- ✅ 12 инвайтов сгенерировано и сохранено
+- ✅ Компоненты зарегистрированы в OrganicComponentRegistry
+- ✅ Готово для создания каталога продуктов (Action 4 или Action 888)
+
+**Важно:**
+- ⚠️ **Development режим:** Компоненты регистрируются с placeholder CIDs (`QmPlaceholder`)
+- ⚠️ **Production:** Для полной загрузки метаданных в Arweave используйте `scripts/upload_all_components.js`
+- ✅ **Идемпотентность:** Можно запускать многократно - пропустит уже зарегистрированные компоненты
 
 **Примеры использования:**
 ```bash
-# Базовый пример с обязательными параметрами (способ 1 - через переменные окружения)
-DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-29NV-YTBS SELLER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8 npx hardhat run scripts/deploy_full.js --network localhost
+# 1. После деплоя контрактов (Action 1) и генерации рутовых инвайтов (Action 777)
+DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-2TK7-MJI1 npx hardhat run scripts/deploy_full.js --network localhost
 
-# С кастомным каталогом (способ 1 - через переменные окружения)
-DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-29NV-YTBS SELLER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8 CATALOG_DATA=/path/to/custom/catalog.json npx hardhat run scripts/deploy_full.js --network localhost
+# 2. Dry-run для проверки (без регистрации)
+DRY_RUN=true DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-2TK7-MJI1 npx hardhat run scripts/deploy_full.js --network localhost
 
-# Через аргументы командной строки (способ 2)
-npx hardhat run scripts/deploy_full.js --network localhost 888 AMANITA-29NV-YTBS 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+# 3. Production (Polygon mainnet)
+DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-XXXX-YYYY npx hardhat run scripts/deploy_full.js --network polygon
 ```
 
+**Типичный workflow:**
+```bash
+# Шаг 1: Деплой контрактов
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
+
+# Шаг 2: Генерация рутовых инвайтов
+DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
+
+# Шаг 3: Активация seller + загрузка компонентов
+DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-XXXX-YYYY npx hardhat run scripts/deploy_full.js --network localhost
+
+# Шаг 4: Создание каталога продуктов
+DEPLOY_ACTION=4 npx hardhat run scripts/deploy_full.js --network localhost
+```
+
+#### `888` - Полная инициализация seller (end-to-end)
+```bash
+# Базовый пример (SELLER_ADDRESS из .env)
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-LIJ5-1EUV npx hardhat run scripts/deploy_full.js --network localhost
+
+# С кастомным каталогом
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-LIJ5-1EUV CATALOG_DATA=/path/to/custom/catalog.json npx hardhat run scripts/deploy_full.js --network localhost
+```
+
+**Описание:** Полная end-to-end инициализация seller от активации до готовности к работе с загруженным каталогом продуктов
+
+**Параметры:**
+- `DEPLOYER_INVITE` - рутовый инвайт-код из Action 777 (обязательный)
+- `SELLER_ADDRESS` - адрес seller (берется из .env)
+- `SELLER_PRIVATE_KEY` - приватный ключ seller (берется из .env)
+- `CATALOG_DATA` - путь к JSON файлу с каталогом (опционально, по умолчанию `bot/catalog/product_registry_upload_data.json`)
+
+**Полный процесс (7 шагов):**
+1. **Валидация параметров:** проверка DEPLOYER_INVITE и SELLER_ADDRESS
+2. **Загрузка контрактов:** SpiralEngine, ProductRegistry, SoulIdentity
+3. **Проверка активации seller:** если не активирован → активация через `activateUser()`
+4. **Назначение ролей:** SELLER_ROLE и ACTIVATOR_ROLE
+5. **Создание SBT токена:** через SoulIdentity
+6. **Загрузка каталога продуктов:** 
+   - Очистка существующего каталога (если есть)
+   - Создание продуктов с привязкой к componentIds (Action 4)
+   - Активация продуктов (Action 41)
+7. **Генерация инвайтов:** 12 новых инвайт-кодов для seller
+
 **Требования:**
-- Существующие контракты SpiralEngine, ProductRegistry, SoulIdentity
-- Валидный инвайт-код деплоера (полученный через action 777)
-- Адрес селлера с достаточным балансом для операций
-- Права деплоера для активации пользователей
+- ✅ Существующие контракты: SpiralEngine, ProductRegistry, SoulIdentity, OrganicComponentRegistry
+- ✅ **Компоненты загружены** (используйте Action 555 перед Action 888)
+- ✅ Валидный рутовый инвайт-код (полученный через Action 777)
+- ✅ SELLER_ADDRESS с достаточным балансом для операций
+- ✅ SELLER_PRIVATE_KEY в .env
 
 **Результат:**
-- Селлер активирован в SpiralEngine
-- Назначена роль SELLER_ROLE
-- Создан SBT токен в SoulIdentity
-- Загружен каталог продуктов
-- Сгенерированы 12 новых инвайтов для селлера
+- ✅ Seller активирован в SpiralEngine (если требовалось)
+- ✅ Назначены роли SELLER_ROLE и ACTIVATOR_ROLE
+- ✅ Создан SBT токен в SoulIdentity
+- ✅ Загружен и активирован каталог продуктов
+- ✅ Сгенерированы 12 новых инвайтов для seller
+- ✅ **Готово к production:** seller может принимать заказы
+
+**Типичный workflow (полная инициализация с нуля):**
+```bash
+# Шаг 1: Деплой контрактов
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
+
+# Шаг 2: Генерация рутовых инвайтов
+DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
+
+# Шаг 3: Активация seller + загрузка компонентов
+DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-XXXX-YYYY npx hardhat run scripts/deploy_full.js --network localhost
+
+# Шаг 4: Полная инициализация seller с каталогом
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-XXXX-YYYY npx hardhat run scripts/deploy_full.js --network localhost
+```
+
+**Важно:**
+- ⚠️ Action 888 **объединяет** функциональность Actions 555, 4, 41 и добавляет SBT
+- ⚠️ Если компоненты не загружены → используйте сначала Action 555
+- ✅ Можно запускать многократно - пропустит активацию если seller уже активирован
 
 ## Подробное описание действий
 
@@ -771,6 +898,8 @@ DEPLOY_ACTION=888 \
   SELLER_ADDRESS=0x... \
   npx hardhat run scripts/deploy_full.js --network localhost
 
+  DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-2TK7-MJI1 npx hardhat run scripts/deploy_full.js --network localhost
+
 # Результат:
 # ✅ Селлер активирован через SpiralEngine Proxy
 # ✅ Роли назначены
@@ -887,32 +1016,30 @@ DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost Bytes
 # npx hardhat run scripts/deploy_full.js --network localhost 5 BytesErrorEngine
 ```
 
-### Сценарий 6: Полная инициализация селлера (action 888)
+### Сценарий 6: Полная инициализация seller (Actions 555 + 888)
 ```bash
 # 1. Запуск локальной ноды
 npx hardhat node
 
-# 2. Полный деплой экосистемы (способ 1 - через переменную окружения)
+# 2. Полный деплой экосистемы
 DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
 
-# 3. Генерация инвайтов для деплоера (способ 1 - через переменную окружения)
+# 3. Генерация рутовых инвайтов
 DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
 
-# 4. Полная инициализация селлера (способ 1 - через переменные окружения)
-DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-B1G4-ADJO npx hardhat run scripts/deploy_full.js --network localhost
-или
-DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-QDBQ-JJSS SELLER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8 npx hardhat run scripts/deploy_full.js --network localhost
+# 4. Активация seller + загрузка компонентов
+DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-B1G4-ADJO npx hardhat run scripts/deploy_full.js --network localhost
 
-# Альтернативно - через аргументы командной строки:
-# npx hardhat run scripts/deploy_full.js --network localhost 1
-# npx hardhat run scripts/deploy_full.js --network localhost 777
-# npx hardhat run scripts/deploy_full.js --network localhost 888 AMANITA-29NV-YTBS 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+# 5. Полная инициализация seller с каталогом (опционально, если нужен каталог сразу)
+DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-B1G4-ADJO npx hardhat run scripts/deploy_full.js --network localhost
 ```
 
 **Примечание:** 
-- Замените `AMANITA-29NV-YTBS` на реальный инвайт-код из файла `bot/flowers/deployer_invites_localhost.txt`
-- Замените `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` на реальный адрес селлера
-- Убедитесь, что селлер имеет достаточный баланс для операций
+- Замените `AMANITA-B1G4-ADJO` на реальный инвайт-код из файла `bot/flowers/deployer_invites_localhost.txt`
+- `SELLER_ADDRESS` берется из `.env` файла
+- Убедитесь, что seller имеет достаточный баланс для операций
+- **Action 555** достаточен для development (активация + компоненты)
+- **Action 888** используется когда нужен полный цикл с каталогом продуктов
 
 ## Мониторинг и аналитика
 
@@ -929,6 +1056,38 @@ const registry = new ethers.Contract(process.env.AMANITA_REGISTRY_CONTRACT_ADDRE
 console.log('ProductRegistry:', await registry.getAddress('ProductRegistry'));
 "
 ```
+
+## Новые возможности в версии 3.1
+
+### 🧬 Архитектура на основе компонентов (Component-Based Architecture)
+**Главное нововведение версии 3.1:**
+- ✅ **OrganicComponentRegistry** - система управления органическими компонентами
+- ✅ **ProductRegistry v2** - продукты создаются с привязкой к массиву компонентов
+- ✅ **Action 555** - автоматизированная активация seller + загрузка компонентов
+- ✅ **Action 4 v2** - создание каталога с componentIds
+- ✅ **Action 888 v2** - полная инициализация с проверкой компонентов
+- ✅ Новый формат `product_registry_upload_data.json` с componentIds
+- ✅ Placeholder CIDs для development режима
+
+**Преимущества компонентной архитектуры:**
+- 🧩 **Переиспользование данных:** Один компонент используется в нескольких продуктах
+- 🌍 **Мультиязычность:** Переводы хранятся на уровне компонентов
+- 📊 **Отслеживание использования:** Счетчики использования компонентов
+- ⚡ **Быстрый деплой:** Action 555 регистрирует компоненты за минуты
+- 🔄 **Идемпотентность:** Безопасное повторное выполнение Actions
+
+**Workflow версии 3.1:**
+```bash
+DEPLOY_ACTION=1   # Деплой контрактов с OrganicComponentRegistry
+DEPLOY_ACTION=777 # Генерация рутовых инвайтов
+DEPLOY_ACTION=555 # Активация seller + загрузка компонентов
+DEPLOY_ACTION=4   # Создание каталога с componentIds
+```
+
+**Обратная совместимость:**
+- ⚠️ Версия 3.1 НЕ совместима с product_registry_upload_data.json версии 3.0
+- ✅ Все контракты версии 3.0 (UUPS) работают без изменений
+- ✅ Миграция: добавьте componentIds и переименуйте ipfsCID → metadataCID
 
 ## Новые возможности в версии 3.0
 
@@ -967,6 +1126,131 @@ console.log('ProductRegistry:', await registry.getAddress('ProductRegistry'));
 - Примеры для SBT экосистемы
 - Новые сценарии деплоя
 
+## Ограничения и известные проблемы
+
+### Action 555 - Два режима работы (v3.2)
+
+Action 555 теперь поддерживает два режима работы для разных сценариев использования.
+
+#### Full Mode (по умолчанию)
+
+**Назначение:** Полная загрузка компонентов в Arweave с реальными метаданными.
+
+```bash
+DEPLOY_ACTION=555 DEPLOYER_INVITE=XXXX node scripts/deploy_full.js 555
+```
+
+**Особенности:**
+- 🚀 Полная загрузка в Arweave (~5-10 минут)
+- 📤 Реальные CIDs для всех метаданных
+- ✅ Готово для production
+- 🔍 Детальный отчёт с CID и Contract ID
+
+**Когда использовать:**
+- Production deployment
+- Полная настройка для бота
+- Загрузка реальных метаданных компонентов
+
+#### Quick Mode (ARWEAVE=false)
+
+**Назначение:** Быстрая регистрация компонентов для development и тестирования.
+
+```bash
+ARWEAVE=false DEPLOY_ACTION=555 DEPLOYER_INVITE=XXXX node scripts/deploy_full.js 555
+```
+
+**Особенности:**
+- ⚡ Быстрое выполнение (~30 секунд)
+- 📝 Использует placeholder CIDs (`QmPlaceholder`)
+- ✅ Подходит для тестирования контрактов
+- ⚠️ БЕЗ реальных метаданных в Arweave
+
+**Когда использовать:**
+- Development и локальное тестирование
+- Быстрая проверка интеграции контрактов
+- Отладка бизнес-логики
+
+**Процесс Full Mode (по умолчанию):**
+1. **Проверка Arweave** - ключ, баланс, подключение
+2. **Upload Simple Fields** → Arweave (title, dosage)
+3. **Upload Complex Fields** → Arweave (описания на всех языках)
+4. **Upload Shareable Data** → Arweave (features, forms)
+5. **Update Root Metadata** - создание финального JSON
+6. **Upload Root Metadata** → Arweave
+7. **Register Component** → Blockchain (с реальными CIDs)
+
+#### Проверка готовности Arweave
+
+Поскольку Full Mode включен по умолчанию, рекомендуется проверить готовность Arweave:
+
+```bash
+# Базовая проверка
+node scripts/Arweave-Readiness.js
+
+# С тестовой загрузкой
+node scripts/Arweave-Readiness.js --test-upload
+```
+
+**Требования:**
+- ✅ Файл `.arweave-key.json` в корне проекта
+- ✅ Баланс AR токенов > 0.001 AR
+- ✅ Подключение к Arweave сети
+- ✅ Активированный seller с SELLER_ROLE
+
+#### Troubleshooting
+
+**Ошибка: "Arweave key не найден"**
+```bash
+# Проверьте наличие ключа
+ls -la .arweave-key.json
+
+# Создайте ключ если отсутствует
+node scripts/archive/upload_all_components.js --generate-key
+```
+
+**Ошибка: "Arweave wallet имеет нулевой баланс"**
+```bash
+# Получите AR токены на https://www.arweave.org/
+# Или используйте Quick Mode для development
+ARWEAVE=false DEPLOY_ACTION=555 DEPLOYER_INVITE=XXXX node scripts/deploy_full.js 555
+```
+
+**Ошибка: "Seller не активирован"**
+```bash
+# Сначала выполните активацию seller
+DEPLOY_ACTION=555 DEPLOYER_INVITE=XXXX node scripts/deploy_full.js 555
+```
+
+**Статус:** ✅ Реализовано в версии 3.2. Поддерживает оба режима работы.
+
+### Migration от версии 3.0 к 3.1
+
+**Проблема:** Формат `product_registry_upload_data.json` изменился.
+
+**Старый формат (v3.0):**
+```json
+{
+  "id": "amanita_lux",
+  "ipfsCID": "QmQHMTL5ep9pKfs5...",
+  "active": true
+}
+```
+
+**Новый формат (v3.1):**
+```json
+{
+  "id": "amanita_lux",
+  "componentIds": ["amanita_muscaria"],
+  "metadataCID": "QmQHMTL5ep9pKfs5...",
+  "active": true
+}
+```
+
+**Миграция:**
+1. Переименовать `ipfsCID` → `metadataCID`
+2. Добавить массив `componentIds` для каждого продукта
+3. Убедиться что компоненты зарегистрированы (Action 555)
+
 ## Заключение
 
 `deploy_full.js` предоставляет гибкий и мощный инструмент для управления контрактами экосистемы Amanita, включая новую SBT экосистему. Параметризуемый деплой (action 5) особенно полезен для обновления отдельных контрактов без полного передеплоя экосистемы.
@@ -979,6 +1263,8 @@ console.log('ProductRegistry:', await registry.getAddress('ProductRegistry'));
 - 🔄 **Автоматизация** - минимальное ручное вмешательство
 - 🆕 **SBT поддержка** - полная поддержка Soulbound Token экосистемы
 - 🧪 **Тестирование** - mock контракты для comprehensive testing
+- 🧬 **Component-based архитектура (v3.1)** - переиспользование компонентов
+- ⚡ **Быстрый deployment** - Action 555 для мгновенной настройки
 
 **Готовность к production:**
 - ✅ 113/113 тестов проходят (100% покрытие)
@@ -986,3 +1272,5 @@ console.log('ProductRegistry:', await registry.getAddress('ProductRegistry'));
 - ✅ Comprehensive error handling
 - ✅ Полная документация и готовность к использованию
 - ✅ **UUPS upgradeable contracts (v3.0)** для долгосрочной эволюции экосистемы
+- ✅ **Component-based architecture (v3.1)** для масштабируемого каталога
+- ⚠️ **Development mode** - Action 555 с placeholder CIDs (production требует upload_all_components.js)

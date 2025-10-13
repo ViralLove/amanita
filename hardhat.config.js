@@ -4,7 +4,13 @@ require("dotenv").config();
 
 // Используем те же имена переменных, что и в deploy.js для единообразия
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
-console.log("[hardhat.config.js] DEPLOYER_PRIVATE_KEY:", DEPLOYER_PRIVATE_KEY);
+// ⚠️ БЕЗОПАСНОСТЬ: НИКОГДА не логируем приватные ключи!
+// console.log("[hardhat.config.js] DEPLOYER_PRIVATE_KEY:", DEPLOYER_PRIVATE_KEY); // ❌ КРИТИЧЕСКАЯ УЯЗВИМОСТЬ - УДАЛЕНО
+if (!DEPLOYER_PRIVATE_KEY) {
+  console.warn("[hardhat.config.js] ⚠️ DEPLOYER_PRIVATE_KEY не установлен");
+} else {
+  console.log("[hardhat.config.js] ✅ DEPLOYER_PRIVATE_KEY установлен");
+}
 
 const AMANITA_REGISTRY_CONTRACT_ADDRESS = process.env.AMANITA_REGISTRY_CONTRACT_ADDRESS;
 console.log("[hardhat.config.js] AMANITA_REGISTRY_CONTRACT_ADDRESS:", AMANITA_REGISTRY_CONTRACT_ADDRESS);
