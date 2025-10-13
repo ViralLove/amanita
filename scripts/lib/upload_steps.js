@@ -17,6 +17,12 @@ const stateManager = require('./state_manager');
 
 /**
  * Загрузка Simple Fields в Arweave и сохранение CID в контракте
+ * 
+ * @notice Ownership-based Access Control (обновлено 2025-01-12)
+ * @dev setSimpleFieldCID вызывается ОТ SELLER (context.seller.address)
+ * @dev Seller становится owner поля при первом создании
+ * @dev После обновления AmanitaInternational с SELLER_ROLE support
+ * 
  * @param {Object} context - Upload context
  * @param {string} context.componentId - ID компонента
  * @param {string} context.componentDir - Путь к директории компонента
@@ -25,7 +31,8 @@ const stateManager = require('./state_manager');
  * @param {Object} context.contracts - Контракты (amanitaInternational, etc.)
  * @param {Object} context.arweave - Arweave client + key
  * @param {Object} context.web3 - Web3 instance
- * @param {Object} context.deployer - Deployer account
+ * @param {Object} context.seller - Seller account (owner компонента)
+ * @param {Object} context.deployer - Deployer account (для совместимости)
  * @param {Object} state - Component state
  * @param {Function} onProgress - Progress callback (optional)
  * @returns {Promise<Object>} Маппинг field → CID
@@ -71,21 +78,22 @@ async function uploadSimpleFields(context, state, onProgress = null) {
     
     // Сохраняем CID в контракте (если не dry-run)
     if (!context.dryRun && !context.arweaveOnly) {
-      console.log("🔷 Сохраняем CID в AmanitaInternational...");
+      console.log("🔷 Сохраняем CID в AmanitaInternational (от seller)...");
       
       const gasPrice = await utils.getGasPrice(context.web3, context.network);
       const gasLimit = utils.getGasLimit(context.network, 300000);
       
+      // ✅ Ownership: вызов от SELLER → seller становится owner поля
       await context.contracts.amanitaInternational.methods.setSimpleFieldCID(
         "ComponentDescription.title",
         titleCID
       ).send({
-        from: context.deployer.address,
+        from: context.seller.address,  // ← SELLER для своих компонентов (обновлено 2025-01-12)
         gas: gasLimit,
         gasPrice: gasPrice
       });
       
-      console.log("✅ CID сохранен в контракте");
+      console.log("✅ CID сохранен в контракте (owner: seller)");
     } else if (context.arweaveOnly) {
       console.log("🔷 [ARWEAVE_ONLY] Пропускаем сохранение в контракт");
     } else {
@@ -125,21 +133,22 @@ async function uploadSimpleFields(context, state, onProgress = null) {
     
     // Сохраняем CID в контракте (если не dry-run)
     if (!context.dryRun && !context.arweaveOnly) {
-      console.log("🔷 Сохраняем CID в AmanitaInternational...");
+      console.log("🔷 Сохраняем CID в AmanitaInternational (от seller)...");
       
       const gasPrice = await utils.getGasPrice(context.web3, context.network);
       const gasLimit = utils.getGasLimit(context.network, 300000);
       
+      // ✅ Ownership: вызов от SELLER → seller становится owner поля
       await context.contracts.amanitaInternational.methods.setSimpleFieldCID(
         "DosageInstruction.description",
         dosageCID
       ).send({
-        from: context.deployer.address,
+        from: context.seller.address,  // ← SELLER для своих компонентов (обновлено 2025-01-12)
         gas: gasLimit,
         gasPrice: gasPrice
       });
       
-      console.log("✅ CID сохранен в контракте");
+      console.log("✅ CID сохранен в контракте (owner: seller)");
     } else if (context.arweaveOnly) {
       console.log("🔷 [ARWEAVE_ONLY] Пропускаем сохранение в контракт");
     } else {
@@ -170,8 +179,15 @@ async function uploadSimpleFields(context, state, onProgress = null) {
 // ====================================================================
 
 /**
- * Загрузка Complex Fields в Arweave и сохранение CID в контракте
+ * Загрузка Complex Fields (переводы) в Arweave и сохранение CID в контракте
+ * 
+ * @notice Ownership-based Access Control (обновлено 2025-01-12)
+ * @dev setComplexFieldCID вызывается ОТ SELLER (context.seller.address)
+ * @dev Seller становится owner каждого перевода при первом создании
+ * @dev После обновления AmanitaInternational с SELLER_ROLE support
+ * 
  * @param {Object} context - Upload context
+ * @param {Object} context.seller - Seller account (owner компонента)
  * @param {Object} state - Component state
  * @param {Function} onProgress - Progress callback (optional)
  * @returns {Promise<Object>} Маппинг language → CID
@@ -224,22 +240,23 @@ async function uploadComplexFields(context, state, onProgress = null) {
         
         // Сохраняем CID в контракте (если не dry-run)
         if (!context.dryRun && !context.arweaveOnly) {
-          console.log("🔷 Сохраняем CID в AmanitaInternational...");
+          console.log(`🔷 Сохраняем CID в AmanitaInternational (от seller, ${lang})...`);
           
           const gasPrice = await utils.getGasPrice(context.web3, context.network);
           const gasLimit = utils.getGasLimit(context.network, 300000);
           
+          // ✅ Ownership: вызов от SELLER → seller становится owner перевода
           await context.contracts.amanitaInternational.methods.setComplexFieldCID(
             "ComponentDescription",
             lang,
             descCID
           ).send({
-            from: context.deployer.address,
+            from: context.seller.address,  // ← SELLER для своих компонентов (обновлено 2025-01-12)
             gas: gasLimit,
             gasPrice: gasPrice
           });
           
-          console.log("✅ CID сохранен в контракте");
+          console.log(`✅ CID сохранен в контракте (owner: seller, ${lang})`);
         } else if (context.arweaveOnly) {
           console.log("🔷 [ARWEAVE_ONLY] Пропускаем сохранение в контракт");
         } else {
@@ -295,10 +312,37 @@ async function uploadComplexFields(context, state, onProgress = null) {
 async function uploadShareableData(context, state, onProgress = null) {
   console.log("\n🔹 ШАГ 3: Загрузка глобальных словарей");
   
-  // Проверяем, был ли шаг уже выполнен
+  // Проверяем, был ли шаг уже выполнен в state
   if (state.shareable_data && state.shareable_data.featuresCID) {
-    console.log("✅ Шаг уже выполнен, используем сохраненные данные");
+    console.log("✅ Шаг уже выполнен (state), используем сохраненные данные");
     return state.shareable_data;
+  }
+  
+  // Проверяем, загружены ли shareable data в контракт
+  try {
+    const existingData = await context.contracts.organicComponentRegistry.methods.getShareableData().call();
+    if (existingData.features_cid && existingData.features_cid !== '' && 
+        existingData.component_forms_cid && existingData.component_forms_cid !== '') {
+      console.log("✅ Shareable Data уже загружены в контракт (пропуск)");
+      console.log(`   → Features CID: ${existingData.features_cid}`);
+      console.log(`   → Forms CID: ${existingData.component_forms_cid}`);
+      
+      // Сохраняем в state для будущих запусков
+      const shareableData = {
+        featuresCID: existingData.features_cid,
+        formsCID: existingData.component_forms_cid,
+        featuresVersion: existingData.features_version,
+        formsVersion: existingData.forms_version
+      };
+      
+      state.shareable_data = shareableData;
+      markStepCompleted(state, 'shareable_data_uploaded');
+      saveComponentState(context.componentDir, context.network, state);
+      
+      return shareableData;
+    }
+  } catch (checkError) {
+    console.log(`   ℹ️ Не удалось проверить контракт, продолжаем загрузку: ${checkError.message}`);
   }
   
   try {

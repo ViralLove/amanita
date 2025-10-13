@@ -211,6 +211,90 @@ async function deployContract(contractName, constructorArgs = [], options = {}) 
 }
 
 /**
+ * Action 41: Transform CSV → Product JSONs с заглушками переводов
+ * Импортирует и вызывает transformProductsFromCSV() напрямую как модуль
+ * Параметры берутся из переменных окружения
+ */
+async function action41_TransformProducts() {
+    console.log(`\n📋 Параметры Transform CSV:`);
+    
+    // Получаем базовые пути и seller business_id
+    const csvBasePath = process.env.CSV_BASE_PATH || 'data/sellers';
+    const outputBasePath = process.env.OUTPUT_BASE_PATH || 'data/sellers';
+    const sellerBusinessId = process.env.SELLER_BUSINESS_ID || 'iveta';
+    const csvFilename = process.env.CSV_FILENAME || 'Iveta_catalog.csv';
+    
+    // Формируем итоговые пути через конкатенацию
+    const csvPath = `${csvBasePath}/${sellerBusinessId}/catalog/${csvFilename}`;
+    const outputDir = `${outputBasePath}/${sellerBusinessId}/products/`;
+    
+    // Остальные параметры
+    const sellerId = sellerBusinessId; // Используем business_id как seller_id
+    const sellerAddress = SELLER_ADDRESS || process.env.SELLER_ADDRESS;
+    const sourceLang = process.env.SOURCE_LANG || 'en';
+    const createStubs = process.env.CREATE_TRANSLATION_STUBS === 'true';
+    const dryRun = process.env.DRY_RUN === 'true';
+    
+    console.log(`   🔹 Base Paths:`);
+    console.log(`      CSV Base: ${csvBasePath}`);
+    console.log(`      Output Base: ${outputBasePath}`);
+    console.log(`   🔹 Seller Business ID: ${sellerBusinessId}`);
+    console.log(`   🔹 CSV Filename: ${csvFilename}`);
+    console.log(`   📄 Computed CSV Path: ${csvPath}`);
+    console.log(`   📂 Computed Output Dir: ${outputDir}`);
+    console.log(`   🔹 Seller Address: ${sellerAddress || 'N/A'}`);
+    console.log(`   🌐 Source Lang: ${sourceLang}`);
+    console.log(`   📝 Create Stubs: ${createStubs ? 'YES' : 'NO'}`);
+    console.log(`   🔷 Dry Run: ${dryRun ? 'YES' : 'NO'}`);
+    
+    try {
+        // Импортируем и вызываем функцию напрямую как модуль
+        const { transformProductsFromCSV } = require('./transform_products_csv.js');
+        
+        console.log("\n🚀 Запускаем трансформацию CSV (прямой вызов функции)...");
+        
+        const result = await transformProductsFromCSV({
+            csvPath,
+            outputDir,
+            sellerId,
+            sellerAddress,
+            sourceLang,
+            createTranslationStubs: createStubs,
+            dryRun
+        });
+        
+        // Выводим результаты
+        console.log("\n" + "=".repeat(70));
+        console.log("📊 TRANSFORMATION RESULTS");
+        console.log("=".repeat(70));
+        console.log(`Status: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}`);
+        console.log(`Total rows: ${result.statistics.total_rows}`);
+        console.log(`Valid products: ${result.statistics.valid_products}`);
+        console.log(`Skipped: ${result.statistics.skipped_products}`);
+        console.log(`Unique components: ${result.statistics.unique_components}`);
+        
+        if (result.errors.length > 0) {
+            console.log(`\n❌ Errors (${result.errors.length}):`);
+            result.errors.forEach(err => {
+                console.log(`   → ${err.product_id}: ${err.error}`);
+            });
+        }
+        
+        console.log("=".repeat(70));
+        
+        if (!result.success) {
+            throw new Error(`Transformation failed with ${result.errors.length} error(s)`);
+        }
+        
+        return result;
+        
+    } catch (error) {
+        console.error("\n❌ Action 41 failed:", error.message);
+        throw error;
+    }
+}
+
+/**
  * Основная функция деплоя
  * @param {number} action - Действие для выполнения:
  * 0 - деплой только реестра
@@ -223,18 +307,19 @@ async function deployContract(contractName, constructorArgs = [], options = {}) 
  * 7 - активация продавца через инвайт-код (требует INVITE_CODE и SELLER_ADDRESS)
  * 9 - назначение роли ACTIVATOR_ROLE селлеру из .env
  * 40 - создание каталога с неактивными продуктами (аналогично action=4)
- * 41 - активация существующих продуктов в каталоге
+ * 41 - CSV → Product JSONs с заглушками переводов (NEW)
+ * 46 - активация существующих продуктов в каталоге (renamed from 41)
  */
 async function main(action) {
 
   // Проверка корректности action
   if (action === undefined || action === null) {
-    throw new Error("Не указан параметр action. Используйте: node deploy_full.js <action> [contract_name] (0-13, 40-41, 777, 888)");
+    throw new Error("Не указан параметр action. Используйте: node deploy_full.js <action> [contract_name] (0-13, 40-46, 444, 555, 777, 888)");
   }
 
   action = parseInt(action);
-  if (isNaN(action) || (action < 0 || action > 13) && (action < 40 || action > 41) && action !== 777 && action !== 888) {
-    throw new Error("Некорректное значение action. Допустимые значения: 0-13, 40-41, 777, 888");
+  if (isNaN(action) || (action < 0 || action > 13) && (action < 40 || action > 46) && action !== 444 && action !== 555 && action !== 777 && action !== 888) {
+    throw new Error("Некорректное значение action. Допустимые значения: 0-13, 40-46, 444, 555, 777, 888");
   }
 
   // Для action 5 требуется дополнительный параметр
@@ -440,7 +525,8 @@ async function main(action) {
       
     }
     
-    if (action === 3 || action === 4 || action === 40 || action === 41) {
+    // Action 41 не требует загрузки контрактов (только CSV трансформация)
+    if (action === 3 || action === 4 || action === 40 || action === 46) {
 
       spiralEngine = await loadUUPSContract("SpiralEngine");
       console.log("☀️ Адрес SpiralEngine:", spiralEngine.options.address);
@@ -456,8 +542,8 @@ async function main(action) {
       
     }
 
-    // Настройка ролей (только для действий 1, 2, 4, 40, 41)
-    if (action === 1 || action === 2 || action === 4 || action === 40 || action === 41) {
+    // Настройка ролей (только для действий 1, 2, 4, 40, 46)
+    if (action === 1 || action === 2 || action === 4 || action === 40 || action === 46) {
       await setupSellerRole(spiralEngine);
     }
     
@@ -511,6 +597,77 @@ async function main(action) {
       
       await action888(deployerInvite, sellerAddress, catalogData);
       console.log("✅ Action 888 завершен успешно!");
+    }
+    
+    // Action 555: Базовая активация seller + загрузка компонентов
+    if (action === 555) {
+      console.log("\n" + "=".repeat(70));
+      console.log("🔷 Action 555: Базовая активация seller + загрузка компонентов");
+      console.log("=".repeat(70));
+      
+      // Получаем параметры из аргументов или переменных окружения
+      const deployerInvite = args[1] || process.env.DEPLOYER_INVITE;
+      const sellerAddress = args[2] || process.env.SELLER_ADDRESS;
+      const dryRun = process.env.DRY_RUN === 'true';
+      
+      if (!deployerInvite) {
+        throw new Error("Action 555: требуется deployerInvite (рутовый инвайт из Action 777)");
+      }
+      
+      if (!sellerAddress) {
+        throw new Error("Action 555: требуется sellerAddress");
+      }
+      
+      // Шаг 1: Загрузка SpiralEngine
+      console.log("\n📦 Шаг 1/3: Загрузка SpiralEngine...");
+      const spiralEngine = await loadUUPSContract("SpiralEngine");
+      console.log("✅ SpiralEngine загружен:", spiralEngine.options.address);
+      
+      // Шаг 2: Базовая активация seller
+      console.log("\n👤 Шаг 2/3: Базовая активация seller...");
+      try {
+        await activateSellerBasic(spiralEngine, sellerAddress, deployerInvite);
+        console.log("✅ Базовая активация завершена успешно!");
+      } catch (error) {
+        console.error("❌ Ошибка при базовой активации seller:");
+        console.error(`   ${error.message}`);
+        throw error;
+      }
+      
+      // Шаг 3: Загрузка компонентов в OrganicComponentRegistry
+      console.log("\n📦 Шаг 3/3: Загрузка компонентов...");
+      try {
+        const uploadResults = await uploadComponentsCore(
+          sellerAddress,
+          "data/components",  // относительный путь от projectRoot
+          network,
+          dryRun,
+          process.env.ARWEAVE !== 'false'  // режим полной загрузки в Arweave (default: true)
+        );
+        
+        console.log("\n" + "=".repeat(70));
+        console.log("📊 ФИНАЛЬНЫЙ ОТЧЕТ Action 555");
+        console.log("=".repeat(70));
+        console.log(`✅ Seller активирован: ${sellerAddress}`);
+        console.log(`✅ Компонентов обработано: ${uploadResults.totalCount}`);
+        console.log(`   → Успешно: ${uploadResults.successCount}`);
+        console.log(`   → Пропущено: ${uploadResults.skippedCount}`);
+        console.log(`   → Ошибок: ${uploadResults.failCount}`);
+        
+        if (uploadResults.failCount > 0) {
+          console.log(`\n⚠️ Некоторые компоненты завершились с ошибками`);
+          console.log(`   Подробности в логе выше`);
+        }
+        
+        console.log("\n" + "=".repeat(70));
+        console.log("✅ Action 555 завершен успешно!");
+        console.log("=".repeat(70));
+        
+      } catch (error) {
+        console.error("❌ Ошибка при загрузке компонентов:");
+        console.error(`   ${error.message}`);
+        throw error;
+      }
     }
     
     // Для action=3 деплоер временно получает роль SELLER_ROLE для минта инвайтов
@@ -594,9 +751,22 @@ async function main(action) {
       console.log("✅ Каталог с неактивными продуктами успешно загружен!");
     }
     
-    // Активация существующих продуктов
+    // Action 41: CSV → Product JSONs с заглушками переводов
     if (action === 41) {
-      console.log("\n🔷 Активируем существующие продукты в каталоге...");
+      console.log("\n" + "=".repeat(70));
+      console.log("🔷 Action 41: Transform CSV → Product JSONs with translation stubs");
+      console.log("=".repeat(70));
+      
+      await action41_TransformProducts();
+      
+      console.log("\n" + "=".repeat(70));
+      console.log("✅ Action 41 completed successfully!");
+      console.log("=".repeat(70));
+    }
+    
+    // Action 46: Активация продуктов (переименовано из старого action 41)
+    if (action === 46) {
+      console.log("\n🔷 Action 46: Активируем продукты в каталоге...");
       
       // Проверяем права доступа селлера
       const sellerAddr = sellerAccount ? sellerAccount.address : SELLER_ADDRESS;
@@ -1062,10 +1232,30 @@ async function prepareInitializeCalldata(contractName, logicInstance = null) {
         ).encodeABI();
     }
     
-    // AmanitaInternational: initialize(address admin)
+    // AmanitaInternational: initialize(address admin, address _spiralEngine)
     if (contractName === 'AmanitaInternational') {
-        console.log(`   → initialize(admin: ${deployerAccount.address})`);
-        return web3Contract.methods.initialize(deployerAccount.address).encodeABI();
+        // Получаем адрес SpiralEngine Proxy из .env или MagicRegistry
+        let spiralEngineProxyAddress = process.env[CONTRACT_ENV_MAPPING['SpiralEngine']];
+        
+        if (!spiralEngineProxyAddress || spiralEngineProxyAddress === 'undefined') {
+            // Пробуем загрузить из MagicRegistry
+            if (magicRegistry) {
+                try {
+                    spiralEngineProxyAddress = await magicRegistry.methods.get('SpiralEngine').call();
+                    console.log(`   ℹ️ SpiralEngine Proxy адрес загружен из MagicRegistry: ${spiralEngineProxyAddress}`);
+                } catch (error) {
+                    throw new Error('SpiralEngine Proxy адрес не найден ни в .env, ни в MagicRegistry! Задеплойте SpiralEngine сначала.');
+                }
+            } else {
+                throw new Error('SpiralEngine Proxy адрес не найден в .env и MagicRegistry недоступен! Задеплойте SpiralEngine сначала.');
+            }
+        }
+        
+        console.log(`   → initialize(admin: ${deployerAccount.address}, spiralEngine: ${spiralEngineProxyAddress})`);
+        return web3Contract.methods.initialize(
+            deployerAccount.address,
+            spiralEngineProxyAddress
+        ).encodeABI();
     }
     
     // OrganicComponentRegistry: initialize(address admin)
@@ -2105,7 +2295,8 @@ async function createCatalog(productRegistry, sellerAddress) {
   console.log("\n💰 ОЦЕНКА ГАЗА ДЛЯ ОДНОГО ПРОДУКТА:");
   try {
     const gasEstimate = await productRegistry.methods.createProduct(
-      productsData[0].ipfsCID
+      productsData[0].componentIds || [],
+      productsData[0].metadataCID
     ).estimateGas({
       from: sellerAddress
     });
@@ -2147,7 +2338,8 @@ async function createCatalog(productRegistry, sellerAddress) {
     const product = productsData[i];
     console.log(`\n➕ Добавляем продукт: ${product.id}`);
     console.log("Product properties:");
-    console.log("ipfsCID:", product.ipfsCID);
+    console.log("componentIds:", product.componentIds || []);
+    console.log("metadataCID:", product.metadataCID);
     console.log("active: false (по умолчанию)");
     
     // Слушаем все события от контракта
@@ -2167,7 +2359,8 @@ async function createCatalog(productRegistry, sellerAddress) {
     const highGasPrice = web3.utils.toWei('50', 'gwei'); // 50 Gwei для mainnet
     
     await productRegistry.methods.createProduct(
-      product.ipfsCID
+      product.componentIds || [],
+      product.metadataCID
     ).send({
       from: sellerAddress,
       gas: 1000000,  // Увеличиваем лимит газа
@@ -2198,11 +2391,12 @@ async function createCatalog(productRegistry, sellerAddress) {
   for (const product of products) {
     console.log(`\n📦 Продукт #${product.id}:`);
     console.log("  Продавец:", product.seller);
-    console.log("  IPFS CID:", product.ipfsCID);
+    console.log("  Component IDs:", product.componentIds);
+    console.log("  Metadata CID:", product.metadataCID);
     console.log("  Активен:", product.active);
     
     // Проверяем соответствие данных
-    const originalProduct = productsData.find(p => p.ipfsCID === product.ipfsCID);
+    const originalProduct = productsData.find(p => p.metadataCID === product.metadataCID);
     if (originalProduct) {
       console.log("  ✅ Данные соответствуют оригинальным");
     } else {
@@ -3588,6 +3782,687 @@ async function updateCordycepsProducts(productRegistry, sellerAddress) {
     }
 }
 
+/**
+ * Загрузка CID компонента из state файла или использование placeholder
+ * @param {string} componentDir - путь к директории компонента
+ * @param {string} componentId - ID компонента
+ * @param {string} networkName - название сети
+ * @returns {{cid: string, source: string, url: string|null}}
+ */
+function loadComponentCID(componentDir, componentId, networkName) {
+    // 1. Пытаемся загрузить из _upload_state_{network}.json
+    const stateFile = path.join(componentDir, `_upload_state_${networkName}.json`);
+    
+    if (fs.existsSync(stateFile)) {
+        try {
+            const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+            if (state.root_metadata?.cid) {
+                return {
+                    cid: state.root_metadata.cid,
+                    source: 'arweave_state',
+                    url: `https://arweave.net/${state.root_metadata.cid}`
+                };
+            }
+        } catch (error) {
+            console.warn(`⚠️ Ошибка чтения state файла: ${error.message}`);
+        }
+    }
+    
+    // 2. Fallback к placeholder для новых компонентов
+    return {
+        cid: "QmPlaceholder",
+        source: 'placeholder',
+        url: null
+    };
+}
+
+/**
+ * Подготовка для загрузки компонентов (общая логика для Full и Quick режимов)
+ * @param {string} sellerAddress - адрес продавца
+ * @param {string} componentsDir - директория с компонентами
+ * @param {string} networkName - название сети
+ * @returns {Promise<Object>} Объект с контрактами, компонентами и путями
+ */
+async function prepareComponentUpload(sellerAddress, componentsDir, networkName) {
+    // 1. Загрузка контрактов
+    const organicRegistry = await loadUUPSContract("OrganicComponentRegistry");
+    const amanitaIntl = await loadUUPSContract("AmanitaInternational");
+    const spiralEngine = await loadUUPSContract("SpiralEngine");
+    
+    // 2. Валидация seller
+    const SELLER_ROLE = await spiralEngine.methods.SELLER_ROLE().call();
+    const hasSellerRole = await spiralEngine.methods.hasRole(SELLER_ROLE, sellerAddress).call();
+    const usedInvite = await spiralEngine.methods.usedInviteByUser(sellerAddress).call();
+    
+    if (usedInvite == 0) {
+        throw new Error(`Seller ${sellerAddress} не активирован!`);
+    }
+    if (!hasSellerRole) {
+        throw new Error(`Seller ${sellerAddress} не имеет SELLER_ROLE!`);
+    }
+    
+    // 3. Создание seller account для транзакций
+    if (!SELLER_PRIVATE_KEY) {
+        throw new Error("SELLER_PRIVATE_KEY не найден в .env");
+    }
+    
+    const sellerWallet = web3.eth.accounts.privateKeyToAccount(SELLER_PRIVATE_KEY);
+    web3.eth.accounts.wallet.add(sellerWallet);
+    
+    // 4. Поиск компонентов
+    const projectRoot = path.join(__dirname, '..');
+    const componentsPath = path.isAbsolute(componentsDir) 
+        ? componentsDir 
+        : path.join(projectRoot, componentsDir);
+    
+    if (!fs.existsSync(componentsPath)) {
+        throw new Error(`Директория компонентов не найдена: ${componentsPath}`);
+    }
+    
+    const entries = fs.readdirSync(componentsPath, { withFileTypes: true });
+    const componentIds = entries
+        .filter(entry => entry.isDirectory())
+        .map(entry => entry.name)
+        .filter(name => {
+            if (name.startsWith('_') || name.startsWith('.')) return false;
+            const componentDir = path.join(componentsPath, name);
+            const rootFile = path.join(componentDir, `${name}.json`);
+            return fs.existsSync(rootFile);
+        })
+        .sort();
+    
+    if (componentIds.length === 0) {
+        throw new Error(`Компоненты не найдены в ${componentsPath}`);
+    }
+    
+    return {
+        contracts: {
+            organicRegistry,
+            amanitaIntl,
+            spiralEngine
+        },
+        componentIds,
+        componentsPath
+    };
+}
+
+/**
+ * Полная загрузка компонентов в Arweave + регистрация в контрактах
+ * Использует lib/upload_steps.js для полного workflow
+ * @param {string} sellerAddress - адрес продавца
+ * @param {string} componentsDir - директория с компонентами
+ * @param {string} networkName - название сети
+ * @param {boolean} dryRun - режим dry-run
+ * @returns {Promise<Object>} Результаты загрузки
+ */
+async function uploadComponentFull(sellerAddress, componentsDir = "data/components", networkName = network, dryRun = false) {
+    console.log(`\n🚀 ПОЛНАЯ ЗАГРУЗКА КОМПОНЕНТОВ В ARWEAVE`);
+    console.log(`👤 Seller: ${sellerAddress}`);
+    console.log(`📁 Директория: ${componentsDir}`);
+    console.log(`🌐 Сеть: ${networkName}`);
+    console.log(`🔍 Dry-run: ${dryRun ? 'YES' : 'NO'}`);
+    
+    // Импортируем модули для полной загрузки
+    const uploadSteps = require('./lib/upload_steps');
+    const uploadUtils = require('./lib/upload_utils');
+    
+    // 1. Инициализация Arweave (используем Arweave-Readiness.js)
+    console.log(`\n📋 Шаг 1/6: Инициализация Arweave...`);
+    const arweaveReadiness = require('./Arweave-Readiness');
+    
+    const arweaveKey = await arweaveReadiness.loadArweaveKey();
+    if (!arweaveKey) {
+        throw new Error("Arweave key не найден или невалиден");
+    }
+    
+    const arweaveClient = arweaveReadiness.initArweave();
+    if (!arweaveClient) {
+        throw new Error("Не удалось инициализировать Arweave client");
+    }
+    
+    const connection = await arweaveReadiness.checkConnection(arweaveClient);
+    if (!connection.success) {
+        throw new Error(`Arweave connection failed: ${connection.error}`);
+    }
+    
+    const wallet = await arweaveReadiness.checkWalletBalance(arweaveClient, arweaveKey);
+    if (wallet.status === 'zero_balance') {
+        throw new Error("Arweave wallet имеет нулевой баланс");
+    }
+    
+    console.log(`✅ Arweave готов: ${wallet.balance} AR, ${connection.networkInfo.peers} peers`);
+    
+    // 2. Подготовка (контракты, seller, компоненты)
+    console.log(`\n📦 Шаг 2/6: Подготовка...`);
+    const preparation = await prepareComponentUpload(sellerAddress, componentsDir, networkName);
+    const { organicRegistry, amanitaIntl, spiralEngine } = preparation.contracts;
+    const { componentIds, componentsPath } = preparation;
+    
+    console.log(`✅ Контракты загружены`);
+    console.log(`✅ Seller валиден: активирован + SELLER_ROLE`);
+    console.log(`✅ Seller wallet добавлен для транзакций`);
+    console.log(`✅ Найдено компонентов: ${componentIds.length}`);
+    
+    // 3. Обработка каждого компонента
+    console.log(`\n🚀 Шаг 3/6: Обработка компонентов...`);
+    const results = [];
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (let i = 0; i < componentIds.length; i++) {
+        const componentId = componentIds[i];
+        const componentDir = path.join(componentsPath, componentId);
+        
+        console.log(`\n${'='.repeat(70)}`);
+        console.log(`🔷 Компонент ${i + 1}/${componentIds.length}: ${componentId}`);
+        console.log(`${'='.repeat(70)}`);
+        
+        try {
+            // Создаем context для upload_steps
+            // 
+            // ✅ Ownership Logic (обновлено 2025-01-13):
+            // - deployer.address = deployerAccount.address (ADMIN для shareable data)
+            // - seller.address = sellerAddress (SELLER для переводов)
+            // 
+            // Разделение ответственности:
+            // 1. Deployer (ADMIN_ROLE):
+            //    - updateShareableData() - глобальные словари
+            // 2. Seller (SELLER_ROLE):
+            //    - setSimpleFieldCID() - переводы компонента
+            //    - setComplexFieldCID() - переводы компонента
+            //    - становится owner своих переводов
+            const context = {
+                componentId: componentId,
+                componentDir: componentDir,
+                network: networkName,
+                dryRun: dryRun,
+                seller: { address: sellerAddress },
+                deployer: { address: deployerAccount.address },  // ← ADMIN для shareable data
+                contracts: {
+                    organicComponentRegistry: organicRegistry,
+                    amanitaInternational: amanitaIntl
+                },
+                arweave: {
+                    client: arweaveClient,
+                    key: arweaveKey
+                },
+                web3: web3,
+                supportedLanguages: uploadUtils.getSupportedLanguages()
+            };
+            
+            // Загружаем state (если есть)
+            const stateManager = require('./lib/state_manager');
+            let state = stateManager.loadComponentState(componentDir, networkName) || {
+                steps_completed: [],
+                componentId: componentId,
+                network: networkName,
+                created_at: new Date().toISOString()
+            };
+            
+            // Проверяем какие шаги уже выполнены
+            const isStepCompleted = (stepName) => {
+                return state.steps_completed && state.steps_completed.includes(stepName);
+            };
+            
+            console.log(`💾 Загрузка component state: ${componentId}`);
+            if (state.steps_completed && state.steps_completed.length > 0) {
+                console.log(`✅ State найден, шагов завершено: ${state.steps_completed.length}`);
+                console.log(`   → Завершенные шаги: ${state.steps_completed.join(', ')}`);
+            } else {
+                console.log(`🆕 State файл не найден, создаем новый`);
+            }
+            
+            console.log(`📝 Начинаем полную загрузку компонента...`);
+            
+            // Шаг 1: Simple Fields
+            let simpleFieldCIDs = {};
+            if (isStepCompleted('simple_fields_uploaded')) {
+                console.log(`\n⏭️  ШАГ 1: Simple Fields уже загружены (пропуск)`);
+                simpleFieldCIDs = state.simple_fields || {};
+            } else {
+                simpleFieldCIDs = await uploadSteps.uploadSimpleFields(context, state);
+                console.log(`✅ Simple Fields загружены`);
+            }
+            
+            // Шаг 2: Complex Fields
+            let complexFieldCIDs = {};
+            if (isStepCompleted('complex_fields_uploaded')) {
+                console.log(`\n⏭️  ШАГ 2: Complex Fields уже загружены (пропуск)`);
+                complexFieldCIDs = state.complex_fields || {};
+            } else {
+                complexFieldCIDs = await uploadSteps.uploadComplexFields(context, state);
+                console.log(`✅ Complex Fields загружены`);
+            }
+            
+            // Шаг 3: Shareable Data (только для первого компонента)
+            if (i === 0) {
+                if (isStepCompleted('shareable_data_uploaded')) {
+                    console.log(`\n⏭️  ШАГ 3: Shareable Data уже загружены (пропуск)`);
+                } else {
+                    await uploadSteps.uploadShareableData(context, state);
+                    console.log(`✅ Shareable Data загружены`);
+                }
+            }
+            
+            // Шаг 4: Update Root Metadata
+            let finalRootData;
+            if (isStepCompleted('root_metadata_updated')) {
+                console.log(`\n⏭️  ШАГ 4: Root Metadata уже обновлен (пропуск)`);
+                finalRootData = state.root_metadata?.data;
+            } else {
+                finalRootData = uploadSteps.updateRootMetadata(context, simpleFieldCIDs, complexFieldCIDs, state);
+                console.log(`✅ Root Metadata обновлен`);
+            }
+            
+            // Шаг 5: Upload Root Metadata
+            let rootCID;
+            if (isStepCompleted('root_metadata_uploaded')) {
+                console.log(`\n⏭️  ШАГ 5: Root Metadata уже загружен в Arweave (пропуск)`);
+                rootCID = state.root_metadata?.cid;
+            } else {
+                rootCID = await uploadSteps.uploadRootMetadata(context, finalRootData, state);
+                console.log(`✅ Root Metadata загружен в Arweave: ${rootCID}`);
+            }
+            
+            // Шаг 6: Register Component
+            let componentIdResult;
+            if (isStepCompleted('component_registered')) {
+                console.log(`\n⏭️  ШАГ 6: Компонент уже зарегистрирован (пропуск)`);
+                componentIdResult = state.contract_registration?.componentId || 'N/A';
+            } else {
+                componentIdResult = await uploadSteps.registerComponent(context, rootCID, state);
+                console.log(`✅ Компонент зарегистрирован в контракте: ID ${componentIdResult}`);
+            }
+            
+            results.push({
+                componentId,
+                success: true,
+                rootCID: rootCID,
+                contractComponentId: componentIdResult,
+                simpleFields: Object.keys(simpleFieldCIDs).length,
+                complexFields: Object.keys(complexFieldCIDs).length
+            });
+            successCount++;
+            
+            // Пауза между компонентами
+            if (networkName === 'polygon' && i < componentIds.length - 1) {
+                console.log(`⏳ Пауза 3 секунды перед следующим компонентом...`);
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+            
+        } catch (error) {
+            console.error(`❌ Ошибка обработки компонента ${componentId}:`);
+            console.error(`   ${error.message}`);
+            
+            results.push({
+                componentId,
+                success: false,
+                error: error.message
+            });
+            failCount++;
+            
+            // В случае ошибки продолжаем со следующим компонентом
+            console.log(`⏭️  Продолжаем со следующим компонентом...`);
+        }
+    }
+    
+    // 7. Финальный отчёт
+    console.log(`\n${'='.repeat(70)}`);
+    console.log(`📊 ФИНАЛЬНЫЙ ОТЧЁТ ПОЛНОЙ ЗАГРУЗКИ`);
+    console.log(`${'='.repeat(70)}`);
+    console.log(`✅ Успешно: ${successCount}`);
+    console.log(`❌ Ошибок: ${failCount}`);
+    console.log(`📊 Всего: ${componentIds.length}`);
+    console.log(`🌐 Сеть: ${networkName}`);
+    console.log(`📤 Arweave: ПОЛНАЯ ЗАГРУЗКА`);
+    
+    if (successCount > 0) {
+        console.log(`\n🎉 Успешно загружены:`);
+        results.filter(r => r.success).forEach((result, index) => {
+            console.log(`   ${index + 1}. ${result.componentId}`);
+            console.log(`      → Root CID: ${result.rootCID}`);
+            console.log(`      → Contract ID: ${result.contractComponentId}`);
+            console.log(`      → Simple Fields: ${result.simpleFields}`);
+            console.log(`      → Complex Fields: ${result.complexFields}`);
+        });
+    }
+    
+    if (failCount > 0) {
+        console.log(`\n❌ Ошибки:`);
+        results.filter(r => !r.success).forEach((result, index) => {
+            console.log(`   ${index + 1}. ${result.componentId}: ${result.error}`);
+        });
+    }
+    
+    console.log(`\n✅ Полная загрузка завершена`);
+    console.log(`${'='.repeat(70)}`);
+    
+    return {
+        successCount,
+        failCount,
+        totalCount: componentIds.length,
+        results,
+        mode: 'FULL_ARWEAVE'
+    };
+}
+
+/**
+ * Быстрая регистрация компонентов без загрузки в Arweave (Quick Mode)
+ * Использует placeholder CID или существующие CID из state файлов
+ * @param {string} sellerAddress - адрес продавца
+ * @param {string} componentsDir - директория с компонентами
+ * @param {string} networkName - название сети
+ * @param {boolean} dryRun - режим dry-run
+ * @returns {Promise<Object>} Результаты загрузки {successCount, failCount, results}
+ */
+async function uploadComponentQuick(sellerAddress, componentsDir = "data/components", networkName = network, dryRun = false) {
+    console.log(`\n⚡ QUICK MODE - Быстрая регистрация без Arweave`);
+    console.log(`👤 Seller: ${sellerAddress}`);
+    console.log(`📁 Директория: ${componentsDir}`);
+    console.log(`🌐 Сеть: ${networkName}`);
+    console.log(`🔍 Dry-run: ${dryRun ? 'YES' : 'NO'}`);
+    
+    // 1. Подготовка (контракты, seller, компоненты)
+    console.log(`\n📦 Шаг 1/3: Подготовка...`);
+    const preparation = await prepareComponentUpload(sellerAddress, componentsDir, networkName);
+    const { organicRegistry, amanitaIntl, spiralEngine } = preparation.contracts;
+    const { componentIds, componentsPath } = preparation;
+    
+    console.log(`✅ OrganicComponentRegistry: ${organicRegistry.options.address}`);
+    console.log(`✅ AmanitaInternational: ${amanitaIntl.options.address}`);
+    console.log(`✅ SpiralEngine: ${spiralEngine.options.address}`);
+    console.log(`✅ Seller валиден: активирован + SELLER_ROLE`);
+    console.log(`✅ Seller wallet добавлен для транзакций`);
+    console.log(`✅ Найдено компонентов: ${componentIds.length}`);
+    
+    // Вывод списка компонентов
+    componentIds.forEach((componentId, index) => {
+        console.log(`   ${index + 1}. ${componentId}`);
+    });
+    
+    // 2. Обработка каждого компонента
+    console.log(`\n🚀 Шаг 2/3: Обработка компонентов...`);
+    const results = [];
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (let i = 0; i < componentIds.length; i++) {
+        const componentId = componentIds[i];
+        const componentDir = path.join(componentsPath, componentId);
+        const componentPath = path.join(componentDir, `${componentId}.json`);
+        
+        console.log(`\n${'='.repeat(70)}`);
+        console.log(`🔷 Компонент ${i + 1}/${componentIds.length}: ${componentId}`);
+        console.log(`${'='.repeat(70)}`);
+        
+        try {
+            // Загрузка JSON данных компонента
+            const componentData = JSON.parse(fs.readFileSync(componentPath, 'utf8'));
+            console.log(`✅ JSON загружен`);
+            console.log(`   → Business ID: ${componentData.biounit_id}`);
+            console.log(`   → Scientific Title: ${componentData.scientific_title || 'N/A'}`);
+            
+            // Проверка: уже зарегистрирован?
+            let isAlreadyRegistered = false;
+            try {
+                await organicRegistry.methods.getComponent(componentData.biounit_id).call();
+                isAlreadyRegistered = true;
+                console.log(`⚠️ Компонент уже зарегистрирован в контракте`);
+            } catch (error) {
+                console.log(`📝 Компонент не найден в контракте, будет зарегистрирован`);
+            }
+            
+            if (isAlreadyRegistered && !dryRun) {
+                console.log(`⏭️  Пропускаем регистрацию (уже существует)`);
+                results.push({
+                    componentId,
+                    success: true,
+                    skipped: true,
+                    reason: "Already registered"
+                });
+                successCount++;
+                continue;
+            }
+            
+            // Dry-run режим
+            if (dryRun) {
+                console.log(`🔍 [DRY-RUN] Симуляция регистрации...`);
+                console.log(`   → Business ID: ${componentData.biounit_id}`);
+                console.log(`   → Seller: ${sellerAddress}`);
+                console.log(`   → Scientific Title: ${componentData.scientific_title || 'N/A'}`);
+                console.log(`✅ [DRY-RUN] Симуляция успешна`);
+                
+                results.push({
+                    componentId,
+                    success: true,
+                    dryRun: true
+                });
+                successCount++;
+                continue;
+            }
+            
+            // РЕАЛЬНАЯ РЕГИСТРАЦИЯ в OrganicComponentRegistry
+            console.log(`🚀 Регистрация в OrganicComponentRegistry...`);
+            
+            const businessId = componentData.biounit_id;
+            
+            // Загружаем CID из state файла (если есть) или используем placeholder
+            const cidInfo = loadComponentCID(componentDir, componentId, networkName);
+            const rootMetadataCID = cidInfo.cid;
+            
+            console.log(`📝 Параметры для createComponent:`);
+            console.log(`   → businessId: ${businessId}`);
+            console.log(`   → rootMetadataCID: ${rootMetadataCID}`);
+            console.log(`   → CID источник: ${cidInfo.source} ${cidInfo.source === 'arweave_state' ? '(переиспользование)' : '(заглушка)'}`);
+            
+            // Получаем nonce для seller
+            const nonce = await web3.eth.getTransactionCount(sellerAddress, 'pending');
+            console.log(`   → nonce: ${nonce}`);
+            
+            // Вызов createComponent
+            const tx = await organicRegistry.methods.createComponent(
+                businessId,
+                rootMetadataCID
+            ).send({
+                from: sellerAddress,
+                gas: 1000000,
+                gasPrice: networkName === 'polygon' ? 
+                    web3.utils.toWei('100', 'gwei') : 
+                    await web3.eth.getGasPrice(),
+                nonce: nonce
+            });
+            
+            console.log(`✅ Компонент зарегистрирован успешно!`);
+            console.log(`   → Tx Hash: ${tx.transactionHash}`);
+            console.log(`   → Block: ${tx.blockNumber}`);
+            console.log(`   → Gas Used: ${tx.gasUsed}`);
+            
+            results.push({
+                componentId,
+                success: true,
+                txHash: tx.transactionHash,
+                blockNumber: tx.blockNumber,
+                gasUsed: tx.gasUsed
+            });
+            successCount++;
+            
+            // Пауза между компонентами (для polygon)
+            if (networkName === 'polygon' && i < componentIds.length - 1) {
+                console.log(`⏳ Пауза 2 секунды перед следующим компонентом...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            
+        } catch (error) {
+            console.error(`❌ Ошибка обработки компонента ${componentId}:`);
+            console.error(`   ${error.message}`);
+            
+            results.push({
+                componentId,
+                success: false,
+                error: error.message
+            });
+            failCount++;
+            
+            console.log(`⏭️  Продолжаем со следующим компонентом...`);
+        }
+    }
+    
+    // 3. Финальный отчет
+    console.log(`\n${'='.repeat(70)}`);
+    console.log(`📊 Шаг 3/3: ИТОГОВЫЙ ОТЧЕТ (QUICK MODE)`);
+    console.log(`${'='.repeat(70)}`);
+    console.log(`✅ Успешно обработано: ${successCount}/${componentIds.length}`);
+    console.log(`❌ Ошибок: ${failCount}/${componentIds.length}`);
+    
+    if (failCount > 0) {
+        console.log(`\n⚠️ Компоненты с ошибками:`);
+        results.filter(r => !r.success).forEach((r, index) => {
+            console.log(`   ${index + 1}. ${r.componentId}: ${r.error}`);
+        });
+    }
+    
+    const skippedCount = results.filter(r => r.skipped).length;
+    if (skippedCount > 0) {
+        console.log(`\n⏭️  Пропущено (уже зарегистрированы): ${skippedCount}`);
+    }
+    
+    console.log(`${'='.repeat(70)}`);
+    
+    return {
+        successCount,
+        failCount,
+        skippedCount,
+        totalCount: componentIds.length,
+        results,
+        mode: 'QUICK'
+    };
+}
+
+/**
+ * Роутер для загрузки компонентов (ARWEAVE=true → Full, ARWEAVE=false → Quick)
+ * @param {string} sellerAddress - адрес seller
+ * @param {string} componentsDir - директория с компонентами (default: "data/components")
+ * @param {string} networkName - название сети (default: network из hardhat)
+ * @param {boolean} dryRun - режим dry-run (default: false)
+ * @param {boolean} withArweave - режим полной загрузки в Arweave (default: true)
+ * @returns {Promise<Object>} Результаты загрузки {successCount, failCount, results}
+ */
+async function uploadComponentsCore(
+    sellerAddress,
+    componentsDir = "data/components",
+    networkName = network,
+    dryRun = false,
+    withArweave = true
+) {
+    console.log(`\n🔷 Загрузка компонентов в OrganicComponentRegistry...`);
+    console.log(`👤 Seller: ${sellerAddress}`);
+    console.log(`📁 Директория: ${componentsDir}`);
+    console.log(`🌐 Сеть: ${networkName}`);
+    console.log(`🔍 Dry-run: ${dryRun ? 'YES' : 'NO'}`);
+    console.log(`📤 Arweave: ${withArweave ? 'FULL UPLOAD' : 'QUICK MODE'}`);
+    
+    // Роутинг к нужной реализации
+    if (withArweave) {
+        console.log(`\n🚀 Режим ARWEAVE=true - полная загрузка в Arweave`);
+        return await uploadComponentFull(sellerAddress, componentsDir, networkName, dryRun);
+    } else {
+        console.log(`\n⚡ Режим ARWEAVE=false - быстрая регистрация`);
+        return await uploadComponentQuick(sellerAddress, componentsDir, networkName, dryRun);
+    }
+}
+
+/**
+ * Базовая активация seller для Action 555
+ * Минимальная активация для возможности регистрации компонентов в OrganicComponentRegistry
+ * @param {Object} spiralEngine - контракт SpiralEngine (UUPS)
+ * @param {string} sellerAddress - адрес seller для активации
+ * @param {string} deployerInvite - рутовый инвайт деплоера из Action 777
+ */
+async function activateSellerBasic(spiralEngine, sellerAddress, deployerInvite) {
+    console.log(`\n🔷 Базовая активация seller для Action 555...`);
+    console.log(`👤 Seller: ${sellerAddress}`);
+    console.log(`🎫 Deployer invite: ${deployerInvite}`);
+    
+    // 1. Проверка текущего состояния seller
+    console.log(`\n📊 Шаг 1/3: Проверка текущего состояния...`);
+    const usedInvite = await spiralEngine.methods.usedInviteByUser(sellerAddress).call();
+    const SELLER_ROLE = await spiralEngine.methods.SELLER_ROLE().call();
+    const hasSellerRole = await spiralEngine.methods.hasRole(SELLER_ROLE, sellerAddress).call();
+    
+    console.log(`   Активирован: ${usedInvite > 0 ? '✅' : '❌'}`);
+    console.log(`   SELLER_ROLE: ${hasSellerRole ? '✅' : '❌'}`);
+    
+    // 2. Активация seller если нужно
+    if (usedInvite == 0) {
+        console.log(`\n🔷 Шаг 2/3: Активация seller...`);
+        
+        // 2.1. Валидация деплоер инвайта
+        await validateDeployerInviteForSeller(spiralEngine, deployerInvite);
+        
+        // 2.2. Генерация 12 новых инвайтов для seller
+        const newInvites = generateInviteCodes(12);
+        console.log(`🎲 Сгенерированы новые инвайты: ${newInvites.length}`);
+        
+        // 2.3. Активация через activateUser
+        console.log(`🚀 Вызываем activateUser()...`);
+        const nonceActivate = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
+        await spiralEngine.methods.activateUser(
+            deployerInvite,
+            sellerAddress,
+            newInvites,
+            0 // Бессрочные инвайты
+        ).send({
+            from: deployerAccount.address,
+            gas: 5000000,
+            gasPrice: network === 'polygon' ? 
+                web3.utils.toWei('100', 'gwei') : 
+                await web3.eth.getGasPrice(),
+            nonce: nonceActivate
+        });
+        
+        console.log(`✅ Seller активирован через activateUser()`);
+        
+        // 2.4. Сохраняем инвайты в файл
+        const invitesPath = path.join(__dirname, "..", "bot", "flowers", `${sellerAddress}_invites_action555.txt`);
+        fs.writeFileSync(invitesPath, newInvites.join("\n"));
+        console.log(`✅ Инвайты seller сохранены в ${invitesPath}`);
+    } else {
+        console.log(`\n✅ Шаг 2/3: Seller уже активирован, пропускаем активацию`);
+    }
+    
+    // 3. Назначение SELLER_ROLE если нужно
+    console.log(`\n🔑 Шаг 3/3: Проверка и назначение SELLER_ROLE...`);
+    if (!hasSellerRole) {
+        console.log(`🔷 Назначаем SELLER_ROLE...`);
+        const nonceGrantRole = await web3.eth.getTransactionCount(deployerAccount.address, 'pending');
+        await spiralEngine.methods.grantSellerRole(sellerAddress).send({
+            from: deployerAccount.address,
+            gas: 500000,
+            gasPrice: network === 'polygon' ? 
+                web3.utils.toWei('100', 'gwei') : 
+                await web3.eth.getGasPrice(),
+            nonce: nonceGrantRole
+        });
+        console.log(`✅ SELLER_ROLE назначена через grantSellerRole()`);
+    } else {
+        console.log(`✅ SELLER_ROLE уже назначена, пропускаем`);
+    }
+    
+    // 4. Финальная проверка
+    console.log(`\n🎯 Финальная проверка...`);
+    const finalUsedInvite = await spiralEngine.methods.usedInviteByUser(sellerAddress).call();
+    const finalHasSellerRole = await spiralEngine.methods.hasRole(SELLER_ROLE, sellerAddress).call();
+    
+    if (finalUsedInvite > 0 && finalHasSellerRole) {
+        console.log(`✅ Базовая активация завершена успешно!`);
+        console.log(`   → Seller активирован: ✅`);
+        console.log(`   → SELLER_ROLE назначена: ✅`);
+        console.log(`   → Готов к регистрации компонентов в OrganicComponentRegistry`);
+    } else {
+        throw new Error(`Базовая активация не завершена: активирован=${finalUsedInvite > 0}, SELLER_ROLE=${finalHasSellerRole}`);
+    }
+}
+
 // Получаем action из аргументов командной строки или переменной окружения
 // Игнорируем флаги Hardhat (--network, --verbose и т.д.)
 const args = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
@@ -3604,7 +4479,7 @@ console.log("[DEBUG] SPIRAL_ENGINE_CONTRACT_ADDRESS:", process.env.SPIRAL_ENGINE
 // Проверяем что action является числом
 if (isNaN(parseInt(action))) {
   console.error("❌ Ошибка: action должен быть числом");
-  console.error("Допустимые значения: 0-12, 40-41, 777, 888");
+  console.error("Допустимые значения: 0-13, 40-46, 444, 555, 777, 888");
   process.exit(1);
 }
 
