@@ -1,0 +1,19 @@
+{
+  "component_id": "test_amanita_muscaria_red_cap",
+  "name": "Amanita Muscaria Red Cap",
+  "type": "psychoactive_mushroom",
+  "origin": "Siberian Forest",
+  "harvest_date": "2024-09-15",
+  "quality_grade": "Premium",
+  "features": [
+    "stress_relief",
+    "focus_enhancement",
+    "spiritual_development"
+  ],
+  "metadata": {
+    "color": "Red with white spots",
+    "size": "Large (10-15cm cap)",
+    "potency": "High"
+  }
+}
+

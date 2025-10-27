@@ -5,14 +5,25 @@
     "deploy:all": "hardhat run scripts/deploy_full.js 1",
     "deploy:contracts": "hardhat run scripts/deploy_full.js 2",
     "deploy:invites": "hardhat run scripts/deploy_full.js 3",
-    "deploy:catalog": "hardhat run scripts/deploy_full.js 4"
+    "deploy:catalog": "hardhat run scripts/deploy_full.js 4",
+    "test": "mocha scripts/tests/**/*.test.js --config scripts/tests/.mocharc.json",
+    "test:unit": "mocha scripts/tests/unit/**/*.test.js --config scripts/tests/.mocharc.json",
+    "test:integration": "mocha scripts/tests/integration/**/*.test.js --config scripts/tests/.mocharc.json",
+    "test:e2e": "mocha scripts/tests/e2e/**/*.test.js --config scripts/tests/.mocharc.json",
+    "test:coverage": "nyc npm test",
+    "test:watch": "mocha scripts/tests/**/*.test.js --config scripts/tests/.mocharc.json --watch"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^0.15.13",
     "@nomicfoundation/hardhat-ignition-ethers": "^0.15.14",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/ignition-core": "^0.15.13",
-    "hardhat": "^2.25.0"
+    "chai": "^4.5.0",
+    "chai-as-promised": "^8.0.2",
+    "hardhat": "^2.25.0",
+    "mocha": "^10.8.2",
+    "nyc": "^15.1.0",
+    "sinon": "^17.0.1"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.3.0",

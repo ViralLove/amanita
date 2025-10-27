@@ -1,0 +1,5 @@
+product_id,name,description,price,category
+prod_001,Missing fields
+prod_002,Extra,Fields,Are,Here,Too,Many,Columns
+prod_003,Normal,Product,19.99,category
+

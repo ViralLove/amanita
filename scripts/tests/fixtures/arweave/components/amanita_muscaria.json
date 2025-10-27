@@ -1,0 +1,16 @@
+{
+  "business_id": "amanita_muscaria",
+  "metadata_cid": "QmTestMetadataCID123456789",
+  "translation_cid": "QmTestTranslationCID123456789",
+  "title": {
+    "en": "Amanita Muscaria",
+    "ru": "Мухомор красный",
+    "fr": "Amanite tue-mouches"
+  },
+  "description": {
+    "en": "Red fly agaric mushroom",
+    "ru": "Красный мухомор",
+    "fr": "Champignon amanite"
+  }
+}
+

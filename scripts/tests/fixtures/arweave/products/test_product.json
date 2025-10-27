@@ -1,0 +1,9 @@
+{
+  "id": "test_product_001",
+  "business_id": "test_product",
+  "componentIds": ["amanita_muscaria"],
+  "title": "QmTestTitleCID123456789",
+  "metadataCID": "QmTestProductMetadataCID123456789",
+  "active": false
+}
+

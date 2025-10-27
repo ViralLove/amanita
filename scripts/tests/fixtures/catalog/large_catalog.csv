@@ -1,0 +1,12 @@
+product_id,name,description,price,category
+prod_001,Product 1,Description 1,10.00,cat1
+prod_002,Product 2,Description 2,20.00,cat2
+prod_003,Product 3,Description 3,30.00,cat1
+prod_004,Product 4,Description 4,40.00,cat2
+prod_005,Product 5,Description 5,50.00,cat1
+prod_006,Product 6,Description 6,60.00,cat2
+prod_007,Product 7,Description 7,70.00,cat1
+prod_008,Product 8,Description 8,80.00,cat2
+prod_009,Product 9,Description 9,90.00,cat1
+prod_010,Product 10,Description 10,100.00,cat2
+

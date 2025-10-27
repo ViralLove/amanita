@@ -1,0 +1,10 @@
+{
+  "require": ["scripts/tests/setup.js"],
+  "timeout": 30000,
+  "colors": true,
+  "recursive": true,
+  "reporter": "spec",
+  "exit": true,
+  "parallel": false
+}
+

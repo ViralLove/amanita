@@ -1,0 +1,19 @@
+{
+  "component_id": "test_lions_mane_extract",
+  "name": "Lion's Mane Extract",
+  "type": "medicinal_mushroom",
+  "origin": "Organic Farm",
+  "harvest_date": "2024-10-01",
+  "quality_grade": "Premium",
+  "features": [
+    "cognitive_support",
+    "nerve_regeneration",
+    "memory_enhancement"
+  ],
+  "metadata": {
+    "extraction_method": "Dual extract (water + alcohol)",
+    "concentration": "10:1",
+    "certifications": ["Organic", "Non-GMO"]
+  }
+}
+

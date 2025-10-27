@@ -1,0 +1,5 @@
+product_id,name,description,price,category
+prod_ru_001,Мухомор Красный,Сибирский мухомор 🍄,2999.99,грибы
+prod_emoji_002,Lion's Mane 🦁,Ежовик гребенчатый ✨,3999.50,экстракты
+prod_special_003,"Product, with comma","Description ""quoted""",24.99,powders
+

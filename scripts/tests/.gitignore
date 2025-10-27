@@ -1,0 +1,12 @@
+# Test artifacts
+coverage/
+.nyc_output/
+*.log
+
+# Temporary test data
+fixtures/temp/
+
+# Test environment files (содержат секреты)
+fixtures/env/.env.test.local
+fixtures/.arweave-key.test.json
+
