@@ -143,18 +143,21 @@ async function loadUUPSContract(contractName, proxyAddress, web3) {
 
 /**
  * Получение текущей цены газа с учетом сети
- * @param {Object} web3 - Web3 instance
+ * @param {Object} ethersProvider - Ethers.js provider instance
  * @param {string} network - Название сети (polygon, mumbai, etc.)
- * @returns {Promise<string>} Gas price в Wei
+ * @returns {Promise<BigInt>} Gas price в Wei
  */
-async function getGasPrice(web3, network) {
+async function getGasPrice(ethersProvider, network) {
+  const { ethers } = require('hardhat');
+  
   if (network === 'polygon') {
     // Фиксированная цена для Polygon mainnet
-    return web3.utils.toWei('100', 'gwei');
+    return ethers.parseUnits('100', 'gwei');
   }
   
   // Для остальных сетей получаем текущую цену
-  return await web3.eth.getGasPrice();
+  const feeData = await ethersProvider.getFeeData();
+  return feeData.gasPrice;
 }
 
 /**
@@ -452,6 +455,9 @@ module.exports = {
   // Contract utilities
   loadContractArtifact,
   loadUUPSContract,
+  
+  // Async utilities
+  sleep,  // ✅ Centralized delay function
   
   // Gas utilities
   getGasPrice,

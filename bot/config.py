@@ -3,6 +3,16 @@ import os
 from dotenv import load_dotenv
 import logging
 
+# Попытка импорта VaultService (опционально, только если hvac установлен)
+try:
+    from services.vault_service import VaultService, VaultServiceError
+    VAULT_AVAILABLE = True
+except ImportError:
+    VAULT_AVAILABLE = False
+    VaultService = None
+    VaultServiceError = Exception
+    logging.warning("[CONFIG] VaultService недоступен (hvac не установлен), используем только .env")
+
 # Подробное логирование
 logging.basicConfig(level=logging.INFO)
 
@@ -52,11 +62,82 @@ BLOCKCHAIN_PROFILE = os.getenv("BLOCKCHAIN_PROFILE", "localhost")
 ACTIVE_PROFILE = BLOCKCHAIN_PROFILE
 RPC_URL = os.getenv("WEB3_PROVIDER_URI", "http://localhost:8545")
 
-# Ключ продавца
-SELLER_PRIVATE_KEY = os.getenv("SELLER_PRIVATE_KEY")
-if not SELLER_PRIVATE_KEY:
-    raise ValueError("SELLER_PRIVATE_KEY не установлен в .env")
-if not SELLER_PRIVATE_KEY.startswith("0x"):
+# Deployment profile для управления источником секретов
+# localhost - загружает из .env (для разработки)
+# polygon - загружает из Vault (для production)
+DEPLOYMENT_PROFILE = os.getenv("DEPLOYMENT_PROFILE", "localhost")
+logging.info(f"[CONFIG] DEPLOYMENT_PROFILE: {DEPLOYMENT_PROFILE}")
+
+# ============================================================================
+# SECRETS MANAGEMENT: Profile-based loading (Vault for polygon, .env for localhost)
+# ============================================================================
+
+def _load_secrets_from_vault():
+    """
+    Загрузка секретов из HashiCorp Vault для polygon profile.
+    
+    Raises:
+        VaultServiceError: Если Vault недоступен или секреты не найдены
+    """
+    if not VAULT_AVAILABLE:
+        raise VaultServiceError(
+            "VaultService недоступен (hvac не установлен). "
+            "Установите: pip install hvac"
+        )
+    
+    vault_addr = os.getenv("VAULT_ADDR")
+    vault_token = os.getenv("VAULT_TOKEN")
+    vault_path = os.getenv("VAULT_PATH", "secret/data/amanita")
+    
+    if not vault_addr:
+        raise VaultServiceError(
+            "VAULT_ADDR не установлен для polygon profile. "
+            "Укажите URL адрес Vault сервера в Railway Variables."
+        )
+    
+    if not vault_token:
+        raise VaultServiceError(
+            "VAULT_TOKEN не установлен для polygon profile. "
+            "Укажите authentication token в Railway Variables."
+        )
+    
+    logging.info(f"[CONFIG] 🔐 Инициализация Vault: {vault_addr}")
+    logging.info(f"[CONFIG] 🔐 Vault path: {vault_path}")
+    
+    try:
+        vault = VaultService(
+            vault_addr=vault_addr,
+            vault_token=vault_token,
+            vault_path=vault_path
+        )
+        
+        # Загружаем секреты
+        seller_key = vault.get_secret("SELLER_PRIVATE_KEY")
+        arweave_key = vault.get_secret("ARWEAVE_PRIVATE_KEY")
+        
+        logging.info("[CONFIG] ✅ Секреты успешно загружены из Vault")
+        return seller_key, arweave_key
+        
+    except VaultServiceError as e:
+        logging.error(f"[CONFIG] ❌ Ошибка загрузки секретов из Vault: {e}")
+        raise
+
+# Ключ продавца - загрузка в зависимости от DEPLOYMENT_PROFILE
+if DEPLOYMENT_PROFILE == "polygon":
+    logging.info("[CONFIG] 🔐 Polygon profile: загружаем секреты из Vault")
+    SELLER_PRIVATE_KEY, ARWEAVE_PRIVATE_KEY = _load_secrets_from_vault()
+else:
+    logging.info("[CONFIG] 📁 Localhost profile: загружаем секреты из .env")
+    SELLER_PRIVATE_KEY = os.getenv("SELLER_PRIVATE_KEY")
+    if not SELLER_PRIVATE_KEY:
+        raise ValueError("SELLER_PRIVATE_KEY не установлен в .env для localhost profile")
+    
+    ARWEAVE_PRIVATE_KEY = os.getenv("ARWEAVE_PRIVATE_KEY")
+    if not ARWEAVE_PRIVATE_KEY:
+        logging.warning("ARWEAVE_PRIVATE_KEY не установлен в .env - ArWeave операции могут не работать")
+
+# Нормализация SELLER_PRIVATE_KEY (добавляем 0x префикс если отсутствует)
+if SELLER_PRIVATE_KEY and not SELLER_PRIVATE_KEY.startswith("0x"):
     SELLER_PRIVATE_KEY = f"0x{SELLER_PRIVATE_KEY}"
 
 # API ключи для аутентификации (MVP)
@@ -69,10 +150,8 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 if not SUPABASE_ANON_KEY:
     logging.warning("SUPABASE_ANON_KEY не установлен в .env - Edge Functions могут не работать")
 
-# ArWeave конфигурация
-ARWEAVE_PRIVATE_KEY = os.getenv("ARWEAVE_PRIVATE_KEY")
-if not ARWEAVE_PRIVATE_KEY:
-    logging.warning("ARWEAVE_PRIVATE_KEY не установлен в .env - ArWeave операции могут не работать")
+# Примечание: ARWEAVE_PRIVATE_KEY теперь загружается через profile-based logic выше
+# (вместе с SELLER_PRIVATE_KEY)
 
 # Тип коммуникации с хранилищем (sync|async|hybrid)
 STORAGE_COMMUNICATION_TYPE = os.getenv("STORAGE_COMMUNICATION_TYPE", "sync")

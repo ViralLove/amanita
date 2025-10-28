@@ -58,7 +58,59 @@ function parsePrices(pricesString) {
 }
 
 /**
- * Проверка существования компонента
+ * Получение component_id из контракта OrganicComponentRegistry
+ * Использует Ethers.js + MagicRegistry для автоматического resolution
+ * Поддерживает fallback на _upload_state файлы для offline scenarios
+ * 
+ * @param {string} biounit_id - ID компонента (e.g., 'amanita_muscaria')
+ * @param {Object} contractManager - ContractManager instance (optional, recommended)
+ * @returns {Promise<string|null>} component_id из контракта или null
+ */
+async function getComponentIdFromContract(biounit_id, contractManager = null) {
+  // Source 1: Query OrganicComponentRegistry contract via Ethers.js + MagicRegistry
+  if (contractManager) {
+    try {
+      // ContractManager auto-resolves from MagicRegistry if .env not set ✅
+      const registry = await contractManager.loadUUPSContract('OrganicComponentRegistry');
+      const componentId = await registry.getComponentId(biounit_id);
+      
+      // Ethers.js returns BigInt, check if > 0 (contract returns 0 if not found)
+      if (componentId > 0 || componentId > 0n) {
+        const idStr = componentId.toString();
+        console.log(`   → Contract component_id: ${idStr} (from OrganicComponentRegistry)`);
+        return idStr;
+      }
+    } catch (error) {
+      console.warn(`⚠️ Contract query failed: ${error.message}`);
+    }
+  } else {
+    console.warn(`⚠️ ContractManager not provided, skipping contract query`);
+  }
+  
+  // Source 2: Fallback to _upload_state file (offline scenario or contract unavailable)
+  try {
+    const network = process.env.NETWORK || 'localhost';
+    const statePath = path.join(__dirname, '../../data/components', biounit_id, `_upload_state_${network}.json`);
+    
+    if (fs.existsSync(statePath)) {
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+      if (state.contract_registration && state.contract_registration.componentId) {
+        const idStr = state.contract_registration.componentId.toString();
+        console.log(`   → Component ID from state file: ${idStr} (fallback source)`);
+        return idStr;
+      }
+    }
+  } catch (error) {
+    console.warn(`⚠️ State file read failed: ${error.message}`);
+  }
+  
+  // All sources exhausted
+  console.warn(`⚠️ Component ${biounit_id} ID not found in contract or state files`);
+  return null;
+}
+
+/**
+ * Проверка существования компонента (файловая система + контракт)
  * @param {string} biounit_id - ID компонента
  * @returns {boolean} true если компонент существует
  */
@@ -70,11 +122,14 @@ function componentExists(biounit_id) {
 }
 
 /**
- * Загрузка компонента
- * @param {string} biounit_id - ID компонента
- * @returns {Object} JSON объект компонента
+ * Загрузка компонента с интеграцией контракта
+ * Использует multi-source resolution для получения contract_component_id
+ * 
+ * @param {string} biounit_id - ID компонента (e.g., 'amanita_muscaria')
+ * @param {Object} contractManager - ContractManager instance (optional but recommended)
+ * @returns {Promise<Object>} JSON объект компонента с contract_component_id
  */
-function loadComponent(biounit_id) {
+async function loadComponent(biounit_id, contractManager = null) {
   const componentDir = path.join(__dirname, '../../data/components', biounit_id);
   const componentFile = path.join(componentDir, `${biounit_id}.json`);
   
@@ -82,17 +137,25 @@ function loadComponent(biounit_id) {
     throw new Error(
       `Component not found: ${biounit_id}\n` +
       `Expected location: ${componentFile}\n` +
-      `Run: DEPLOY_ACTION=555 node scripts/deploy_full.js 555 to upload components first`
+      `Run: DEPLOY_ACTION=555 npx hardhat run scripts/deploy_full_new.js --network localhost`
     );
   }
   
   try {
-    const componentData = fs.readFileSync(componentFile, 'utf8');
-    return JSON.parse(componentData);
+    const componentData = JSON.parse(fs.readFileSync(componentFile, 'utf8'));
+    
+    // Получаем component_id из контракта (с MagicRegistry fallback + state file fallback)
+    const contractComponentId = await getComponentIdFromContract(biounit_id, contractManager);
+    if (contractComponentId) {
+      componentData.contract_component_id = contractComponentId;
+    } else {
+      console.warn(`   ⚠️ Component ${biounit_id} not found in contract (will use biounit_id only)`);
+      componentData.contract_component_id = null;
+    }
+    
+    return componentData;
   } catch (error) {
-    throw new Error(
-      `Failed to load component ${biounit_id}: ${error.message}`
-    );
+    throw new Error(`Failed to load component ${biounit_id}: ${error.message}`);
   }
 }
 
@@ -131,12 +194,21 @@ function validateProductId(product_id) {
 
 /**
  * Создание директории продукта
- * @param {string} seller_id - ID продавца
+ * @param {string} seller_id - ID продавца (deprecated, for backward compatibility)
  * @param {string} product_id - ID продукта
+ * @param {string} outputDir - Output directory path (optional, если не указан - используется старая логика)
  * @returns {string} Путь к созданной директории
  */
-function createProductDirectory(seller_id, product_id) {
-  const productDir = path.join(__dirname, '../products', seller_id, product_id);
+function createProductDirectory(seller_id, product_id, outputDir = null) {
+  let productDir;
+  
+  if (outputDir) {
+    // NEW: Use provided outputDir (respects OUTPUT_DIR from action444)
+    productDir = path.join(outputDir, product_id);
+  } else {
+    // LEGACY: Old hardcoded path for backward compatibility
+    productDir = path.join(process.cwd(), 'data/sellers', seller_id, 'products', product_id);
+  }
   
   if (!fs.existsSync(productDir)) {
     fs.mkdirSync(productDir, { recursive: true });
@@ -178,10 +250,11 @@ function saveProductJSON(productData, productDir) {
 /**
  * Проверка существования изображения
  * @param {string} imageFile - Имя файла изображения
+ * @param {string} sellerId - Seller business ID (optional, default: 'iveta')
  * @returns {boolean} true если изображение существует
  */
-function imageExists(imageFile) {
-  const imageDir = path.join(__dirname, '../catalog/images');
+function imageExists(imageFile, sellerId = 'iveta') {
+  const imageDir = path.join(__dirname, '../../data/sellers', sellerId, 'catalog/images');
   const imagePath = path.join(imageDir, imageFile);
   
   return fs.existsSync(imagePath);
@@ -190,10 +263,11 @@ function imageExists(imageFile) {
 /**
  * Получение абсолютного пути к изображению
  * @param {string} imageFile - Имя файла изображения
+ * @param {string} sellerId - Seller business ID (optional, default: 'iveta')
  * @returns {string} Абсолютный путь
  */
-function getImagePath(imageFile) {
-  const imageDir = path.join(__dirname, '../catalog/images');
+function getImagePath(imageFile, sellerId = 'iveta') {
+  const imageDir = path.join(__dirname, '../../data/sellers', sellerId, 'catalog/images');
   return path.join(imageDir, imageFile);
 }
 
@@ -201,6 +275,7 @@ module.exports = {
   parsePrices,
   componentExists,
   loadComponent,
+  getComponentIdFromContract,
   validateProductId,
   createProductDirectory,
   saveProductJSON,

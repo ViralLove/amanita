@@ -33,6 +33,9 @@ const productUtils = require('./lib/product_utils');
 // Глобальные переменные (будут инициализированы позже)
 let DRY_RUN, CSV_PATH, OUTPUT_DIR, SELLER_ID, SELLER_ADDRESS, SOURCE_LANG, CREATE_TRANSLATION_STUBS;
 
+// ContractManager instance (passed via config, not global env var)
+let CONTRACT_MANAGER_INSTANCE;
+
 // Supported languages (aligned with upload_utils.js)
 const SUPPORTED_LANGUAGES = ["ru", "et", "en", "es", "fr", "de", "nl"];
 
@@ -169,35 +172,35 @@ function getLanguageName(langCode) {
 /**
  * Трансформация одной строки CSV в product JSON
  */
-function transformProduct(row, index) {
-  console.log(`\n${"=".repeat(70)}`);
-  console.log(`📦 Product ${index + 1}: ${row.product_id}`);
-  console.log(`${"=".repeat(70)}`);
+async function transformProduct(row, index) {
+    console.log(`\n${"=".repeat(70)}`);
+    console.log(`📦 Product ${index + 1}: ${row.product_business_id}`);
+    console.log(`${"=".repeat(70)}`);
   
   try {
     // 1. Валидация product_id
     console.log("🔍 Step 1: Validating product_id...");
-    productUtils.validateProductId(row.product_id);
-    console.log(`   ✅ Valid product_id: ${row.product_id}`);
+    productUtils.validateProductId(row.product_business_id);
+    console.log(`   ✅ Valid product_id: ${row.product_business_id}`);
     
     // 2. Проверка компонента
     console.log("🔍 Step 2: Validating component...");
-    if (!productUtils.componentExists(row.biounit_id)) {
+    if (!productUtils.componentExists(row.component_business_id)) {
       throw new Error(
-        `Component not found: ${row.biounit_id}. ` +
+        `Component not found: ${row.component_business_id}. ` +
         `Upload component first: node scripts/upload_all_components.js`
       );
     }
     
-    const component = productUtils.loadComponent(row.biounit_id);
-    console.log(`   ✅ Component found: ${row.biounit_id}`);
+    const component = await productUtils.loadComponent(row.component_business_id, CONTRACT_MANAGER_INSTANCE);
+    console.log(`   ✅ Component found: ${row.component_business_id}`);
     console.log(`      → Forms available: ${component.forms.join(', ')}`);
     
-    stats.component_links.add(row.biounit_id);
+    stats.component_links.add(row.component_business_id);
     
     // 3. Мапинг формы
     console.log("🔍 Step 3: Mapping form...");
-    const formMapping = formMapper.mapFormToStandard(row.form, row.biounit_id);
+    const formMapping = formMapper.mapFormToStandard(row.form, row.component_business_id);
     console.log(`   ✅ Form mapped: "${row.form}" → "${formMapping.standard_form}"`);
     console.log(`      → Confidence: ${(formMapping.confidence * 100).toFixed(0)}%`);
     console.log(`      → Type: ${formMapping.mapping_type}`);
@@ -234,24 +237,23 @@ function transformProduct(row, index) {
     // 6. Создание product JSON
     console.log("🔍 Step 6: Creating product JSON...");
     
-    // Создание мультиязычного title
-    const title = createMultilingualTitle(row.product_name, SOURCE_LANG);
-    console.log(`   → Title created with source language: ${SOURCE_LANG}`);
-    console.log(`   → Source title (${SOURCE_LANG}): ${title[SOURCE_LANG]}`);
-    console.log(`   → Translation stubs: ${Object.keys(title).filter(k => k !== SOURCE_LANG).join(', ')}`);
+    // Создание заглушки для title (будет заменена на CID в Action 43)
+    console.log(`   → Title placeholder created (will be replaced with CID in Action 43)`);
+    console.log(`   → Source language: ${SOURCE_LANG}`);
+    console.log(`   → Source title: ${row.product_name}`);
     
     const productData = {
-      product_id: row.product_id,
+      product_id: row.product_business_id,
       seller_id: SELLER_ID,
       created_at: new Date().toISOString(),
       last_updated: new Date().toISOString(),
       created_by: SELLER_ADDRESS,
       
-      title: title,
+      title: null, // Заглушка для CID из Arweave
       
       components: [
         {
-          biounit_id: row.biounit_id,
+          component_business_id: row.component_business_id,
           proportion: "100%",
           form: formMapping.standard_form,
           form_mapping_confidence: formMapping.confidence,
@@ -275,30 +277,12 @@ function transformProduct(row, index) {
         version: "1.0",
         schema_version: "1.0",
         status: "active",
-        visibility: "public",
         transformation: {
           from_csv: CSV_PATH,
           transformed_at: new Date().toISOString(),
           form_mapping_type: formMapping.mapping_type,
           form_mapping_confidence: formMapping.confidence
         }
-      },
-      
-      inventory: {
-        stock_quantity: null,
-        stock_unit: prices[0]?.unit || "g",
-        low_stock_threshold: 500,
-        reorder_quantity: 1000
-      },
-      
-      shipping: {
-        dimensions: {
-          length_cm: null,
-          width_cm: null,
-          height_cm: null
-        },
-        weight_g: prices[0]?.quantity || 100,
-        handling_time_days: 3
       }
     };
     
@@ -317,36 +301,44 @@ function transformProduct(row, index) {
     // 8. Сохранение (если не dry-run)
     if (!DRY_RUN) {
       console.log("🔍 Step 8: Saving to file...");
-      const productDir = productUtils.createProductDirectory(SELLER_ID, row.product_id);
+      const productDir = productUtils.createProductDirectory(SELLER_ID, row.product_business_id, OUTPUT_DIR);
       const productFile = productUtils.saveProductJSON(productData, productDir);
       console.log(`   ✅ Saved: ${productFile}`);
       
-      // 8.1. Создание translation stubs (если флаг установлен)
+      // 8.1. Создание файла переводов в Simple формате для AmanitaInternational
+      console.log("🔍 Step 8.1: Creating title translations file...");
+      const titleTranslations = createMultilingualTitle(row.product_name, SOURCE_LANG);
+      const titleFilePath = path.join(productDir, `${row.product_business_id}.titles.json`);
+      fs.writeFileSync(titleFilePath, JSON.stringify(titleTranslations, null, 2));
+      console.log(`   ✅ Title translations: ${titleFilePath}`);
+      
+      // 8.2. Создание translation stubs (если флаг установлен)
       if (CREATE_TRANSLATION_STUBS) {
-        console.log("🔍 Step 8.1: Creating translation stubs...");
-        const stubPath = createTranslationStub(row.product_id, row.product_name, SOURCE_LANG, productDir);
+        console.log("🔍 Step 8.2: Creating translation stubs...");
+        const stubPath = createTranslationStub(row.product_business_id, row.product_name, SOURCE_LANG, productDir);
         console.log(`   ✅ Translation stub: ${stubPath}`);
         
-        const readmePath = createTranslatorReadme(row.product_id, productDir);
+        const readmePath = createTranslatorReadme(row.product_business_id, productDir);
         console.log(`   ✅ README: ${readmePath}`);
       }
     } else {
       console.log("🔷 [DRY-RUN] Skipping file save");
+      console.log("🔷 [DRY-RUN] Would create title translations file");
       if (CREATE_TRANSLATION_STUBS) {
         console.log("🔷 [DRY-RUN] Would create translation stubs");
       }
     }
     
     stats.valid_products++;
-    console.log(`\n✅ Product ${row.product_id} transformed successfully`);
+    console.log(`\n✅ Product ${row.product_business_id} transformed successfully`);
     
     return { success: true, productData };
     
   } catch (error) {
-    console.error(`\n❌ Error transforming ${row.product_id}:`, error.message);
+    console.error(`\n❌ Error transforming ${row.product_business_id}:`, error.message);
     stats.skipped_products++;
     stats.errors.push({
-      product_id: row.product_id,
+      product_id: row.product_business_id,
       error: error.message
     });
     
@@ -418,7 +410,7 @@ async function main() {
     
     const results = [];
     for (let i = 0; i < rows.length; i++) {
-      const result = transformProduct(rows[i], i);
+      const result = await transformProduct(rows[i], i);
       results.push(result);
       
       // Небольшая задержка для читаемости логов
@@ -531,6 +523,7 @@ async function transformProductsFromCSV(config) {
   const originalLang = SOURCE_LANG;
   const originalStubs = CREATE_TRANSLATION_STUBS;
   const originalDryRun = DRY_RUN;
+  const originalContractManager = CONTRACT_MANAGER_INSTANCE;
   
   try {
     // Инициализируем глобальные переменные из config
@@ -541,6 +534,7 @@ async function transformProductsFromCSV(config) {
     SOURCE_LANG = config.sourceLang || 'en';
     CREATE_TRANSLATION_STUBS = config.createTranslationStubs || false;
     DRY_RUN = config.dryRun || false;
+    CONTRACT_MANAGER_INSTANCE = config.contractManager || null; // ← ContractManager instance for component_id resolution
     
     // Вызываем mainWithoutExit() без process.exit()
     const result = await mainWithoutExit();
@@ -553,6 +547,7 @@ async function transformProductsFromCSV(config) {
     SOURCE_LANG = originalLang;
     CREATE_TRANSLATION_STUBS = originalStubs;
     DRY_RUN = originalDryRun;
+    CONTRACT_MANAGER_INSTANCE = originalContractManager;
     
     return result;
   } catch (error) {
@@ -564,6 +559,7 @@ async function transformProductsFromCSV(config) {
     SOURCE_LANG = originalLang;
     CREATE_TRANSLATION_STUBS = originalStubs;
     DRY_RUN = originalDryRun;
+    CONTRACT_MANAGER_INSTANCE = originalContractManager;
     
     throw error;
   }
@@ -596,7 +592,7 @@ async function mainWithoutExit() {
   
   const results = [];
   for (let i = 0; i < rows.length; i++) {
-    const result = transformProduct(rows[i], i);
+    const result = await transformProduct(rows[i], i);
     results.push(result);
     
     // Небольшая задержка для читаемости логов
@@ -703,6 +699,7 @@ if (require.main === module) {
 // Экспортируем для использования как модуль
 module.exports = {
   transformProductsFromCSV,
+  mainWithoutExit,
   // Экспортируем константы для доступа извне
   SUPPORTED_LANGUAGES
 };

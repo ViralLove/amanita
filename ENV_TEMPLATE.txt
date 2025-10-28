@@ -1,0 +1,93 @@
+# 🔐 Amanita Environment Variables Template
+# 
+# ⚠️ ИНСТРУКЦИЯ:
+# 1. Переименуйте этот файл: mv ENV_TEMPLATE.txt .env.example
+# 2. Для работы: cp .env.example .env
+# 3. Заполните реальными значениями в .env
+
+# ============================================================================
+# 🔴 КРИТИЧЕСКИЕ КЛЮЧИ
+# ============================================================================
+
+DEPLOYER_PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000001
+SELLER_PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000002
+NODE_ADMIN_PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000003
+ARWEAVE_PRIVATE_KEY={"kty":"RSA","n":"...","e":"AQAB"}
+TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+
+# ============================================================================
+# 🌐 WEB3 & BLOCKCHAIN
+# ============================================================================
+
+WEB3_PROVIDER_URI=https://polygon-rpc.com/
+BLOCKCHAIN_PROFILE=mainnet
+NETWORK_ID=137
+
+# ============================================================================
+# 📦 STORAGE
+# ============================================================================
+
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+
+PINATA_API_KEY=your-pinata-api-key
+PINATA_API_SECRET=your-pinata-api-secret
+PINATA_JWT=your-pinata-jwt
+
+STORAGE_TYPE=supabase
+STORAGE_COMMUNICATION_MODE=direct
+INTEGRATION_STORAGE=supabase
+
+# ============================================================================
+# 🔑 API
+# ============================================================================
+
+AMANITA_API_URL=https://api.amanita.love
+AMANITA_API_KEY=your-api-key
+AMANITA_API_SECRET=your-api-secret
+AMANITA_API_HMAC_SECRET_KEY=your-hmac-secret
+
+# ============================================================================
+# 🌍 URLs
+# ============================================================================
+
+WALLET_APP_URL=https://wallet.amanita.love
+
+# ============================================================================
+# 🔧 DEVELOPMENT
+# ============================================================================
+
+NODE_ENV=development
+DEBUG=false
+VERBOSE=false
+
+# ============================================================================
+# 📁 PRODUCT CATALOG PATHS (для Actions 41-46)
+# ============================================================================
+
+# Базовые пути для каталогов (без trailing slash)
+CSV_BASE_PATH=data/sellers
+OUTPUT_BASE_PATH=data/sellers
+
+# Пути для компонентов, state и registry
+COMPONENTS_PATH=data/components
+STATE_PATH=data/state
+REGISTRY_PATH=data/registry
+
+# Идентификатор селлера (business_id)
+SELLER_BUSINESS_ID=iveta
+
+# Имя CSV файла внутри каталога селлера
+CSV_FILENAME=Iveta_catalog.csv
+
+# Итоговые пути формируются как:
+# CSV: ${CSV_BASE_PATH}/${SELLER_BUSINESS_ID}/catalog/${CSV_FILENAME}
+# Output: ${OUTPUT_BASE_PATH}/${SELLER_BUSINESS_ID}/products/
+
+# Исходный язык названий продуктов в CSV
+SOURCE_LANG=en
+
+# Создавать ли файлы-заглушки для переводов
+CREATE_TRANSLATION_STUBS=true
+

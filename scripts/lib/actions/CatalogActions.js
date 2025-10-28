@@ -162,33 +162,11 @@ class CatalogActions {
       // Import the upload steps module
       const { action43_UnifiedContractRegistration } = require('../product_upload_steps.js');
       
-      // ✅ Load ProductRegistry for catalog clearing
-      const productRegistry = await this.contractManager.loadUUPSContract('ProductRegistry');
-      
-      // ✅ Resolve paths from config
-      const sellerId = this.config.get('seller.businessId') || 'iveta';
-      const sellerDir = `data/sellers/${sellerId}`;
-      const mappingFile = `${sellerDir}/output/product_combined_mapping.json`;
-      const productsDir = `${sellerDir}/output/products`;
-      
-      // ✅ Create context with seller signer for catalog clearing
-      const context = {
-        productRegistry: productRegistry,
+      const result = await action43_UnifiedContractRegistration({
         contractManager: this.contractManager,
         config: this.config,
-        logger: logger,
-        dryRun: false,
-        seller: {
-          address: this.config.get('seller.address'),
-          signer: this.ethersUtils.getSigner(this.config.get('seller.privateKey'))
-        },
-        deployer: {
-          address: this.config.get('deployer.address'),
-          signer: this.ethersUtils.getSigner()
-        }
-      };
-      
-      const result = await action43_UnifiedContractRegistration(context, mappingFile, productsDir);
+        logger: logger
+      });
       
       logger.success(43);
       return {

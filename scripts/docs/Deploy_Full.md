@@ -193,7 +193,7 @@ AMANITA_PAYMENT_ROUTER_CONTRACT_ADDRESS=0x...
 npx hardhat node
 
 # Деплой на localhost (способ 1 - через переменную окружения)
-DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full_new.js --network localhost
 
 # Деплой на localhost (способ 2 - через аргументы командной строки)
 npx hardhat run scripts/deploy_full.js --network localhost 1

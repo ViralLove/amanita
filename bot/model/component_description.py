@@ -10,6 +10,8 @@ class ComponentDescription:
     Структура для хранения расширенного описания компонента продукта.
     
     Attributes:
+        title (Optional[str]): Локализованное название компонента (SIMPLE поле)
+        scientific_title (Optional[str]): Латинское научное название (не локализуется)
         generic_description (str): Общее описание компонента
         effects (Optional[str]): Описание эффектов и воздействия
         shamanic (Optional[str]): Шаманская перспектива и традиционное использование
@@ -17,6 +19,8 @@ class ComponentDescription:
         dosage_instructions (Optional[List[DosageInstruction]]): Инструкции по дозировке
         features (Optional[List[str]]): Особенности и характеристики компонента
     """
+    title: Optional[str] = None
+    scientific_title: Optional[str] = None
     generic_description: str
     effects: Optional[str] = None
     shamanic: Optional[str] = None
@@ -118,6 +122,8 @@ class ComponentDescription:
         
         logger.info(f"🏗️ Создаем ComponentDescription объект...")
         description = cls(
+            title=data.get('title'),
+            scientific_title=data.get('scientific_title'),
             generic_description=str(data['generic_description']).strip(),
             effects=data.get('effects'),
             shamanic=data.get('shamanic'),
@@ -141,6 +147,10 @@ class ComponentDescription:
         }
         
         # Добавляем опциональные поля только если они не None
+        if self.title is not None:
+            result['title'] = self.title
+        if self.scientific_title is not None:
+            result['scientific_title'] = self.scientific_title
         if self.effects is not None:
             result['effects'] = self.effects
         if self.shamanic is not None:
@@ -166,6 +176,8 @@ class ComponentDescription:
             return False
         
         return (
+            self.title == other.title and
+            self.scientific_title == other.scientific_title and
             self.generic_description == other.generic_description and
             self.effects == other.effects and
             self.shamanic == other.shamanic and
@@ -177,6 +189,8 @@ class ComponentDescription:
     def __hash__(self) -> int:
         """Хеш объекта для использования в множествах"""
         return hash((
+            self.title,
+            self.scientific_title,
             self.generic_description,
             self.effects,
             self.shamanic,

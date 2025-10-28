@@ -1,6 +1,13 @@
 node_modules
 .env
 
+# 🔐 Private Keys (НИКОГДА не коммитить!)
+.arweave-key.json
+arweave-wallet.json
+api_keys.json
+*.pem
+*.key
+
 # Hardhat files
 /cache
 /artifacts
@@ -12,6 +19,9 @@ node_modules
 # solidity-coverage files
 /coverage
 /coverage.json
+
+# Cursor Rules (they go to proper repository)
+.cursor/rules/
 
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
@@ -54,3 +64,6 @@ data/
 scripts_backup_*/
 scripts_structure_before_*.txt
 *.backup
+
+# Scripts archive (legacy code for reference)
+scripts/archive/

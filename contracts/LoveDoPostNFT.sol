@@ -160,8 +160,6 @@ contract LoveDoPostNFT is ERC721URIStorage, AccessControl {
         require(postExists(tokenId), "LoveDo: post does not exist");
         // Безопасность: не позволяем ставить лайк в несуществующий пост
 
-        LoveDo storage post = loveDos[tokenId];
-
         // --- [2] Проверяем, не ставил ли этот адрес лайк уже ранее
         require(!hasSuperliked[tokenId][msg.sender], "LoveDo: already superliked");
         // Безопасность: один адрес может суперлайкнуть пост только один раз

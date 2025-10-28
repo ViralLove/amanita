@@ -30,9 +30,9 @@ const stateManager = require('./state_manager');
  * @param {boolean} context.dryRun - Режим dry-run
  * @param {Object} context.contracts - Контракты (amanitaInternational, etc.)
  * @param {Object} context.arweave - Arweave client + key
- * @param {Object} context.web3 - Web3 instance
- * @param {Object} context.seller - Seller account (owner компонента)
- * @param {Object} context.deployer - Deployer account (для совместимости)
+ * @param {Object} context.ethersProvider - Ethers.js provider instance
+ * @param {Object} context.seller - Seller account (owner компонента, с signer)
+ * @param {Object} context.deployer - Deployer account (для ADMIN операций, с signer)
  * @param {Object} state - Component state
  * @param {Function} onProgress - Progress callback (optional)
  * @returns {Promise<Object>} Маппинг field → CID
@@ -80,19 +80,16 @@ async function uploadSimpleFields(context, state, onProgress = null) {
     if (!context.dryRun && !context.arweaveOnly) {
       console.log("🔷 Сохраняем CID в AmanitaInternational (от seller)...");
       
-      const gasPrice = await utils.getGasPrice(context.web3, context.network);
-      const gasLimit = utils.getGasLimit(context.network, 300000);
-      
       // ✅ Ownership: вызов от SELLER → seller становится owner поля
-      await context.contracts.amanitaInternational.methods.setSimpleFieldCID(
+      const signer = context.seller.signer;
+      const amanitaIntlWithSigner = context.contracts.amanitaInternational.connect(signer);
+      
+      const tx = await amanitaIntlWithSigner.setSimpleFieldCID(
         "ComponentDescription.title",
         titleCID
-      ).send({
-        from: context.seller.address,  // ← SELLER для своих компонентов (обновлено 2025-01-12)
-        gas: gasLimit,
-        gasPrice: gasPrice
-      });
+      );
       
+      await tx.wait();
       console.log("✅ CID сохранен в контракте (owner: seller)");
     } else if (context.arweaveOnly) {
       console.log("🔷 [ARWEAVE_ONLY] Пропускаем сохранение в контракт");
@@ -135,19 +132,16 @@ async function uploadSimpleFields(context, state, onProgress = null) {
     if (!context.dryRun && !context.arweaveOnly) {
       console.log("🔷 Сохраняем CID в AmanitaInternational (от seller)...");
       
-      const gasPrice = await utils.getGasPrice(context.web3, context.network);
-      const gasLimit = utils.getGasLimit(context.network, 300000);
-      
       // ✅ Ownership: вызов от SELLER → seller становится owner поля
-      await context.contracts.amanitaInternational.methods.setSimpleFieldCID(
+      const signer = context.seller.signer;
+      const amanitaIntlWithSigner = context.contracts.amanitaInternational.connect(signer);
+      
+      const tx = await amanitaIntlWithSigner.setSimpleFieldCID(
         "DosageInstruction.description",
         dosageCID
-      ).send({
-        from: context.seller.address,  // ← SELLER для своих компонентов (обновлено 2025-01-12)
-        gas: gasLimit,
-        gasPrice: gasPrice
-      });
+      );
       
+      await tx.wait();
       console.log("✅ CID сохранен в контракте (owner: seller)");
     } else if (context.arweaveOnly) {
       console.log("🔷 [ARWEAVE_ONLY] Пропускаем сохранение в контракт");
@@ -242,20 +236,17 @@ async function uploadComplexFields(context, state, onProgress = null) {
         if (!context.dryRun && !context.arweaveOnly) {
           console.log(`🔷 Сохраняем CID в AmanitaInternational (от seller, ${lang})...`);
           
-          const gasPrice = await utils.getGasPrice(context.web3, context.network);
-          const gasLimit = utils.getGasLimit(context.network, 300000);
-          
           // ✅ Ownership: вызов от SELLER → seller становится owner перевода
-          await context.contracts.amanitaInternational.methods.setComplexFieldCID(
+          const signer = context.seller.signer;
+          const amanitaIntlWithSigner = context.contracts.amanitaInternational.connect(signer);
+          
+          const tx = await amanitaIntlWithSigner.setComplexFieldCID(
             "ComponentDescription",
             lang,
             descCID
-          ).send({
-            from: context.seller.address,  // ← SELLER для своих компонентов (обновлено 2025-01-12)
-            gas: gasLimit,
-            gasPrice: gasPrice
-          });
+          );
           
+          await tx.wait();
           console.log(`✅ CID сохранен в контракте (owner: seller, ${lang})`);
         } else if (context.arweaveOnly) {
           console.log("🔷 [ARWEAVE_ONLY] Пропускаем сохранение в контракт");
@@ -320,7 +311,7 @@ async function uploadShareableData(context, state, onProgress = null) {
   
   // Проверяем, загружены ли shareable data в контракт
   try {
-    const existingData = await context.contracts.organicComponentRegistry.methods.getShareableData().call();
+    const existingData = await context.contracts.organicComponentRegistry.getShareableData();
     if (existingData.features_cid && existingData.features_cid !== '' && 
         existingData.component_forms_cid && existingData.component_forms_cid !== '') {
       console.log("✅ Shareable Data уже загружены в контракт (пропуск)");
@@ -399,20 +390,18 @@ async function uploadShareableData(context, state, onProgress = null) {
     if (!context.dryRun) {
       console.log("\n🔷 Обновляем shareable data в OrganicComponentRegistry...");
       
-      const gasPrice = await utils.getGasPrice(context.web3, context.network);
-      const gasLimit = utils.getGasLimit(context.network, 500000);
+      // ✅ Ownership: вызов от DEPLOYER (ADMIN для shareable data)
+      const signer = context.deployer.signer;
+      const organicRegistryWithSigner = context.contracts.organicComponentRegistry.connect(signer);
       
-      await context.contracts.organicComponentRegistry.methods.updateShareableData(
+      const tx = await organicRegistryWithSigner.updateShareableData(
         featuresCID,
         formsCID,
         1, // features version
         1  // forms version
-      ).send({
-        from: context.deployer.address,
-        gas: gasLimit,
-        gasPrice: gasPrice
-      });
+      );
       
+      await tx.wait();
       console.log("✅ Shareable data обновлены в контракте");
     } else {
       console.log("🔷 [DRY-RUN] Пропускаем обновление в контракте");
@@ -581,11 +570,9 @@ async function uploadRootMetadata(context, rootData, state, onProgress = null) {
 async function registerComponent(context, rootCID, state, onProgress = null) {
   console.log("\n🔹 ШАГ 6: Регистрация в OrganicComponentRegistry");
   
-  // Проверяем, был ли шаг уже выполнен
-  if (stateManager.isStepCompleted(state, 'component_registered')) {
-    console.log("✅ Шаг уже выполнен, используем сохраненный componentId");
-    return state.contract_registration.componentId;
-  }
+  // ✅ REMOVED: No longer blindly trust state file
+  // Component existence is now verified in ComponentActions.js before calling this function
+  // If this function is called, registration MUST be performed
   
   // В dry-run режиме не регистрируем в контракте
   if (context.dryRun) {
@@ -625,57 +612,51 @@ async function registerComponent(context, rootCID, state, onProgress = null) {
     }
     
     console.log(`🌐 Контракт: OrganicComponentRegistry`);
-    console.log(`   → Адрес: ${context.contracts.organicComponentRegistry.options.address}`);
+    const organicRegistryAddress = await context.contracts.organicComponentRegistry.getAddress();
+    console.log(`   → Адрес: ${organicRegistryAddress}`);
     console.log(`   → Deployer: ${context.deployer.address}`);
     console.log(`   → Seller (создатель компонента): ${context.seller.address}`);
-    
-    const gasPrice = await utils.getGasPrice(context.web3, context.network);
-    const gasLimit = utils.getGasLimit(context.network, 1000000);
-    
-    console.log(`⛽ Gas параметры:`);
-    console.log(`   → Gas Price: ${gasPrice}`);
-    console.log(`   → Gas Limit: ${gasLimit}`);
     
     console.log(`\n🚀 Вызов createComponent("${context.componentId}", "${rootCID}")...`);
     console.log(`   → От имени seller: ${context.seller.address}`);
     
-    // Получаем актуальный nonce для предотвращения "Nonce too low"
-    const nonce = await context.web3.eth.getTransactionCount(context.seller.address, 'pending');
-    console.log(`   → Nonce: ${nonce}`);
+    // ✅ ethers.js: регистрация компонента от seller
+    const signer = context.seller.signer;
+    const organicRegistryWithSigner = context.contracts.organicComponentRegistry.connect(signer);
     
-    const tx = await context.contracts.organicComponentRegistry.methods.createComponent(
+    // ✅ CRITICAL FIX: Wait for nonce update to prevent race conditions
+    // Same pattern as DeployActions.js - prevents "nonce has already been used"
+    console.log(`⏱️  Waiting 500ms for nonce synchronization...`);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const tx = await organicRegistryWithSigner.createComponent(
       context.componentId,
       rootCID
-    ).send({
-      from: context.seller.address,
-      gas: gasLimit,
-      gasPrice: gasPrice,
-      nonce: nonce
-    });
+    );
     
-    console.log(`📝 Транзакция отправлена: ${tx.transactionHash}`);
+    console.log(`📝 Транзакция отправлена: ${tx.hash}`);
     
     if (onProgress) {
-      onProgress({ step: 'register_component', progress: 50, status: 'tx_sent', txHash: tx.transactionHash });
+      onProgress({ step: 'register_component', progress: 50, status: 'tx_sent', txHash: tx.hash });
     }
     
-    // Получаем receipt
-    const receipt = await context.web3.eth.getTransactionReceipt(tx.transactionHash);
+    // Ждем подтверждения транзакции
+    const receipt = await tx.wait();
     console.log(`✅ Транзакция подтверждена: блок ${receipt.blockNumber}`);
     
-    // Извлекаем componentId из события ComponentCreated
+    // Извлекаем componentId из события ComponentCreated (ethers.js парсинг)
     let componentId = null;
     
     for (const log of receipt.logs) {
       try {
-        // Пытаемся распарсить лог как событие контракта
-        const parsedLog = context.contracts.organicComponentRegistry._decodeEventABI.bind({
-          name: 'allEvents',
-          jsonInterface: context.contracts.organicComponentRegistry.options.jsonInterface
-        })(log);
+        // ethers.js: парсинг события через contract.interface
+        const parsedLog = context.contracts.organicComponentRegistry.interface.parseLog({
+          topics: log.topics,
+          data: log.data
+        });
         
-        if (parsedLog && parsedLog.event === 'ComponentCreated') {
-          componentId = parsedLog.returnValues.componentId;
+        if (parsedLog && parsedLog.name === 'ComponentCreated') {
+          componentId = parsedLog.args.componentId;
           console.log(`🎉 Компонент создан с ID: ${componentId}`);
           break;
         }
@@ -698,7 +679,7 @@ async function registerComponent(context, rootCID, state, onProgress = null) {
     // Сохраняем в state
     state.contract_registration = {
       componentId: componentId,
-      txHash: tx.transactionHash,
+      txHash: receipt.hash,
       blockNumber: receipt.blockNumber
     };
     stateManager.markStepCompleted(state, 'component_registered');
@@ -725,17 +706,45 @@ async function registerComponent(context, rootCID, state, onProgress = null) {
  * @param {string} filename - Имя файла для логирования
  * @returns {Promise<string>} Arweave TX ID (используется как CID)
  */
-async function uploadToArweave(context, data, filename) {
+/**
+ * Detect Content-Type from filename extension
+ */
+function detectContentType(filename) {
+  const ext = filename.toLowerCase().match(/\.(json|jpeg|jpg|png|gif|webp|txt|md)$/);
+  if (!ext) return 'application/octet-stream';
+  
+  const mimeMap = {
+    'json': 'application/json',
+    'jpeg': 'image/jpeg',
+    'jpg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'txt': 'text/plain',
+    'md': 'text/markdown'
+  };
+  
+  return mimeMap[ext[1]] || 'application/octet-stream';
+}
+
+async function uploadToArweave(context, data, filename, options = {}) {
   const startTime = Date.now();
   
   console.log(`📤 Загрузка ${filename} в Arweave...`);
   
+  // ✅ Determine if data is binary
+  const isBinary = options.isBinary !== undefined ? options.isBinary : Buffer.isBuffer(data);
+  
+  // ✅ Determine Content-Type
+  const contentType = options.contentType || detectContentType(filename);
+  
   // Если dry-run режим → вернуть mock TX ID
   if (context.dryRun) {
+    const mockSize = isBinary ? data.length : JSON.stringify(data, null, 2).length;
     const mockTxId = `DRYRUN_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    const mockSize = JSON.stringify(data, null, 2).length;
     console.log(`🔷 [DRY-RUN] Mock TX ID: ${mockTxId}`);
     console.log(`   → Размер: ${mockSize} bytes (${(mockSize / 1024).toFixed(2)} KB)`);
+    console.log(`   → Content-Type: ${contentType}`);
     return { txId: mockTxId, size: mockSize, duration: 0 };
   }
   
@@ -743,9 +752,17 @@ async function uploadToArweave(context, data, filename) {
   try {
     const Arweave = require('arweave');
     
-    // Конвертируем данные в JSON строку
-    const dataString = JSON.stringify(data, null, 2);
-    const dataSize = Buffer.byteLength(dataString, 'utf8');
+    // ✅ Prepare data based on type
+    let dataToUpload, dataSize;
+    if (isBinary) {
+      // Binary data (Buffer) - use directly
+      dataToUpload = data;
+      dataSize = data.length;
+    } else {
+      // JSON data - stringify
+      dataToUpload = JSON.stringify(data, null, 2);
+      dataSize = Buffer.byteLength(dataToUpload, 'utf8');
+    }
     
     console.log(`   → Размер: ${dataSize} bytes (${(dataSize / 1024).toFixed(2)} KB)`);
     
@@ -784,11 +801,11 @@ async function uploadToArweave(context, data, filename) {
     // Создаем transaction
     console.log(`   → Создание транзакции...`);
     const transaction = await context.arweave.client.createTransaction({
-      data: dataString
+      data: dataToUpload
     }, context.arweave.key);
     
-    // Добавляем tags для метаданных
-    transaction.addTag('Content-Type', 'application/json');
+    // ✅ Добавляем tags для метаданных с правильным Content-Type
+    transaction.addTag('Content-Type', contentType);
     transaction.addTag('App-Name', 'Amanita-Organic-Components');
     transaction.addTag('File-Name', filename);
     transaction.addTag('Type', 'organic-component-metadata');
@@ -824,7 +841,10 @@ async function uploadToArweave(context, data, filename) {
         duration: parseFloat(duration)
       };
     } else {
-      throw new Error(`Arweave API вернул статус ${response.status}`);
+      // ✅ FIX: Show detailed error from Arweave API
+      const errorDetails = response.data || response.statusText || 'No details';
+      console.error(`❌ Arweave API error details:`, errorDetails);
+      throw new Error(`Arweave API вернул статус ${response.status}: ${JSON.stringify(errorDetails)}`);
     }
     
   } catch (error) {

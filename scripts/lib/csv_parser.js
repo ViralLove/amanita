@@ -38,8 +38,8 @@ function parseProductCatalog(csvPath) {
   
   // 3. Валидация структуры
   const requiredColumns = [
-    'biounit_id',
-    'product_id', 
+    'component_business_id',
+    'product_business_id', 
     'product_name',
     'image_file',
     'form',
@@ -70,8 +70,8 @@ function parseProductCatalog(csvPath) {
   
   // 4. Очистка данных
   const cleaned = records.map(row => ({
-    biounit_id: row.biounit_id?.trim() || '',
-    product_id: row.product_id?.trim() || '',
+    component_business_id: row.component_business_id?.trim() || '',
+    product_business_id: row.product_business_id?.trim() || '',
     product_name: row.product_name?.trim() || '',
     image_file: row.image_file?.trim() || '',
     form: row.form?.trim() || '',
@@ -81,7 +81,7 @@ function parseProductCatalog(csvPath) {
   
   // 5. Фильтрация пустых строк
   const filtered = cleaned.filter(row => 
-    row.biounit_id && row.product_id && row.product_name
+    row.component_business_id && row.product_business_id && row.product_name
   );
   
   console.log(`   ✅ Cleaned and filtered: ${filtered.length} valid rows`);

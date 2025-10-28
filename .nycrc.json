@@ -1,0 +1,31 @@
+{
+  "all": true,
+  "include": [
+    "scripts/lib/**/*.js",
+    "scripts/deploy_full_new.js"
+  ],
+  "exclude": [
+    "scripts/tests/**",
+    "scripts/lib/**/*.test.js",
+    "node_modules/**"
+  ],
+  "reporter": [
+    "text",
+    "text-summary",
+    "html",
+    "lcov"
+  ],
+  "report-dir": "./coverage",
+  "check-coverage": true,
+  "lines": 90,
+  "statements": 90,
+  "functions": 90,
+  "branches": 85,
+  "watermarks": {
+    "lines": [85, 95],
+    "functions": [85, 95],
+    "branches": [80, 90],
+    "statements": [85, 95]
+  }
+}
+

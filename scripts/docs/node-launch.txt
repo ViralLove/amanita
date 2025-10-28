@@ -1,0 +1,252 @@
+# 🚀 ПОЛНЫЙ ПАЙП: ЧИСТАЯ НОДА → ГОТОВЫЙ КАТАЛОГ (FIXED)
+
+# ========================================
+# 🔧 ЕСЛИ ПОРТ 8545 ЗАНЯТ (Error: listen EADDRINUSE)
+# ========================================
+
+# Найти процесс на порту 8545:
+lsof -ti:8545
+
+# Убить процесс:
+kill -9 $(lsof -ti:8545)
+
+# Или kill все hardhat node процессы:
+pkill -f "hardhat node"
+
+# Проверить что порт свободен:
+lsof -ti:8545
+# (должно быть пусто)
+
+# Теперь можно запускать ноду:
+npx hardhat node
+
+# ========================================
+# ⚠️ PREREQUISITES (ОБЯЗАТЕЛЬНО!)
+# ========================================
+
+# Убедитесь что .env содержит эти переменные:
+#
+# DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+# DEPLOYER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+# SELLER_PRIVATE_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+# SELLER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+#
+# Без этих переменных деплой ПРОВАЛИТСЯ на Шаге 3!
+
+# ========================================
+# ВАРИАНТ A: С СОХРАНЕНИЕМ ARWEAVE CID ✅ RECOMMENDED
+# ========================================
+
+# 1. Очистка локальных данных (сохраняем CID)
+bash scripts/clean_components_upload.bash --keep-cids
+
+# 2. Restart hardhat node
+# Ctrl+C в терминале с нодой → npx hardhat node
+
+# 3. Передеплой контрактов
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
+
+# ✓ ПРОВЕРКА: После успеха должны быть в .env:
+#   grep "MAGIC_REGISTRY_CONTRACT_ADDRESS" .env  # → должен вернуть адрес
+#   grep "SPIRAL_ENGINE_PROXY_ADDRESS" .env      # → должен вернуть адрес
+
+# 4. Создание рутовых инвайтов
+mkdir -p bot/flowers  # ← ВАЖНО: создать директорию перед Action 777!
+DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
+
+# ✓ ПРОВЕРКА: После успеха:
+#   cat bot/flowers/deployer_invites_localhost.txt  # → 12 инвайтов
+#
+# ⚠️ ВАЖНО: Скопировать ДВА РАЗНЫХ инвайта для Шагов 5 и 6:
+#   Invite #1 (для Action 555): _________________________
+#   Invite #2 (для Action 888): _________________________
+
+# 5. Загрузка компонентов (с реальными CID)
+DEPLOY_ACTION=555 DEPLOYER_INVITE=<PASTE_INVITE_1_HERE> \
+npx hardhat run scripts/deploy_full.js --network localhost
+
+# Пример (НЕ КОПИРОВАТЬ, использовать свой invite!):
+DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-9Z1P-I5WM npx hardhat run scripts/deploy_full.js --network localhost
+
+# ✓ ОЖИДАЕТСЯ В ЛОГАХ:
+#   → CID источник: arweave_state (переиспользование) ✅
+#   → Компоненты регистрируются с РЕАЛЬНЫМИ Arweave CID
+
+# ✓ ВАЛИДАЦИЯ КОМПОНЕНТОВ (после Action 555):
+node scripts/validate_component_upload.js --component amanita_muscaria --network localhost
+# Или для всех компонентов:
+for comp in data/components/*; do 
+  [ -d "$comp" ] && node scripts/validate_component_upload.js --component $(basename $comp) --network localhost
+done
+
+5.a Инициализация каталога
+DEPLOY_ACTION=444 npx hardhat run scripts/deploy_full.js --network localhost
+
+# ✓ ВАЛИДАЦИЯ КАТАЛОГА (после Action 444):
+node scripts/validate_catalog_pipeline.js --seller iveta --network localhost
+# Или с полной проверкой Arweave CIDs:
+node scripts/validate_catalog_pipeline.js --seller iveta --network localhost --full-arweave-check
+
+# 6. Полная инициализация селлера + создание каталога
+DEPLOY_ACTION=888 DEPLOYER_INVITE=<PASTE_INVITE_2_HERE> \
+  npx hardhat run scripts/deploy_full.js --network localhost
+
+# Пример (НЕ КОПИРОВАТЬ, использовать ДРУГОЙ invite!):
+# DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-ASR7-7XY npx hardhat run scripts/deploy_full.js --network localhost
+
+# ✓ ФИНАЛЬНАЯ ПРОВЕРКА:
+#   - Селлер активирован в SpiralEngine
+#   - Компоненты в OrganicComponentRegistry
+#   - Продукты в ProductRegistry
+#   - SBT токен в SoulIdentity
+
+# ========================================
+# ВАРИАНТ B: ПОЛНАЯ ОЧИСТКА (включая CID) ⚠️ USE WITH CAUTION
+# ========================================
+
+# ⚠️ ВНИМАНИЕ: Этот вариант УДАЛИТ все Arweave CID!
+# Потребуется ПОВТОРНАЯ загрузка в Arweave (2-3 часа + ~$30-60)
+
+# 1. ПОЛНАЯ очистка (включая CID)
+bash scripts/clean_components_upload.bash --full
+# → Вводим 'DELETE' для подтверждения
+
+# 2. Restart hardhat node
+# Ctrl+C в терминале с нодой → npx hardhat node
+
+# 3. Передеплой контрактов
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
+
+# 4. Создание рутовых инвайтов
+mkdir -p bot/flowers
+DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
+
+# 5. Загрузка компонентов (с PLACEHOLDER CID!)
+DEPLOY_ACTION=555 DEPLOYER_INVITE=<PASTE_INVITE_1_HERE> \
+  npx hardhat run scripts/deploy_full.js --network localhost
+
+# ⚠️ ОЖИДАЕТСЯ В ЛОГАХ:
+#   → CID источник: placeholder (заглушка) ⚠️
+#   → Компоненты регистрируются с QmPlaceholder
+
+# 6. Полная инициализация (с placeholder components!)
+DEPLOY_ACTION=888 DEPLOYER_INVITE=<PASTE_INVITE_2_HERE> \
+  npx hardhat run scripts/deploy_full.js --network localhost
+
+# ⚠️ РЕЗУЛЬТАТ: Система работает, НО metadata не доступна (placeholder CID)
+
+# 7. ДОПОЛНИТЕЛЬНЫЙ ШАГ (ОБЯЗАТЕЛЬНО ДЛЯ PRODUCTION):
+#    Реальная загрузка в Arweave:
+#    node scripts/upload_all_components.js
+#    (2-3 часа, ~$30-60 в AR)
+
+# ========================================
+# БЫСТРЫЙ РЕСТАРТ (если компоненты уже загружены) ✅ FASTEST
+# ========================================
+
+# Prerequisites: .env с credentials, Arweave CID сохранены
+
+# 1. Очистка
+bash scripts/clean_components_upload.bash --keep-cids
+
+# 2. Restart node
+# Ctrl+C → npx hardhat node
+
+# 3-6. Единая команда chain (после restart):
+mkdir -p bot/flowers && \
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost && \
+DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
+
+# → Скопировать 2 invites из вывода
+
+# Затем с real invites:
+DEPLOY_ACTION=555 DEPLOYER_INVITE=<INVITE_1> npx hardhat run scripts/deploy_full.js --network localhost && \
+DEPLOY_ACTION=888 DEPLOYER_INVITE=<INVITE_2> npx hardhat run scripts/deploy_full.js --network localhost
+
+# ========================================
+# ВАЛИДАЦИЯ РЕЗУЛЬТАТА
+# ========================================
+
+# После успешного выполнения проверить:
+
+# 1. Контракты deployed:
+grep "MAGIC_REGISTRY_CONTRACT_ADDRESS" .env  # → должен быть адрес
+grep "SPIRAL_ENGINE_PROXY_ADDRESS" .env     # → должен быть адрес
+
+# 2. Invites созданы:
+cat bot/flowers/deployer_invites_localhost.txt  # → 12 инвайтов
+
+# 3. Компоненты загружены:
+# → Проверить в логах Action 555: "Component registered: <component_id>"
+# → Валидация:
+node scripts/validate_component_upload.js --component amanita_muscaria --network localhost
+# Ожидается: Quality Score >= 9.0/10
+
+# 4. Каталог создан:
+# → Проверить в логах Action 888: "Product created: <product_id>"
+# → Валидация:
+node scripts/validate_catalog_pipeline.js --seller iveta --network localhost
+# Ожидается: Quality Score >= 7.0/10 (PASS)
+
+# 5. SBT токен:
+# → Проверить в логах: "SBT token created for seller"
+
+# ========================================
+# АВТОМАТИЧЕСКАЯ ВАЛИДАЦИЯ (RECOMMENDED)
+# ========================================
+
+# Полная валидация после деплоя:
+bash scripts/validate_full_deployment.sh
+
+# Или по отдельности:
+
+# Валидация компонентов (single):
+node scripts/validate_component_upload.js \
+  --component amanita_muscaria \
+  --network localhost \
+  --seller 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+
+# Валидация каталога:
+node scripts/validate_catalog_pipeline.js \
+  --seller iveta \
+  --network localhost \
+  --full-arweave-check
+
+# JSON output для CI/CD:
+node scripts/validate_catalog_pipeline.js --seller iveta --json > validation_report.json
+jq '.validation_report.summary.quality_score' validation_report.json
+# Ожидается: >= 7.0
+
+# ========================================
+# TROUBLESHOOTING
+# ========================================
+
+# Если Шаг 3 провалился:
+#   → Проверить .env (credentials есть?)
+#   → Проверить node запущена (netstat -an | grep 8545)
+#   → Проверить artifacts compiled (npx hardhat compile)
+
+# Если Шаг 4 провалился:
+#   → Проверить bot/flowers/ exists (mkdir -p bot/flowers)
+#   → Проверить SPIRAL_ENGINE_PROXY_ADDRESS в .env
+
+# Если Шаг 5 провалился:
+#   → Проверить DEPLOYER_INVITE корректный (из Шага 4)
+#   → Проверить SELLER_ADDRESS, SELLER_PRIVATE_KEY в .env
+#   → Проверить _upload_state_*.json существуют (для keep-cids)
+
+# Если Шаг 6 провалился:
+#   → Проверить DEPLOYER_INVITE ДРУГОЙ (не тот же что в Шаге 5!)
+#   → Проверить компоненты загружены (из Шага 5)
+#   → Проверить SELLER_ADDRESS в .env
+
+# ========================================
+# E2E VALIDATION (RECOMMENDED BEFORE MANUAL DEPLOY)
+# ========================================
+
+# Запустить E2E tests для проверки инфраструктуры:
+npm run test:e2e
+
+# Ожидается: 122 passing (2s)
+# Если OK → infrastructure validated, можно деплоить вручную
+

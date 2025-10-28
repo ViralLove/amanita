@@ -1,0 +1,314 @@
+# 🧪 VALIDATION COMMANDS QUICK REFERENCE
+
+# ========================================
+# COMPONENT UPLOAD VALIDATION (Action 555)
+# ========================================
+
+# Single component validation
+node scripts/validators/validate_component_upload.js --component amanita_muscaria --network localhost
+
+# With JSON output (для programmatic use)
+node scripts/validators/validate_component_upload.js --component blue_lotus --network localhost --json
+
+# With custom seller (override .env)
+node scripts/validators/validate_component_upload.js \
+  --component lions_mane \
+  --network localhost \
+  --seller 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+
+# ✓ EXPECTED OUTPUT:
+#   Quality Score: 8.0+/10 ✅ PASS
+#   🎯 Action 444 Compatible: ✅ COMPATIBLE
+#
+# ⚠️ CRITICAL CHECK:
+#   Если "Action 444 Compatible: ❌ INCOMPATIBLE"
+#   → Action 444 упадет с ComponentNotFound
+#   → Нужно перезапустить Action 555
+
+# ========================================
+# BATCH VALIDATION (все компоненты)
+# ========================================
+
+# Validate все компоненты в data/components/
+for comp in data/components/*/; do
+  component=$(basename "$comp")
+  [[ "$component" == "component_features_presets.json" ]] && continue
+  echo "=== $component ==="
+  node scripts/validators/validate_component_upload.js --component "$component" --network localhost \
+    | grep -E "Quality Score|Action 444"
+  echo ""
+done
+
+# ✓ ОЖИДАЕТСЯ:
+#   amanita_muscaria:    Quality Score: 8.3/10 ✅ | Action 444: ✅ COMPATIBLE
+#   blue_lotus:          Quality Score: 8.3/10 ✅ | Action 444: ✅ COMPATIBLE
+#   ...
+
+# ========================================
+# CATALOG PIPELINE VALIDATION (Action 444)
+# ========================================
+
+# Full catalog validation (all 5 phases)
+node scripts/validators/validate_catalog_pipeline.js --seller iveta --network localhost
+
+# With full Arweave check (all CIDs, not sampled)
+node scripts/validators/validate_catalog_pipeline.js --seller iveta --network localhost --full-arweave-check
+
+# JSON output (for automation)
+node scripts/validators/validate_catalog_pipeline.js --seller iveta --network localhost --json
+
+# ✓ EXPECTED OUTPUT:
+#   Quality Score: 10.0/10 ✅ PASS
+#   Phase 1 (CSV): 10.0/10 ✅
+#   Phase 2 (Arweave): 10.0/10 ✅
+#   Phase 3 (Contract): 10.0/10 ✅
+#   Phase 4 (Consistency): 10.0/10 ✅
+#   Phase 5 (Components): 10.0/10 ✅
+#   Action 444 Compatible: ✅ YES
+
+# ========================================
+# VALIDATION SEQUENCE (после Action 555)
+# ========================================
+
+# Step 1: Validate компоненты загружены
+echo "=== Validating Components ==="
+node scripts/validators/validate_component_upload.js --component amanita_muscaria --network localhost \
+  | grep "Action 444 Compatible"
+
+# Step 2: Если ✅ COMPATIBLE → validate catalog pipeline
+echo "=== Validating Catalog Pipeline ==="
+node scripts/validators/validate_catalog_upload.js --network localhost --seller iveta --summary
+
+# Step 3: Если все ✅ → safe to run Action 444
+echo "=== Safe to run Action 444 ==="
+DEPLOY_ACTION=444 npx hardhat run scripts/deploy_full_new.js --network localhost
+
+# ========================================
+# TROUBLESHOOTING VALIDATION
+# ========================================
+
+# Issue: "Contracts not accessible"
+# Solution: Node not running or .env missing proxy addresses
+#   → Check: curl -s -X POST -H "Content-Type: application/json" \
+#            --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+#            http://127.0.0.1:8545
+#   → Expected: {"jsonrpc":"2.0","id":1,"result":"0x..."}
+#   → If fails: npx hardhat node  (restart node)
+
+# Issue: "Component not registered in OrganicComponentRegistry"
+# Solution: Re-run Action 555
+#   → DEPLOY_ACTION=555 DEPLOYER_INVITE=<INVITE> \
+#     npx hardhat run scripts/deploy_full_new.js --network localhost
+
+# Issue: Quality Score < 8.0
+# Solution: Check specific phase failures
+#   → Read validation output for errors
+#   → Fix identified issues (missing files, bad CIDs, etc.)
+
+# Issue: "Action 444 Compatible: ❌ INCOMPATIBLE"
+# Solution: Component not in contract → run Action 555 again
+#   → This is CRITICAL - Action 444 WILL FAIL without fix
+
+# ========================================
+# QUICK HEALTH CHECKS
+# ========================================
+
+# Check components in contract
+node -e "
+const { ethers } = require('hardhat');
+async function check() {
+  const registry = await ethers.getContractAt(
+    'OrganicComponentRegistryLogic',
+    '0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1'
+  );
+  const total = await registry.totalComponents();
+  console.log('Total components:', total.toString());
+}
+check();
+"
+
+# Expected: Total components: 11 (если Action 555 отработал)
+
+# Check specific component exists
+node -e "
+const { ethers } = require('hardhat');
+async function check() {
+  const registry = await ethers.getContractAt(
+    'OrganicComponentRegistryLogic',
+    '0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1'
+  );
+  const exists = await registry.componentExists('amanita_muscaria');
+  console.log('amanita_muscaria exists:', exists);
+}
+check();
+"
+
+# Expected: amanita_muscaria exists: true
+
+# ========================================
+# VALIDATION REPORT FORMATS
+# ========================================
+
+# Console format (human-readable, default)
+node scripts/validate_component_upload.js --component amanita_muscaria --network localhost
+
+# JSON format (machine-readable, для CI/CD)
+node scripts/validate_component_upload.js --component amanita_muscaria --network localhost --json \
+  | jq '.qualityScore, .contract.action444_compatible'
+
+# Compact format (только summary)
+node scripts/validate_component_upload.js --component amanita_muscaria --network localhost \
+  | grep -E "Quality Score|Action 444 Compatible|Overall Status"
+
+# ========================================
+# VALIDATION WORKFLOW (полный цикл)
+# ========================================
+
+# 1. Deploy contracts
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full_new.js --network localhost
+
+# 2. Create root invites
+DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full_new.js --network localhost
+
+# 3. Upload components
+DEPLOY_ACTION=555 DEPLOYER_INVITE=<INVITE_1> \
+  npx hardhat run scripts/deploy_full_new.js --network localhost
+
+# 4. VALIDATE COMPONENTS ✅
+for comp in amanita_muscaria blue_lotus lions_mane; do
+  node scripts/validators/validate_component_upload.js --component "$comp" --network localhost \
+    | grep "Action 444 Compatible"
+done
+
+# Expected output:
+#   ✅ COMPATIBLE - Component can be used in product creation
+#   ✅ COMPATIBLE - Component can be used in product creation
+#   ✅ COMPATIBLE - Component can be used in product creation
+
+# 5. If all ✅ → proceed with Action 444
+DEPLOY_ACTION=444 npx hardhat run scripts/deploy_full.js --network localhost
+
+# 6. VALIDATE CATALOG ✅
+node scripts/validators/validate_catalog_upload.js --network localhost --seller iveta --summary
+
+# Expected:
+#   Pipeline Status: ✅ ALL PHASES PASSED
+#   Products Ready: 17/17
+
+# ========================================
+# VALIDATION METRICS
+# ========================================
+
+# Quality Score breakdown:
+#   File System:  15% weight
+#   Arweave:      30% weight
+#   Contract:     35% weight (CRITICAL for Action 444)
+#   State:        20% weight
+#
+# Passing threshold: >= 8.0/10
+
+# Action 444 Compatibility:
+#   ✅ COMPATIBLE:    componentExists(componentId) == true
+#   ❌ INCOMPATIBLE:  componentExists(componentId) == false
+#   ⚠️ UNKNOWN:       Contract not accessible (node down)
+
+# ========================================
+# PROGRAMMATIC USE (в других скриптах)
+# ========================================
+
+# JavaScript/Node.js
+cat << 'EOF' > validate_example.js
+const { validateComponent } = require('./scripts/validators/validate_component_upload.js');
+
+async function checkBeforeAction444() {
+  const components = ['amanita_muscaria', 'blue_lotus', 'lions_mane'];
+  
+  for (const comp of components) {
+    const report = await validateComponent(comp, 'localhost');
+    
+    if (!report.contract.action444_compatible) {
+      console.error(`❌ ${comp} not ready for Action 444`);
+      process.exit(1);
+    }
+    
+    console.log(`✅ ${comp} validated (score: ${report.qualityScore}/10)`);
+  }
+  
+  console.log('✅ All components ready - safe to run Action 444');
+}
+
+checkBeforeAction444();
+EOF
+
+node validate_example.js
+
+# Expected output:
+#   ✅ amanita_muscaria validated (score: 8.3/10)
+#   ✅ blue_lotus validated (score: 8.3/10)
+#   ✅ lions_mane validated (score: 8.3/10)
+#   ✅ All components ready - safe to run Action 444
+
+# ========================================
+# CONTINUOUS VALIDATION (watch mode)
+# ========================================
+
+# Monitor component uploads in real-time
+while true; do
+  clear
+  echo "=== Component Validation Status ($(date +%H:%M:%S)) ==="
+  for comp in data/components/*/; do
+    component=$(basename "$comp")
+    [[ "$component" == "component_features_presets.json" ]] && continue
+    score=$(node scripts/validate_component_upload.js --component "$component" --network localhost 2>&1 \
+      | grep "Quality Score" | awk '{print $3}')
+    echo "$component: $score"
+  done
+  sleep 5
+done
+
+# ========================================
+# E2E VALIDATION SUITE
+# ========================================
+
+# Run all validations in sequence
+bash scripts/validate_e2e.sh
+
+# Custom E2E script:
+cat << 'EOF' > scripts/validate_e2e.sh
+#!/bin/bash
+set -e
+
+echo "=== E2E Validation Suite ==="
+echo ""
+
+echo "1. Validating Components..."
+for comp in amanita_muscaria blue_lotus lions_mane; do
+  node scripts/validate_component_upload.js --component "$comp" --network localhost \
+    | grep -q "✅ PASS" && echo "  ✅ $comp" || echo "  ❌ $comp FAILED"
+done
+
+echo ""
+echo "2. Validating Catalog Pipeline..."
+node scripts/validate_catalog_upload.js --network localhost --seller iveta --summary \
+  | grep -q "ALL PHASES PASSED" && echo "  ✅ Catalog Pipeline" || echo "  ❌ Pipeline FAILED"
+
+echo ""
+echo "3. Checking Contract State..."
+node -e "
+const { ethers } = require('hardhat');
+async function check() {
+  const registry = await ethers.getContractAt('OrganicComponentRegistryLogic', '0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1');
+  const total = await registry.totalComponents();
+  console.log('  Components in contract:', total.toString());
+  if (total >= 11) console.log('  ✅ Contract State'); 
+  else console.log('  ❌ Missing components');
+}
+check();
+"
+
+echo ""
+echo "=== Validation Complete ==="
+EOF
+
+chmod +x scripts/validate_e2e.sh
+

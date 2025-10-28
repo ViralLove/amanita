@@ -1,669 +1,499 @@
-# 🚀 План реализации локализации каталога продуктов
+# AI Development Journal - Amanita Bot
 
-## 📊 Детальный анализ процесса наполнения каталога
+## 📅 2025-10-10: HashiCorp Vault Integration Analysis
 
-**См. полный анализ**: [`@catalog-localization-analysis.md`](tech/catalog-localization-analysis.md)
-
-**Основные выводы**:
-- ✅ Идентифицированы все локализуемые поля в текущем процессе
-- ✅ Создана таблица соответствий: старый процесс → новый процесс
-- ✅ Определены новые компоненты для загрузки (компоненты + продукты)
-- ✅ Спланирован пошаговый процесс создания мультиязычного каталога с нуля
+**Status:** 🔍 Analysis Phase  
+**Cognitive Pattern:** @analysis.mdc (Hard Analysis - Code-based only)  
+**Priority:** 🔴 CRITICAL (Security Enhancement)
 
 ---
 
-## 📋 Текущее состояние
+## 🎯 Task Overview
 
-### ✅ Реализованные компоненты (Этап 1-2)
+**Goal:** Integrate HashiCorp Vault for secure private key storage in `polygon` profile, replacing direct environment variables.
 
-1. **LocalizationService** - универсальный сервис локализации
-2. **ProductLocalizationService** - обработка простых полей продуктов
-3. **ComponentLocalizationService** - обработка сложных полей компонентов
-4. **TranslationCacheService** - 3-уровневое кэширование
-5. **FallbackLocalizationService** - 4-уровневая fallback стратегия
-6. **MultilingualIPFSService** - загрузка переводов из IPFS
-7. **CacheManager** - централизованное управление кэшами
-8. **ProductFormatterService** - частичная интеграция с локализацией
+**Context:**
+- Current: Private keys stored in Railway Variables → риск утечки через код
+- Target: Private keys in HashiCorp Vault → Railway хранит только Vault credentials
+- Scope: `bot/services/core/blockchain.py` + configuration layer
 
-### ❌ Отсутствующие компоненты
+---
 
-1. **AmanitaInternational.sol** - контракт для маппинга лейблов к CID
-2. **Утилиты загрузки** - скрипты для создания мультиязычного каталога
-3. **Полная интеграция** с существующими сервисами
-4. **Тестирование пайплайна** - интеграционные тесты
+## 📊 Current State Analysis (Code-Based)
 
-## 🎯 Структура локализуемых полей
+### 1.1 Configuration Analysis
 
-### Простые поля (1 CID для всех языков)
+**File:** `bot/config.py` (Lines 1-114)
+
+**Current Implementation:**
 ```python
-SIMPLE_FIELDS = {
-    "product.forms": ["powder", "capsules", "tea", "tincture", "extract"],
-    "product.title": "Названия продуктов",
-    "product.species": "Биологические виды", 
-    "description.scientific_name": "Научные названия",
-    "dosage.type": ["dried", "tincture", "extract", "tea"]
-}
+# Lines 51-60
+BLOCKCHAIN_PROFILE = os.getenv("BLOCKCHAIN_PROFILE", "localhost")
+SELLER_PRIVATE_KEY = os.getenv("SELLER_PRIVATE_KEY")
+if not SELLER_PRIVATE_KEY:
+    raise ValueError("SELLER_PRIVATE_KEY не установлен в .env")
+if not SELLER_PRIVATE_KEY.startswith("0x"):
+    SELLER_PRIVATE_KEY = f"0x{SELLER_PRIVATE_KEY}"
 ```
 
-### Сложные поля (1 CID на класс.язык)
+**Findings:**
+- ✅ `BLOCKCHAIN_PROFILE` exists - can be used as conditional flag
+- ✅ `SELLER_PRIVATE_KEY` loaded directly from `os.getenv()`
+- ✅ Validation: checks for `0x` prefix
+- ⚠️ Raises error if not found - needs graceful Vault fallback
+
+**Additional Private Keys Found:**
 ```python
-COMPLEX_FIELDS = {
-    "Description": ["generic_description", "effects", "shamanic", "warnings"],
-    "ComponentDescription": ["generic_description", "effects", "shamanic", "warnings", "features", "dosage_instructions"],
-    "DosageInstruction": ["title", "description"]
-}
+# Line 73
+ARWEAVE_PRIVATE_KEY = os.getenv("ARWEAVE_PRIVATE_KEY")
+
+# Not in config.py but used in contracts deployment (separate concern)
+# DEPLOYER_PRIVATE_KEY - used in scripts/*, not in bot runtime
 ```
 
 ---
 
-## 📅 Этап 0: Трансформация AmanitaInternational в Upgradeable архитектуру (1 неделя)
+### 1.2 Architecture Analysis
 
-### 🎯 Обоснование необходимости Proxy Pattern
+**File:** `bot/services/core/blockchain.py` (Lines 1-896)
 
-**Критический анализ:**
+**Current Usage of Private Keys:**
 
-AmanitaInternational - это **критически важный инфраструктурный контракт** для всей системы локализации:
+```python
+# Line 14, 22: Import from config
+from config import (
+    SELLER_PRIVATE_KEY,
+    RPC_URL,
+    ABI_BASE_DIR,
+    MAGIC_REGISTRY_CONTRACT_ADDRESS
+)
 
-1. **Данные растут постоянно**:
-   - Новые языки добавляются регулярно (украинский, грузинский, турецкий...)
-   - Новые продукты и компоненты создают новые лейблы
-   - Crowdsourcing переводов генерирует новые версии CID
+# Lines 135-139: Initialization
+if not SELLER_PRIVATE_KEY:
+    raise ValueError("SELLER_PRIVATE_KEY не установлен в .env")
+self.seller_key = SELLER_PRIVATE_KEY
+self.seller_account = Account.from_key(SELLER_PRIVATE_KEY)
 
-2. **Бизнес-логика будет эволюционировать**:
-   - Модерация переводов (голосование за качество)
-   - Версионирование переводов (история изменений)
-   - Система репутации переводчиков
-   - Интеграция с governance для валидации переводов
+# Lines 328-394: Transaction signing
+def transact_contract_function(..., private_key: str, ...):
+    account = Account.from_key(private_key)
+    ...
+    signed_txn = self.web3.eth.account.sign_transaction(txn, private_key)
+```
 
-3. **Риски фиксированного контракта**:
-   - ❌ Невозможно добавить новые функции без миграции всех CID
-   - ❌ Потеря всех маппингов при обнаружении критического бага
-   - ❌ Невозможность оптимизировать газ для растущих маппингов
+**Key Methods Using Private Keys:**
+1. `__init__` (Line 119) - initializes `self.seller_account`
+2. `transact_contract_function` (Line 328) - accepts `private_key` parameter
+3. `activate_invite` (Line 428) - passes private key to transact
+4. `mint_invite` (Line 552) - uses `self.seller_key`
+5. `grant_seller_role` (Line 576) - uses private key parameter
+6. `create_product` (Line 677) - uses `self.seller_key`
+7. `set_product_active` (Line 726) - accepts private key parameter
 
-**Решение:** Использовать UUPS (Universal Upgradeable Proxy Standard) для обеспечения эволюции контракта без потери данных.
-
----
-
-### Задача 0.1: Архитектурный анализ и планирование
-
-**Постановка задачи:**
-Провести глубокий анализ AmanitaInternational и спланировать его трансформацию в upgradeable контракт.
-
-**Критерии приемки:**
-- ✅ Определены критические данные для сохранения (маппинги CID)
-- ✅ Определена бизнес-логика для обновления (функции управления)
-- ✅ Создана схема разделения Storage/Logic
-- ✅ Определены будущие функции для V2 (модерация, версионирование)
-- ✅ Создан детальный план трансформации
-
-**Что анализировать:**
-- Какие данные абсолютно критичны (маппинги CID)
-- Какие функции могут меняться (управление, валидация)
-- Какие интеграции необходимы (AmanitaRegistry, IPFS)
-- Какие будущие функции потребуются (crowdsourcing, модерация)
-
-**Файлы:**
-- `contracts/docs/AmanitaInternational-Proxy-Architecture.md`
-- `bot/docs/AIJournal.md` (обновление)
+**Pattern:**
+- `self.seller_key` stored as instance variable
+- Some methods accept `private_key` as parameter (flexible)
+- Some methods use `self.seller_key` directly (fixed seller context)
 
 ---
 
-### Задача 0.2: Создание AmanitaInternationalV2 (Upgradeable)
+### 1.3 Dependency Analysis
 
-**Постановка задачи:**
-Трансформировать существующий AmanitaInternational в upgradeable контракт с использованием UUPS паттерна.
+**ArWeave Service:** `bot/services/core/storage/ar_weave.py` (Line 16)
+```python
+from config import SUPABASE_URL, SUPABASE_ANON_KEY, ARWEAVE_PRIVATE_KEY
+```
 
-**Критерии приемки:**
-- ✅ Контракт наследует `Initializable`, `AccessControlUpgradeable`, `UUPSUpgradeable`
-- ✅ Все маппинги сохранены без изменений (storage layout)
-- ✅ Функция `initialize()` заменяет `constructor()`
-- ✅ Функция `_authorizeUpgrade()` реализована с проверкой ADMIN_ROLE
-- ✅ Все существующие функции работают идентично
-- ✅ Добавлено версионирование (VERSION, UPGRADE_VERSION)
-
-**Что тестировать:**
-- Инициализация контракта с правильными ролями
-- Авторизация обновлений (только ADMIN_ROLE)
-- Сохранность всех данных после обновления
-- Корректность storage layout (нет коллизий)
-- Все функции из V1 работают корректно
-
-**Файлы:**
-- `contracts/AmanitaInternationalV2.sol` (новый upgradeable контракт)
-- `contracts/tests/AmanitaInternationalV2.upgrade.test.js`
+**Import Chain:**
+```
+config.py (loads from env)
+    ↓
+blockchain.py (imports SELLER_PRIVATE_KEY)
+    ↓
+BlockchainService.__init__ (creates Account)
+    ↓
+Various transaction methods (use private_key)
+```
 
 ---
 
-### Задача 0.3: Деплой и инициализация Proxy
+## 🏗️ Architecture Design
 
-**Постановка задачи:**
-Задеплоить AmanitaInternationalV2 через UUPS Proxy и интегрировать с AmanitaRegistry.
+### 2.1 Vault Service Design
 
-**Критерии приемки:**
-- ✅ Proxy задеплоен с правильной инициализацией
-- ✅ Implementation V2 задеплоен и привязан к Proxy
-- ✅ Proxy зарегистрирован в AmanitaRegistry как "AmanitaInternational"
-- ✅ Все роли назначены корректно
-- ✅ Адрес Proxy сохранен в `.env` как `AMANITA_INTERNATIONAL_ADDRESS`
+**New File:** `bot/services/core/vault_service.py`
 
-**Что тестировать:**
-- Деплой Proxy и Implementation в локальную сеть
-- Инициализация через Proxy
-- Вызов функций через Proxy
-- Регистрация в AmanitaRegistry
-- Корректность адресов в `.env`
+**Requirements:**
+1. Connect to HashiCorp Vault using `VAULT_ADDR` and `VAULT_TOKEN`
+2. Read secrets from specified path `VAULT_PATH`
+3. Provide synchronous interface (bot is sync-first)
+4. Handle errors gracefully (fallback to env vars for localhost)
+5. Cache secrets in memory (avoid repeated API calls)
 
-**Файлы:**
-- `scripts/deploy_full.js` (добавить action для деплоя)
-- `scripts/upgrade_amanita_international.js` (скрипт обновления)
-- `.env` (добавить `AMANITA_INTERNATIONAL_ADDRESS`)
-
----
-
-### Задача 0.4: Тестирование процесса обновления
-
-**Постановка задачи:**
-Создать полноценные тесты для процесса обновления контракта с V2 на V3.
-
-**Критерии приемки:**
-- ✅ Тест обновления контракта через `upgradeToAndCall()`
-- ✅ Проверка сохранности данных после обновления
-- ✅ Проверка авторизации (только ADMIN_ROLE)
-- ✅ Проверка работы новых функций в V3
-- ✅ Проверка что старые функции работают после обновления
-
-**Что тестировать:**
-- Деплой V2 → установка данных → обновление до V3
-- Сохранность маппингов `simpleFieldCIDs` и `complexFieldCIDs`
-- Авторизация обновления (неавторизованные не могут обновить)
-- Новые функции V3 работают корректно
-- Интеграция с AmanitaRegistry после обновления
-
-**Файлы:**
-- `contracts/AmanitaInternationalV3.sol` (mock V3 для тестов)
-- `contracts/tests/AmanitaInternational.upgrade.test.js`
+**Interface Design:**
+```python
+class VaultService:
+    """Service for retrieving secrets from HashiCorp Vault"""
+    
+    def __init__(self, vault_addr: str, vault_token: str, vault_path: str):
+        """Initialize Vault client"""
+        
+    def get_secret(self, key: str) -> Optional[str]:
+        """Get single secret by key"""
+        
+    def get_all_secrets(self) -> Dict[str, str]:
+        """Get all secrets from vault path"""
+        
+    def is_available(self) -> bool:
+        """Check if Vault is available"""
+```
 
 ---
 
-### Задача 0.5: Документация Proxy Architecture
+### 2.2 Configuration Layer Modification
 
-**Постановка задачи:**
-Создать полную документацию по upgradeable архитектуре AmanitaInternational.
+**File:** `bot/config.py`
 
-**Критерии приемки:**
-- ✅ Описание UUPS паттерна для AmanitaInternational
-- ✅ Схемы разделения Storage/Logic
-- ✅ Процедуры обновления контракта
-- ✅ Emergency procedures (что делать при проблемах)
-- ✅ Roadmap будущих версий (V3, V4)
+**New Configuration Variables:**
+```python
+# Vault configuration (only for polygon profile)
+VAULT_ADDR = os.getenv("VAULT_ADDR")  # https://vault.company.com
+VAULT_TOKEN = os.getenv("VAULT_TOKEN")  # hvs.xxxxx
+VAULT_PATH = os.getenv("VAULT_PATH", "secret/amanita")  # path in Vault
 
-**Файлы:**
-- `contracts/docs/AmanitaInternational-Proxy-Architecture.md`
-- `contracts/docs/AmanitaInternational-Upgrade-Guide.md`
+USE_VAULT = BLOCKCHAIN_PROFILE == "polygon" and VAULT_ADDR and VAULT_TOKEN
+```
 
----
-
-## 📅 Этап 1: Создание смарт-контракта AmanitaInternational (переименовано из Этап 3)
-
-### ✅ Задача 3.1: Разработка контракта - ЗАВЕРШЕНО (2025-10-01)
-
-**Результаты тестирования:**
-- ✅ **33/33 тестов успешно** (100% успешность)
-- ✅ Время выполнения: ~969ms
-- ✅ Gas efficiency: Batch операции экономят **24.10% газа**
-- ✅ Покрытие всех критических путей
-- ✅ Соответствие @test-qualification.mdc: **100%**
-
-**Реализованные функции:**
-- ✅ `setSimpleFieldCID` / `getSimpleFieldCID` + batch операции
-- ✅ `setComplexFieldCID` / `getComplexFieldCID` + batch операции
-- ✅ `removeSimpleField` / `removeComplexField`
-- ✅ `getAllSimpleFields` / `getAllComplexClasses` / `getComplexFieldLanguages`
-- ✅ `simpleFieldExist` / `complexFieldExist`
-- ✅ `getStatistics`
-- ✅ Роли: ADMIN_ROLE, DEFAULT_ADMIN_ROLE
-- ✅ События: SimpleFieldRegistered, ComplexFieldRegistered, SimpleFieldRemoved, ComplexFieldRemoved
-
-**Файлы:**
-- ✅ `contracts/AmanitaInternational.sol` (372 строки)
-- ✅ `contracts/tests/AmanitaInternational.test.js` (743 строки, 33 теста)
-- ✅ `contracts/docs/AmanitaInternational-test-analysis.md`
+**Modified Key Loading Logic:**
+```python
+if USE_VAULT:
+    # Load from Vault
+    from services.core.vault_service import VaultService
+    vault = VaultService(VAULT_ADDR, VAULT_TOKEN, VAULT_PATH)
+    
+    SELLER_PRIVATE_KEY = vault.get_secret("seller_private_key")
+    if not SELLER_PRIVATE_KEY:
+        raise ValueError("SELLER_PRIVATE_KEY не найден в Vault")
+        
+    ARWEAVE_PRIVATE_KEY = vault.get_secret("arweave_private_key")
+    # Note: can be None, ArWeave is optional
+else:
+    # Load from environment (localhost profile)
+    SELLER_PRIVATE_KEY = os.getenv("SELLER_PRIVATE_KEY")
+    if not SELLER_PRIVATE_KEY:
+        raise ValueError("SELLER_PRIVATE_KEY не установлен")
+        
+    ARWEAVE_PRIVATE_KEY = os.getenv("ARWEAVE_PRIVATE_KEY")
+```
 
 ---
 
-### ✅ Задача 1.1: Разработка базового контракта - ЗАВЕРШЕНО (2025-10-01)
-*(Переименовано из Задачи 3.1)*
+### 2.3 Integration Points
 
-**Примечание:** Это был базовый не-upgradeable контракт для первичного тестирования архитектуры. В Этапе 0 мы трансформируем его в upgradeable версию.
+**Unchanged Components:**
+- ✅ `blockchain.py` - no changes needed, imports from `config`
+- ✅ `ar_weave.py` - no changes needed, imports from `config`
+- ✅ All other services - transparent to Vault integration
 
----
+**Changed Components:**
+- 🔄 `config.py` - conditional key loading logic
+- ➕ `vault_service.py` - new service (to be created)
 
-### Задача 1.2: Интеграция контракта с деплой скриптом
-**Постановка задачи:**
-Добавить AmanitaInternational в процесс деплоя и инициализировать с начальными данными.
+**Environment Variables (Railway):**
 
-**Критерии приемки:**
-- ✅ Контракт добавлен в `deploy_full.js`
-- ✅ Контракт инициализируется с корректными ролями
-- ✅ Адрес контракта сохраняется в переменные окружения
-- ✅ Создан отдельный action для обновления маппингов переводов
+**Before (Current - INSECURE):**
+```bash
+BLOCKCHAIN_PROFILE=polygon
+SELLER_PRIVATE_KEY=0xYOUR_ACTUAL_KEY  # ❌ Exposed in Railway
+ARWEAVE_PRIVATE_KEY={"kty":"RSA"...}  # ❌ Exposed in Railway
+```
 
-**Что тестировать:**
-- Деплой в локальную тестовую сеть
-- Проверка корректности адресов в `.env`
-- Проверка прав доступа после деплоя
+**After (Target - SECURE):**
+```bash
+BLOCKCHAIN_PROFILE=polygon
+VAULT_ADDR=https://vault.hashicorp.cloud/...
+VAULT_TOKEN=hvs.xxxxx  # ✅ Read-only token
+VAULT_PATH=secret/amanita
 
-**Файлы:**
-- `scripts/deploy_full.js`
-- `scripts/config/deploy_config.js`
-
----
-
-### Задача 1.3: Python-интеграция с контрактом
-**Постановка задачи:**
-Создать Python-сервис для взаимодействия с AmanitaInternational.sol.
-
-**Критерии приемки:**
-- ✅ Создан `InternationalService` в `bot/services/blockchain/`
-- ✅ Методы для получения CID по лейблу (`get_simple_field_cid`, `get_complex_field_cid`)
-- ✅ Методы для установки CID (только для админов)
-- ✅ Кэширование запросов к контракту
-- ✅ Обработка ошибок при недоступности блокчейна
-
-**Что тестировать:**
-- Unit тесты с мокированием web3
-- Тесты кэширования запросов
-- Тесты обработки ошибок (недоступность сети, неверный CID)
-- Интеграционные тесты с тестовым контрактом
-
-**Файлы:**
-- `bot/services/blockchain/international_service.py`
-- `bot/tests/test_international_service.py`
+# ❌ Remove these from Railway:
+# SELLER_PRIVATE_KEY
+# ARWEAVE_PRIVATE_KEY
+```
 
 ---
 
-## 📅 Этап 2: Утилиты для создания мультиязычного каталога (2 недели)
+## 📋 Implementation Tasks
 
-### Задача 2.1: Подготовка структуры переводов
-**Постановка задачи:**
-Создать утилиту для конвертации существующих данных каталога в мультиязычный формат JSON.
+### ✅ Phase 1: Vault Service Creation [COMPLETED 2025-10-10]
+**File:** `bot/services/vault_service.py`
 
-**Критерии приемки:**
-- ✅ Скрипт `prepare_multilingual_data.py` создает JSON для простых полей
-- ✅ Скрипт создает JSON для сложных полей
-- ✅ Все JSON соответствуют архитектурной спецификации
-- ✅ Валидация структуры JSON перед сохранением
-- ✅ Поддержка fallback на русский для отсутствующих переводов
+**Dependencies:**
+```bash
+pip install hvac>=2.1.0  # Official HashiCorp Vault Python client
+```
 
-**Что тестировать:**
-- Корректность структуры JSON для простых полей
-- Корректность структуры JSON для сложных полей
-- Валидация обязательных полей (label, type, version, timestamp, author)
-- Проверка всех 15 поддерживаемых языков
-- Обработка отсутствующих переводов (fallback)
+**Implementation:**
+- [x] Create `VaultService` class
+- [x] Implement `__init__` with connection logic
+- [x] Implement `get_secret` method
+- [x] Implement `get_all_secrets` method
+- [x] Add error handling and logging
+- [x] Add healthcheck method
+- [x] Add connection validation (fail-fast)
+- [ ] Add in-memory caching (future enhancement)
+- [ ] Add connection retry logic (future enhancement)
 
-**Файлы:**
-- `bot/utility/prepare_multilingual_data.py`
-- `bot/tests/test_prepare_multilingual_data.py`
-- `bot/data/translations/simple/` (выходная директория)
-- `bot/data/translations/complex/` (выходная директория)
-
-**Входные данные:**
-- `bot/catalog/active_catalog.json` - текущий каталог
-- `bot/catalog/organic_descriptions.json` - описания биоединиц
-- `bot/templates/ru.json`, `bot/templates/en.json` - существующие переводы интерфейса
+**Result:** 367 lines, fully functional VaultService with comprehensive error handling
 
 ---
 
-### Задача 2.2: Загрузка переводов в IPFS
-**Постановка задачи:**
-Создать утилиту для загрузки мультиязычных JSON в IPFS и сохранения маппингов.
+### ✅ Phase 2: Config Modification [COMPLETED 2025-10-10]
+**File:** `bot/config.py`
 
-**Критерии приемки:**
-- ✅ Скрипт `upload_multilingual_translations.py` загружает все JSON в IPFS
-- ✅ Создается маппинг `translation_cid_mapping.json` с лейблами и CID
-- ✅ Разделение на простые и сложные поля в маппинге
-- ✅ Валидация CID после загрузки
-- ✅ Логирование процесса загрузки
+**Changes:**
+- [x] Add DEPLOYMENT_PROFILE variable
+- [x] Add Vault import (with graceful fallback)
+- [x] Add `_load_secrets_from_vault()` helper function
+- [x] Refactor `SELLER_PRIVATE_KEY` loading with if/else by profile
+- [x] Refactor `ARWEAVE_PRIVATE_KEY` loading with if/else by profile
+- [x] Add logging for which source is used (env vs Vault)
+- [x] Ensure backward compatibility (localhost profile unchanged)
 
-**Что тестировать:**
-- Успешная загрузка всех JSON файлов
-- Корректность CID в маппинге
-- Доступность загруженных файлов в IPFS
-- Обработка ошибок загрузки (retry механизм)
-- Валидация структуры маппинга
+**Validation:**
+- [x] Test script created: `validate_vault_integration.py`
+- [x] Localhost profile validated (uses env vars as before)
+- [x] Polygon profile validated (fails gracefully without Vault)
 
-**Файлы:**
-- `bot/utility/upload_multilingual_translations.py`
-- `bot/tests/test_upload_multilingual_translations.py`
-- `bot/data/translation_cid_mapping.json` (выходной файл)
-
-**Зависимости:**
-- IPFSFactory для абстракции хранилища
-- TranslationCacheService для кэширования
+**Result:** +70 lines, profile-based configuration with backward compatibility
 
 ---
 
-### Задача 2.3: Регистрация переводов в контракте
-**Постановка задачи:**
-Создать утилиту для регистрации CID переводов в AmanitaInternational.sol.
+### 📋 Phase 3: Railway Configuration [USER ACTION REQUIRED]
+**Railway Dashboard:**
 
-**Критерии приемки:**
-- ✅ Скрипт `register_translations.py` читает маппинг и обновляет контракт
-- ✅ Batch-обновления для оптимизации газа
-- ✅ Проверка прав доступа перед выполнением транзакций
-- ✅ Логирование всех транзакций
-- ✅ Механизм восстановления при сбоях
+**Add New Variables:**
+- [ ] `DEPLOYMENT_PROFILE=polygon` - Enable Vault for production
+- [ ] `VAULT_ADDR` - Vault server URL (from HCP Vault cluster)
+- [ ] `VAULT_TOKEN` - Read-only access token
+- [ ] `VAULT_PATH` - Path to secrets (default: `secret/data/amanita`)
 
-**Что тестировать:**
-- Успешная регистрация всех простых полей
-- Успешная регистрация всех сложных полей
-- Корректность batch-транзакций
-- Обработка ошибок транзакций
-- Проверка событий контракта после регистрации
+**Remove Old Variables (after validation):**
+- [ ] ~~`SELLER_PRIVATE_KEY`~~ → Move to Vault
+- [ ] ~~`ARWEAVE_PRIVATE_KEY`~~ → Move to Vault
 
-**Файлы:**
-- `bot/utility/register_translations.py`
-- `bot/tests/test_register_translations.py`
+**Migration Steps:**
+1. Create secrets in Vault first (Phase 4)
+2. Add Vault variables to Railway
+3. Deploy new code
+4. Test that keys are loaded from Vault
+5. Only then remove old variables
 
-**Зависимости:**
-- InternationalService для взаимодействия с контрактом
-- Web3 для выполнения транзакций
+**Documentation:** See `docs/VAULT_RAILWAY_SETUP.md` for detailed instructions
 
 ---
 
-### Задача 2.4: Обновление prepare_products_for_registry.py
-**Постановка задачи:**
-Интегрировать поддержку локализации в существующий процесс подготовки продуктов.
+### 📋 Phase 4: Vault Setup (External) [USER ACTION REQUIRED]
+**HashiCorp Vault Cloud:**
 
-**Критерии приемки:**
-- ✅ Скрипт не создает локализованные поля в метаданных продукта
-- ✅ Продукты содержат только ссылки на `business_id` и `biounit_id`
-- ✅ Локализация загружается через `AmanitaInternational.sol`
-- ✅ Обратная совместимость со старыми продуктами
-- ✅ Документация обновлена
+**Setup Steps:**
+1. [ ] Create HCP Vault cluster
+2. [ ] Enable KV v2 secrets engine
+3. [ ] Create secrets at `secret/amanita`:
+   - [ ] `SELLER_PRIVATE_KEY = "0x..."`
+   - [ ] `ARWEAVE_PRIVATE_KEY = "{...}"`
+4. [ ] Create read-only policy `amanita-bot-readonly`
+5. [ ] Generate service token with policy
 
-**Что тестировать:**
-- Корректность структуры product JSON без локализованных полей
-- Проверка что локализация работает через контракт
-- Обратная совместимость с существующими продуктами
-- Интеграционный тест полного пайплайна
+**Secrets Structure:**
+```
+secret/amanita/
+├── SELLER_PRIVATE_KEY = "0x..."
+├── ARWEAVE_PRIVATE_KEY = "{\"kty\":\"RSA\"...}"
+└── (future: DEPLOYER_PRIVATE_KEY for scripts)
+```
 
-**Файлы:**
-- `bot/utility/prepare_products_for_registry.py` (обновление)
-- `bot/tests/test_prepare_products_for_registry.py`
+**Access Policy:**
+```hcl
+# Read-only policy for bot
+path "secret/data/amanita" {
+  capabilities = ["read"]
+}
 
----
+path "secret/metadata/amanita" {
+  capabilities = ["list", "read"]
+}
+```
 
-## 📅 Этап 3: Полная интеграция с форматтерами (1 неделя)
+**Token Requirements:**
+- ✅ Read-only access to `secret/data/amanita`
+- ✅ TTL >= 30 days or renewable
+- ❌ No write/delete permissions
 
-### Задача 3.1: Завершение интеграции ProductFormatterService
-**Постановка задачи:**
-Полностью интегрировать LocalizationService в методы форматирования продуктов.
-
-**Критерии приемки:**
-- ✅ Метод `format_product_for_telegram` использует локализацию для всех полей
-- ✅ Метод `format_main_info` локализует название и формы
-- ✅ Метод `format_detailed_description` локализует описания компонентов
-- ✅ Fallback на русский при отсутствии перевода
-- ✅ Кэширование локализованных строк
-
-**Что тестировать:**
-- Корректность локализации для всех поддерживаемых языков
-- Fallback на русский при отсутствии перевода
-- Кэширование повторных запросов
-- Производительность форматирования (должна быть < 100ms)
-- Корректность форматирования с emoji и markdown
-
-**Файлы:**
-- `bot/handlers/common/formatting/product_formatter_service.py` (обновление)
-- `bot/tests/test_product_formatter_service.py` (обновление)
+**Documentation:** See `docs/VAULT_SETUP.md` for detailed instructions
 
 ---
 
-### Задача 3.2: Интеграция с CatalogService
-**Постановка задачи:**
-Обновить CatalogService для использования LocalizationService при отправке каталога.
+## 🔒 Security Improvements
 
-**Критерии приемки:**
-- ✅ `send_catalog` использует LocalizationService для названий категорий
-- ✅ `send_product_details` локализует все поля продукта
-- ✅ Кэширование локализованных каталогов по языку
-- ✅ Предзагрузка переводов при инициализации
-- ✅ Обработка ошибок локализации без блокировки UI
+### Current (Before):
+```
+Railway Variables
+├── SELLER_PRIVATE_KEY = "0xREAL_KEY"  ❌
+├── ARWEAVE_PRIVATE_KEY = "{...}"     ❌
+└── (риск утечки через console.log, error.stack)
+```
 
-**Что тестировать:**
-- Корректность локализации каталога для всех языков
-- Кэширование локализованных каталогов
-- Предзагрузка переводов при старте бота
-- Обработка ошибок IPFS (fallback на кэш)
-- Производительность отправки каталога
+### Target (After):
+```
+Railway Variables                      HashiCorp Vault
+├── VAULT_ADDR = "https://..."    →   secret/amanita/
+├── VAULT_TOKEN = "hvs.xxx"       →   ├── seller_private_key
+└── VAULT_PATH = "secret/amanita" →   └── arweave_private_key
+    ✅ Только credentials               ✅ Actual secrets
+```
 
-**Файлы:**
-- `bot/services/application/catalog/catalog_service.py` (обновление)
-- `bot/tests/test_catalog_service.py` (обновление)
-
----
-
-### Задача 3.3: Интеграция с ProductService
-**Постановка задачи:**
-Обновить ProductService для локализации детальной информации о продукте.
-
-**Критерии приемки:**
-- ✅ `get_product_details` локализует все поля
-- ✅ `get_component_description` использует ComponentLocalizationService
-- ✅ Lazy loading переводов для компонентов
-- ✅ Агрессивное кэширование описаний компонентов
-- ✅ Метрики использования локализации
-
-**Что тестировать:**
-- Корректность локализации детальной информации
-- Lazy loading переводов компонентов
-- Агрессивное кэширование (hit rate > 80%)
-- Метрики использования (логирование запросов)
-- Производительность загрузки детальной информации
-
-**Файлы:**
-- `bot/services/application/catalog/product_service.py` (обновление)
-- `bot/tests/test_product_service.py` (обновление)
+**Benefits:**
+- ✅ Private keys НЕ в Railway → no risk via UI/API
+- ✅ Railway compromised ≠ keys compromised (need Vault token + addr)
+- ✅ Vault token can be rotated independently
+- ✅ Audit log in Vault (who accessed what, when)
+- ✅ Centralized secret management
+- ✅ Easy to rotate keys (update in Vault → restart bot)
 
 ---
 
-## 📅 Этап 4: Интеграционное тестирование (1 неделя)
+## ⚠️ Risk Analysis
 
-### Задача 4.1: Тестирование полного пайплайна
-**Постановка задачи:**
-Создать интеграционные тесты для проверки работы всей системы локализации.
+### Implementation Risks:
 
-**Критерии приемки:**
-- ✅ Тест полного flow: от блокчейна до Telegram
-- ✅ Тест кэширования на всех уровнях
-- ✅ Тест fallback стратегии
-- ✅ Тест производительности (latency < 200ms)
-- ✅ Тест обработки ошибок
+**Risk 1: Vault Unavailable**
+- **Impact:** Bot cannot start or perform transactions
+- **Mitigation:** Add connection retry with exponential backoff
+- **Fallback:** Keep error message clear, suggest checking Vault status
 
-**Что тестировать:**
-- Полный flow получения локализованного продукта
-- Кэширование на всех уровнях (Memory, File, IPFS)
-- Fallback стратегия (4 уровня)
-- Производительность под нагрузкой
-- Обработка ошибок IPFS, блокчейна, кэша
+**Risk 2: Invalid Token**
+- **Impact:** Cannot read secrets, bot fails to start
+- **Mitigation:** Validate token on startup, fail fast with clear error
+- **Monitoring:** Alert on token expiration
 
-**Файлы:**
-- `bot/tests/integration/test_localization_pipeline.py`
-- `bot/tests/integration/test_localization_performance.py`
-- `bot/tests/integration/test_localization_errors.py`
+**Risk 3: Network Latency**
+- **Impact:** Slower bot startup (need to fetch secrets)
+- **Mitigation:** Cache secrets in memory after first fetch
+- **Optimization:** Fetch all secrets at once (not per-key)
 
----
-
-### Задача 4.2: Тестирование в тестовой сети
-**Постановка задачи:**
-Развернуть полный стек в тестовой сети и проверить работу с реальным блокчейном.
-
-**Критерии приемки:**
-- ✅ Контракт AmanitaInternational задеплоен в тестовую сеть
-- ✅ Переводы загружены в IPFS и зарегистрированы в контракте
-- ✅ Telegram бот работает с локализацией
-- ✅ Все метрики в пределах нормы
-- ✅ Документация обновлена
-
-**Что тестировать:**
-- Деплой контракта в тестовую сеть
-- Загрузка переводов в IPFS
-- Регистрация CID в контракте
-- Работа Telegram бота с локализацией
-- Мониторинг производительности и ошибок
-
-**Файлы:**
-- `scripts/deploy_testnet.sh`
-- `bot/tests/integration/test_testnet_deployment.py`
+**Risk 4: Breaking Localhost Development**
+- **Impact:** Developers cannot run bot locally
+- **Mitigation:** Strict conditional - only use Vault if `BLOCKCHAIN_PROFILE=polygon`
+- **Documentation:** Clear setup instructions for both modes
 
 ---
 
-### Задача 4.3: Валидация данных и качества переводов
-**Постановка задачи:**
-Создать утилиту для валидации качества переводов и полноты покрытия.
+## 📊 Verification Checklist
 
-**Критерии приемки:**
-- ✅ Скрипт `validate_translations.py` проверяет наличие всех ключей
-- ✅ Проверка качества переводов (нет пустых строк, минимальная длина)
-- ✅ Статистика покрытия по языкам
-- ✅ Отчет о недостающих переводах
-- ✅ Автоматическая проверка в CI/CD
+### Configuration Verification:
+- [ ] `BLOCKCHAIN_PROFILE` read correctly from env
+- [ ] `USE_VAULT` conditional works as expected
+- [ ] Vault variables present when profile=polygon
+- [ ] Environment variables used when profile=localhost
 
-**Что тестировать:**
-- Валидация структуры JSON переводов
-- Проверка обязательных ключей
-- Проверка качества переводов (длина, символы)
-- Статистика покрытия по языкам
-- Генерация отчета о проблемах
+### Functional Verification:
+- [ ] Bot starts successfully (polygon profile + Vault)
+- [ ] Bot starts successfully (localhost profile + env vars)
+- [ ] Private keys loaded correctly from Vault
+- [ ] `BlockchainService` initializes with Vault keys
+- [ ] Transactions can be signed with Vault keys
+- [ ] ArWeave operations work with Vault key
 
-**Файлы:**
-- `bot/utility/validate_translations.py`
-- `bot/tests/test_validate_translations.py`
-- `.github/workflows/validate_translations.yml` (CI/CD)
-
----
-
-## 📅 Этап 5: Документация и финализация (3 дня)
-
-### Задача 5.1: Обновление технической документации
-**Постановка задачи:**
-Обновить всю техническую документацию для отражения новой архитектуры локализации.
-
-**Критерии приемки:**
-- ✅ `Localization-architecture.md` содержит полное описание
-- ✅ `product-catalog-population.md` обновлен с учетом локализации
-- ✅ Создан `Multilingual-catalog-guide.md` с инструкциями
-- ✅ Все диаграммы обновлены
-- ✅ Примеры кода актуальны
-
-**Файлы:**
-- `bot/docs/tech/service/Localization-architecture.md` (обновление)
-- `bot/docs/product/product-catalog-population.md` (обновление)
-- `bot/docs/product/Multilingual-catalog-guide.md` (новый)
+### Security Verification:
+- [ ] No private keys in Railway Variables
+- [ ] Vault credentials have read-only access
+- [ ] Vault logs show access from bot
+- [ ] No keys logged in Railway logs
+- [ ] Error messages don't expose keys
 
 ---
 
-### Задача 5.2: Создание руководства для продавцов
-**Постановка задачи:**
-Создать понятное руководство для продавцов по добавлению мультиязычных продуктов.
+## 🎓 Learning Points
 
-**Критерии приемки:**
-- ✅ Пошаговая инструкция по подготовке переводов
-- ✅ Примеры JSON для всех типов полей
-- ✅ Руководство по загрузке в IPFS
-- ✅ FAQ по типичным проблемам
-- ✅ Видео-инструкция (опционально)
+### From Code Analysis:
 
-**Файлы:**
-- `bot/docs/guides/Seller-localization-guide.md` (новый)
-- `bot/docs/guides/Translation-examples.md` (новый)
+**Pattern 1: Centralized Configuration**
+- ✅ All config in `config.py` - good separation of concerns
+- ✅ Import pattern allows transparent switching (env → Vault)
+- ✅ Services don't need to know about Vault existence
 
----
+**Pattern 2: Private Key Flexibility**
+- ✅ Some methods accept `private_key` parameter (flexible)
+- ✅ Some methods use `self.seller_key` (fixed context)
+- 💡 Design allows future multi-wallet support
 
-### Задача 5.3: Миграция существующих продуктов
-**Постановка задачи:**
-Мигрировать все существующие продукты на новую систему локализации.
+**Pattern 3: Singleton Service**
+- ✅ `BlockchainService` is singleton - initialized once
+- ✅ Vault fetch only happens once at startup
+- ✅ No repeated Vault calls during runtime
 
-**Критерии приемки:**
-- ✅ Скрипт `migrate_existing_products.py` конвертирует старые продукты
-- ✅ Все продукты мигрированы без потери данных
-- ✅ Обратная совместимость обеспечена
-- ✅ Rollback механизм при ошибках
-- ✅ Отчет о миграции
-
-**Что тестировать:**
-- Корректность конвертации старых продуктов
-- Отсутствие потери данных
-- Обратная совместимость
-- Rollback при ошибках
-- Валидация мигрированных продуктов
-
-**Файлы:**
-- `bot/utility/migrate_existing_products.py`
-- `bot/tests/test_migrate_existing_products.py`
+### Dependencies Found:
+```
+hvac==1.2.1  # Official HashiCorp Vault client
+    ├── requests>=2.27.0  # Already in project
+    └── pyhcl>=0.4.4      # HCL parser (not needed for client usage)
+```
 
 ---
 
-## 📊 Метрики успеха
+## 📝 Next Steps
 
-### Производительность
-- ✅ Latency получения локализованного продукта < 200ms
-- ✅ Hit rate кэша > 80%
-- ✅ Время загрузки каталога < 2 секунд
-- ✅ Поддержка 1000+ одновременных пользователей
+### Immediate (Today):
+1. ✅ Complete this analysis document
+2. ⏳ Create `vault_service.py` implementation
+3. ⏳ Write unit tests for `VaultService`
+4. ⏳ Modify `config.py` with conditional logic
 
-### Качество
-- ✅ Покрытие кода тестами > 85%
-- ✅ Все интеграционные тесты проходят
-- ✅ Нет критических ошибок в production
-- ✅ Fallback работает в 100% случаев
+### Short-term (This Week):
+5. ⏳ Set up HashiCorp Vault Cloud account
+6. ⏳ Create secrets in Vault
+7. ⏳ Generate read-only token
+8. ⏳ Test integration end-to-end (localhost → dev Vault)
 
-### Функциональность
-- ✅ Поддержка всех 15 языков
-- ✅ Все поля продуктов локализованы
-- ✅ Кэширование работает на всех уровнях
-- ✅ Мониторинг и метрики настроены
-
----
-
-## 🎯 Общий статус прогресса
-
-### Инфраструктура (завершена ранее)
-- **Подготовка инфраструктуры (Python)** - ✅ Завершена (100%)
-- **Реализация сервисов локализации (Python)** - ✅ Завершена (100%)
-
-### Текущий план (Blockchain + Integration)
-- **Этап 0: Upgradeable архитектура** - ❌ Не начат (0%)
-- **Этап 1: Базовый контракт** - ✅ Завершен (100%)
-  - ✅ Задача 1.1: AmanitaInternational.sol - ЗАВЕРШЕНО
-  - ❌ Задача 1.2: Интеграция с deploy_full.js
-  - ❌ Задача 1.3: Python InternationalService
-- **Этап 2: Утилиты загрузки** - ❌ Не начат (0%)
-- **Этап 3: Полная интеграция** - ⚠️ Частично (20%)
-- **Этап 4: Интеграционное тестирование** - ❌ Не начат (0%)
-- **Этап 5: Документация и финализация** - ⚠️ Частично (50%)
-
-**Общий прогресс: 38% завершено**
+### Before Production:
+9. ⏳ Add Vault variables to Railway
+10. ⏳ Deploy to Railway staging
+11. ⏳ Verify bot startup with Vault
+12. ⏳ Test transactions on polygon testnet
+13. ⏳ Remove old private key variables from Railway
+14. ⏳ Update documentation
 
 ---
 
-## 🚀 Следующие действия
+## 📚 References
 
-### 🔴 **КРИТИЧЕСКИЙ ПРИОРИТЕТ**
-1. **Этап 0: Upgradeable архитектура** (ОБЯЗАТЕЛЬНО до начала Этапа 2)
-   - Трансформация в AmanitaInternationalV2
-   - Деплой через UUPS Proxy
-   - Тестирование процесса обновления
+### Code Files Analyzed:
+- `bot/config.py` (lines 1-114) - configuration layer
+- `bot/services/core/blockchain.py` (lines 1-896) - blockchain service
+- `bot/services/core/storage/ar_weave.py` (line 16) - ArWeave key usage
 
-**Обоснование:** Без upgradeable архитектуры мы рискуем потерять все CID маппинги при необходимости обновления контракта. Это критично для долгосрочной эволюции системы локализации.
+### External Documentation:
+- HashiCorp Vault Python Client: https://hvac.readthedocs.io/
+- Vault KV Secrets Engine: https://developer.hashicorp.com/vault/docs/secrets/kv
+- Best Practices: https://developer.hashicorp.com/vault/tutorials/recommended-patterns
 
-### 📋 **После Этапа 0**
-2. **Завершить Этап 1** - интеграция с deploy_full.js и Python
-3. **Параллельно**: Этап 2 (утилиты) + Этап 3 (интеграция)
-4. **Этап 4** - тестирование
-5. **Этап 5** - финализация
+### Related Security Docs:
+- `SECURITY_SUMMARY.md` - Overall security analysis
+- `RAILWAY_SECURITY_REAL.md` - Railway variables vs external secrets
+- `security_analysis_20251010_133220/` - Detailed security scan results
 
-**Ожидаемое время до полного завершения: 6-7 недель**
+---
+
+## ✅ Analysis Complete
+
+**Status:** Ready for implementation  
+**Confidence:** HIGH (based on actual code analysis)  
+**Breaking Changes:** NONE (backward compatible with localhost profile)  
+**Security Impact:** CRITICAL IMPROVEMENT
+
+---
+
+**Next File to Create:** `bot/services/core/vault_service.py`  
+**Next File to Modify:** `bot/config.py`
+
 
