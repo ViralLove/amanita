@@ -1,12 +1,26 @@
 node_modules
+
+# 🔐 Environment Variables (НИКОГДА не коммитить!)
 .env
+.env.*
+*.env
+!.env.example
+!.env.template
+*.local.env
 
 # 🔐 Private Keys (НИКОГДА не коммитить!)
 .arweave-key.json
+**/arweave-wallet.json
 arweave-wallet.json
 api_keys.json
 *.pem
 *.key
+# SSH private keys (без расширений тоже!)
+Amanita
+amanita
+id_rsa
+id_ed25519
+id_ecdsa
 
 # Hardhat files
 /cache
@@ -30,31 +44,39 @@ ignition/deployments/chain-31337
 .cache_key
 amanita.pub
 bot.zip
-/bot/__pycache__
-/bot/__pycache__
-bot/arweave_wallet.json
-bot/.env.production
-/bot/tests/__pycache__
-/bot/tests/__pycache__
+# Универсальные правила для Python cache (все __pycache__ директории)
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Временные файлы и документы
+temp-*
+**/temp-*
+*.temp.*
+
+# AI Working Documents (temporary, not for git)
+**/AIJournal.md
+AIJournal.md
+**/Bridge.md
+Bridge.md
+**/bridge-prompt.md
+**/bridge.md
+bridge.md
+
+# Data и каталоги (не в Git)
+/data
+/bot/catalog
+/bot/catalog_data
+/scripts/organic_components
 /metrics
 /venv
-/bot/services/product/__pycache__
-/bot/services/core/__pycache__
-/bot/services/__pycache__
-/bot/model/__pycache__
-/bot/services/__pycache__
-/bot/services/core/storage/__pycache__
-/bot/__pycache__
-bot/tests/__pycache__/test_blockchain.cpython-311-pytest-8.3.5.pyc
-/bot/catalog
-/bot/catalog
-/bot/catalog
-/scripts/organic_components
-/bot/catalog_data
-scripts/docs/AIJournal.md
-contracts/docs/AIjournal.md
-bot/docs/AIJournal.md
-contracts/docs/bridge-prompt.md
+
+# Wallets и keys
+bot/arweave_wallet.json
+bot/.env.production
 contracts/docs/UUPS-Strategy-Analysis.md
 
 # Data directory (not in Git)
@@ -64,6 +86,21 @@ data/
 scripts_backup_*/
 scripts_structure_before_*.txt
 *.backup
+
+# Temporary/Cache files
+.cleanup_timestamp
+pinata_cache.json
+test_results.log
+*.log
+
+# Security incident response files (local only)
+SECURITY_INCIDENT_*.sh
+SECURITY_INCIDENT_*.md
+sensitive-files.txt
+.env.new.*
+
+# Deprecated/Legacy files
+deploy.json
 
 # Scripts archive (legacy code for reference)
 scripts/archive/
