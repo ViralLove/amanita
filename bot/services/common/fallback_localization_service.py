@@ -201,7 +201,7 @@ class FallbackLocalizationService:
                 return None
             
             content_type = key_parts[0]  # product, component, interface
-            content_id = key_parts[1]    # business_id, biounit_id, section
+            content_id = key_parts[1]    # business_id, component_id, section
             field = key_parts[2]         # title, description, etc.
             
             # Ищем в соответствующей секции
@@ -293,6 +293,61 @@ class FallbackLocalizationService:
         except Exception as e:
             self.logger.error(f"[FallbackLocalizationService] Ошибка форматирования: {e}")
             return translation
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Получает статистику fallback операций с экспортом всех метрик
+        
+        Возвращает основные метрики:
+        - total_requests: общее количество запросов
+        - requested_language_hits: попадания на запрошенном языке
+        - default_language_hits: попадания на языке по умолчанию
+        - translation_key_hits: попадания на ключ перевода
+        - placeholder_hits: использования placeholder'ов
+        - errors: количество ошибок
+        
+        И производные метрики:
+        - requested_language_rate_percent: процент попаданий на запрошенном языке (requested_language_hits / total_requests * 100)
+        - default_language_rate_percent: процент попаданий на языке по умолчанию (default_language_hits / total_requests * 100)
+        - placeholder_rate_percent: процент использования placeholder'ов (placeholder_hits / total_requests * 100)
+        - error_rate_percent: процент ошибок (errors / total_requests * 100)
+        
+        Дополнительные метрики:
+        - default_language: язык по умолчанию для fallback
+        
+        Returns:
+            Dict[str, Any]: Статистика fallback операций с основными и производными метриками
+        """
+        total_requests = self.fallback_stats['total_requests']
+        
+        # Вычисляем производные метрики (защита от деления на ноль)
+        if total_requests == 0:
+            requested_language_rate = 0.0
+            default_language_rate = 0.0
+            placeholder_rate = 0.0
+            error_rate = 0.0
+        else:
+            requested_language_rate = (self.fallback_stats['requested_language_hits'] / total_requests) * 100
+            default_language_rate = (self.fallback_stats['default_language_hits'] / total_requests) * 100
+            placeholder_rate = (self.fallback_stats['placeholder_hits'] / total_requests) * 100
+            error_rate = (self.fallback_stats['errors'] / total_requests) * 100
+        
+        return {
+            # Основные метрики
+            'total_requests': total_requests,
+            'requested_language_hits': self.fallback_stats['requested_language_hits'],
+            'default_language_hits': self.fallback_stats['default_language_hits'],
+            'translation_key_hits': self.fallback_stats['translation_key_hits'],
+            'placeholder_hits': self.fallback_stats['placeholder_hits'],
+            'errors': self.fallback_stats['errors'],
+            # Производные метрики
+            'requested_language_rate_percent': round(requested_language_rate, 2),
+            'default_language_rate_percent': round(default_language_rate, 2),
+            'placeholder_rate_percent': round(placeholder_rate, 2),
+            'error_rate_percent': round(error_rate, 2),
+            # Дополнительные метрики
+            'default_language': self.default_language
+        }
     
     def get_fallback_statistics(self) -> Dict[str, Any]:
         """

@@ -8,7 +8,16 @@ import traceback
 logger = logging.getLogger(__name__)
 
 class Localization:
-    def __init__(self, lang='ru'):
+    def __init__(self, lang: str = 'ru', language: str | None = None):
+        if language is not None:
+            if lang != 'ru' and lang != language:
+                logger.warning(
+                    "[LOCALIZATION] Both 'lang' ('%s') and 'language' ('%s') provided; using 'language' value.",
+                    lang,
+                    language,
+                )
+            lang = language
+
         self.lang = lang
         logger.debug(f"[LOCALIZATION] Инициализация Localization с языком: {lang}")
         self.labels = self.load_labels(lang)

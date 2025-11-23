@@ -301,19 +301,36 @@ class ProductLocalizationService:
             if not self.fallback_service:
                 return None
             
-            # Получаем переводы для разных языков
-            requested_translation = self._get_translation_for_language(business_id, field, self.language)
-            default_translation = self._get_translation_for_language(business_id, field, 'ru')
+            key = f"product.{business_id}.{field}"
+
+            # Готовим источники переводов для fallback (структура ожидается как nested dict)
+            sources: Dict[str, Any] = {}
+            # requested language
+            requested_data = self.get_cached_data(business_id, self.language) or {}
+            if not requested_data and self.ipfs_service:
+                ipfs_payload = self.ipfs_service.get_product_translations(business_id, self.language) or {}
+                if isinstance(ipfs_payload, dict):
+                    requested_data = ipfs_payload
+            sources[self.language] = {"product": {business_id: requested_data}} if requested_data else {}
+
+            # default language (ru)
+            default_lang = 'ru'
+            default_data = self.get_cached_data(business_id, default_lang) or {}
+            if not default_data and self.ipfs_service:
+                ipfs_payload_default = self.ipfs_service.get_product_translations(business_id, default_lang) or {}
+                if isinstance(ipfs_payload_default, dict):
+                    default_data = ipfs_payload_default
+            sources[default_lang] = {"product": {business_id: default_data}} if default_data else {}
             
-            # Используем fallback сервис
-            result = self.fallback_service.get_translation(
-                requested_language_translation=requested_translation,
-                default_language_translation=default_translation,
-                key=f"product.{business_id}.{field}",
-                default_placeholder=default or f"[{field}]"
+            # Вызов нового API fallback
+            result = self.fallback_service.get_translation_with_fallback(
+                key=key,
+                requested_language=self.language,
+                translation_sources=sources,
+                default=default or f"[{field}]"
             )
             
-            return result.translation
+            return getattr(result, "translation", None)
             
         except Exception as e:
             logger.error(f"[ProductLocalizationService] Ошибка fallback перевода: {e}")
