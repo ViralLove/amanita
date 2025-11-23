@@ -1,57 +1,131 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectRevertCustom(txPromise, errorName, contract) {
+    try {
+        await txPromise;
+        expect.fail(`Ожидался custom error ${errorName}, но транзакция прошла успешно`);
+    } catch (error) {
+        if (error && error.errorName) {
+            expect(error.errorName).to.equal(errorName);
+            return;
+        }
+        const message = (error?.message || "").toLowerCase();
+        if (contract && message.includes("return data:")) {
+            const match = message.match(/return data:\s*(0x[0-9a-f]+)/);
+            if (match) {
+                const selector = contract.interface.getError(errorName).selector.toLowerCase();
+                if (match[1].startsWith(selector)) {
+                    return;
+                }
+            }
+        }
+        expect(message).to.include(errorName.toLowerCase(), `Ожидался custom error ${errorName}, получено: ${error?.message || error}`);
+    }
+}
+
+async function expectEvent(txPromise, contract, eventName, assertFn) {
+    const tx = await txPromise;
+    const receipt = await tx.wait();
+    const parsedEvent = receipt.logs
+        .map(log => {
+            try {
+                return contract.interface.parseLog(log);
+            } catch (_) {
+                return null;
+            }
+        })
+        .find(event => event && event.name === eventName);
+
+    expect(parsedEvent, `Событие ${eventName} не найдено`).to.exist;
+
+    if (assertFn) {
+        await assertFn(parsedEvent.args);
+    }
+
+    return parsedEvent;
+}
+
 describe("ProductRegistry - Clear Catalog (UUPS)", function () {
     let productRegistry;
     let spiralEngine;
+    let componentRegistry;
     let admin, seller, otherSeller;
     let SELLER_ROLE;
+    let sellerComponentIds;
+    let otherSellerComponentIds;
 
     beforeEach(async function () {
         [admin, seller, otherSeller] = await ethers.getSigners();
         
-        // 1. Deploy Mock SpiralEngine
         const SpiralEngineMock = await ethers.getContractFactory("contracts/mocks/MockSpiralEngine.sol:MockSpiralEngine");
         spiralEngine = await SpiralEngineMock.deploy();
         await spiralEngine.waitForDeployment();
 
-        // 2. Deploy ProductRegistry Logic
+        const OCRLogic = await ethers.getContractFactory("OrganicComponentRegistryLogic");
+        const ocrLogic = await OCRLogic.deploy();
+        await ocrLogic.waitForDeployment();
+        const ocrInitCalldata = ocrLogic.interface.encodeFunctionData("initialize", [admin.address]);
+        const OCRProxy = await ethers.getContractFactory("OrganicComponentRegistryProxy");
+        const ocrProxy = await OCRProxy.deploy(await ocrLogic.getAddress(), ocrInitCalldata);
+        await ocrProxy.waitForDeployment();
+        componentRegistry = ocrLogic.attach(await ocrProxy.getAddress());
+        await componentRegistry.connect(admin).setSpiralEngine(await spiralEngine.getAddress());
+
         const Logic = await ethers.getContractFactory("ProductRegistryLogic");
         const logic = await Logic.deploy();
         await logic.waitForDeployment();
         
-        // 3. Encode initialize calldata
         const initCalldata = logic.interface.encodeFunctionData("initialize", [
             admin.address,
             await spiralEngine.getAddress()
         ]);
         
-        // 4. Deploy Proxy
         const Proxy = await ethers.getContractFactory("ProductRegistryProxy");
         const proxy = await Proxy.deploy(await logic.getAddress(), initCalldata);
         await proxy.waitForDeployment();
         
-        // 5. Attach Logic ABI to Proxy
         productRegistry = Logic.attach(await proxy.getAddress());
+        await productRegistry.connect(admin).setOrganicComponentRegistry(await componentRegistry.getAddress());
         
-        // 6. Setup sellers in mock
         SELLER_ROLE = await spiralEngine.SELLER_ROLE();
         
-        // Активируем и назначаем роль seller
         await spiralEngine.setUserActivated(seller.address, true);
         await spiralEngine.grantRole(SELLER_ROLE, seller.address);
         
-        // Активируем и назначаем роль otherSeller
         await spiralEngine.setUserActivated(otherSeller.address, true);
         await spiralEngine.grantRole(SELLER_ROLE, otherSeller.address);
+
+        sellerComponentIds = ["clear-comp-s-1", "clear-comp-s-2", "clear-comp-s-3"];
+        otherSellerComponentIds = ["clear-comp-o-1", "clear-comp-o-2", "clear-comp-o-3"];
+
+        for (const cid of sellerComponentIds) {
+            await componentRegistry.connect(seller).createComponent(cid, `Qm${cid}`);
+        }
+
+        for (const cid of otherSellerComponentIds) {
+            await componentRegistry.connect(otherSeller).createComponent(cid, `Qm${cid}`);
+        }
     });
 
     describe("clearSellerCatalog", function () {
         it("Should clear seller's catalog successfully", async function () {
             // Создаем несколько продуктов
-            await productRegistry.connect(seller).createProduct("QmTest1");
-            await productRegistry.connect(seller).createProduct("QmTest2");
-            await productRegistry.connect(seller).createProduct("QmTest3");
+            await productRegistry.connect(seller).createProduct(
+                "clear-main-product-1",
+                [sellerComponentIds[0]],
+                "QmTest1"
+            );
+            await productRegistry.connect(seller).createProduct(
+                "clear-main-product-2",
+                [sellerComponentIds[1]],
+                "QmTest2"
+            );
+            await productRegistry.connect(seller).createProduct(
+                "clear-main-product-3",
+                [sellerComponentIds[2]],
+                "QmTest3"
+            );
 
             // Активируем продукты
             await productRegistry.connect(seller).activateProduct(1);
@@ -60,10 +134,10 @@ describe("ProductRegistry - Clear Catalog (UUPS)", function () {
 
             // Проверяем, что продукты существуют
             const productsBefore = await productRegistry.getProductsBySeller(seller.address);
-            expect(productsBefore.length).to.equal(3);
+            expect(productsBefore.map(id => Number(id))).to.deep.equal([1, 2, 3]);
 
             const activeProductsBefore = await productRegistry.getAllActiveProductIds();
-            expect(activeProductsBefore.length).to.equal(3);
+            expect(activeProductsBefore.map(id => Number(id))).to.deep.equal([1, 2, 3]);
 
             // Очищаем каталог
             const tx = await productRegistry.connect(seller).clearSellerCatalog(seller.address);
@@ -82,7 +156,7 @@ describe("ProductRegistry - Clear Catalog (UUPS)", function () {
             
             const parsedCatalogCleared = productRegistry.interface.parseLog(catalogClearedEvent);
             expect(parsedCatalogCleared.args.seller).to.equal(seller.address);
-            expect(parsedCatalogCleared.args.productsCleared).to.equal(3);
+            expect(Number(parsedCatalogCleared.args.productsCleared)).to.equal(3);
 
             // Проверяем, что каталог очищен
             const productsAfter = await productRegistry.getProductsBySeller(seller.address);
@@ -92,37 +166,60 @@ describe("ProductRegistry - Clear Catalog (UUPS)", function () {
             expect(activeProductsAfter.length).to.equal(0);
 
             // Проверяем, что продукты удалены
-            await expect(productRegistry.getProduct(1)).to.be.revertedWithCustomError(productRegistry, "ProductDoesNotExist");
-            await expect(productRegistry.getProduct(2)).to.be.revertedWithCustomError(productRegistry, "ProductDoesNotExist");
-            await expect(productRegistry.getProduct(3)).to.be.revertedWithCustomError(productRegistry, "ProductDoesNotExist");
+            await expectRevertCustom(productRegistry.getProduct(1), "ProductDoesNotExist", productRegistry);
+            await expectRevertCustom(productRegistry.getProduct(2), "ProductDoesNotExist", productRegistry);
+            await expectRevertCustom(productRegistry.getProduct(3), "ProductDoesNotExist", productRegistry);
+            await expectRevertCustom(
+                productRegistry.getProductIdByBusinessId("clear-main-product-1"),
+                "BusinessIdUnknown",
+                productRegistry
+            );
+            await expectRevertCustom(
+                productRegistry.getProductIdByBusinessId("clear-main-product-2"),
+                "BusinessIdUnknown",
+                productRegistry
+            );
+            await expectRevertCustom(
+                productRegistry.getProductIdByBusinessId("clear-main-product-3"),
+                "BusinessIdUnknown",
+                productRegistry
+            );
         });
 
         it("Should revert when trying to clear empty catalog", async function () {
-            await expect(
-                productRegistry.connect(seller).clearSellerCatalog(seller.address)
-            ).to.be.revertedWithCustomError(productRegistry, "CatalogAlreadyEmpty");
+            await expectRevertCustom(
+                productRegistry.connect(seller).clearSellerCatalog(seller.address),
+                "CatalogAlreadyEmpty",
+                productRegistry
+            );
         });
 
         it("Should revert when non-seller tries to clear catalog", async function () {
             // Убираем роль у otherSeller для теста
             await spiralEngine.grantRole(SELLER_ROLE, otherSeller.address); // сначала убедимся что роль есть
             // Но он пытается очистить чужой каталог
-            await expect(
-                productRegistry.connect(otherSeller).clearSellerCatalog(seller.address)
-            ).to.be.revertedWithCustomError(productRegistry, "CanOnlyClearOwnCatalog");
+            await expectRevertCustom(
+                productRegistry.connect(otherSeller).clearSellerCatalog(seller.address),
+                "CanOnlyClearOwnCatalog",
+                productRegistry
+            );
         });
 
         it("Should revert when trying to clear someone else's catalog", async function () {
             // otherSeller уже активирован и имеет SELLER_ROLE из beforeEach
-            await expect(
-                productRegistry.connect(seller).clearSellerCatalog(otherSeller.address)
-            ).to.be.revertedWithCustomError(productRegistry, "CanOnlyClearOwnCatalog");
+            await expectRevertCustom(
+                productRegistry.connect(seller).clearSellerCatalog(otherSeller.address),
+                "CanOnlyClearOwnCatalog",
+                productRegistry
+            );
         });
 
         it("Should revert when seller address is zero", async function () {
-            await expect(
-                productRegistry.connect(seller).clearSellerCatalog(ethers.ZeroAddress)
-            ).to.be.revertedWithCustomError(productRegistry, "InvalidSellerAddress");
+            await expectRevertCustom(
+                productRegistry.connect(seller).clearSellerCatalog(ethers.ZeroAddress),
+                "InvalidSellerAddress",
+                productRegistry
+            );
         });
 
         it("Should revert when catalog is too large", async function () {
@@ -137,9 +234,21 @@ describe("ProductRegistry - Clear Catalog (UUPS)", function () {
 
         it("Should handle mixed active/inactive products correctly", async function () {
             // Создаем продукты
-            await productRegistry.connect(seller).createProduct("QmTest1");
-            await productRegistry.connect(seller).createProduct("QmTest2");
-            await productRegistry.connect(seller).createProduct("QmTest3");
+            await productRegistry.connect(seller).createProduct(
+                "clear-mixed-1",
+                [sellerComponentIds[0]],
+                "QmTest1"
+            );
+            await productRegistry.connect(seller).createProduct(
+                "clear-mixed-2",
+                [sellerComponentIds[1]],
+                "QmTest2"
+            );
+            await productRegistry.connect(seller).createProduct(
+                "clear-mixed-3",
+                [sellerComponentIds[2]],
+                "QmTest3"
+            );
 
             // Активируем только некоторые
             await productRegistry.connect(seller).activateProduct(1);
@@ -147,7 +256,7 @@ describe("ProductRegistry - Clear Catalog (UUPS)", function () {
 
             // Проверяем состояние до очистки
             const activeProductsBefore = await productRegistry.getAllActiveProductIds();
-            expect(activeProductsBefore.length).to.equal(2);
+            expect(activeProductsBefore.map(id => Number(id))).to.deep.equal([1, 3]);
 
             // Очищаем каталог
             await productRegistry.connect(seller).clearSellerCatalog(seller.address);
@@ -158,6 +267,22 @@ describe("ProductRegistry - Clear Catalog (UUPS)", function () {
 
             const activeProductsAfter = await productRegistry.getAllActiveProductIds();
             expect(activeProductsAfter.length).to.equal(0);
+
+            await expectRevertCustom(
+                productRegistry.getProductIdByBusinessId("clear-mixed-1"),
+                "BusinessIdUnknown",
+                productRegistry
+            );
+            await expectRevertCustom(
+                productRegistry.getProductIdByBusinessId("clear-mixed-2"),
+                "BusinessIdUnknown",
+                productRegistry
+            );
+            await expectRevertCustom(
+                productRegistry.getProductIdByBusinessId("clear-mixed-3"),
+                "BusinessIdUnknown",
+                productRegistry
+            );
         });
     });
 
@@ -165,7 +290,11 @@ describe("ProductRegistry - Clear Catalog (UUPS)", function () {
         it("Should use reasonable gas for clearing small catalog", async function () {
             // Создаем несколько продуктов
             for (let i = 0; i < 5; i++) {
-                await productRegistry.connect(seller).createProduct(`QmTest${i}`);
+                await productRegistry.connect(seller).createProduct(
+                    `clear-gas-${i}`,
+                    [sellerComponentIds[i % sellerComponentIds.length]],
+                    `QmTest${i}`
+                );
                 await productRegistry.connect(seller).activateProduct(i + 1);
             }
 
@@ -176,7 +305,7 @@ describe("ProductRegistry - Clear Catalog (UUPS)", function () {
             console.log(`Gas used for clearing 5 products: ${receipt.gasUsed.toString()}`);
             
             // Проверяем, что газ разумный (менее 1M для 5 продуктов)
-            expect(receipt.gasUsed).to.be.lessThan(1000000);
+            expect(Number(receipt.gasUsed)).to.be.lessThan(1000000);
         });
     });
 });

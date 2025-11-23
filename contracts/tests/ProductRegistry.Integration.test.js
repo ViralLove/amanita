@@ -1,5 +1,70 @@
-const { expect } = require("chai");
+require("@nomicfoundation/hardhat-chai-matchers");
+const chai = require("chai");
+const { expect } = chai;
 const { ethers } = require("hardhat");
+
+async function expectRevertCustom(txPromise, errorName, contract) {
+    try {
+        await txPromise;
+        expect.fail(`Ожидался custom error ${errorName}, но транзакция прошла успешно`);
+    } catch (error) {
+        if (error && error.errorName) {
+            expect(error.errorName).to.equal(errorName);
+            return;
+        }
+        const message = error?.message || "";
+        if (contract && message.includes("return data:")) {
+            const match = message.match(/return data:\s*(0x[0-9a-fA-F]+)/);
+            if (match) {
+                const selector = contract.interface.getError(errorName).selector.toLowerCase();
+                if (match[1].toLowerCase().startsWith(selector)) {
+                    return;
+                }
+            }
+        }
+        expect(message).to.include(errorName, `Ожидался custom error ${errorName}, получено: ${message}`);
+    }
+}
+
+async function expectRevertReason(txPromise, reasonSubstring) {
+    try {
+        await txPromise;
+        expect.fail(`Ожидался revert с сообщением "${reasonSubstring}", но транзакция прошла успешно`);
+    } catch (error) {
+        const message = error?.message || "";
+        expect(message).to.include(reasonSubstring, `Ожидался revert с "${reasonSubstring}", получено: ${message}`);
+    }
+}
+
+async function expectNotReverted(txPromise) {
+    try {
+        await txPromise;
+    } catch (error) {
+        expect.fail(`Транзакция не должна была ревертиться, но получила: ${error?.message || error}`);
+    }
+}
+
+async function expectEvent(txPromise, contract, eventName, assertFn) {
+    const tx = await txPromise;
+    const receipt = await tx.wait();
+    const parsedEvent = receipt.logs
+        .map(log => {
+            try {
+                return contract.interface.parseLog(log);
+            } catch (_) {
+                return null;
+            }
+        })
+        .find(event => event && event.name === eventName);
+
+    expect(parsedEvent, `Событие ${eventName} не найдено`).to.exist;
+
+    if (assertFn) {
+        await assertFn(parsedEvent.args);
+    }
+
+    return parsedEvent;
+}
 
 /**
  * 🔗 ProductRegistry ↔ OrganicComponentRegistry - Integration Tests
@@ -101,6 +166,65 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
     });
 
     // ==========================================
+    // TEST SUITE 3b: Catalog Cleanup & Mapping Consistency
+    // ==========================================
+    describe("🧹 Catalog Cleanup", function () {
+        let componentCleanupA, componentCleanupB;
+
+        beforeEach(async function () {
+            console.log("   🧪 Preparing components for cleanup tests...");
+
+            componentCleanupA = "cleanup_comp_a";
+            componentCleanupB = "cleanup_comp_b";
+
+            await componentRegistry.connect(seller).createComponent(componentCleanupA, "QmCleanupA");
+            await componentRegistry.connect(seller).createComponent(componentCleanupB, "QmCleanupB");
+
+            console.log("   ✅ Cleanup components ready");
+        });
+
+        it("Should remove businessId mapping after clearSellerCatalog", async function () {
+            console.log("   🔍 Testing clearSellerCatalog businessId cleanup...");
+
+            await productRegistry.connect(seller).createProduct(
+                "cleanup-product-1",
+                [componentCleanupA],
+                "QmCleanup1"
+            );
+            await productRegistry.connect(seller).createProduct(
+                "cleanup-product-2",
+                [componentCleanupB],
+                "QmCleanup2"
+            );
+
+            expect(Number(await productRegistry.getProductIdByBusinessId("cleanup-product-1"))).to.equal(1);
+            expect(Number(await productRegistry.getProductIdByBusinessId("cleanup-product-2"))).to.equal(2);
+
+            await productRegistry.connect(seller).clearSellerCatalog(seller.address);
+
+            await expectRevertCustom(
+                productRegistry.getProductIdByBusinessId("cleanup-product-1"),
+                "BusinessIdUnknown",
+                productRegistry
+            );
+
+            await expectRevertCustom(
+                productRegistry.getProductIdByBusinessId("cleanup-product-2"),
+                "BusinessIdUnknown",
+                productRegistry
+            );
+
+            await expectRevertCustom(
+                productRegistry.getProduct(1),
+                "ProductDoesNotExist",
+                productRegistry
+            );
+
+            console.log("   ✅ clearSellerCatalog removes businessId mapping");
+        });
+    });
+
+    // ==========================================
     // TEST SUITE 1: Admin Configuration
     // ==========================================
     describe("⚙️ Admin Configuration", function () {
@@ -117,9 +241,11 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             console.log("   🔍 Testing access control for setOrganicComponentRegistry()...");
             
             const ADMIN_ROLE = await productRegistry.ADMIN_ROLE();
-            await expect(
-                productRegistry.connect(seller).setOrganicComponentRegistry(await componentRegistry.getAddress())
-            ).to.be.revertedWithCustomError(productRegistry, "AccessControlUnauthorizedAccount");
+            await expectRevertCustom(
+                productRegistry.connect(seller).setOrganicComponentRegistry(await componentRegistry.getAddress()),
+                "AccessControlUnauthorizedAccount",
+                productRegistry
+            );
             
             console.log("   ✅ Access control works correctly");
         });
@@ -127,9 +253,11 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
         it("Should revert when setting zero address", async function () {
             console.log("   🔍 Testing zero address validation...");
             
-            await expect(
-                productRegistry.connect(admin).setOrganicComponentRegistry(ethers.ZeroAddress)
-            ).to.be.revertedWithCustomError(productRegistry, "ZeroAddress");
+            await expectRevertCustom(
+                productRegistry.connect(admin).setOrganicComponentRegistry(ethers.ZeroAddress),
+                "ZeroAddress",
+                productRegistry
+            );
             
             console.log("   ✅ Zero address validation works");
         });
@@ -144,10 +272,15 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             const oldAddress = await componentRegistry.getAddress();
             const newAddress = await newInstance.getAddress();
             
-            await expect(
-                productRegistry.connect(admin).setOrganicComponentRegistry(newAddress)
-            ).to.emit(productRegistry, "ComponentRegistryUpdated")
-             .withArgs(oldAddress, newAddress);
+            await expectEvent(
+                productRegistry.connect(admin).setOrganicComponentRegistry(newAddress),
+                productRegistry,
+                "ComponentRegistryUpdated",
+                args => {
+                    expect(args.oldRegistry).to.equal(oldAddress);
+                    expect(args.newRegistry).to.equal(newAddress);
+                }
+            );
             
             console.log("   ✅ Event emitted correctly");
         });
@@ -179,8 +312,9 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             
             const componentIds = [component1, component2, component3];
             const metadataCID = "QmProductMetadata123";
+            const businessId = "product-business-001";
             
-            const tx = await productRegistry.connect(seller).createProduct(componentIds, metadataCID);
+            const tx = await productRegistry.connect(seller).createProduct(businessId, componentIds, metadataCID);
             const receipt = await tx.wait();
             
             // Проверяем событие ProductCreated с ПОЛНОЙ проверкой параметров
@@ -198,7 +332,8 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             // ✅ P2 FIX: Полная проверка всех параметров события
             const parsed = productRegistry.interface.parseLog(event);
             expect(parsed.args.seller).to.equal(seller.address);
-            expect(parsed.args.productId).to.equal(1);
+            expect(Number(parsed.args.productId)).to.equal(1);
+            expect(parsed.args.businessId).to.equal(businessId);
             expect(parsed.args.componentIds.length).to.equal(componentIds.length);
             for (let i = 0; i < componentIds.length; i++) {
                 expect(parsed.args.componentIds[i]).to.equal(componentIds[i]);
@@ -207,10 +342,14 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             
             // Проверяем данные продукта
             const product = await productRegistry.getProduct(1);
-            expect(product.id).to.equal(1);
+            expect(Number(product.id)).to.equal(1);
             expect(product.seller).to.equal(seller.address);
+            expect(product.businessId).to.equal(businessId);
             expect(product.metadataCID).to.equal(metadataCID);
             expect(product.active).to.be.false;
+
+            const lookedUpId = await productRegistry.getProductIdByBusinessId(businessId);
+            expect(Number(lookedUpId)).to.equal(1);
             
             console.log("   ✅ Product created successfully");
         });
@@ -219,7 +358,7 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             console.log("   🔍 Testing componentIds storage...");
             
             const componentIds = [component1, component2];
-            await productRegistry.connect(seller).createProduct(componentIds, "QmMeta");
+            await productRegistry.connect(seller).createProduct("product-components", componentIds, "QmMeta");
             
             const storedComponents = await productRegistry.getProductComponents(1);
             expect(storedComponents.length).to.equal(2);
@@ -234,9 +373,11 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             
             const componentIds = [component1, "non_existent_comp", component2];
             
-            await expect(
-                productRegistry.connect(seller).createProduct(componentIds, "QmMeta")
-            ).to.be.revertedWithCustomError(productRegistry, "ComponentNotFound");
+            await expectRevertCustom(
+                productRegistry.connect(seller).createProduct("product-invalid-comp", componentIds, "QmMeta"),
+                "ComponentNotFound",
+                productRegistry
+            );
             
             console.log("   ✅ Non-existent component validation works");
         });
@@ -244,9 +385,11 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
         it("Should revert when componentIds array is empty", async function () {
             console.log("   🔍 Testing empty componentIds validation...");
             
-            await expect(
-                productRegistry.connect(seller).createProduct([], "QmMeta")
-            ).to.be.revertedWithCustomError(productRegistry, "NoComponentsProvided");
+            await expectRevertCustom(
+                productRegistry.connect(seller).createProduct("product-empty-components", [], "QmMeta"),
+                "NoComponentsProvided",
+                productRegistry
+            );
             
             console.log("   ✅ Empty array validation works");
         });
@@ -262,9 +405,11 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
                 manyComponents.push(compId);
             }
             
-            await expect(
-                productRegistry.connect(seller).createProduct(manyComponents, "QmMeta")
-            ).to.be.revertedWithCustomError(productRegistry, "TooManyComponents");
+            await expectRevertCustom(
+                productRegistry.connect(seller).createProduct("product-many-components", manyComponents, "QmMeta"),
+                "TooManyComponents",
+                productRegistry
+            );
             
             console.log("   ✅ Max components limit works");
         });
@@ -291,9 +436,11 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             await spiralEngine.setUserActivated(user1.address, true);
             await spiralEngine.grantRole(SELLER_ROLE, user1.address);
             
-            await expect(
-                newProductRegistry.connect(user1).createProduct([component1], "QmMeta")
-            ).to.be.revertedWithCustomError(newProductRegistry, "ComponentRegistryNotSet");
+            await expectRevertCustom(
+                newProductRegistry.connect(user1).createProduct("product-no-registry", [component1], "QmMeta"),
+                "ComponentRegistryNotSet",
+                newProductRegistry
+            );
             
             console.log("   ✅ ComponentRegistry requirement works");
         });
@@ -301,11 +448,35 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
         it("Should revert with EmptyCID when metadataCID is empty", async function () {
             console.log("   🔍 Testing empty metadataCID validation...");
             
-            await expect(
-                productRegistry.connect(seller).createProduct([component1], "")
-            ).to.be.revertedWithCustomError(productRegistry, "EmptyCID");
+            await expectRevertCustom(
+                productRegistry.connect(seller).createProduct("product-empty-cid", [component1], ""),
+                "EmptyCID",
+                productRegistry
+            );
             
             console.log("   ✅ Empty CID validation works");
+        });
+
+        it("Should revert when using duplicate businessId", async function () {
+            console.log("   🔍 Testing unique businessId constraint...");
+            
+            await productRegistry.connect(seller).createProduct(
+                "product-dup",
+                [component1],
+                "QmDup1"
+            );
+            
+            await expectRevertCustom(
+                productRegistry.connect(seller).createProduct(
+                    "product-dup",
+                    [component2],
+                    "QmDup2"
+                ),
+                "BusinessIdExists",
+                productRegistry
+            );
+            
+            console.log("   ✅ Duplicate businessId prevented");
         });
     });
 
@@ -332,16 +503,20 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             
             // Проверяем начальное значение
             const comp1Id = await componentRegistry.businessIdToComponentId(component1);
-            expect(await componentRegistry.componentUsageCount(comp1Id)).to.equal(0);
+            expect(Number(await componentRegistry.componentUsageCount(comp1Id))).to.equal(0);
             
             // Создаём продукт
-            await productRegistry.connect(seller).createProduct([component1, component2], "QmMeta");
+            await productRegistry.connect(seller).createProduct(
+                "usage-track-1",
+                [component1, component2],
+                "QmMeta"
+            );
             
             // Проверяем что счётчики увеличились
-            expect(await componentRegistry.componentUsageCount(comp1Id)).to.equal(1);
+            expect(Number(await componentRegistry.componentUsageCount(comp1Id))).to.equal(1);
             
             const comp2Id = await componentRegistry.businessIdToComponentId(component2);
-            expect(await componentRegistry.componentUsageCount(comp2Id)).to.equal(1);
+            expect(Number(await componentRegistry.componentUsageCount(comp2Id))).to.equal(1);
             
             console.log("   ✅ Usage count incremented correctly");
         });
@@ -352,7 +527,11 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             const comp1Id = await componentRegistry.businessIdToComponentId(component1);
             
             // Создаём продукт
-            await productRegistry.connect(seller).createProduct([component1], "QmMeta");
+            await productRegistry.connect(seller).createProduct(
+                "usage-track-user",
+                [component1],
+                "QmMeta"
+            );
             
             // Проверяем что componentsByUser обновлен
             const userComponents = await componentRegistry.getComponentsByUser(seller.address);
@@ -368,13 +547,21 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             const comp1Id = await componentRegistry.businessIdToComponentId(component1);
             
             // seller создаёт продукт
-            await productRegistry.connect(seller).createProduct([component1], "QmMeta1");
+            await productRegistry.connect(seller).createProduct(
+                "usage-multi-seller-1",
+                [component1],
+                "QmMeta1"
+            );
             
             // otherSeller создаёт продукт с тем же компонентом
-            await productRegistry.connect(otherSeller).createProduct([component1], "QmMeta2");
+            await productRegistry.connect(otherSeller).createProduct(
+                "usage-multi-seller-2",
+                [component1],
+                "QmMeta2"
+            );
             
             // Проверяем счётчик
-            expect(await componentRegistry.componentUsageCount(comp1Id)).to.equal(2);
+            expect(Number(await componentRegistry.componentUsageCount(comp1Id))).to.equal(2);
             
             // Проверяем что оба продавца добавлены в componentsByUser
             const sellerComponents = await componentRegistry.getComponentsByUser(seller.address);
@@ -392,12 +579,12 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             const comp1Id = await componentRegistry.businessIdToComponentId(component1);
             
             // seller создаёт 3 продукта с одним и тем же компонентом
-            await productRegistry.connect(seller).createProduct([component1], "QmMeta1");
-            await productRegistry.connect(seller).createProduct([component1], "QmMeta2");
-            await productRegistry.connect(seller).createProduct([component1], "QmMeta3");
+            await productRegistry.connect(seller).createProduct("usage-repeat-1", [component1], "QmMeta1");
+            await productRegistry.connect(seller).createProduct("usage-repeat-2", [component1], "QmMeta2");
+            await productRegistry.connect(seller).createProduct("usage-repeat-3", [component1], "QmMeta3");
             
             // Счётчик должен быть 3
-            expect(await componentRegistry.componentUsageCount(comp1Id)).to.equal(3);
+            expect(Number(await componentRegistry.componentUsageCount(comp1Id))).to.equal(3);
             
             // Но пользователь должен быть только один (try-catch игнорирует дубликаты)
             const sellerComponents = await componentRegistry.getComponentsByUser(seller.address);
@@ -424,7 +611,11 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             const componentIds = ["view_comp_1", "view_comp_2", "view_comp_3"];
             
             // Создаём продукт
-            await productRegistry.connect(seller).createProduct(componentIds, "QmMeta");
+            await productRegistry.connect(seller).createProduct(
+                "components-view",
+                componentIds,
+                "QmMeta"
+            );
             
             // Получаем компоненты
             const storedComponents = await productRegistry.getProductComponents(1);
@@ -440,9 +631,11 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
         it("Should revert when product does not exist", async function () {
             console.log("   🔍 Testing getProductComponents() for non-existent product...");
             
-            await expect(
-                productRegistry.getProductComponents(999)
-            ).to.be.revertedWithCustomError(productRegistry, "ProductDoesNotExist");
+            await expectRevertCustom(
+                productRegistry.getProductComponents(999),
+                "ProductDoesNotExist",
+                productRegistry
+            );
             
             console.log("   ✅ Validation for non-existent product works");
         });
@@ -467,17 +660,19 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             console.log("   ⛽ Measuring gas for 1 component...");
             
             const tx = await productRegistry.connect(seller).createProduct(
+                "gas-1",
                 ["gas_comp_1"],
                 "QmMeta"
             );
             const receipt = await tx.wait();
             const gasUsed = receipt.gasUsed;
+            const gasUsedNumber = Number(gasUsed);
             
             console.log(`   📊 Gas used (1 component): ${gasUsed.toString()}`);
             
             // ✅ P2 FIX: Проверка диапазона (минимум + максимум)
-            expect(gasUsed).to.be.greaterThan(300000n, "Gas too low - logic might be skipped");
-            expect(gasUsed).to.be.lessThan(400000n, "Gas too high - optimization needed");
+            expect(gasUsedNumber).to.be.greaterThan(300000, "Gas too low - logic might be skipped");
+            expect(gasUsedNumber).to.be.lessThan(400000, "Gas too high - optimization needed");
             
             console.log("   ✅ Gas cost within acceptable range for 1 component");
         });
@@ -486,17 +681,19 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             console.log("   ⛽ Measuring gas for 3 components...");
             
             const tx = await productRegistry.connect(seller).createProduct(
+                "gas-3",
                 ["gas_comp_1", "gas_comp_2", "gas_comp_3"],
                 "QmMeta"
             );
             const receipt = await tx.wait();
             const gasUsed = receipt.gasUsed;
+            const gasUsedNumber = Number(gasUsed);
             
             console.log(`   📊 Gas used (3 components): ${gasUsed.toString()}`);
             
             // ✅ P2 FIX: Проверка диапазона
-            expect(gasUsed).to.be.greaterThan(450000n, "Gas too low for 3 components");
-            expect(gasUsed).to.be.lessThan(600000n, "Gas too high - optimization needed");
+            expect(gasUsedNumber).to.be.greaterThan(450000, "Gas too low for 3 components");
+            expect(gasUsedNumber).to.be.lessThan(600000, "Gas too high - optimization needed");
             
             console.log("   ✅ Gas cost within acceptable range for 3 components");
         });
@@ -510,17 +707,19 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             }
             
             const tx = await productRegistry.connect(seller).createProduct(
+                "gas-10",
                 componentIds,
                 "QmMeta"
             );
             const receipt = await tx.wait();
             const gasUsed = receipt.gasUsed;
+            const gasUsedNumber = Number(gasUsed);
             
             console.log(`   📊 Gas used (10 components): ${gasUsed.toString()}`);
             
             // ✅ P2 FIX: Проверка диапазона
-            expect(gasUsed).to.be.greaterThan(1000000n, "Gas too low for 10 components");
-            expect(gasUsed).to.be.lessThan(1300000n, "Gas too high - optimization needed");
+            expect(gasUsedNumber).to.be.greaterThan(1000000, "Gas too low for 10 components");
+            expect(gasUsedNumber).to.be.lessThan(1300000, "Gas too high - optimization needed");
             
             console.log("   ✅ Gas cost within acceptable range for 10 components");
         });
@@ -530,26 +729,28 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             
             // Измеряем газ для 1, 3 и 10 компонентов
             const gas1 = (await (await productRegistry.connect(seller).createProduct(
-                ["gas_comp_1"], "QmLinear1"
+                "gas-linear-1", ["gas_comp_1"], "QmLinear1"
             )).wait()).gasUsed;
             
             const gas3 = (await (await productRegistry.connect(seller).createProduct(
-                ["gas_comp_1", "gas_comp_2", "gas_comp_3"], "QmLinear3"
+                "gas-linear-3", ["gas_comp_1", "gas_comp_2", "gas_comp_3"], "QmLinear3"
             )).wait()).gasUsed;
             
             // Вычисляем стоимость компонента
-            const gasPerComponent = (gas3 - gas1) / 2n;
-            console.log(`   📊 Base gas (1 comp): ${gas1}`);
-            console.log(`   📊 Gas for 3 comps: ${gas3}`);
+            const gas1Number = Number(gas1);
+            const gas3Number = Number(gas3);
+            const gasPerComponent = (gas3Number - gas1Number) / 2;
+            console.log(`   📊 Base gas (1 comp): ${gas1Number}`);
+            console.log(`   📊 Gas for 3 comps: ${gas3Number}`);
             console.log(`   📊 Estimated gas per component: ${gasPerComponent}`);
             
             // ✅ P2 FIX: Проверка линейности
             // Ожидаемый диапазон: ~30K-50K gas на компонент (измерено: ~36K)
-            expect(gasPerComponent).to.be.greaterThan(30000n, "Gas per component too low");
-            expect(gasPerComponent).to.be.lessThan(50000n, "Gas per component too high");
+            expect(gasPerComponent).to.be.greaterThan(30000, "Gas per component too low");
+            expect(gasPerComponent).to.be.lessThan(50000, "Gas per component too high");
             
             // Формула: Gas ≈ BASE + (N * gasPerComponent)
-            const expectedBase = gas1 - gasPerComponent;
+            const expectedBase = gas1Number - gasPerComponent;
             console.log(`   📊 Estimated base gas: ${expectedBase}`);
             console.log(`   📊 Formula: Gas ≈ ${expectedBase} + (N * ${gasPerComponent})`);
             
@@ -573,9 +774,9 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             }
             
             // Должно успешно создаться
-            await expect(
-                productRegistry.connect(seller).createProduct(maxComponents, "QmMeta")
-            ).to.not.be.reverted;
+            await expectNotReverted(
+                productRegistry.connect(seller).createProduct("edge-max-components", maxComponents, "QmMeta")
+            );
             
             const storedComponents = await productRegistry.getProductComponents(1);
             expect(storedComponents.length).to.equal(20);
@@ -594,9 +795,11 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             await spiralEngine.grantRole(SELLER_ROLE, notActivated.address);
             // НЕ вызываем setUserActivated
             
-            await expect(
-                productRegistry.connect(notActivated).createProduct(["test_comp"], "QmMeta")
-            ).to.be.revertedWithCustomError(productRegistry, "NotActivatedUser");
+            await expectRevertCustom(
+                productRegistry.connect(notActivated).createProduct("edge-not-activated", ["test_comp"], "QmMeta"),
+                "NotActivatedUser",
+                productRegistry
+            );
             
             console.log("   ✅ Activation requirement works");
         });
@@ -606,9 +809,11 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             
             await componentRegistry.connect(seller).createComponent("test_comp", "QmTest");
             
-            await expect(
-                productRegistry.connect(user1).createProduct(["test_comp"], "QmMeta")
-            ).to.be.revertedWithCustomError(productRegistry, "NotASeller");
+            await expectRevertCustom(
+                productRegistry.connect(user1).createProduct("edge-not-seller", ["test_comp"], "QmMeta"),
+                "NotASeller",
+                productRegistry
+            );
             
             console.log("   ✅ SELLER_ROLE requirement works");
         });
@@ -619,9 +824,9 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             const specialId = "comp_with-special.chars_123";
             await componentRegistry.connect(seller).createComponent(specialId, "QmSpecial");
             
-            await expect(
-                productRegistry.connect(seller).createProduct([specialId], "QmMeta")
-            ).to.not.be.reverted;
+            await expectNotReverted(
+                productRegistry.connect(seller).createProduct("edge-special", [specialId], "QmMeta")
+            );
             
             const storedComponents = await productRegistry.getProductComponents(1);
             expect(storedComponents[0]).to.equal(specialId);
@@ -651,7 +856,7 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             const metadataCID2 = "QmMeta2";
             
             // Создаём и активируем продукт
-            await productRegistry.connect(seller).createProduct(originalComponents, metadataCID1);
+            await productRegistry.connect(seller).createProduct("p2-update", originalComponents, metadataCID1);
             await productRegistry.connect(seller).activateProduct(1);
             
             // Обновляем только metadataCID
@@ -675,12 +880,12 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             const comp1Id = await componentRegistry.businessIdToComponentId(component1);
             
             // Создаём продукт (это должно увеличить счётчик)
-            await productRegistry.connect(seller).createProduct([component1], "QmMeta");
-            expect(await componentRegistry.componentUsageCount(comp1Id)).to.equal(1);
+            await productRegistry.connect(seller).createProduct("p2-activate", [component1], "QmMeta");
+            expect(Number(await componentRegistry.componentUsageCount(comp1Id))).to.equal(1);
             
             // Активируем продукт (НЕ должно увеличивать счётчик)
             await productRegistry.connect(seller).activateProduct(1);
-            expect(await componentRegistry.componentUsageCount(comp1Id)).to.equal(1); // Всё ещё 1
+            expect(Number(await componentRegistry.componentUsageCount(comp1Id))).to.equal(1); // Всё ещё 1
             
             console.log("   ✅ activateProduct() correctly does NOT trigger tracking");
         });
@@ -691,14 +896,14 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             const comp1Id = await componentRegistry.businessIdToComponentId(component1);
             
             // Создаём 5 продуктов с одинаковыми компонентами
-            await productRegistry.connect(seller).createProduct([component1], "QmMeta1");
-            await productRegistry.connect(seller).createProduct([component1], "QmMeta2");
-            await productRegistry.connect(seller).createProduct([component1], "QmMeta3");
-            await productRegistry.connect(seller).createProduct([component1], "QmMeta4");
-            await productRegistry.connect(seller).createProduct([component1], "QmMeta5");
+            await productRegistry.connect(seller).createProduct("p2-batch-1", [component1], "QmMeta1");
+            await productRegistry.connect(seller).createProduct("p2-batch-2", [component1], "QmMeta2");
+            await productRegistry.connect(seller).createProduct("p2-batch-3", [component1], "QmMeta3");
+            await productRegistry.connect(seller).createProduct("p2-batch-4", [component1], "QmMeta4");
+            await productRegistry.connect(seller).createProduct("p2-batch-5", [component1], "QmMeta5");
             
             // Счётчик должен быть 5 (каждый раз инкрементировался)
-            expect(await componentRegistry.componentUsageCount(comp1Id)).to.equal(5);
+            expect(Number(await componentRegistry.componentUsageCount(comp1Id))).to.equal(5);
             
             // Но пользователь добавлен только 1 раз (try-catch игнорирует дубликаты)
             const sellerComponents = await componentRegistry.getComponentsByUser(seller.address);
@@ -715,9 +920,13 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             const duplicateComponents = [component1, component1, component1];
             
             // Ожидаем успех (дубликаты допустимы на уровне ProductRegistry)
-            await expect(
-                productRegistry.connect(seller).createProduct(duplicateComponents, "QmMeta")
-            ).to.not.be.reverted;
+            await expectNotReverted(
+                productRegistry.connect(seller).createProduct(
+                    "p2-duplicate",
+                    duplicateComponents,
+                    "QmMeta"
+                )
+            );
             
             // Проверяем что все 3 элемента сохранены (включая дубликаты)
             const storedComponents = await productRegistry.getProductComponents(1);
@@ -728,7 +937,7 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             
             // Но usage count увеличился только 3 раза (по одному на каждый вызов)
             const comp1Id = await componentRegistry.businessIdToComponentId(component1);
-            expect(await componentRegistry.componentUsageCount(comp1Id)).to.equal(3);
+            expect(Number(await componentRegistry.componentUsageCount(comp1Id))).to.equal(3);
             
             console.log("   ✅ Duplicate componentIds handled correctly");
         });
@@ -743,16 +952,19 @@ describe("🔗 ProductRegistry ↔ OrganicComponentRegistry Integration", functi
             const veryLongId = "comp_" + "x".repeat(250); // 255 символов total
             
             // Проверяем что OrganicComponentRegistry отклоняет слишком длинный ID
-            await expect(
-                componentRegistry.connect(seller).createComponent(veryLongId, "QmLong")
-            ).to.be.revertedWith("OrganicComponentRegistryLogic: business ID too long");
+            await expectRevertReason(
+                componentRegistry.connect(seller).createComponent(veryLongId, "QmLong"),
+                "OrganicComponentRegistryLogic: business ID too long"
+            );
             
             // Проверяем что ID длиной ровно 64 символа принимается
             const maxLengthId = "comp_" + "x".repeat(59); // 64 символа total
             await componentRegistry.connect(seller).createComponent(maxLengthId, "QmMax");
             
             // Проверяем что можно создать продукт с максимально допустимым ID
-            await productRegistry.connect(seller).createProduct([maxLengthId], "QmMeta");
+            await expectNotReverted(
+                productRegistry.connect(seller).createProduct("p2-max-length", [maxLengthId], "QmMeta")
+            );
             
             const storedComponents = await productRegistry.getProductComponents(1);
             expect(storedComponents[0]).to.equal(maxLengthId);
