@@ -11,8 +11,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 from bot.model.product import Product, PriceInfo
 from bot.model.organic_component import OrganicComponent
 
-def test_biounit_id_edge_cases():
-    """Тест граничных случаев для biounit_id"""
+def test_component_id_edge_cases():
+    """Тест граничных случаев для component_id"""
     test_cases = [
         ('a', True, 'Минимальная длина'),
         ('a' * 50, True, 'Максимальная длина'),
@@ -29,28 +29,28 @@ def test_biounit_id_edge_cases():
     passed = 0
     total = len(test_cases)
     
-    for biounit_id, should_pass, description in test_cases:
+    for component_id, should_pass, description in test_cases:
         try:
             component = OrganicComponent(
-                biounit_id=biounit_id,
+                component_id=component_id,
                 description_cid='QmTest123',
                 proportion='100%'
             )
             if should_pass:
-                print(f'✅ {description}: {biounit_id}')
+                print(f'✅ {description}: {component_id}')
                 passed += 1
             else:
-                print(f'❌ {description}: Ожидалась ошибка для {biounit_id}')
+                print(f'❌ {description}: Ожидалась ошибка для {component_id}')
         except ValueError as e:
             if not should_pass:
-                print(f'✅ {description}: Правильно отклонен {biounit_id}')
+                print(f'✅ {description}: Правильно отклонен {component_id}')
                 passed += 1
             else:
-                print(f'❌ {description}: Неожиданная ошибка для {biounit_id}: {e}')
+                print(f'❌ {description}: Неожиданная ошибка для {component_id}: {e}')
         except Exception as e:
             print(f'❌ {description}: Неожиданная ошибка {type(e).__name__}: {e}')
     
-    print(f'Тест biounit_id: {passed}/{total} прошли')
+    print(f'Тест component_id: {passed}/{total} прошли')
     assert passed == total, f"Тест не прошел: {passed}/{total}"
 
 def test_proportion_edge_cases():
@@ -77,7 +77,7 @@ def test_proportion_edge_cases():
     for proportion, should_pass, description in test_cases:
         try:
             component = OrganicComponent(
-                biounit_id='test_comp',
+                component_id='test_comp',
                 description_cid='QmTest123',
                 proportion=proportion
             )
@@ -157,7 +157,7 @@ def test_proportion_sum_edge_cases():
             components = []
             for i, proportion in enumerate(proportions):
                 components.append(OrganicComponent(
-                    biounit_id=f'comp_{i}',
+                    component_id=f'comp_{i}',
                     description_cid=f'QmComp{i}',
                     proportion=proportion
                 ))
@@ -201,7 +201,7 @@ if __name__ == '__main__':
     print('=' * 60)
     
     results = []
-    results.append(test_biounit_id_edge_cases())
+    results.append(test_component_id_edge_cases())
     results.append(test_proportion_edge_cases())
     results.append(test_price_edge_cases())
     results.append(test_proportion_sum_edge_cases())

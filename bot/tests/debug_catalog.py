@@ -44,7 +44,7 @@ def test_mock_catalog():
             logger.info(f"  Components: {len(product.organic_components)}")
             
             for j, component in enumerate(product.organic_components, 1):
-                logger.info(f"    Компонент {j}: {component.biounit_id} ({component.proportion})")
+                logger.info(f"    Компонент {j}: {component.component_id} ({component.proportion})")
         
         # Тестируем поиск по ID
         test_product = mock_service.get_product_by_id("amanita_lux")
@@ -70,13 +70,13 @@ def test_product_validation():
         
         # Тестируем компонент с дефисом
         component_data = {
-            "biounit_id": "lions-mane",
+            "component_id": "lions-mane",
             "description_cid": "QmTestDescription2",
             "proportion": "100%"
         }
         
         component = OrganicComponent.from_dict(component_data)
-        logger.info(f"✅ Компонент с дефисом создан успешно: {component.biounit_id}")
+        logger.info(f"✅ Компонент с дефисом создан успешно: {component.component_id}")
         
         return True
         

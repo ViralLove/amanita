@@ -92,7 +92,7 @@ def test_model_validation_errors():
     print('\n📋 OrganicComponent ошибки:')
     try:
         component = OrganicComponent(
-            biounit_id='invalid-id-with-dashes',
+            component_id='invalid-id-with-dashes',
             description_cid='invalid_cid',
             proportion='150%'
         )
@@ -117,7 +117,7 @@ def test_model_validation_errors():
     print('\n📋 Product ошибки:')
     try:
         component1 = OrganicComponent('comp1', 'QmComp1', '50%')
-        component2 = OrganicComponent('comp1', 'QmComp2', '50%')  # Дублирующий biounit_id
+        component2 = OrganicComponent('comp1', 'QmComp2', '50%')  # Дублирующий component_id
         
         product = Product(
             id='test_product',

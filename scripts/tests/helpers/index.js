@@ -10,7 +10,8 @@ const MockArweaveManager = require('./MockArweaveManager');
 const MockWeb3 = require('./MockWeb3');
 const assertionHelpers = require('./AssertionHelpers');
 const IntegrationHarness = require('./IntegrationHarness');
-const E2EHarness = require('./E2EHarness'); // NEW
+const E2EHarness = require('./E2EHarness');
+const MagicRegistryHelper = require('./MagicRegistryHelper');
 
 module.exports = {
   TestHarness,
@@ -18,7 +19,8 @@ module.exports = {
   MockArweaveManager,
   MockWeb3,
   IntegrationHarness,
-  E2EHarness, // NEW
+  E2EHarness,
+  MagicRegistryHelper,
   ...assertionHelpers
 };
 

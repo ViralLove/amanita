@@ -13,9 +13,17 @@ from model.product import Product, PriceInfo
 def test_multi_component_product():
     """Тест создания продукта с несколькими компонентами"""
     try:
-        # Создаем несколько компонентов
-        component1 = OrganicComponent('amanita_muscaria', 'Qm123456789', '60%')
-        component2 = OrganicComponent('blue_lotus', 'Qm987654321', '40%')
+        # Создаем несколько компонентов (используем keyword arguments)
+        component1 = OrganicComponent(
+            component_id='amanita_muscaria',
+            description_cid='Qm123456789',
+            proportion='60%'
+        )
+        component2 = OrganicComponent(
+            component_id='blue_lotus',
+            description_cid='Qm987654321',
+            proportion='40%'
+        )
         
         # Создаем цену
         price = PriceInfo(price=100, currency='EUR', weight='100', weight_unit='g')
@@ -48,9 +56,17 @@ def test_multi_component_product():
 def test_percentage_proportion_validation():
     """Тест валидации процентных пропорций"""
     try:
-        # Компоненты с процентными пропорциями
-        component1 = OrganicComponent('component1', 'Qm123456789', '25%')
-        component2 = OrganicComponent('component2', 'Qm987654321', '75%')
+        # Компоненты с процентными пропорциями (используем keyword arguments)
+        component1 = OrganicComponent(
+            component_id='component1',
+            description_cid='Qm123456789',
+            proportion='25%'
+        )
+        component2 = OrganicComponent(
+            component_id='component2',
+            description_cid='Qm987654321',
+            proportion='75%'
+        )
         
         # Создаем продукт
         price = PriceInfo(price=100, currency='EUR', weight='100', weight_unit='g')
@@ -80,9 +96,17 @@ def test_percentage_proportion_validation():
 def test_weight_based_proportions():
     """Тест валидации пропорций на основе веса"""
     try:
-        # Компоненты с весовыми пропорциями
-        component1 = OrganicComponent('component1', 'Qm123456789', '50g')
-        component2 = OrganicComponent('component2', 'Qm987654321', '50g')
+        # Компоненты с весовыми пропорциями (используем keyword arguments)
+        component1 = OrganicComponent(
+            component_id='component1',
+            description_cid='Qm123456789',
+            proportion='50g'
+        )
+        component2 = OrganicComponent(
+            component_id='component2',
+            description_cid='Qm987654321',
+            proportion='50g'
+        )
         
         # Создаем продукт
         price = PriceInfo(price=100, currency='EUR', weight='100', weight_unit='g')

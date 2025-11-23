@@ -56,7 +56,9 @@ describe('SetupActions', () => {
       setRecoveryContract: sinon.stub().resolves({ wait: sinon.stub().resolves() }),
       setIntegrationContract: sinon.stub().resolves({ wait: sinon.stub().resolves() }),
       setSoulIdentity: sinon.stub().resolves({ wait: sinon.stub().resolves() }),
-      setSpiralEngine: sinon.stub().resolves({ wait: sinon.stub().resolves() })
+      setSpiralEngine: sinon.stub().resolves({ wait: sinon.stub().resolves() }),
+      setOrganicComponentRegistry: sinon.stub().resolves({ wait: sinon.stub().resolves() }),
+      spiralEngine: sinon.stub().resolves('0x0000000000000000000000000000000000000000')
     });
 
     // Setup mock contracts

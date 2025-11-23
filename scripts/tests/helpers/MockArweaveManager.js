@@ -9,6 +9,9 @@ class MockArweaveManager {
     this.uploads = [];
     this.initialized = false;
     this.mockBalance = '1.5';
+    this.client = null;
+    this.key = null;
+    this.wallet = null;
   }
 
   /**
@@ -17,11 +20,14 @@ class MockArweaveManager {
    */
   async initialize() {
     this.initialized = true;
+    this.client = { mock: true };
+    this.key = { mock: true };
+    this.wallet = '0xMockArweaveWallet';
     return {
       success: true,
-      client: { mock: true },
-      key: { mock: true },
-      wallet: '0xMockArweaveWallet',
+      client: this.client,
+      key: this.key,
+      wallet: this.wallet,
       balance: { address: '0xMockArweaveWallet', balance: this.mockBalance }
     };
   }
@@ -31,7 +37,8 @@ class MockArweaveManager {
    * @returns {Object} - Mock key
    */
   async loadArweaveKey() {
-    return { mock: true, kty: 'RSA' };
+    this.key = { mock: true, kty: 'RSA' };
+    return this.key;
   }
 
   /**
@@ -40,7 +47,7 @@ class MockArweaveManager {
    */
   async checkWalletBalance() {
     return {
-      address: '0xMockArweaveWallet',
+      address: this.wallet || '0xMockArweaveWallet',
       balance: this.mockBalance
     };
   }
@@ -63,6 +70,22 @@ class MockArweaveManager {
     });
 
     return mockCID;
+  }
+
+  isReady() {
+    return this.initialized && this.client !== null && this.key !== null && this.wallet !== null;
+  }
+
+  getClient() {
+    return this.client;
+  }
+
+  getKey() {
+    return this.key;
+  }
+
+  getWalletAddress() {
+    return this.wallet;
   }
 
   /**
@@ -147,6 +170,9 @@ class MockArweaveManager {
   reset() {
     this.uploads = [];
     this.initialized = false;
+    this.client = null;
+    this.key = null;
+    this.wallet = null;
   }
 }
 

@@ -358,9 +358,13 @@ describe('ContractManager Service', () => {
       const deploySpy = sinon.spy(contractManager, 'deployContract');
       
       // Stub ethers.ContractFactory чтобы предотвратить реальный deployment
+      const deploymentWaitStub = sinon.stub().resolves({ gasUsed: 100000n });
       const mockContract = {
         getAddress: async () => '0xMockAddress',
-        waitForDeployment: async () => {}
+        waitForDeployment: async () => {},
+        deploymentTransaction: () => ({
+          wait: deploymentWaitStub
+        })
       };
       const factoryStub = sinon.stub(ethers, 'ContractFactory').returns({
         deploy: sinon.stub().resolves(mockContract)
@@ -396,9 +400,13 @@ describe('ContractManager Service', () => {
       const constructorArgs = ['arg1', 'arg2'];
       const deploySpy = sinon.spy(contractManager, 'deployContract');
       
+      const deploymentWaitStub = sinon.stub().resolves({ gasUsed: 100000n });
       const mockContract = {
         getAddress: async () => '0xMockAddress',
-        waitForDeployment: async () => {}
+        waitForDeployment: async () => {},
+        deploymentTransaction: () => ({
+          wait: deploymentWaitStub
+        })
       };
       const factoryStub = sinon.stub(ethers, 'ContractFactory').returns({
         deploy: sinon.stub().resolves(mockContract)
@@ -429,9 +437,13 @@ describe('ContractManager Service', () => {
 
     it('должен кэшировать deployed UUPS contract в contracts Map', async () => {
       // GIVEN: Successful deployment mocks
+      const deploymentWaitStub = sinon.stub().resolves({ gasUsed: 100000n });
       const mockContract = {
         getAddress: async () => '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
-        waitForDeployment: async () => {}
+        waitForDeployment: async () => {},
+        deploymentTransaction: () => ({
+          wait: deploymentWaitStub
+        })
       };
       
       const factoryStub = sinon.stub(ethers, 'ContractFactory').returns({

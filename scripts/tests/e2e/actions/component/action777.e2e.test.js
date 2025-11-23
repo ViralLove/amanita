@@ -3,7 +3,12 @@
  */
 
 const { expect } = require('chai');
-const E2EHarness = require('../../../helpers/E2EHarness');
+const {
+  E2EHarness,
+  expectRevertCustom,
+  assertSellerState
+} = require('../../../helpers');
+const { ethers } = require('hardhat');
 
 describe('E2E: Action 777 - Create Root Invites', function() {
   this.timeout(120000);
@@ -26,24 +31,69 @@ describe('E2E: Action 777 - Create Root Invites', function() {
     await harness.resetNetwork();
   });
 
-  describe('Invite Generation', () => {
-    it('должен генерировать 12 invite codes', () => {
-      // Generate invite codes
-      const codes = Array.from({ length: 12 }, (_, i) => 
-        `AMANITA-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${i.toString().padStart(4, '0')}`
-      );
-      
-      expect(codes).to.have.lengthOf(12);
-      console.log(`✓ Generated ${codes.length} invite codes`);
+  describe('Root Invite Generation (real SpiralEngine)', () => {
+    let suite;
+    let SpiralEngine;
+
+    beforeEach(async () => {
+      suite = await harness.deployProductSuite({
+        forceRedeploy: true,
+        invitesPrefix: 'ACTION777'
+      });
+      SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', suite.spiralEngineAddress);
     });
 
-    it('должен валидировать invite code format', async () => {
-      const codes = ['AMANITA-AB12-0001', 'AMANITA-CD34-0002'];
+    it('должен минтить root invite и сохранять mapping', async () => {
+      const inviteCode = `AMANITA-ROOT-${Date.now()}`;
+      const mintTx = await SpiralEngine.connect(suite.admin).mintInvite(inviteCode, 0);
+      await mintTx.wait();
+
+      const exists = await SpiralEngine.inviteCodeExists(inviteCode);
+      expect(exists).to.be.true;
+
+      const tokenId = await SpiralEngine.inviteCodeToTokenId(inviteCode);
+      expect(Number(tokenId)).to.be.greaterThan(0);
+
+      console.log(`✓ Root invite minted: ${inviteCode}, tokenId=${tokenId}`);
+    });
+
+    it('должен активировать seller через prepareSellerForE2E c reuse root invite', async function() {
+      this.timeout(60000);
+
+      const rootInvite = `AMANITA-ROOT-${Date.now()}`;
+      await (await SpiralEngine.connect(suite.admin).mintInvite(rootInvite, 0)).wait();
+
+      const result = await harness.prepareSellerForE2E({
+        spiralEngine: SpiralEngine,
+        deployerSigner: suite.admin,
+        sellerSigner: suite.seller,
+        invitesPrefix: 'ACTION777',
+        useExistingInvite: rootInvite
+      });
+
+      expect(result.sellerInvites).to.have.lengthOf(12);
+
+      const adminAddress = await suite.admin.getAddress();
+      await assertSellerState(SpiralEngine, result.sellerAddress, {
+        activated: true,
+        sellerRole: true,
+        activatorRole: true,
+        activatorAddress: adminAddress
+      });
       
-      const validation = await harness.validateInviteCodes(codes);
-      expect(validation.count).to.equal(2);
-      
-      console.log(`✓ Invite codes validated`);
+      console.log(`✓ Seller prepared via helper, root invite=${rootInvite}`);
+    });
+
+    it('должен отклонять mintInvite без SELLER_ROLE', async () => {
+      const [, , randomUser] = await ethers.getSigners();
+
+      await expectRevertCustom(
+        SpiralEngine.connect(randomUser).mintInvite('AMANITA-HACK-0001', 0),
+        'AccessControlUnauthorizedAccount',
+        SpiralEngine
+      );
+
+      console.log('✓ Unauthorized mintInvite rejected');
     });
   });
 });

@@ -307,5 +307,232 @@ class TestFallbackLocalizationService(unittest.TestCase):
         # Возвращаем стандартный порог
         self.fallback_service.configure_fallback(confidence_threshold=0.5)
 
+    def test_get_stats_returns_all_metrics(self):
+        """Тест: get_stats() возвращает все необходимые метрики"""
+        # GIVEN: Сервис с выполненными операциями
+        self.fallback_service.fallback_stats['total_requests'] = 10
+        self.fallback_service.fallback_stats['requested_language_hits'] = 5
+        self.fallback_service.fallback_stats['default_language_hits'] = 3
+        self.fallback_service.fallback_stats['translation_key_hits'] = 1
+        self.fallback_service.fallback_stats['placeholder_hits'] = 1
+        self.fallback_service.fallback_stats['errors'] = 0
+        
+        # WHEN: Получаем статистику
+        stats = self.fallback_service.get_stats()
+        
+        # THEN: Все основные метрики присутствуют
+        self.assertIn('total_requests', stats)
+        self.assertIn('requested_language_hits', stats)
+        self.assertIn('default_language_hits', stats)
+        self.assertIn('translation_key_hits', stats)
+        self.assertIn('placeholder_hits', stats)
+        self.assertIn('errors', stats)
+        
+        # THEN: Все производные метрики присутствуют
+        self.assertIn('requested_language_rate_percent', stats)
+        self.assertIn('default_language_rate_percent', stats)
+        self.assertIn('placeholder_rate_percent', stats)
+        self.assertIn('error_rate_percent', stats)
+        
+        # THEN: Дополнительные метрики присутствуют
+        self.assertIn('default_language', stats)
+        
+        # THEN: Всего 11 метрик
+        self.assertEqual(len(stats), 11)
+
+    def test_get_stats_computes_derived_metrics(self):
+        """Тест: get_stats() корректно вычисляет производные метрики"""
+        # GIVEN: Сервис с известными значениями
+        self.fallback_service.fallback_stats['total_requests'] = 100
+        self.fallback_service.fallback_stats['requested_language_hits'] = 60
+        self.fallback_service.fallback_stats['default_language_hits'] = 30
+        self.fallback_service.fallback_stats['translation_key_hits'] = 5
+        self.fallback_service.fallback_stats['placeholder_hits'] = 5
+        self.fallback_service.fallback_stats['errors'] = 3
+        
+        # WHEN: Получаем статистику
+        stats = self.fallback_service.get_stats()
+        
+        # THEN: Производные метрики вычислены корректно
+        self.assertEqual(stats['requested_language_rate_percent'], 60.0)  # 60/100 * 100
+        self.assertEqual(stats['default_language_rate_percent'], 30.0)  # 30/100 * 100
+        self.assertEqual(stats['placeholder_rate_percent'], 5.0)  # 5/100 * 100
+        self.assertEqual(stats['error_rate_percent'], 3.0)  # 3/100 * 100
+        
+        # THEN: Производные метрики являются float и округлены до 2 знаков
+        self.assertIsInstance(stats['requested_language_rate_percent'], float)
+        # Проверяем что значение корректно округлено (может быть целым, например 60.0)
+        self.assertGreaterEqual(stats['requested_language_rate_percent'], 0.0)
+        self.assertLessEqual(stats['requested_language_rate_percent'], 100.0)
+
+    def test_get_stats_rounds_derived_metrics_correctly(self):
+        """Тест: get_stats() корректно округляет производные метрики до 2 знаков"""
+        # GIVEN: Сервис с дробными значениями, которые требуют округления
+        # Случай, который даст дробное значение: 1/3 = 0.333... * 100 = 33.333...
+        self.fallback_service.fallback_stats['total_requests'] = 3
+        self.fallback_service.fallback_stats['requested_language_hits'] = 1  # 1/3 * 100 = 33.333... → должно быть 33.33
+        self.fallback_service.fallback_stats['default_language_hits'] = 0
+        self.fallback_service.fallback_stats['translation_key_hits'] = 0
+        self.fallback_service.fallback_stats['placeholder_hits'] = 0
+        self.fallback_service.fallback_stats['errors'] = 0
+        
+        # WHEN: Получаем статистику
+        stats = self.fallback_service.get_stats()
+        
+        # THEN: Производные метрики округлены до 2 знаков после запятой
+        # 1/3 * 100 = 33.333... → должно быть округлено до 33.33
+        expected_rate = round((1 / 3) * 100, 2)  # 33.33
+        self.assertEqual(stats['requested_language_rate_percent'], expected_rate)
+        self.assertEqual(stats['requested_language_rate_percent'], 33.33)
+        
+        # GIVEN: Случай с другим дробным значением: 2/7 = 0.2857... * 100 = 28.571...
+        self.fallback_service.fallback_stats['total_requests'] = 7
+        self.fallback_service.fallback_stats['requested_language_hits'] = 2  # 2/7 * 100 = 28.571... → должно быть 28.57
+        self.fallback_service.fallback_stats['default_language_hits'] = 1  # 1/7 * 100 = 14.285... → должно быть 14.29
+        
+        # WHEN: Получаем статистику
+        stats_fractional = self.fallback_service.get_stats()
+        
+        # THEN: Производные метрики округлены до 2 знаков
+        # 2/7 * 100 = 28.571... → должно быть округлено до 28.57
+        expected_rate_fractional = round((2 / 7) * 100, 2)  # 28.57
+        self.assertEqual(stats_fractional['requested_language_rate_percent'], expected_rate_fractional)
+        self.assertEqual(stats_fractional['requested_language_rate_percent'], 28.57)
+        
+        # 1/7 * 100 = 14.285... → должно быть округлено до 14.29
+        expected_default_rate = round((1 / 7) * 100, 2)  # 14.29
+        self.assertEqual(stats_fractional['default_language_rate_percent'], expected_default_rate)
+        self.assertEqual(stats_fractional['default_language_rate_percent'], 14.29)
+        
+        # THEN: Проверяем, что округление действительно до 2 знаков
+        # Преобразуем в строку и проверяем количество знаков после запятой
+        rate_str = str(stats_fractional['requested_language_rate_percent'])
+        if '.' in rate_str:
+            decimal_places = len(rate_str.split('.')[-1])
+            self.assertLessEqual(decimal_places, 2, 
+                                f"Округление должно быть до 2 знаков, получено {decimal_places}")
+
+    def test_get_stats_handles_zero_requests(self):
+        """Тест: get_stats() корректно обрабатывает случай нулевых запросов"""
+        # GIVEN: Сервис без запросов
+        self.fallback_service.fallback_stats['total_requests'] = 0
+        self.fallback_service.fallback_stats['requested_language_hits'] = 0
+        self.fallback_service.fallback_stats['default_language_hits'] = 0
+        self.fallback_service.fallback_stats['translation_key_hits'] = 0
+        self.fallback_service.fallback_stats['placeholder_hits'] = 0
+        self.fallback_service.fallback_stats['errors'] = 0
+        
+        # WHEN: Получаем статистику
+        stats = self.fallback_service.get_stats()
+        
+        # THEN: Все производные метрики равны 0.0 (без деления на ноль)
+        self.assertEqual(stats['requested_language_rate_percent'], 0.0)
+        self.assertEqual(stats['default_language_rate_percent'], 0.0)
+        self.assertEqual(stats['placeholder_rate_percent'], 0.0)
+        self.assertEqual(stats['error_rate_percent'], 0.0)
+        
+        # THEN: Основные метрики равны 0
+        self.assertEqual(stats['total_requests'], 0)
+        self.assertEqual(stats['requested_language_hits'], 0)
+        
+        # THEN: default_language присутствует
+        self.assertIn('default_language', stats)
+        self.assertEqual(stats['default_language'], 'ru')
+
+    def test_get_stats_boundary_cases_for_derived_metrics(self):
+        """Тест: get_stats() корректно обрабатывает граничные случаи производных метрик"""
+        # GIVEN: Граничный случай 1 - 100% requested_language rate (все запросы на запрошенном языке)
+        self.fallback_service.fallback_stats['total_requests'] = 40
+        self.fallback_service.fallback_stats['requested_language_hits'] = 40  # 100% на запрошенном языке
+        self.fallback_service.fallback_stats['default_language_hits'] = 0
+        self.fallback_service.fallback_stats['translation_key_hits'] = 0
+        self.fallback_service.fallback_stats['placeholder_hits'] = 0
+        self.fallback_service.fallback_stats['errors'] = 0
+        
+        # WHEN: Получаем статистику
+        stats_100_percent = self.fallback_service.get_stats()
+        
+        # THEN: Производные метрики корректны для 100% requested_language rate
+        self.assertEqual(stats_100_percent['requested_language_rate_percent'], 100.0)  # 40/40 * 100
+        self.assertEqual(stats_100_percent['default_language_rate_percent'], 0.0)  # 0/40 * 100
+        self.assertEqual(stats_100_percent['placeholder_rate_percent'], 0.0)  # 0/40 * 100
+        self.assertEqual(stats_100_percent['error_rate_percent'], 0.0)  # 0/40 * 100
+        
+        # GIVEN: Граничный случай 2 - 0% requested_language rate при не нулевых запросах (все fallback на default)
+        self.fallback_service.fallback_stats['total_requests'] = 25
+        self.fallback_service.fallback_stats['requested_language_hits'] = 0  # 0% на запрошенном языке
+        self.fallback_service.fallback_stats['default_language_hits'] = 25  # 100% fallback на default
+        self.fallback_service.fallback_stats['translation_key_hits'] = 0
+        self.fallback_service.fallback_stats['placeholder_hits'] = 0
+        self.fallback_service.fallback_stats['errors'] = 0
+        
+        # WHEN: Получаем статистику
+        stats_0_percent = self.fallback_service.get_stats()
+        
+        # THEN: Производные метрики корректны для 0% requested_language rate
+        self.assertEqual(stats_0_percent['requested_language_rate_percent'], 0.0)  # 0/25 * 100
+        self.assertEqual(stats_0_percent['default_language_rate_percent'], 100.0)  # 25/25 * 100
+        self.assertEqual(stats_0_percent['placeholder_rate_percent'], 0.0)  # 0/25 * 100
+        self.assertEqual(stats_0_percent['error_rate_percent'], 0.0)  # 0/25 * 100
+        
+        # GIVEN: Граничный случай 3 - 100% error rate (все запросы с ошибками)
+        self.fallback_service.fallback_stats['total_requests'] = 15
+        self.fallback_service.fallback_stats['requested_language_hits'] = 0
+        self.fallback_service.fallback_stats['default_language_hits'] = 0
+        self.fallback_service.fallback_stats['translation_key_hits'] = 0
+        self.fallback_service.fallback_stats['placeholder_hits'] = 0
+        self.fallback_service.fallback_stats['errors'] = 15  # 100% ошибок
+        
+        # WHEN: Получаем статистику
+        stats_100_error = self.fallback_service.get_stats()
+        
+        # THEN: Производные метрики корректны для 100% error rate
+        self.assertEqual(stats_100_error['requested_language_rate_percent'], 0.0)  # 0/15 * 100
+        self.assertEqual(stats_100_error['default_language_rate_percent'], 0.0)  # 0/15 * 100
+        self.assertEqual(stats_100_error['placeholder_rate_percent'], 0.0)  # 0/15 * 100
+        self.assertEqual(stats_100_error['error_rate_percent'], 100.0)  # 15/15 * 100
+
+    def test_get_stats_reflects_fallback_usage(self):
+        """Тест: get_stats() отражает корректные метрики после использования fallback"""
+        # GIVEN: Очищаем статистику
+        self.fallback_service.clear_statistics()
+        
+        # WHEN: Выполняем различные fallback операции
+        self.fallback_service.get_translation_with_fallback(
+            'product.test_product.title', 'en', self.translation_sources
+        )  # requested_language hit
+        
+        self.fallback_service.get_translation_with_fallback(
+            'product.test_product.title', 'fr', self.translation_sources
+        )  # default_language hit
+        
+        self.fallback_service.get_translation_with_fallback(
+            'product.nonexistent.title', 'fr', self.translation_sources
+        )  # translation_key hit
+        
+        self.fallback_service.get_translation_with_fallback(
+            'product.nonexistent.nonexistent', 'fr', self.translation_sources
+        )  # translation_key hit (не placeholder, т.к. сначала fallback на ключ)
+        
+        # WHEN: Получаем статистику
+        stats = self.fallback_service.get_stats()
+        
+        # THEN: Метрики отражают реальное использование
+        self.assertEqual(stats['total_requests'], 4)
+        self.assertEqual(stats['requested_language_hits'], 1)
+        self.assertEqual(stats['default_language_hits'], 1)
+        self.assertEqual(stats['translation_key_hits'], 2)  # 2 запроса на translation_key
+        self.assertEqual(stats['placeholder_hits'], 0)  # 0 запросов на placeholder
+        self.assertEqual(stats['errors'], 0)
+        
+        # THEN: Производные метрики корректны
+        self.assertEqual(stats['requested_language_rate_percent'], 25.0)  # 1/4 * 100
+        self.assertEqual(stats['default_language_rate_percent'], 25.0)  # 1/4 * 100
+        self.assertEqual(stats['placeholder_rate_percent'], 0.0)  # 0/4 * 100
+        self.assertEqual(stats['error_rate_percent'], 0.0)  # 0/4 * 100
+        
+        # THEN: default_language присутствует
+        self.assertEqual(stats['default_language'], 'ru')
+
 if __name__ == '__main__':
     unittest.main()

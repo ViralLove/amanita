@@ -43,7 +43,7 @@ def test_fixtures_compatibility():
             components = []
             for comp_data in product_data.get('organic_components', []):
                 component = OrganicComponent(
-                    biounit_id=comp_data.get('biounit_id', f'comp_{i}'),
+                    component_id=comp_data.get('component_id', f'comp_{i}'),
                     description_cid=comp_data.get('description_cid', 'QmDefault'),
                     proportion=comp_data.get('proportion', '100%')
                 )
@@ -146,8 +146,8 @@ def test_real_world_scenarios():
         try:
             # Создаем компоненты
             components = []
-            for biounit_id, cid, proportion in scenario['components']:
-                components.append(OrganicComponent(biounit_id, cid, proportion))
+            for component_id, cid, proportion in scenario['components']:
+                components.append(OrganicComponent(component_id, cid, proportion))
             
             # Создаем цены
             prices = []
@@ -208,7 +208,7 @@ def test_migration_scenarios():
                 'forms': ['powder'],
                 'species': 'legacy_species',
                 'cid': 'QmLegacy123',
-                'organic_components': [{'biounit_id': 'legacy_comp', 'description_cid': 'QmLegacyComp', 'proportion': '100%'}],
+                'organic_components': [{'component_id': 'legacy_comp', 'description_cid': 'QmLegacyComp', 'proportion': '100%'}],
                 'prices': [{'price': 100, 'currency': 'EUR'}],
                 'cover_image_url': 'QmLegacyCover'
             }
@@ -225,8 +225,8 @@ def test_migration_scenarios():
                 'species': 'mixed_species',
                 'cid': 'QmMixed123',
                 'organic_components': [
-                    {'biounit_id': 'comp1', 'description_cid': 'QmComp1', 'proportion': '50g'},
-                    {'biounit_id': 'comp2', 'description_cid': 'QmComp2', 'proportion': '30ml'}
+                    {'component_id': 'comp1', 'description_cid': 'QmComp1', 'proportion': '50g'},
+                    {'component_id': 'comp2', 'description_cid': 'QmComp2', 'proportion': '30ml'}
                 ],
                 'prices': [{'price': 150, 'currency': 'EUR'}],
                 'cover_image_url': 'QmMixedCover'
@@ -244,7 +244,7 @@ def test_migration_scenarios():
             components = []
             for comp_data in data['organic_components']:
                 components.append(OrganicComponent(
-                    biounit_id=comp_data['biounit_id'],
+                    component_id=comp_data['component_id'],
                     description_cid=comp_data['description_cid'],
                     proportion=comp_data['proportion']
                 ))

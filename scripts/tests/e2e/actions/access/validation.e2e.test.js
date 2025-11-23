@@ -563,14 +563,8 @@ describe('E2E: AccessControl Validation (Layer 3 - TDD)', function() {
       console.log('✅ getUserDiagnostics(): полная диагностика activated user с ролями работает!');
     });
 
-    it.skip('должен показать количество созданных invites пользователем', async () => {
-      // SKIP: Контракт не хранит счётчик invites напрямую
-      // Требует event-based counting или дополнительный mapping
-      // TODO: Реализовать после добавления invitesMintedByUser mapping в контракт
-      
-      console.log('⏳ SKIPPED: getUserDiagnostics() invites count (requires contract update)');
-      expect(true).to.be.true; // Placeholder
-    });
+    // NOTE: Invites count tracking requires contract update (invitesMintedByUser mapping)
+    // Not planned for MVP - removed pending test
   });
 
   // ================================================================
@@ -673,33 +667,9 @@ describe('E2E: AccessControl Validation (Layer 3 - TDD)', function() {
   // ================================================================
 
   describe('Error Scenarios (TDD Spec)', () => {
-    it.skip('должен обработать несуществующий invite code', async () => {
-      // SKIP: Уже покрыто в validateInviteCode() error path (lines 207-244)
-      // Этот тест дублирует, но проверяет контракт напрямую (не через accessControl)
-      // Оставляем skip для документации
-      
-      const invalidInvite = 'AMANITA-NOTEXIST-00';
-      const exists = await spiralEngine.inviteCodeExists(invalidInvite);
-      expect(exists).to.be.false;
-      
-      console.log('⏳ SKIPPED: уже покрыто в validateInviteCode() error tests');
-    });
-
-    it.skip('должен обработать уже использованный invite', async () => {
-      // SKIP: Уже покрыто в validateInviteCode() error path (lines 246-281)
-      // Этот тест дублирует, оставляем для документации
-      
-      const [deployer, seller] = await ethers.getSigners();
-      const newInvites = Array(12).fill().map((_, i) => `USED-INV-${i}`);
-      const spiralWithDeployer = spiralEngine.connect(deployer);
-      await spiralWithDeployer.activateUser(testInviteCode, seller.address, newInvites, 0);
-      
-      const tokenId = await spiralEngine.inviteCodeToTokenId(testInviteCode);
-      const isUsed = await spiralEngine.isInviteUsed(tokenId);
-      expect(isUsed).to.be.true;
-      
-      console.log('⏳ SKIPPED: уже покрыто в validateInviteCode() error tests');
-    });
+    // NOTE: Invalid invite code and used invite scenarios are already covered
+    // in validateInviteCode() error path tests (lines 207-281)
+    // Duplicate tests removed
 
     it('должен обработать zero address (getUserDiagnostics graceful handling)', async () => {
       // NOTE: validateSellerAccess() zero address уже покрыт в lines 356-373
@@ -720,50 +690,64 @@ describe('E2E: AccessControl Validation (Layer 3 - TDD)', function() {
   // Integration: AccessControl → InviteActions (TDD Spec)
   // ================================================================
 
-  describe('Integration: AccessControl → InviteActions (TDD Spec)', () => {
-    it.skip('должен работать в связке: validateInviteCode → activateUser', async () => {
-      // SKIP: InviteActions.js ещё не создан (ItemY_CODE2)
-      // Интеграционный тест будет активирован после рефакторинга
-      // TODO: Раскомментировать после создания InviteActions.activateUser()
+  describe('Integration: AccessControl → InviteActions', () => {
+    it('должен работать в связке: validateInviteCode → activateUser', async () => {
+      // GIVEN: Создаем новый invite для этого теста (testInviteCode уже использован)
+      const [deployer, seller, newUser] = await ethers.getSigners();
+      const integrationTestInvite = 'AMANITA-INTEGRATION-TEST';
+      const spiralWithDeployer = spiralEngine.connect(deployer);
+      const mintTx = await spiralWithDeployer.mintInvite(integrationTestInvite, 0);
+      await mintTx.wait();
       
-      // GIVEN: AccessControl проверяет invite
-      // const isValid = await accessControl.validateInviteCode(spiralEngine, testInviteCode);
-      // expect(isValid).to.be.true;
+      // AccessControl проверяет invite
+      const validationResult = await accessControl.validateInviteCode(spiralEngine, integrationTestInvite);
+      expect(validationResult.exists).to.be.true;
+      expect(validationResult.used).to.be.false;
+      expect(validationResult.valid).to.be.true;
       
       // WHEN: InviteActions использует этот invite для активации
-      // const activation = await inviteActions.activateUser(spiralEngine, testInviteCode, sellerAddress);
+      const InviteActions = require('../../../../lib/actions/InviteActions');
+      const ethersUtils = new EthersUtils(ethers.provider, config);
+      const contractManager = new ContractManager(ethers.provider, config, ethersUtils);
+      const inviteActions = new InviteActions(
+        contractManager,
+        ethersUtils,
+        config,
+        accessControl,
+        null // catalogActions not needed for this test
+      );
+      
+      const activation = await inviteActions.activateUser(spiralEngine, integrationTestInvite, newUser.address);
       
       // THEN: Activation успешна
+      expect(activation).to.have.property('success', true);
+      expect(activation).to.have.property('newInvites');
+      expect(activation.newInvites).to.be.an('array');
+      expect(activation.newInvites.length).to.be.greaterThan(0);
       
-      console.log('⏳ SKIPPED: AccessControl → InviteActions integration (InviteActions not created yet)');
+      // Verify user is activated
+      const usedInvite = await spiralEngine.usedInviteByUser(newUser.address);
+      expect(usedInvite).to.be.greaterThan(0);
+      
+      console.log('✅ AccessControl → InviteActions integration работает!');
+      console.log(`   Активирован: ${newUser.address}`);
+      console.log(`   Новые invites: ${activation.newInvites.length}`);
     });
 
-    it.skip('должен работать в связке: checkActivationStatus → grantSellerRole', async () => {
-      // SKIP: Интеграционный тест уже покрыт в grantSellerRole() describe block
-      // grantSellerRole() внутренне использует checkActivationStatus()
-      // Этот тест избыточен, можно удалить или оставить skip для документации
-      
-      // GIVEN: Проверить что user активирован
-      // const isActivated = await accessControl.checkActivationStatus(spiralEngine, sellerAddress);
-      
-      // IF activated:
-      // WHEN: grantSellerRole можно вызвать
-      // await accessControl.grantSellerRole(spiralEngine, sellerAddress);
-      
-      // THEN: Role назначена
-      
-      console.log('⏳ SKIPPED: checkActivation → grantRole integration (already tested in grantSellerRole)');
-    });
+    // NOTE: checkActivationStatus → grantSellerRole integration is already covered
+    // in grantSellerRole() describe block - grantSellerRole() internally uses checkActivationStatus()
+    // Duplicate test removed
   });
 
   // ================================================================
-  // DAO Governance Foundation (TDD Spec)
+  // DAO Governance Foundation (Foundation Check)
   // ================================================================
 
-  describe('DAO Governance Foundation (TDD Spec)', () => {
+  describe('DAO Governance Foundation (Foundation Check)', () => {
     it('должен подготовить структуру для DAO voting (future)', async () => {
-      // TODO: AccessControl = фундамент для DAO governance
+      // NOTE: AccessControl = фундамент для DAO governance
       // Проверяем что роли могут управляться on-chain
+      // Это foundation для будущей DAO voting системы (не реализована для MVP)
       
       const SELLER_ROLE = await spiralEngine.SELLER_ROLE();
       const ACTIVATOR_ROLE = await spiralEngine.ACTIVATOR_ROLE();
@@ -771,21 +755,13 @@ describe('E2E: AccessControl Validation (Layer 3 - TDD)', function() {
       expect(SELLER_ROLE).to.not.equal(ethers.ZeroHash);
       expect(ACTIVATOR_ROLE).to.not.equal(ethers.ZeroHash);
       
-      console.log('⏳ TDD: DAO governance foundation (role structure)');
+      console.log('✅ DAO governance foundation: role structure готов');
       console.log(`   SELLER_ROLE: ${SELLER_ROLE}`);
       console.log(`   ACTIVATOR_ROLE: ${ACTIVATOR_ROLE}`);
     });
 
-    it.skip('должен поддерживать role-based permissions для будущего DAO', async () => {
-      // SKIP: Future feature - DAO voting система
-      // AccessControl создаёт foundation для DAO governance
-      // TODO: Реализовать после внедрения DAO voting механизма
-      // - Vote для назначения ролей
-      // - Collective decision-making
-      // - Proposal system
-      
-      console.log('⏳ SKIPPED: DAO extensibility (future feature - not yet implemented)');
-    });
+    // NOTE: DAO voting система (role-based permissions, proposals, voting) - future feature
+    // Не реализована для MVP, тест удален
   });
 });
 

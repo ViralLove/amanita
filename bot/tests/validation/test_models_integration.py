@@ -16,13 +16,13 @@ def test_complete_product_integration():
     try:
         # Создаем компоненты с разными типами пропорций
         component1 = OrganicComponent(
-            biounit_id='amanita_muscaria',
+            component_id='amanita_muscaria',
             description_cid='QmAmanita123',
             proportion='60%'
         )
         
         component2 = OrganicComponent(
-            biounit_id='cordyceps_militaris', 
+            component_id='cordyceps_militaris', 
             description_cid='QmCordyceps456',
             proportion='40%'
         )
@@ -104,7 +104,7 @@ def test_multi_component_proportions():
         
         print('✅ Тест множественных компонентов успешен')
         print(f'  - Components: {len(product.organic_components)}')
-        print(f'  - All unique biounit_ids: {len(set(c.biounit_id for c in components)) == 5}')
+        print(f'  - All unique component_ids: {len(set(c.component_id for c in components)) == 5}')
         
         pass
         

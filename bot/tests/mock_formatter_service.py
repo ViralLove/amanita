@@ -39,9 +39,9 @@ class MockFormatterService:
             composition = "\n🧬 <b>Состав:</b>\n"
             if hasattr(product, 'organic_components') and product.organic_components:
                 for component in product.organic_components:
-                    biounit_id = getattr(component, 'biounit_id', 'Неизвестно')
+                    component_id = getattr(component, 'component_id', 'Неизвестно')
                     proportion = getattr(component, 'proportion', 'Не указано')
-                    composition += f"• {biounit_id} ({proportion})\n"
+                    composition += f"• {component_id} ({proportion})\n"
             else:
                 composition += "• Состав не указан\n"
             

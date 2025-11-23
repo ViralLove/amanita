@@ -7,7 +7,13 @@
 
 const { expect } = require('chai');
 const sinon = require('sinon');
-const { IntegrationHarness } = require('../helpers');
+const {
+  IntegrationHarness,
+  expectEvent,
+  expectRevertCustom,
+  assertBusinessIdMapping,
+  assertBusinessIdCleared
+} = require('../helpers');
 
 describe('Contract Validation Tests', () => {
   let harness, modules;
@@ -226,6 +232,70 @@ describe('Contract Validation Tests', () => {
         
         // CONTRACT: Errors preserve message and context
       }
+    });
+  });
+
+  describe('Contract: CoreLogic → ProductRegistry (businessId flow)', () => {
+    let suite;
+
+    beforeEach(async () => {
+      suite = await harness.setupProductRegistrySuite({ forceRedeploy: true });
+    });
+
+    it('должен создавать продукт с businessId и фиксировать событие', async () => {
+      const { productRegistry, seller, sellerComponentIds } = suite;
+
+      const businessId = 'integration-prod-1';
+      const metadataCID = 'QmIntegrationCID1';
+
+      await expectEvent(
+        productRegistry
+          .connect(seller)
+          .createProduct(businessId, [sellerComponentIds[0]], metadataCID),
+        productRegistry,
+        'ProductCreated',
+        async (args) => {
+          expect(args.seller).to.equal(seller.address);
+          expect(args.businessId).to.equal(businessId);
+          expect(args.metadataCID).to.equal(metadataCID);
+        }
+      );
+
+      await assertBusinessIdMapping(productRegistry, businessId, 1);
+    });
+
+    it('должен запрещать повторное использование businessId', async () => {
+      const { productRegistry, seller, sellerComponentIds } = suite;
+
+      const businessId = 'integration-prod-duplicate';
+      const metadataCID = 'QmIntegrationCID2';
+
+      await productRegistry
+        .connect(seller)
+        .createProduct(businessId, [sellerComponentIds[0]], metadataCID);
+
+      await expectRevertCustom(
+        productRegistry
+          .connect(seller)
+          .createProduct(businessId, [sellerComponentIds[1]], metadataCID),
+        'BusinessIdExists',
+        productRegistry
+      );
+    });
+
+    it('должен очищать businessId mapping при clearSellerCatalog', async () => {
+      const { productRegistry, seller, sellerComponentIds } = suite;
+
+      const businessId = 'integration-prod-clear';
+      await productRegistry
+        .connect(seller)
+        .createProduct(businessId, [sellerComponentIds[0]], 'QmIntegrationCID3');
+
+      await assertBusinessIdMapping(productRegistry, businessId, 1);
+
+      await productRegistry.connect(seller).clearSellerCatalog(seller.address);
+
+      await assertBusinessIdCleared(productRegistry, businessId);
     });
   });
 });

@@ -200,10 +200,10 @@ describe('Product Upload Helper Functions', function() {
       ];
       
       entries.forEach(entry => {
-        const titleValid = entry.title_cid && 
+        const titleValid = !!(entry.title_cid && 
                           typeof entry.title_cid === 'string' &&
                           entry.title_cid.length === 43 &&
-                          /^[A-Za-z0-9_-]{43}$/.test(entry.title_cid);
+                          /^[A-Za-z0-9_-]{43}$/.test(entry.title_cid));
         
         if (entry.expectedValid) {
           expect(titleValid, `${entry.id} should be valid`).to.be.true;

@@ -5,9 +5,16 @@
  */
 
 const { expect } = require('chai');
-const E2EHarness = require('../../../helpers/E2EHarness');
+const {
+  E2EHarness,
+  expectEvent,
+  assertBusinessIdMapping,
+  assertBusinessIdCleared,
+  assertSellerState
+} = require('../../../helpers');
 const fs = require('fs');
 const path = require('path');
+const { ethers } = require('hardhat');
 
 describe('E2E: Action 444 - Automatic Pipeline', function() {
   this.timeout(120000);
@@ -42,16 +49,18 @@ describe('E2E: Action 444 - Automatic Pipeline', function() {
       console.log('✓ Pipeline components ready');
     });
 
-    it('should orchestrate CSV → JSON → CID workflow', async () => {
+    it('should orchestrate CSV → JSON → CID workflow и зарегистрировать продукты', async () => {
+      console.log('Фаза 1: Подготовка и чтение CSV');
       const timer = harness.measureExecutionTime('Automatic Pipeline');
-      
-      // STEP 1: CSV → JSON
       const csvPath = path.join(__dirname, '../../../fixtures/catalog/test_catalog.csv');
       const csvData = fs.readFileSync(csvPath, 'utf8');
       const lines = csvData.trim().split('\n');
       const headers = lines[0].split(',');
+
+      console.log('Фаза 2: Проверка структуры CSV через validateCsvHeaders');
+      harness.validateCsvHeaders(headers);
+
       const products = [];
-      
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(',');
         const product = {};
@@ -60,15 +69,17 @@ describe('E2E: Action 444 - Automatic Pipeline', function() {
         });
         products.push(product);
       }
-      
+
+      console.log('Фаза 3: Подтверждаем наличие businessId в каждой строке');
       expect(products).to.have.length.greaterThan(0);
+      products.forEach(product => {
+        expect(product.product_id, 'Отсутствует businessId (product_id) в CSV строке').to.be.a('string');
+      });
       
       // STEP 2: Generate CID
       const json = JSON.stringify(products);
-      const randomPart = Array(5).fill(0).map(() => Math.random().toString(36).substring(2, 11)).join('');
-      const cid = `Qm${randomPart.substring(0, 44)}`;
-      
-      expect(cid).to.have.lengthOf(46);
+      const cid = harness.generateValidCid('action444-json');
+      harness.assertCidFormat(cid);
       
       // STEP 3: Validate complete pipeline
       const result = {
@@ -81,6 +92,41 @@ describe('E2E: Action 444 - Automatic Pipeline', function() {
       expect(result.json).to.be.greaterThan(0);
       expect(result.cid).to.match(/^Qm/);
       
+      // STEP 4: Register products on-chain через harness
+      console.log('Фаза 4: Разворачиваем suite для регистрации продуктов');
+      const suite = await harness.deployProductSuite({ forceRedeploy: true });
+      const { productRegistry, seller, sellerComponentIds } = suite;
+
+      console.log('Фаза 5: Регистрируем продукты и валидируем CID');
+      const registeredBusinessIds = [];
+      for (let i = 0; i < products.length; i++) {
+        const product = products[i];
+        const businessId = product.product_id;
+        const metadataCID = harness.generateValidCid(`action444-metadata-${i}`);
+        harness.assertCidFormat(metadataCID);
+        const componentId = sellerComponentIds[i % sellerComponentIds.length];
+
+        await expectEvent(
+          productRegistry
+            .connect(seller)
+            .createProduct(businessId, [componentId], metadataCID),
+          productRegistry,
+          'ProductCreated'
+        );
+
+        await assertBusinessIdMapping(productRegistry, businessId, i + 1);
+        registeredBusinessIds.push(businessId);
+      }
+
+      console.log('Фаза 6: Проверяем очистку mapping и catalogVersion после pipeline');
+      const sellerAddress = await seller.getAddress();
+      await productRegistry.connect(seller).clearSellerCatalog(sellerAddress);
+      for (const businessId of registeredBusinessIds) {
+        await assertBusinessIdCleared(productRegistry, businessId);
+      }
+      const catalogVersion = await productRegistry.catalogVersion(sellerAddress);
+      expect(Number(catalogVersion)).to.be.greaterThan(0);
+
       const duration = timer.end();
       expect(duration).to.be.lessThan(5000);
       
@@ -93,17 +139,41 @@ describe('E2E: Action 444 - Automatic Pipeline', function() {
       const csvExists = fs.existsSync(csvPath);
       expect(csvExists).to.be.true;
       
-      // Step 2: JSON created
+      // Step 2: JSON created + структура CSV
       const csvData = fs.readFileSync(csvPath, 'utf8');
       const lines = csvData.trim().split('\n');
       expect(lines.length).to.be.greaterThan(1);
-      
+      const headers = lines[0].split(',');
+      harness.validateCsvHeaders(headers);
+
       // Step 3: CID generated
-      const randomPart = Array(5).fill(0).map(() => Math.random().toString(36).substring(2, 11)).join('');
-      const cid = `Qm${randomPart.substring(0, 44)}`;
-      expect(cid).to.have.lengthOf(46);
+      const cid = harness.generateValidCid('action444-state-check');
+      harness.assertCidFormat(cid);
       
       console.log('✓ State validated at each step');
+    });
+  });
+
+  describe('Seller Preparation via Harness Helper', () => {
+    it('должен подготовить seller через harness.deployProductSuite() + prepareSellerForE2E', async function() {
+      this.timeout(60000);
+
+      const suite = await harness.deployProductSuite({
+        forceRedeploy: true,
+        invitesPrefix: 'ACTION444'
+      });
+
+      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', suite.spiralEngineAddress);
+      const sellerAddr = await suite.seller.getAddress();
+
+      const adminAddress = await suite.admin.getAddress();
+
+      await assertSellerState(SpiralEngine, sellerAddr, {
+        activated: true,
+        sellerRole: true,
+        activatorRole: true,
+        activatorAddress: adminAddress
+      });
     });
   });
 

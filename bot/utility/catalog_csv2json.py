@@ -23,7 +23,7 @@ def load_image_cids(mapping_path: str) -> Dict[str, str]:
 
 def load_description_cids(mapping_path: str) -> Dict[str, str]:
     """
-    Загружает маппинг biounit_id и их CID описаний
+    Загружает маппинг component_id и их CID описаний
     
     Args:
         mapping_path: Путь к файлу с маппингом
@@ -31,8 +31,8 @@ def load_description_cids(mapping_path: str) -> Dict[str, str]:
     try:
         with open(mapping_path, 'r', encoding='utf-8') as file:
             mapping = json.load(file)
-            # Преобразуем структуру в простой словарь biounit_id -> cid
-            return {biounit_id: data["cid"] for biounit_id, data in mapping.items()}
+            # Преобразуем структуру в простой словарь component_id -> cid
+            return {component_id: data["cid"] for component_id, data in mapping.items()}
     except Exception as e:
         logger.error(f"😱 Ошибка при загрузке маппинга описаний: {e}")
         return {}
@@ -123,10 +123,10 @@ def convert_catalog_to_json(
                 cover_image_cid = image_cids.get(image_file, "")
                 
                 # Получаем CID описания из маппинга
-                biounit_id = row['biounit_id']
-                description_cid = description_cids.get(biounit_id)
+                component_id = row['component_id']
+                description_cid = description_cids.get(component_id)
                 if not description_cid:
-                    logger.warning(f"⚠️ Не найден CID описания для biounit_id: {biounit_id}")
+                    logger.warning(f"⚠️ Не найден CID описания для component_id: {component_id}")
                 
                 # Обрабатываем цены
                 prices = parse_prices(row['prices'])
@@ -137,7 +137,7 @@ def convert_catalog_to_json(
                     "title": row['product_name'],
                     "organic_components": [
                         {
-                            "biounit_id": biounit_id,
+                            "component_id": component_id,
                             "description_cid": description_cid or "",
                             "proportion": "100%"
                         }

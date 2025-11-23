@@ -7,6 +7,7 @@
 
 const { expect } = require('chai');
 const sinon = require('sinon');
+const { ethers } = require('hardhat');
 const { IntegrationHarness } = require('../helpers');
 
 describe('Integration Proof Tests', () => {
@@ -59,15 +60,95 @@ describe('Integration Proof Tests', () => {
 
   describe('Module Integration: ContractManager ↔ EthersUtils', () => {
     it('должен интегрировать ContractManager с EthersUtils', async () => {
+      // GIVEN: Setup mock contract with state tracking для проверки изменения состояния
+      const sellerAddress = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+      
+      // ✅ ИСПРАВЛЕНИЕ 1.3: Отслеживание состояния между вызовами через замыкание
+      let userActivationState = {
+        usedInvite: '0', // Not activated initially
+        isActivated: false,
+        hasSellerRole: false, // ✅ P0 FIX: Добавляем состояние для SELLER_ROLE
+        SELLER_ROLE: null // Будет установлено при первом вызове
+      };
+
+      // ✅ ИСПРАВЛЕНИЕ 1.3: Создаем функции, которые используют замыкание для состояния
+      const usedInviteByUserFn = async (address) => {
+        // ✅ ИСПРАВЛЕНИЕ 1.3: Возвращаем актуальное состояние из замыкания
+        return userActivationState.usedInvite;
+      };
+      
+      const activateUserFn = async (inviteCode, userAddress, newInvites, expiry) => {
+        // ✅ ИСПРАВЛЕНИЕ 1.3: Обновляем состояние в замыкании после активации
+        userActivationState.usedInvite = '1'; // Token ID after activation
+        userActivationState.isActivated = true;
+        
+        return '1'; // Token ID after activation
+      };
+
+      // ✅ P0 FIX: Функция для проверки роли с отслеживанием состояния
+      const hasRoleFn = async (role, address) => {
+        // Получаем SELLER_ROLE при первом вызове
+        if (!userActivationState.SELLER_ROLE) {
+          userActivationState.SELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('SELLER_ROLE'));
+        }
+        // Проверяем, является ли это SELLER_ROLE и назначена ли роль
+        const sellerRole = userActivationState.SELLER_ROLE;
+        if (role === sellerRole || role.toLowerCase() === sellerRole.toLowerCase()) {
+          return userActivationState.hasSellerRole;
+        }
+        return false;
+      };
+
+      // ✅ P0 FIX: Функция для назначения роли с обновлением состояния
+      const grantSellerRoleFn = async (userAddress) => {
+        // Обновляем состояние после назначения роли
+        userActivationState.hasSellerRole = true;
+        return { hash: '0xgrantSellerRole', wait: async () => ({ status: 1 }) };
+      };
+
       // GIVEN: Setup mock contract FIRST (before calling method)
       const mockSpiralEngine = harness.setupContractMock('SpiralEngine', {
         usedInviteByUser: {
-          call: async () => '0' // User not yet activated
+          call: usedInviteByUserFn
         },
         activateUser: {
-          call: async () => '1', // User activated with token ID 1
+          call: activateUserFn,
           encodeABI: '0xactivate'
+        },
+        SELLER_ROLE: {
+          call: async () => {
+            if (!userActivationState.SELLER_ROLE) {
+              userActivationState.SELLER_ROLE = ethers.keccak256(ethers.toUtf8Bytes('SELLER_ROLE'));
+            }
+            return userActivationState.SELLER_ROLE;
+          }
+        },
+        hasRole: {
+          call: hasRoleFn
+        },
+        inviteCodeExists: {
+          call: async (inviteCode) => {
+            // Возвращаем true для тестового invite кода
+            return true;
+          }
+        },
+        // ✅ P0 FIX: Добавляем grantSellerRole() для AccessControlActions.grantSellerRole()
+        grantSellerRole: {
+          call: grantSellerRoleFn,
+          encodeABI: '0xgrantSellerRole'
         }
+      });
+      
+      // ✅ ИСПРАВЛЕНИЕ 1.3: Создаем spy для отслеживания вызовов activateUser
+      // Используем callsFake, чтобы сохранить оригинальное поведение и отслеживать вызовы
+      const originalActivateUser = mockSpiralEngine.activateUser;
+      const activateUserSpy = sinon.stub(mockSpiralEngine, 'activateUser').callsFake(async (...args) => {
+        // ✅ ИСПРАВЛЕНИЕ 1.3: Обновляем состояние при вызове activateUser
+        userActivationState.usedInvite = '1'; // Token ID after activation
+        userActivationState.isActivated = true;
+        
+        // Вызываем оригинальный метод (который возвращает транзакцию)
+        return originalActivateUser.apply(mockSpiralEngine, args);
       });
       
       // Stub getContract BEFORE calling CoreLogic
@@ -79,9 +160,14 @@ describe('Integration Proof Tests', () => {
       const inviteCodes = modules.ethersUtils.generateNewInviteCodes(3);
       expect(inviteCodes).to.have.lengthOf(3);
       
+      // ✅ ИСПРАВЛЕНИЕ 1.3: Проверяем начальное состояние (до активации)
+      const initialStateBefore = await mockSpiralEngine.usedInviteByUser(sellerAddress);
+      expect(initialStateBefore).to.equal('0'); // Не активирован
+      expect(userActivationState.isActivated).to.be.false;
+      
       // WHEN: CoreLogic использует оба модуля (ContractManager + EthersUtils)
       const result = await modules.coreLogic.activateSellerBasic(
-        '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+        sellerAddress,
         inviteCodes
       );
       
@@ -90,7 +176,22 @@ describe('Integration Proof Tests', () => {
       expect(result.success).to.be.true;
       expect(getContractStub.calledOnce).to.be.true;
       
+      // ✅ ИСПРАВЛЕНИЕ 1.3: Проверяем изменение состояния после активации
+      // Так как activateUserFn был вызван через spy, состояние должно быть обновлено
+      expect(userActivationState.isActivated).to.be.true; // Флаг активации обновлен
+      expect(userActivationState.usedInvite).to.not.equal('0'); // Состояние изменилось
+      expect(userActivationState.usedInvite).to.equal('1'); // Использован invite с token ID 1
+      
+      // ✅ ИСПРАВЛЕНИЕ 1.3: Проверяем изменение состояния через мок (после активации)
+      const stateAfterActivation = await mockSpiralEngine.usedInviteByUser(sellerAddress);
+      expect(stateAfterActivation).to.not.equal('0'); // Состояние изменилось
+      expect(stateAfterActivation).to.equal('1'); // Использован invite с token ID 1
+      
+      // ✅ ИСПРАВЛЕНИЕ 1.3: Проверяем, что состояние действительно изменилось
+      expect(stateAfterActivation).to.not.equal(initialStateBefore);
+      
       // EthersUtils generated codes → CoreLogic used them → ContractManager processed
+      // ✅ ИСПРАВЛЕНИЕ 1.3: Теперь также проверяем изменение состояния блокчейна через мок
     });
   });
 

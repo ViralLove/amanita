@@ -4,9 +4,18 @@
 import pytest
 import logging
 import os
+import sys
 import time
+from pathlib import Path
 from unittest.mock import Mock, AsyncMock
-from bot.services.core import blockchain
+
+# Add bot/ to Python path for imports (fixes config import issue)
+bot_dir = Path(__file__).parent.parent
+if str(bot_dir) not in sys.path:
+    sys.path.insert(0, str(bot_dir))
+
+# Lazy import: blockchain imported only when needed to avoid config import issues
+# from bot.services.core import blockchain
 from bot.model.product import Product
 from bot.model.organic_component import OrganicComponent
 from bot.model.product import PriceInfo
@@ -43,6 +52,32 @@ def setup_test_logging():
 
 
 @pytest.fixture(scope="function")
+def product_formatter_service():
+    """
+    Fixture для ProductFormatterService без blockchain dependencies.
+    
+    Используется для unit tests форматирования продуктов.
+    Избегает инициализации blockchain при импорте handlers.
+    """
+    import sys
+    from unittest.mock import Mock, patch
+    from pathlib import Path
+    
+    # Mock registry_singleton ПЕРЕД импортом
+    mock_registry = Mock()
+    
+    with patch.dict('sys.modules', {'services.product.registry_singleton': Mock(product_registry_service=mock_registry)}):
+        from handlers.common.formatting.product_formatter_service import ProductFormatterService
+        from handlers.common.formatting.product_formatter_config import ProductFormatterConfig
+        
+        # Create с minimal config (no dependencies)
+        config = ProductFormatterConfig()
+        formatter = ProductFormatterService(config=config, localization_service=None)
+        
+        return formatter
+
+
+@pytest.fixture(scope="function")
 def mock_blockchain_service(monkeypatch):
     """Мок для BlockchainService (только для unit-тестов продуктов)"""
     
@@ -66,6 +101,13 @@ def mock_blockchain_service(monkeypatch):
                 "user_roles": {},
                 "circle_members": {},
                 "violations": {}
+            }
+            
+            # Состояние для OrganicComponentRegistry
+            self.component_registry_state = {
+                "components": {},
+                "total_components": 0,
+                "next_component_id": 1
             }
             
             # 🔧 ИЗОЛЯЦИЯ: Сбрасываем состояние при каждом создании фикстуры
@@ -106,6 +148,9 @@ def mock_blockchain_service(monkeypatch):
             
             # 🆕 Инициализация тестовых данных для SpiralEngine
             self._initialize_spiral_engine_test_data()
+            
+            # 🆕 Инициализация тестовых данных для OrganicComponentRegistry
+            self._initialize_component_test_data()
             
             logger.info(f"🔧 [MockBlockchainService] Инициализированы тестовые данные: {len(self.product_statuses)} продуктов")
             logger.info(f"   - product_statuses: {self.product_statuses}")
@@ -167,6 +212,38 @@ def mock_blockchain_service(monkeypatch):
             })
             
             logger.info("🆕 [MockBlockchainService] Инициализированы тестовые данные SpiralEngine")
+        
+        def _initialize_component_test_data(self):
+            """Инициализация тестовых данных для OrganicComponentRegistry"""
+            self.component_registry_state = {
+                "components": {
+                    "amanita_muscaria": {
+                        "id": 1,
+                        "businessId": "amanita_muscaria",
+                        "creator": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                        "rootMetadataCID": "ar://xyz123abc456def789",
+                        "createdAt": 1730000000,
+                        "lastUpdated": 1730000000,
+                        "status": 0,
+                        "isShared": True,
+                    },
+                    "blue_lotus": {
+                        "id": 2,
+                        "businessId": "blue_lotus",
+                        "creator": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                        "rootMetadataCID": "ar://abc789xyz456def123",
+                        "createdAt": 1730000100,
+                        "lastUpdated": 1730000100,
+                        "status": 0,
+                        "isShared": True,
+                    }
+                },
+                "total_components": 2,
+                "next_component_id": 3
+            }
+            
+            logger.info("🆕 [MockBlockchainService] Инициализированы тестовые данные OrganicComponentRegistry")
+            logger.info(f"   - Компонентов: {len(self.component_registry_state['components'])}")
         
         def _generate_next_blockchain_id(self):
             """Генерирует следующий уникальный blockchain ID"""
@@ -329,6 +406,10 @@ def mock_blockchain_service(monkeypatch):
             # Поддержка SpiralEngine функций
             if contract_name == "SpiralEngine":
                 return self._call_spiral_engine_function(function_name, default_value, *args)
+            
+            # Поддержка OrganicComponentRegistry функций
+            elif contract_name == "OrganicComponentRegistry":
+                return self._call_component_registry_function(function_name, default_value, *args)
             
             # Определяем тип контракта по функции (старая логика для обратной совместимости)
             if function_name in ["isSeller", "userInviteCount", "isUserActivated", "getAllActivatedUsers", 
@@ -529,6 +610,91 @@ def mock_blockchain_service(monkeypatch):
             # Fallback
             return default_value
         
+        def _call_component_registry_function(self, function_name, default_value, *args):
+            """
+            Вызов функций OrganicComponentRegistry в моке
+            
+            Supported methods:
+            - componentExists(businessId) → bool
+            - getComponentByBusinessId(businessId) → Component struct (tuple)
+            - totalComponents() → uint256
+            - componentBusinessIds(id) → string
+            - getComponentRootMetadata(businessId) → string
+            """
+            logger.info(f"🔍 [MockBlockchainService] OrganicComponentRegistry функция: {function_name} с аргументами {args}")
+            
+            # componentExists(businessId)
+            if function_name == "componentExists":
+                business_id = args[0] if args else ""
+                exists = business_id in self.component_registry_state["components"]
+                logger.info(f"   - componentExists('{business_id}') = {exists}")
+                return exists
+            
+            # getComponentByBusinessId(businessId)
+            elif function_name == "getComponentByBusinessId":
+                business_id = args[0] if args else ""
+                component = self.component_registry_state["components"].get(business_id)
+                
+                if component:
+                    # Return tuple matching Solidity struct signature:
+                    # (id, creator, createdAt, lastUpdated, status, isShared)
+                    result = (
+                        component["id"],
+                        component["creator"],
+                        component.get("createdAt"),
+                        component.get("lastUpdated", component.get("createdAt")),
+                        component.get("status", 0),
+                        component.get("isShared", True),
+                    )
+                    logger.info(
+                        "   - getComponentByBusinessId('%s') = Component(id=%s)",
+                        business_id,
+                        component["id"],
+                    )
+                    return result
+                else:
+                    logger.info(f"   - getComponentByBusinessId('{business_id}') = None (not found)")
+                    return None
+            
+            # totalComponents()
+            elif function_name == "totalComponents":
+                total = self.component_registry_state["total_components"]
+                logger.info(f"   - totalComponents() = {total}")
+                return total
+            
+            # componentBusinessIds(id)
+            elif function_name == "componentBusinessIds":
+                component_id = args[0] if args else 0
+                
+                # Find component by blockchain ID
+                for comp in self.component_registry_state["components"].values():
+                    if comp["id"] == component_id:
+                        business_id = comp["businessId"]
+                        logger.info(f"   - componentBusinessIds({component_id}) = '{business_id}'")
+                        return business_id
+                
+                logger.info(f"   - componentBusinessIds({component_id}) = '' (not found)")
+                return ""
+            
+            elif function_name == "getComponentRootMetadata":
+                business_id = args[0] if args else ""
+                component = self.component_registry_state["components"].get(business_id)
+                if component:
+                    cid = component.get("rootMetadataCID")
+                    logger.info(
+                        "   - getComponentRootMetadata('%s') = %s",
+                        business_id,
+                        cid,
+                    )
+                    return cid
+                logger.info(f"   - getComponentRootMetadata('{business_id}') = None (not found)")
+                return None
+            
+            # Unknown method
+            else:
+                logger.warning(f"⚠️ [MockBlockchainService] Неизвестная OrganicComponentRegistry функция: {function_name}")
+                return default_value
+        
         def get_contract(self, contract_name):
             """Получение контракта для тестирования"""
             if contract_name == "SpiralEngine":
@@ -592,10 +758,145 @@ def mock_blockchain_service(monkeypatch):
                 return {"success": False, "message": "Invite code already used"}
             
             return {"success": True, "token_id": token_id, "invite_code": invite_code}
+        
+        # ==========================================
+        # OrganicComponentRegistry Methods
+        # ==========================================
+        
+        def component_exists(self, component_id: str) -> bool:
+            """Проверяет существование компонента по business ID"""
+            return self._call_contract_read_function(
+                "OrganicComponentRegistry",
+                "componentExists",
+                False,
+                component_id
+            )
+        
+        def get_component(self, component_id: str):
+            """Получает компонент по business ID"""
+            return self._call_contract_read_function(
+                "OrganicComponentRegistry",
+                "getComponentByBusinessId",
+                None,
+                component_id,
+            )
+
+        def get_component_root_metadata(self, component_id: str):
+            """Возвращает rootMetadataCID компонента из маппинга."""
+            return self._call_contract_read_function(
+                "OrganicComponentRegistry",
+                "getComponentRootMetadata",
+                None,
+                component_id,
+            )
+
+        def get_component_root_metadata_cid(self, component_id: str):
+            """Совместимость со старыми тестами: alias для get_component_root_metadata."""
+            return self.get_component_root_metadata(component_id)
+
+        def get_component_business_id(self, blockchain_id: int):
+            """Возвращает businessId по числовому ID."""
+            return self._call_contract_read_function(
+                "OrganicComponentRegistry",
+                "componentBusinessIds",
+                None,
+                blockchain_id,
+            )
+        
+        def get_all_components(self):
+            """Получает все компоненты из реестра"""
+            try:
+                total = self._call_contract_read_function(
+                    "OrganicComponentRegistry",
+                    "totalComponents",
+                    0
+                )
+                
+                components = []
+                for i in range(1, total + 1):
+                    business_id = self._call_contract_read_function(
+                        "OrganicComponentRegistry",
+                        "componentBusinessIds",
+                        None,
+                        i
+                    )
+                    
+                    if business_id:
+                        component = self.get_component(business_id)
+                        if component:
+                            components.append(component)
+                
+                return components
+            except Exception:
+                return []
     
     # Подменяем BlockchainService на мок
+    from bot.services.core import blockchain  # Lazy import
     monkeypatch.setattr(blockchain, "BlockchainService", MockBlockchainService)
     return MockBlockchainService()
+
+
+@pytest.fixture(scope="function")
+def mock_storage_service():
+    """Мок для ProductStorageService для unit-тестов ComponentService"""
+    
+    class MockStorageService:
+        """Mock storage service для тестирования ComponentService"""
+        
+        def __init__(self):
+            # Mock Arweave metadata для компонентов
+            # CIDs must match those in MockBlockchainService._initialize_component_test_data()
+            self.mock_metadata = {
+                "xyz123abc456def789": {  # amanita_muscaria CID (matches MockBlockchainService)
+                    "component_id": "amanita_muscaria",
+                    "scientific_title": "Amanita muscaria",
+                    "forms": ["dried"],
+                    "features": {
+                        "common": ["stress_relief", "vitality_boost"],
+                        "forms": {
+                            "dried": ["long_term_effect", "easy_storage"]
+                        }
+                    },
+                    "localizations": {
+                        "simple_fields": {
+                            "title": {"cid": "Qm123"}
+                        },
+                        "complex_fields": {
+                            "ru": {"cid": "Qm456", "size": 3902},
+                            "en": {"cid": "Qm789", "size": 246}
+                        }
+                    }
+                },
+                "abc789xyz456def123": {  # blue_lotus CID (matches MockBlockchainService)
+                    "component_id": "blue_lotus",
+                    "scientific_title": "Nymphaea caerulea",
+                    "forms": ["flower", "tincture"],
+                    "features": {
+                        "common": ["relaxation", "consciousness_expansion"]
+                    },
+                    "localizations": {}
+                },
+                # Nested description CIDs (for get_component_description tests)
+                "Qm456": {  # Russian description for amanita_muscaria
+                    "generic_description": "🔬 Активные компоненты: мусцимол, иботеновая кислота",
+                    "effects": "🌿 Целительное действие: снижение стресса, повышение витальности",
+                    "shamanic": "🌀 Шаманская перспектива: расширение сознания, духовное путешествие",
+                    "warnings": "⚠️ Предостережения: не рекомендуется при беременности"
+                },
+                "Qm789": {  # English description for amanita_muscaria
+                    "generic_description": "🔬 Active compounds: muscimol, ibotenic acid",
+                    "effects": "🌿 Healing action: stress reduction, vitality boost",
+                    "shamanic": "🌀 Shamanic perspective: consciousness expansion, spiritual journey",
+                    "warnings": "⚠️ Warnings: not recommended during pregnancy"
+                }
+            }
+        
+        def download_json(self, cid: str):
+            """Mock download_json method"""
+            clean_cid = cid.replace("ar://", "")
+            return self.mock_metadata.get(clean_cid)
+    
+    return MockStorageService()
 
 
 @pytest.fixture(scope="function")
@@ -636,7 +937,7 @@ def mock_validation_service():
                         if not isinstance(component, dict):
                             errors.append(f"organic_components[{i}]: Должен быть словарем")
                         else:
-                            required_component_fields = ["biounit_id", "description_cid", "proportion"]
+                            required_component_fields = ["component_id", "description_cid", "proportion"]
                             for comp_field in required_component_fields:
                                 if comp_field not in component:
                                     errors.append(f"organic_components[{i}].{comp_field}: Поле обязательно")
@@ -783,7 +1084,7 @@ def mock_ipfs_storage_failing():
                 "title": "Amanita muscaria — sliced caps and gills (1st grade)",
                 "organic_components": [
                     {
-                        "biounit_id": "amanita_muscaria",
+                        "component_id": "amanita_muscaria",
                         "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         "proportion": "100%"
                     }
@@ -907,7 +1208,7 @@ def mock_ipfs_service(monkeypatch):
                 "title": "Amanita muscaria — sliced caps and gills (1st grade)",
                 "organic_components": [
                     {
-                        "biounit_id": "amanita_muscaria",
+                        "component_id": "amanita_muscaria",
                         "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         "proportion": "100%"
                     }
@@ -1303,7 +1604,7 @@ def mock_ipfs_storage():
                                 "title": f"Test Product {blockchain_id}",
                                 "organic_components": [
                                     {
-                                        "biounit_id": f"test_component_{blockchain_id}",
+                                        "component_id": f"test_component_{blockchain_id}",
                                         "description_cid": cid,
                                         "proportion": "100%"
                                     }
@@ -1338,7 +1639,7 @@ def mock_ipfs_storage():
                     "title": "Amanita muscaria — sliced caps and gills (1st grade)",
                     "organic_components": [
                         {
-                            "biounit_id": "amanita_muscaria",
+                            "component_id": "amanita_muscaria",
                             "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                             "proportion": "100%"
                         }
@@ -1356,7 +1657,7 @@ def mock_ipfs_storage():
                     "title": "Amanita pantherina — premium powder",
                     "organic_components": [
                         {
-                            "biounit_id": "amanita_pantherina",
+                            "component_id": "amanita_pantherina",
                             "description_cid": "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1",
                             "proportion": "100%"
                         }
@@ -1374,7 +1675,7 @@ def mock_ipfs_storage():
                     "title": "Blue Lotus — flower extract",
                     "organic_components": [
                         {
-                            "biounit_id": "blue_lotus",
+                            "component_id": "blue_lotus",
                             "description_cid": "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B",
                             "proportion": "100%"
                         }
@@ -1392,7 +1693,7 @@ def mock_ipfs_storage():
                     "title": "Chaga — medicinal mushroom",
                     "organic_components": [
                         {
-                            "biounit_id": "chaga",
+                            "component_id": "chaga",
                             "description_cid": "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz",
                             "proportion": "100%"
                         }
@@ -1410,7 +1711,7 @@ def mock_ipfs_storage():
                     "title": "Lion's Mane — cognitive support",
                     "organic_components": [
                         {
-                            "biounit_id": "lions_mane",
+                            "component_id": "lions_mane",
                             "description_cid": "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy",
                             "proportion": "100%"
                         }
@@ -1428,7 +1729,7 @@ def mock_ipfs_storage():
                     "title": "Reishi — longevity mushroom",
                     "organic_components": [
                         {
-                            "biounit_id": "reishi",
+                            "component_id": "reishi",
                             "description_cid": "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd",
                             "proportion": "100%"
                         }
@@ -1446,7 +1747,7 @@ def mock_ipfs_storage():
                     "title": "Cordyceps — energy boost",
                     "organic_components": [
                         {
-                            "biounit_id": "cordyceps",
+                            "component_id": "cordyceps",
                             "description_cid": "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa",
                             "proportion": "100%"
                         }
@@ -1464,7 +1765,7 @@ def mock_ipfs_storage():
                     "title": "Turkey Tail — immune support",
                     "organic_components": [
                         {
-                            "biounit_id": "turkey_tail",
+                            "component_id": "turkey_tail",
                             "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
                             "proportion": "100%"
                         }
@@ -1710,7 +2011,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
             test_metadata = {
                 "id": "test_product",
                 "title": "Test Product",
-                "organic_components": [{"biounit_id": "test_biounit", "description_cid": "QmTestDesc", "proportion": "100%"}],
+                "organic_components": [{"component_id": "test_biounit", "description_cid": "QmTestDesc", "proportion": "100%"}],
                 "cover_image_url": "QmTestImage",
                 "categories": ["mushroom"],
                 "forms": ["powder"],
@@ -1896,7 +2197,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     
                     # Создаем OrganicComponent для тестирования
                     organic_component = OrganicComponent(
-                        biounit_id="test_biounit_1",
+                        component_id="test_biounit_1",
                         description_cid="QmTestDescriptionCID1",
                         proportion="100%"
                     )
@@ -1945,7 +2246,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                         # Создаем тестовый продукт для мока
                         
                         test_component = OrganicComponent(
-                            biounit_id="test_biounit_1",
+                            component_id="test_biounit_1",
                             description_cid="QmTestDescriptionCID1",
                             proportion="100%"
                         )
@@ -2001,7 +2302,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     title="Test Amanita Product",
                     organic_components=[
                         OrganicComponent(
-                            biounit_id="amanita_muscaria",
+                            component_id="amanita_muscaria",
                             description_cid="QmTestDescCID",
                             proportion="100%"
                         )
@@ -2445,7 +2746,7 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     from bot.model.product import Product, OrganicComponent, PriceInfo
                     
                     test_component = OrganicComponent(
-                        biounit_id="test_biounit_1",
+                        component_id="test_biounit_1",
                         description_cid="QmTestDescriptionCID1",
                         proportion="100%"
                     )
@@ -2721,7 +3022,7 @@ def test_products():
             "title": "Amanita muscaria — sliced caps and gills (1st grade)",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     "proportion": "100%"
                 }
@@ -2736,7 +3037,7 @@ def test_products():
             "title": "Amanita pantherina — premium capsules",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_pantherina",
+                    "component_id": "amanita_pantherina",
                     "description_cid": "QmYXGiCLB1sPtkoskNWA5dCo8d9uW6RVVS94uq2xf6awQ7",
                     "proportion": "100%"
                 }
@@ -2766,7 +3067,7 @@ async def preloaded_products_basic(mock_product_registry_service):
             "title": "Basic Test Product 1",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "QmBasicTestCID001",
                     "proportion": "100%"
                 }
@@ -2789,7 +3090,7 @@ async def preloaded_products_basic(mock_product_registry_service):
             "title": "Basic Test Product 2",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_pantherina",
+                    "component_id": "amanita_pantherina",
                     "description_cid": "QmBasicTestCID002",
                     "proportion": "100%"
                 }
@@ -2833,12 +3134,12 @@ async def preloaded_products_extended(mock_product_registry_service):
             "title": "Extended Test Product 1",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "QmExtendedTestCID001",
                     "proportion": "70%"
                 },
                 {
-                    "biounit_id": "amanita_pantherina",
+                    "component_id": "amanita_pantherina",
                     "description_cid": "QmExtendedTestCID002",
                     "proportion": "30%"
                 }
@@ -2867,7 +3168,7 @@ async def preloaded_products_extended(mock_product_registry_service):
             "title": "Extended Test Product 2",
             "organic_components": [
                 {
-                    "biounit_id": "blue_lotus",
+                    "component_id": "blue_lotus",
                     "description_cid": "QmExtendedTestCID003",
                     "proportion": "100%"
                 }
@@ -2911,7 +3212,7 @@ async def preloaded_products_validation(mock_product_registry_service):
             "title": "Validation Test Product 1",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "QmValidationTestCID001",
                     "proportion": "100%"
                 }
@@ -2934,7 +3235,7 @@ async def preloaded_products_validation(mock_product_registry_service):
             "title": "Validation Test Product 2",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_pantherina",
+                    "component_id": "amanita_pantherina",
                     "description_cid": "QmValidationTestCID002",
                     "proportion": "100%"
                 }

@@ -27,7 +27,7 @@ def measure_time(func):
 def create_single_component():
     """Создание одного OrganicComponent"""
     return OrganicComponent(
-        biounit_id='test_component',
+        component_id='test_component',
         description_cid='QmTestComponent123',
         proportion='100%'
     )
@@ -68,7 +68,7 @@ def create_complex_product():
     components = []
     for i in range(5):
         components.append(OrganicComponent(
-            biounit_id=f'component_{i}',
+            component_id=f'component_{i}',
             description_cid=f'QmComp{i}',
             proportion='20%'
         ))

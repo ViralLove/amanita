@@ -11,13 +11,13 @@ def test_product_with_priceinfo():
     try:
         # Создаем компоненты
         component1 = OrganicComponent(
-            biounit_id='amanita_muscaria',
+            component_id='amanita_muscaria',
             description_cid='QmTest1',
             proportion='50%'
         )
 
         component2 = OrganicComponent(
-            biounit_id='cordyceps_militaris',
+            component_id='cordyceps_militaris',
             description_cid='QmTest2',
             proportion='50%'
         )
@@ -77,7 +77,7 @@ def test_product_simple():
     try:
         # Создаем простой компонент
         component = OrganicComponent(
-            biounit_id='simple_component',
+            component_id='simple_component',
             description_cid='QmSimple',
             proportion='100%'
         )

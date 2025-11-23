@@ -39,6 +39,10 @@ describe('CatalogActions', () => {
         getAddress: sinon.stub().resolves('0xSigner')
       })
     };
+    mockEthersUtils.provider = {
+      getBalance: sinon.stub().resolves(0n)
+    };
+    mockEthersUtils.formatEther = sinon.stub().returns('0.0');
 
     mockConfig = {
       get: sinon.stub()
@@ -322,6 +326,83 @@ describe('CatalogActions', () => {
     });
   });
 
+  describe('createCatalogFromDataFile()', () => {
+    const fs = require('fs');
+    const path = require('path');
+
+    let fsExistsSync;
+    let fsReadFileSync;
+    let mockProductRegistry;
+    let mockSigner;
+
+    beforeEach(() => {
+      fsExistsSync = sinon.stub(fs, 'existsSync');
+      fsReadFileSync = sinon.stub(fs, 'readFileSync');
+
+      mockProductRegistry = {
+        connect: sinon.stub().returnsThis(),
+        createProduct: sinon.stub().resolves({
+          wait: sinon.stub().resolves({})
+        }),
+        getProductsBySellerFull: sinon.stub().resolves([{
+          id: 1,
+          seller: '0xSeller',
+          businessId: 'amanita_lux',
+          componentIds: ['amanita_muscaria'],
+          metadataCID: 'QmCID',
+          active: false
+        }])
+      };
+
+      mockContractManager.loadUUPSContract.withArgs('ProductRegistry').resolves(mockProductRegistry);
+      mockConfig.get.withArgs('paths.projectRoot').returns('/workspace');
+      mockConfig.get.withArgs('seller.privateKey').returns('0xpriv');
+      mockConfig.get.withArgs('network.name').returns('localhost');
+
+      mockSigner = {
+        getAddress: sinon.stub().resolves('0xSeller')
+      };
+      mockEthersUtils.getSigner.returns(mockSigner);
+    });
+
+    afterEach(() => {
+      fsExistsSync.restore();
+      fsReadFileSync.restore();
+    });
+
+    it('должен передавать businessId (product.id) первым аргументом createProduct', async () => {
+      const dataFile = path.join('/workspace', 'bot', 'catalog', 'product_registry_upload_data.json');
+      fsExistsSync.withArgs(dataFile).returns(true);
+      fsReadFileSync.withArgs(dataFile, 'utf8').returns(JSON.stringify([{
+        id: 'amanita_lux',
+        componentIds: ['amanita_muscaria'],
+        metadataCID: 'QmCID'
+      }]));
+
+      await catalogActions.createCatalogFromDataFile(mockProductRegistry, '0xSeller');
+
+      sinon.assert.calledWith(
+        mockProductRegistry.createProduct,
+        'amanita_lux',
+        ['amanita_muscaria'],
+        'QmCID',
+        sinon.match.object
+      );
+    });
+
+    it('должен выбрасывать ошибку если отсутствует строковый id (businessId)', async () => {
+      const dataFile = path.join('/workspace', 'bot', 'catalog', 'product_registry_upload_data.json');
+      fsExistsSync.withArgs(dataFile).returns(true);
+      fsReadFileSync.withArgs(dataFile, 'utf8').returns(JSON.stringify([{
+        componentIds: ['amanita_muscaria'],
+        metadataCID: 'QmCID'
+      }]));
+
+      const result = await catalogActions.createCatalogFromDataFile(mockProductRegistry, '0xSeller');
+      expect(result.productsFailed).to.equal(1);
+    });
+  });
+
   // ================================================================
   // REAL TESTS: action41 (CSV Transform)
   // ================================================================
@@ -425,6 +506,14 @@ describe('CatalogActions', () => {
   // ================================================================
 
   describe('action444() - Pipeline (41 → 42 → 43)', () => {
+    let prepareContextStub;
+    beforeEach(() => {
+      mockConfig.get.withArgs('catalog.csvPath').returns('/tmp/catalog.csv');
+      mockConfig.get.withArgs('catalog.outputDir').returns('/tmp/output');
+      mockConfig.get.withArgs('catalog.sellerId').returns('seller123');
+      mockConfig.get.withArgs('catalog.sourceLang').returns('en');
+    });
+
     it('должен делегировать в action444_AutomaticPipeline', async () => {
       // GIVEN: Mock product_upload_steps module
       const mockPipeline = sinon.stub().resolves({
@@ -443,6 +532,7 @@ describe('CatalogActions', () => {
         }
         return originalRequire.apply(this, arguments);
       };
+      prepareContextStub = sinon.stub(catalogActions, '_prepareArweaveContext').resolves({});
       
       // WHEN
       const result = await catalogActions.action444();
@@ -452,6 +542,7 @@ describe('CatalogActions', () => {
       expect(result.success).to.be.true;
       
       // Cleanup
+      prepareContextStub.restore();
       Module.prototype.require = originalRequire;
     });
 
@@ -467,6 +558,7 @@ describe('CatalogActions', () => {
         }
         return originalRequire.apply(this, arguments);
       };
+      prepareContextStub = sinon.stub(catalogActions, '_prepareArweaveContext').resolves({});
       
       // WHEN
       const result = await catalogActions.action444();
@@ -475,6 +567,7 @@ describe('CatalogActions', () => {
       expect(result).to.have.property('success', true);
       
       // Cleanup
+      prepareContextStub.restore();
       Module.prototype.require = originalRequire;
     });
 
@@ -490,6 +583,7 @@ describe('CatalogActions', () => {
         }
         return originalRequire.apply(this, arguments);
       };
+      prepareContextStub = sinon.stub(catalogActions, '_prepareArweaveContext').resolves({});
       
       // WHEN/THEN
       try {
@@ -498,6 +592,7 @@ describe('CatalogActions', () => {
       } catch (error) {
         expect(error.message).to.include('Upload failed');
       } finally {
+        prepareContextStub.restore();
         Module.prototype.require = originalRequire;
       }
     });

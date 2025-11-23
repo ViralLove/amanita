@@ -62,7 +62,7 @@ class TestFormatterServiceIssue:
         
         # Создаем тестовый компонент
         test_component = OrganicComponent(
-            biounit_id="amanita_muscaria",
+            component_id="amanita_muscaria",
             description_cid="QmTestDescription1",
             proportion="100%",
             description=ComponentDescription(

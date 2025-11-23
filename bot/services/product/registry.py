@@ -77,8 +77,12 @@ class ProductRegistryService:
         # Инициализируем сервис метаданных
         self.metadata_service = ProductMetadataService(self.storage_service)
         
-        # Инициализируем ProductAssembler для централизованной сборки продуктов
-        self.assembler = assembler or ProductAssembler(storage_service=self.storage_service)
+        # Инициализируем ProductAssembler (clean break: требует ComponentService)
+        if assembler is None:
+            from services.product.component_service import ComponentService
+            self.assembler = ProductAssembler(component_service=ComponentService())
+        else:
+            self.assembler = assembler
         
         # Инициализируем AccountService
         if account_service is None:
@@ -956,8 +960,9 @@ class ProductRegistryService:
                 return None
 
             product_id = product_data[0]  # Блокчейн ID
-            ipfs_cid = product_data[2]
-            is_active = bool(product_data[3])
+            component_ids = product_data[2]  # componentIds (список)
+            ipfs_cid = product_data[3]  # metadataCID (строка)
+            is_active = bool(product_data[4])  # active (bool)
 
             self.logger.info(f"[ProductRegistry] 📋 Извлечены данные: ID={product_id}, CID={ipfs_cid}, Active={is_active}")
             self.logger.info(f"[ProductRegistry] 🔗 Загружаем метаданные из IPFS: {ipfs_cid}")
@@ -972,7 +977,7 @@ class ProductRegistryService:
 
             # Используем ProductAssembler для централизованной сборки продукта
             self.logger.info(f"[ProductRegistry] 🔧 Вызываем ProductAssembler.assemble_product...")
-            product = self.assembler.assemble_product(product_data, metadata)
+            product = await self.assembler.assemble_product(product_data, metadata)
             if product:
                 self.logger.info(f"[ProductRegistry] ✅ Продукт {product_id} успешно собран через ProductAssembler")
             else:

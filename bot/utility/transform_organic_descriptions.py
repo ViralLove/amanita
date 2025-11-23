@@ -38,7 +38,7 @@ def extract_simple_fields(organic_items: dict, simple_dir: Path, languages: list
     
     file_count = 0
     
-    for biounit_id, item in organic_items.items():
+    for component_id, item in organic_items.items():
         # 1. ComponentDescription.title для каждого компонента
         title_data = {}
         for lang in languages:
@@ -47,7 +47,7 @@ def extract_simple_fields(organic_items: dict, simple_dir: Path, languages: list
             else:
                 title_data[lang] = f"[{item.get('title', '')}]"  # Заглушка
         
-        filename = f"{biounit_id}.ComponentDescription.title.json"
+        filename = f"{component_id}.ComponentDescription.title.json"
         with open(simple_dir / filename, 'w', encoding='utf-8') as f:
             json.dump(title_data, f, ensure_ascii=False, indent=2)
         file_count += 1
@@ -60,7 +60,7 @@ def extract_simple_fields(organic_items: dict, simple_dir: Path, languages: list
             else:
                 scientific_name_data[lang] = item.get('scientific_name', '')  # Научные названия обычно одинаковые
         
-        filename = f"{biounit_id}.Description.scientific_name.json"
+        filename = f"{component_id}.Description.scientific_name.json"
         with open(simple_dir / filename, 'w', encoding='utf-8') as f:
             json.dump(scientific_name_data, f, ensure_ascii=False, indent=2)
         file_count += 1
@@ -84,7 +84,7 @@ def extract_simple_fields(organic_items: dict, simple_dir: Path, languages: list
                         else:
                             dosage_type_data[dosage_type][lang] = f"[{dosage_type}]"  # Заглушка
                 
-                filename = f"{biounit_id}.DosageInstruction.type.json"
+                filename = f"{component_id}.DosageInstruction.type.json"
                 with open(simple_dir / filename, 'w', encoding='utf-8') as f:
                     json.dump(dosage_type_data, f, ensure_ascii=False, indent=2)
                 file_count += 1
@@ -99,7 +99,7 @@ def extract_complex_fields(organic_items: dict, complex_dir: Path, languages: li
     component_count = 0
     dosage_count = 0
     
-    for biounit_id, item in organic_items.items():
+    for component_id, item in organic_items.items():
         # 1. ComponentDescription для каждого языка - ВСЕ поля должны быть
         for lang in languages:
             component_data = {
@@ -116,7 +116,7 @@ def extract_complex_fields(organic_items: dict, complex_dir: Path, languages: li
                     if not value or value == '':
                         component_data[key] = f"[{key} placeholder]"
             
-            filename = f"{biounit_id}.ComponentDescription.{lang}.json"
+            filename = f"{component_id}.ComponentDescription.{lang}.json"
             with open(complex_dir / filename, 'w', encoding='utf-8') as f:
                 json.dump(component_data, f, ensure_ascii=False, indent=2)
             
@@ -143,7 +143,7 @@ def extract_complex_fields(organic_items: dict, complex_dir: Path, languages: li
                             }
                 
                 if dosage_data:  # Создаем файл только если есть данные
-                    filename = f"{biounit_id}.DosageInstruction.{lang}.json"
+                    filename = f"{component_id}.DosageInstruction.{lang}.json"
                     with open(complex_dir / filename, 'w', encoding='utf-8') as f:
                         json.dump(dosage_data, f, ensure_ascii=False, indent=2)
                     
@@ -164,17 +164,17 @@ def create_mappings(simple_dir: Path, complex_dir: Path, mappings_dir: Path):
     simple_mapping = {}
     for file_path in simple_dir.glob("*.json"):
         filename = file_path.stem
-        # Формат: biounit_id.ClassName.field
+        # Формат: component_id.ClassName.field
         parts = filename.split('.')
         if len(parts) >= 3:
-            biounit_id = parts[0]
+            component_id = parts[0]
             class_name = parts[1]
             field_name = parts[2]
             key = f"{class_name}.{field_name}"  # Ключ для контракта
             if key not in simple_mapping:
                 simple_mapping[key] = []
             simple_mapping[key].append({
-                "biounit_id": biounit_id,
+                "component_id": component_id,
                 "cid": "",  # Будет заполнен после загрузки в IPFS
                 "file_path": str(file_path)
             })
@@ -186,13 +186,13 @@ def create_mappings(simple_dir: Path, complex_dir: Path, mappings_dir: Path):
     complex_mapping = {}
     for file_path in complex_dir.glob("*.json"):
         filename = file_path.stem
-        # Формат: biounit_id.ClassName.lang
+        # Формат: component_id.ClassName.lang
         parts = filename.split('.')
         if len(parts) >= 3:
-            biounit_id = parts[0]
+            component_id = parts[0]
             class_name = parts[1]
             language = parts[2]
-            key = f"{biounit_id}.{class_name}.{language}"
+            key = f"{component_id}.{class_name}.{language}"
             complex_mapping[key] = {
                 "cid": "",  # Будет заполнен после загрузки в IPFS
                 "file_path": str(file_path)

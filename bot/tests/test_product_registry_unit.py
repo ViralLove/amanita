@@ -57,7 +57,7 @@ async def test_validate_product_data_valid():
     valid_data = {
         "business_id": "1",
         "title": "Test Product",
-        "organic_components": [{"biounit_id": "Amanita_muscaria", "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG", "proportion": "100%"}],
+        "organic_components": [{"component_id": "Amanita_muscaria", "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG", "proportion": "100%"}],
         "categories": ["mushroom"],
         "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
         "forms": ["mixed slices"],
@@ -91,7 +91,7 @@ async def test_validate_product_data_invalid():
     invalid_data = {
         "business_id": "2",
         "title": "",  # Пустой заголовок
-        "organic_components": [{"biounit_id": "Amanita_muscaria", "description_cid": "invalid_cid", "proportion": "100%"}],  # Невалидный CID
+        "organic_components": [{"component_id": "Amanita_muscaria", "description_cid": "invalid_cid", "proportion": "100%"}],  # Невалидный CID
         "categories": [],  # Пустые категории
         "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
         "forms": ["mixed slices"],
@@ -125,7 +125,7 @@ async def test_validate_product_data_missing_required():
     incomplete_data = {
         "business_id": "3",
         # Отсутствует title
-        "organic_components": [{"biounit_id": "Amanita_muscaria", "description_cid": "QmdoqBWBZoupjQWFfBxMMJD5N9dJSFTyjVEV1AVL8oNEVSG", "proportion": "100%"}],
+        "organic_components": [{"component_id": "Amanita_muscaria", "description_cid": "QmdoqBWBZoupjQWFfBxMMJD5N9dJSFTyjVEV1AVL8oNEVSG", "proportion": "100%"}],
         "categories": ["mushroom"],
         "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
         "forms": ["mixed slices"],
@@ -195,7 +195,7 @@ async def test_update_product_success():
     # Создаем тестовый OrganicComponent
     from bot.model.organic_component import OrganicComponent
     test_component = OrganicComponent(
-        biounit_id="Amanita_muscaria",
+        component_id="Amanita_muscaria",
         description_cid="QmDescCID123",
         proportion="100%"
     )
@@ -225,7 +225,7 @@ async def test_update_product_success():
         "forms": ["tincture"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmNewDescCID123",
             "proportion": "100%"
         }],
@@ -279,7 +279,7 @@ async def test_update_product_not_found():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmDescCID123",
             "proportion": "100%"
         }],
@@ -337,7 +337,7 @@ async def test_update_product_validation_error():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmDescCID123",
             "proportion": "100%"
         }],
@@ -391,7 +391,7 @@ async def test_update_product_status_success():
     from bot.model.organic_component import OrganicComponent
     
     test_component = OrganicComponent(
-        biounit_id="Amanita_muscaria",
+        component_id="Amanita_muscaria",
         description_cid="QmDescCID123",
         proportion="100%"
     )
@@ -490,7 +490,7 @@ async def test_update_product_status_idempotency():
     from bot.model.organic_component import OrganicComponent
     
     test_component = OrganicComponent(
-        biounit_id="Amanita_muscaria",
+        component_id="Amanita_muscaria",
         description_cid="QmDescCID123",
         proportion="100%"
     )
@@ -579,7 +579,7 @@ async def test_validate_product_update():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmOldDescCID123",
             "proportion": "100%"
         }],
@@ -595,7 +595,7 @@ async def test_validate_product_update():
         "forms": ["tincture"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmNewDescCID123",
             "proportion": "100%"
         }],
@@ -638,7 +638,7 @@ async def test_validate_product_update_id_change():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmOldDescCID123",
             "proportion": "100%"
         }],
@@ -654,7 +654,7 @@ async def test_validate_product_update_id_change():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmNewDescCID123",
             "proportion": "100%"
         }],
@@ -700,7 +700,7 @@ async def test_create_product_success(mock_product_registry_service):
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmValidCID123",
             "proportion": "100%"
         }],
@@ -740,7 +740,7 @@ async def test_create_product_validation_error(mock_product_registry_service_wit
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmValidCID123",
             "proportion": "100%"
         }],
@@ -777,7 +777,7 @@ async def test_create_product_ipfs_upload_error(mock_registry_service_with_faili
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmValidCID123",
             "proportion": "100%"
         }],
@@ -815,7 +815,7 @@ async def test_create_product_blockchain_error(mock_blockchain_service_with_erro
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmValidCID123",
             "proportion": "100%"
         }],
@@ -874,7 +874,7 @@ async def test_create_product_blockchain_id_error(mock_blockchain_service_with_i
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmValidCID123",
             "proportion": "100%"
         }],
@@ -898,7 +898,7 @@ async def test_create_product_blockchain_id_error(mock_blockchain_service_with_i
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmDescriptionCID",
             "proportion": "100%"
         }],
@@ -950,7 +950,7 @@ async def test_create_product_idempotency():
             "forms": ["powder"],
             "species": "Amanita muscaria",
             "organic_components": [{
-                "biounit_id": "Amanita_muscaria",
+                "component_id": "Amanita_muscaria",
                 "description_cid": "QmDescriptionCID123",
                 "proportion": "100%"
             }],
@@ -975,7 +975,7 @@ async def test_create_product_idempotency():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmDescriptionCID",
             "proportion": "100%"
         }],
@@ -1047,7 +1047,7 @@ async def test_create_product_success_simple():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmValidCID123",
             "proportion": "100%"
         }],
@@ -1080,7 +1080,7 @@ async def test_create_product_success_simple():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmValidCID123",
             "proportion": "100%"
         }],
@@ -1131,7 +1131,7 @@ async def test_get_all_products_success():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmDescCID",
             "proportion": "100%"
         }],
@@ -1179,7 +1179,7 @@ async def test_get_all_products_cache_hit():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmDescCID",
             "proportion": "100%"
         }],
@@ -1279,7 +1279,7 @@ async def test_get_all_products_blockchain_error():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmDescCID",
             "proportion": "100%"
         }],
@@ -2011,7 +2011,7 @@ async def test_deserialize_product_success():
     # Создаем тестовый OrganicComponent
     from bot.model.organic_component import OrganicComponent
     test_component = OrganicComponent(
-        biounit_id="test_species",
+        component_id="test_species",
         description_cid="QmDescCID123",
         proportion="100%"
     )
@@ -2054,8 +2054,8 @@ async def test_deserialize_product_success():
         "prices": []
     })
     
-    # Тестовые данные продукта (кортеж из блокчейна)
-    product_data = (1, "0x123456789", "QmTestCID123", True)
+    # Тестовые данные продукта (кортеж из блокчейна) - НОВАЯ структура с componentIds
+    product_data = (1, "0x123456789", ["test_component"], "QmTestCID123", True)
     
     logger.info("🚀 Вызываем _deserialize_product с корректными данными")
     
@@ -2093,7 +2093,7 @@ async def test_deserialize_product_invalid_data():
     )
     
     # Тестовые данные с некорректной структурой
-    invalid_product_data = (1, 2)  # Недостаточно элементов
+    invalid_product_data = (1, 2, 3)  # Недостаточно элементов (нужно минимум 5)
     
     logger.info("🚀 Вызываем _deserialize_product с некорректными данными")
     
@@ -2106,6 +2106,116 @@ async def test_deserialize_product_invalid_data():
     assert result is None
     
     logger.info("✅ Тест десериализации с некорректными данными завершен")
+
+
+@pytest.mark.asyncio
+async def test_deserialize_product_correct_tuple_indices():
+    """
+    REGRESSION TEST: Проверка правильных индексов в Product tuple
+    
+    Контракт возвращает:
+    struct Product {
+        uint256 id;              // [0]
+        address seller;          // [1]
+        string[] componentIds;   // [2] ← СПИСОК!
+        string metadataCID;      // [3] ← CID метаданных
+        bool active;             // [4]
+    }
+    
+    БЫЛО (ОШИБКА):
+        ipfs_cid = product_data[2]  # ← componentIds (список)
+        is_active = product_data[3]  # ← metadataCID (строка)
+    
+    СТАЛО (ПРАВИЛЬНО):
+        component_ids = product_data[2]  # ← componentIds (список)
+        ipfs_cid = product_data[3]       # ← metadataCID (строка)
+        is_active = product_data[4]      # ← active (bool)
+    """
+    logger.info("🧪 [REGRESSION] Тест правильных индексов Product tuple")
+    
+    # Arrange
+    mock_blockchain = Mock()
+    mock_storage = Mock()
+    mock_validation = Mock()
+    mock_account = Mock()
+    
+    registry_service = ProductRegistryService(
+        blockchain_service=mock_blockchain,
+        storage_service=mock_storage,
+        validation_service=mock_validation,
+        account_service=mock_account
+    )
+    
+    # Mock assembler
+    from bot.services.product.assembler import ProductAssembler
+    mock_assembler = Mock(spec=ProductAssembler)
+    
+    # Создаем успешный продукт для возврата
+    from bot.model.organic_component import OrganicComponent
+    from bot.model.product import PriceInfo
+    
+    test_component = OrganicComponent(
+        component_id="amanita_muscaria",
+        description_cid="QmComponentCID",
+        proportion="100%"
+    )
+    
+    test_product = Product(
+        business_id="test_product",
+        blockchain_id=1,
+        status=1,
+        cid="QmProductMetadataCID",
+        title="Test Product",
+        organic_components=[test_component],
+        cover_image_url="QmImageCID",
+        categories=["mushroom"],
+        forms=["dried"],
+        species="Amanita muscaria",
+        prices=[PriceInfo(price=100, currency="EUR", weight=100, weight_unit="g")]
+    )
+    
+    # Mock assembler возвращает успешный продукт
+    mock_assembler.assemble_product = AsyncMock(return_value=test_product)
+    registry_service.assembler = mock_assembler
+    
+    # Mock storage возвращает метаданные
+    mock_storage.download_json = Mock(return_value={
+        "business_id": "test_product",
+        "component_id": "amanita_muscaria",
+        "title": "Test Product"
+    })
+    
+    # ========================================
+    # КРИТИЧЕСКИЙ ТЕСТ: Новая структура tuple с componentIds
+    # ========================================
+    product_data_new_structure = (
+        1,                          # [0] id
+        "0xSellerAddress",          # [1] seller
+        ["amanita_muscaria"],       # [2] componentIds (СПИСОК!)
+        "QmProductMetadataCID",     # [3] metadataCID (строка)
+        True                        # [4] active
+    )
+    
+    logger.info("🔍 Тестируем с НОВОЙ структурой tuple (5 элементов, componentIds как список)")
+    logger.info(f"   product_data[2] = {product_data_new_structure[2]} (тип: {type(product_data_new_structure[2])})")
+    logger.info(f"   product_data[3] = {product_data_new_structure[3]} (тип: {type(product_data_new_structure[3])})")
+    
+    # Act
+    result = await registry_service._deserialize_product(product_data_new_structure)
+    
+    # Assert
+    assert result is not None, "Продукт должен быть десериализован"
+    assert result.blockchain_id == 1, "Blockchain ID должен совпадать"
+    
+    # ✅ КРИТИЧЕСКАЯ ПРОВЕРКА: download_json был вызван со СТРОКОЙ, не со списком
+    mock_storage.download_json.assert_called_once()
+    call_args = mock_storage.download_json.call_args[0][0]
+    logger.info(f"🔍 download_json вызван с: {call_args} (тип: {type(call_args)})")
+    
+    assert isinstance(call_args, str), f"download_json должен получать СТРОКУ, получил {type(call_args)}"
+    assert call_args == "QmProductMetadataCID", f"CID должен быть metadataCID, получили: {call_args}"
+    
+    logger.info("✅ [REGRESSION] Тест правильных индексов PASSED")
 
 
 @pytest.mark.asyncio
@@ -2130,8 +2240,8 @@ async def test_deserialize_product_metadata_error():
     # Настраиваем мок storage_service для возврата None (ошибка)
     mock_storage.download_json = Mock(return_value=None)
     
-    # Тестовые данные продукта
-    product_data = (1, "0x123456789", "QmTestCID123", True)
+    # Тестовые данные продукта (новая структура!)
+    product_data = (1, "0x123456789", ["amanita_muscaria"], "QmTestCID123", True)
     
     logger.info("🚀 Вызываем _deserialize_product с ошибкой метаданных")
     
@@ -2444,12 +2554,12 @@ async def test_update_catalog_cache_success():
     # Создаем тестовые OrganicComponent
     from bot.model.organic_component import OrganicComponent
     test_component1 = OrganicComponent(
-        biounit_id="test_species_1",
+        component_id="test_species_1",
         description_cid="QmDescCID1",
         proportion="100%"
     )
     test_component2 = OrganicComponent(
-        biounit_id="test_species_2",
+        component_id="test_species_2",
         description_cid="QmDescCID2",
         proportion="100%"
     )
@@ -2576,7 +2686,7 @@ async def test_update_catalog_cache_large_products(mock_blockchain_service, mock
         
         # Создаем тестовый OrganicComponent
         test_component = OrganicComponent(
-            biounit_id=f"test_species_{i}",
+            component_id=f"test_species_{i}",
             description_cid=f"QmDescCID{i}",
             proportion="100%"
         )
@@ -2734,7 +2844,7 @@ async def test_check_product_id_exists_existing_by_alias():
     # Создаем мок-продукт с правильными параметрами
     from bot.model.organic_component import OrganicComponent
     mock_component = OrganicComponent(
-        biounit_id="Mock_Species",
+        component_id="Mock_Species",
         description_cid="QmMockDesc",
         proportion="100%"
     )
@@ -2787,7 +2897,7 @@ async def test_check_product_id_exists_existing_by_id():
     
     # Создаем мок-продукт со строковым id (как в реальных данных)
     mock_component = OrganicComponent(
-        biounit_id="Mock_Species",
+        component_id="Mock_Species",
         description_cid="QmMockDesc",
         proportion="100%"
     )
@@ -2924,7 +3034,7 @@ async def test_create_product_duplicate_id_prevention():
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
-            "biounit_id": "Amanita_muscaria",
+            "component_id": "Amanita_muscaria",
             "description_cid": "QmDescriptionCID",
             "proportion": "100%"
         }],
@@ -2949,7 +3059,7 @@ async def test_create_product_duplicate_id_prevention():
     
     # Создаем мок-продукт для симуляции существующего продукта
     existing_component = OrganicComponent(
-        biounit_id="Existing_Species",
+        component_id="Existing_Species",
         description_cid="QmExistingDesc",
         proportion="100%"
     )
@@ -2979,7 +3089,7 @@ async def test_create_product_duplicate_id_prevention():
         "forms": ["new_form"],
         "species": "New Species",
         "organic_components": [{
-            "biounit_id": "New_Species",
+            "component_id": "New_Species",
             "description_cid": "QmNewDesc",
             "proportion": "100%"
         }],
@@ -3028,7 +3138,7 @@ async def test_create_product_unique_id_success(mock_blockchain_service, mock_ip
         "forms": ["unique_form"],
         "species": "Unique Species",
         "organic_components": [{
-            "biounit_id": "Unique_Species",
+            "component_id": "Unique_Species",
             "description_cid": "QmUniqueDesc",
             "proportion": "100%"
         }],
@@ -3162,7 +3272,7 @@ async def test_edge_cases_empty_id_unit(mock_blockchain_service, mock_ipfs_servi
         "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
         "categories": ["test"],
-        "organic_components": [{"biounit_id": "test_species", "description_cid": "QmTestDesc", "proportion": "100%"}],
+        "organic_components": [{"component_id": "test_species", "description_cid": "QmTestDesc", "proportion": "100%"}],
         "prices": [{"price": "10.00", "currency": "EUR", "weight": "100", "weight_unit": "g"}],
         "forms": ["powder"],
         "species": "Test Species"
@@ -3194,7 +3304,7 @@ async def test_edge_cases_none_id_unit(mock_blockchain_service, mock_ipfs_servic
         "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         "cover_image_url": "QmYrs5gAMeZEmiFAJnmRcD19rpCpXF52ssMJ6X2oWrxWWj",
         "categories": ["test"],
-        "organic_components": [{"biounit_id": "test_species", "description_cid": "QmTestDesc", "proportion": "100%"}],
+        "organic_components": [{"component_id": "test_species", "description_cid": "QmTestDesc", "proportion": "100%"}],
         "prices": [{"price": "10.00", "currency": "EUR", "weight": "100", "weight_unit": "g"}],
         "forms": ["powder"],
         "species": "Test Species"
@@ -3330,7 +3440,7 @@ async def test_create_product_calls_blockchain_validation_when_blockchain_id_exi
         "forms": ["test_form"],
         "species": "Test Species",
         "organic_components": [{
-            "biounit_id": "Test_Species",
+            "component_id": "Test_Species",
             "description_cid": "QmTestDesc",
             "proportion": "100%"
         }],
@@ -3388,7 +3498,7 @@ async def test_create_product_skips_blockchain_validation_when_no_blockchain_id_
         "forms": ["test_form"],
         "species": "Test Species",
         "organic_components": [{
-            "biounit_id": "Test_Species",
+            "component_id": "Test_Species",
             "description_cid": "QmTestDesc",
             "proportion": "100%"
         }],

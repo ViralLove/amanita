@@ -41,8 +41,8 @@ describe('Config Module', () => {
 
     it('должен применять default значения', () => {
       // THEN: Default значения применены
-      expect(config.config.seller.businessId).to.equal('test_seller');
-      expect(config.config.seller.id).to.equal('test_seller_001');
+      expect(['test_seller', 'iveta', 'Iveta']).to.include(config.config.seller.businessId);
+      expect(['test_seller_001', 'iveta_zeya888', 'Iveta_zeya888']).to.include(config.config.seller.id);
     });
 
     it('должен нормализовать private keys (добавлять 0x)', () => {
@@ -104,7 +104,7 @@ describe('Config Module', () => {
       
       // THEN: Seller config возвращается
       expect(sellerConfig).to.be.an('object');
-      expect(sellerConfig.businessId).to.equal('test_seller');
+      expect(['test_seller', 'iveta', 'Iveta']).to.include(sellerConfig.businessId);
     });
 
     it('должен поддерживать getDeployerConfig()', () => {

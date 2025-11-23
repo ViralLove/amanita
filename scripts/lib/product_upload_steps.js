@@ -879,6 +879,7 @@ async function registerProductsInContract(context, productMapping, productData) 
         const mockProductId = Math.floor(Math.random() * 1000000) + 1;
         registrationResults[productId] = {
           contractProductId: mockProductId,
+          contractBusinessId: productId,
           success: true,
           txHash: `DRYRUN_${Date.now()}_${Math.random().toString(36).substring(7)}`
         };
@@ -889,7 +890,7 @@ async function registerProductsInContract(context, productMapping, productData) 
           throw new Error("ProductRegistry контракт не инициализирован");
         }
         
-        const tx = await context.productRegistry.createProduct(componentIds, metadataCID);
+        const tx = await context.productRegistry.createProduct(productId, componentIds, metadataCID);
         const receipt = await tx.wait();
         
         // ✅ Delay to prevent nonce race condition in batch operations
@@ -911,14 +912,16 @@ async function registerProductsInContract(context, productMapping, productData) 
         
         const parsedEvent = context.productRegistry.interface.parseLog(event);
         const contractProductId = parsedEvent.args.productId.toString();
+        const contractBusinessId = parsedEvent.args.businessId;
         
         registrationResults[productId] = {
           contractProductId: contractProductId,
+          contractBusinessId: contractBusinessId,
           success: true,
           txHash: receipt.transactionHash
         };
         
-        console.log(`   ✅ Продукт зарегистрирован: ID ${contractProductId}`);
+        console.log(`   ✅ Продукт зарегистрирован: ID ${contractProductId}, businessId ${contractBusinessId}`);
         console.log(`   → TX: ${receipt.transactionHash}`);
       }
       

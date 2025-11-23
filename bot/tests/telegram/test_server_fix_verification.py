@@ -45,7 +45,7 @@ class TestServerFixVerification:
         from model.component_description import ComponentDescription
         
         test_component = OrganicComponent(
-            biounit_id="test_component",
+            component_id="test_component",
             description_cid="QmTest123",
             proportion="100%",
             description=ComponentDescription(

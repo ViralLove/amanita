@@ -69,7 +69,7 @@ def format_composition_ux(product, loc: Localization) -> str:
     
     for i, component in enumerate(product.organic_components, 1):
         # Основная информация о компоненте
-        composition_text += f"   {i}. <b>{component.biounit_id}</b>"
+        composition_text += f"   {i}. <b>{component.component_id}</b>"
         
         # Пропорция - важно для понимания концентрации
         if hasattr(component, 'proportion') and component.proportion:
@@ -185,7 +185,7 @@ def format_product_details_for_telegram(product, loc: Localization) -> str:
                 details_text += f"🖼️ <i>Визуальное представление продукта</i>\n\n"
             
             for i, component in enumerate(product.organic_components, 1):
-                details_text += f"• <b>{component.biounit_id}</b> - <b>{component.proportion}</b>\n"
+                details_text += f"• <b>{component.component_id}</b> - <b>{component.proportion}</b>\n"
                 
                 # Детальное описание компонента из ComponentDescription
                 if hasattr(component, 'description') and component.description:

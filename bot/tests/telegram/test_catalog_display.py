@@ -170,7 +170,7 @@ class TestCatalogDisplay:
         assert len(components) > 0, "Продукт должен содержать компоненты"
         
         component = components[0]
-        component_fields = ['biounit_id', 'description_cid', 'proportion']
+        component_fields = ['component_id', 'description_cid', 'proportion']
         for field in component_fields:
             assert field in component, f"Компонент должен содержать поле {field}"
         
@@ -858,57 +858,57 @@ class TestCatalogDisplay:
         
         logger.info(f"  ✅ Детали продукта {test_product.business_id} отправлены успешно")
     
-    def test_biounit_id_validation_with_real_data(self, real_catalog_data):
-        """Тест валидации biounit_id с реальными данными"""
+    def test_component_id_validation_with_real_data(self, real_catalog_data):
+        """Тест валидации component_id с реальными данными"""
         from model.organic_component import OrganicComponent
         
         catalog_data, descriptions_data = real_catalog_data
         
-        # Собираем все biounit_id из каталога
-        all_biounit_ids = set()
+        # Собираем все component_id из каталога
+        all_component_ids = set()
         for product in catalog_data:
             for component in product['organic_components']:
-                all_biounit_ids.add(component['biounit_id'])
+                all_component_ids.add(component['component_id'])
         
-        logger.info(f"🔍 Найдено {len(all_biounit_ids)} уникальных biounit_id")
+        logger.info(f"🔍 Найдено {len(all_component_ids)} уникальных component_id")
         
-        # Тестируем валидацию каждого biounit_id
-        for biounit_id in all_biounit_ids:
-            logger.info(f"  🧪 Тестируем валидацию: {biounit_id}")
+        # Тестируем валидацию каждого component_id
+        for component_id in all_component_ids:
+            logger.info(f"  🧪 Тестируем валидацию: {component_id}")
             
             try:
-                # Создаем компонент с реальным biounit_id
+                # Создаем компонент с реальным component_id
                 component = OrganicComponent.from_dict({
-                    "biounit_id": biounit_id,
+                    "component_id": component_id,
                     "description_cid": "QmTestDescription",
                     "proportion": "100%"
                 })
                 
-                logger.info(f"    ✅ {biounit_id} прошел валидацию")
+                logger.info(f"    ✅ {component_id} прошел валидацию")
                 
             except Exception as e:
-                logger.error(f"    ❌ {biounit_id} не прошел валидацию: {e}")
-                pytest.fail(f"biounit_id '{biounit_id}' не прошел валидацию: {e}")
+                logger.error(f"    ❌ {component_id} не прошел валидацию: {e}")
+                pytest.fail(f"component_id '{component_id}' не прошел валидацию: {e}")
         
-        logger.info("✅ Все biounit_id из реального каталога прошли валидацию")
+        logger.info("✅ Все component_id из реального каталога прошли валидацию")
     
     def test_catalog_data_completeness(self, real_catalog_data):
         """Тест полноты данных каталога"""
         catalog_data, descriptions_data = real_catalog_data
         
-        # Проверяем, что все biounit_id из каталога имеют описания
-        catalog_biounit_ids = set()
+        # Проверяем, что все component_id из каталога имеют описания
+        catalog_component_ids = set()
         for product in catalog_data:
             for component in product['organic_components']:
-                catalog_biounit_ids.add(component['biounit_id'])
+                catalog_component_ids.add(component['component_id'])
         
-        description_biounit_ids = set(descriptions_data['organic_items'].keys())
+        description_component_ids = set(descriptions_data['organic_items'].keys())
         
-        missing_descriptions = catalog_biounit_ids - description_biounit_ids
+        missing_descriptions = catalog_component_ids - description_component_ids
         if missing_descriptions:
             logger.warning(f"⚠️ Отсутствуют описания для: {missing_descriptions}")
         
-        extra_descriptions = description_biounit_ids - catalog_biounit_ids
+        extra_descriptions = description_component_ids - catalog_component_ids
         if extra_descriptions:
             logger.info(f"ℹ️ Есть описания, не используемые в каталоге: {extra_descriptions}")
         

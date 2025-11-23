@@ -5,7 +5,16 @@
  */
 
 const { expect } = require('chai');
-const E2EHarness = require('../../../helpers/E2EHarness');
+const {
+  E2EHarness,
+  expectEvent,
+  expectRevertCustom,
+  assertBusinessIdMapping,
+  assertBusinessIdCleared,
+  assertRegisteredProxy,
+  assertSellerState
+} = require('../../../helpers');
+const { ethers } = require('hardhat');
 
 describe('E2E: Action 43 - Contract Registration', function() {
   this.timeout(120000);
@@ -30,142 +39,205 @@ describe('E2E: Action 43 - Contract Registration', function() {
 
   describe('Infrastructure', () => {
     it('should have ready infrastructure', async () => {
-      const { ethers } = require('hardhat');
       const blockNumber = await ethers.provider.getBlockNumber();
       expect(blockNumber).to.be.a('number');
       console.log('✓ Infrastructure ready');
     });
   });
 
+  describe('Seller Preparation via Harness Helper', () => {
+    it('должен активировать seller и выдать роли через deployProductSuite()', async function() {
+      this.timeout(60000);
+
+      const suite = await harness.deployProductSuite({
+        forceRedeploy: true,
+        invitesPrefix: 'ACTION43'
+      });
+
+      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', suite.spiralEngineAddress);
+      const sellerAddress = await suite.seller.getAddress();
+      const adminAddress = await suite.admin.getAddress();
+
+      await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: true,
+        sellerRole: true,
+        activatorRole: true,
+        activatorAddress: adminAddress
+      });
+    });
+  });
+
   describe('ProductRegistry Deployment', () => {
-    it('должен деплоить ProductRegistry (UUPS)', async () => {
-      const { ethers } = require('hardhat');
-      
-      // Deploy Logic
-      const Logic = await ethers.getContractFactory('ProductRegistryLogic');
-      const logic = await Logic.deploy();
-      await logic.waitForDeployment();
-      const logicAddress = await logic.getAddress();
-      
-      // Deploy Proxy
-      const Proxy = await ethers.getContractFactory('ProductRegistryProxy');
-      const proxy = await Proxy.deploy(logicAddress, '0x');
-      await proxy.waitForDeployment();
-      const proxyAddress = await proxy.getAddress();
-      
-      // Validate UUPS
-      const validation = await harness.validateUUPSDeployment(proxyAddress, logicAddress);
-      
+    it('должен деплоить ProductRegistry и связать с OCR', async () => {
+      console.log('Фаза 1: Понимание текущего состояния — готовим suite');
+      const suite = await harness.deployProductSuite({ forceRedeploy: true });
+
+      console.log('Фаза 2: Проверка infrastructure suite');
+      expect(suite.productRegistry).to.exist;
+      expect(suite.componentRegistry).to.exist;
+
+      const registryAddress = suite.productRegistryAddress;
+      const logicAddress = suite.productRegistryLogicAddress;
+
+      console.log('Фаза 3: Проверяем связь ProductRegistry ↔ OCR');
+      const onChainComponentRegistry = await suite.productRegistry.componentRegistry();
+      expect(onChainComponentRegistry).to.equal(suite.componentRegistryAddress);
+
+      console.log('Фаза 4: Валидация через MagicRegistryHelper');
+      const entry = harness.loadContractFromSuite('ProductRegistry');
+      assertRegisteredProxy({ ProductRegistry: entry }, 'ProductRegistry', registryAddress, logicAddress);
+
+      console.log('Фаза 5: Проверка UUPS Deployment');
+      const validation = await harness.validateUUPSDeployment(registryAddress, logicAddress);
       expect(validation.proxyDeployed).to.be.true;
-      expect(validation.implementation.toLowerCase()).to.equal(logicAddress.toLowerCase());
-      
-      console.log(`✓ ProductRegistry deployed: ${proxyAddress}`);
+
+      console.log('Фаза 6: Тест завершён — ProductRegistry связан с OCR');
     });
   });
 
   describe('Product Registration', () => {
-    let registryAddress;
+    let suite;
 
     beforeEach(async () => {
-      const { ethers } = require('hardhat');
-      
-      // Deploy ProductRegistry for each test
-      const Logic = await ethers.getContractFactory('ProductRegistryLogic');
-      const logic = await Logic.deploy();
-      await logic.waitForDeployment();
-      
-      const Proxy = await ethers.getContractFactory('ProductRegistryProxy');
-      const proxy = await Proxy.deploy(await logic.getAddress(), '0x');
-      await proxy.waitForDeployment();
-      
-      registryAddress = await proxy.getAddress();
+      suite = await harness.deployProductSuite({ forceRedeploy: true });
     });
 
-    it('должен регистрировать single product on-chain', async () => {
-      const { ethers } = require('hardhat');
-      const [deployer] = await ethers.getSigners();
-      
-      const ProductRegistry = await ethers.getContractAt('ProductRegistryLogic', registryAddress);
-      
-      const productId = 'prod_test_001';
-      const cid = 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG';
-      
-      // Register product (using ethers, assuming method exists)
-      // Note: Actual method name may differ based on contract ABI
-      try {
-        const tx = await ProductRegistry.registerProduct(productId, cid);
-        await tx.wait();
-        
-        console.log('✓ Product registered on-chain');
-      } catch (error) {
-        // Method might not exist or require init
-        console.log(`ℹ️ Registration test skipped: ${error.message}`);
-        expect(true).to.be.true; // Test passes anyway (infrastructure validated)
+    it('должен регистрировать продукт с businessId и событием', async () => {
+      console.log('Фаза 1: Готовим начальные данные');
+      const { productRegistry, seller, sellerComponentIds } = suite;
+      const businessId = 'e2e-prod-001';
+      const metadataCID = 'QmE2EProductCID1';
+
+      console.log('Фаза 2: Проверяем событие ProductCreated');
+      await expectEvent(
+        productRegistry
+          .connect(seller)
+          .createProduct(businessId, [sellerComponentIds[0]], metadataCID),
+        productRegistry,
+        'ProductCreated',
+        async (args) => {
+          expect(args.seller).to.equal(seller.address);
+          expect(args.businessId).to.equal(businessId);
+          expect(args.metadataCID).to.equal(metadataCID);
+        }
+      );
+
+      console.log('Фаза 3: Проверяем mapping businessId → productId');
+      await assertBusinessIdMapping(productRegistry, businessId, 1);
+
+      console.log('Фаза 4: Сценарий завершён успешно');
+    });
+
+    it('должен сохранять состояние продукта', async () => {
+      console.log('Фаза 1: Подготовка данных');
+      const { productRegistry, seller, sellerComponentIds } = suite;
+      const businessId = 'e2e-prod-state';
+      const metadataCID = 'QmE2EProductCID2';
+
+      console.log('Фаза 2: Создание продукта через suite');
+      await productRegistry
+        .connect(seller)
+        .createProduct(businessId, [sellerComponentIds[1]], metadataCID);
+
+      console.log('Фаза 3: Проверка mapping и состояния');
+      const productId = await productRegistry.getProductIdByBusinessId(businessId);
+      await assertBusinessIdMapping(productRegistry, businessId, Number(productId));
+      const stored = await productRegistry.getProduct(Number(productId));
+      expect(stored.businessId).to.equal(businessId);
+      expect(stored.metadataCID).to.equal(metadataCID);
+      expect(stored.componentIds[0]).to.equal(sellerComponentIds[1]);
+
+      console.log('Фаза 4: Сценарий проверки state завершён');
+    });
+
+    it('должен обрабатывать bulk регистрацию 5 продуктов', async () => {
+      console.log('Фаза 1: Подготовка bulk данных');
+      const { productRegistry, seller, sellerComponentIds } = suite;
+      const bulkBusinessIds = Array.from({ length: 5 }, (_, i) => `e2e-bulk-${i + 1}`);
+
+      console.log('Фаза 2: Регистрация продуктов через suite');
+      for (let i = 0; i < bulkBusinessIds.length; i++) {
+        await productRegistry
+          .connect(seller)
+          .createProduct(bulkBusinessIds[i], [sellerComponentIds[i % sellerComponentIds.length]], `QmBulk${i}`);
       }
-    });
 
-    it('должен валидировать on-chain state после registration', async () => {
-      const { ethers } = require('hardhat');
-      
-      const ProductRegistry = await ethers.getContractAt('ProductRegistryLogic', registryAddress);
-      
-      // Validate deployment exists
-      const code = await ethers.provider.getCode(registryAddress);
-      expect(code).to.not.equal('0x');
-      expect(code.length).to.be.greaterThan(100);
-      
-      console.log('✓ ProductRegistry on-chain state valid');
-    });
+      console.log('Фаза 3: Проверка mapping каждого businessId');
+      for (let i = 0; i < bulkBusinessIds.length; i++) {
+        const productId = await productRegistry.getProductIdByBusinessId(bulkBusinessIds[i]);
+        await assertBusinessIdMapping(productRegistry, bulkBusinessIds[i], i + 1);
+      }
 
-    it('должен обрабатывать bulk registration (10+ products)', async () => {
-      const productIds = Array.from({ length: 10 }, (_, i) => `prod_bulk_${i}`);
-      const cid = 'QmBulkUploadCID' + Math.random().toString(36).substring(2, 15);
-      
-      expect(productIds).to.have.lengthOf(10);
-      
-      console.log(`✓ Bulk registration prepared: ${productIds.length} products`);
+      console.log(`Фаза 4: Bulk регистрация завершена (${bulkBusinessIds.length} продуктов)`);
     });
   });
 
   describe('Error Scenarios', () => {
-    it('should handle registration without deployment', async () => {
-      const { ethers } = require('hardhat');
-      
-      // Try to interact with non-existent contract
-      const fakeAddress = '0x0000000000000000000000000000000000000001';
-      
-      try {
-        await ethers.getContractAt('ProductRegistryLogic', fakeAddress);
-        const code = await ethers.provider.getCode(fakeAddress);
-        expect(code).to.equal('0x'); // No contract
-      } catch (error) {
-        expect(error).to.exist;
-      }
-      
-      console.log('✓ Error handling validated');
+    let suite;
+
+    beforeEach(async () => {
+      suite = await harness.deployProductSuite({ forceRedeploy: true });
     });
 
-    it('should validate CID format before registration', async () => {
-      const validCID = 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG';
-      const invalidCID = 'invalid_cid_format';
-      
-      const cidPattern = /^Qm[1-9A-HJ-NP-Za-km-z]{44,}$/;
-      
-      expect(validCID).to.match(cidPattern);
-      expect(invalidCID).to.not.match(cidPattern);
-      
-      console.log('✓ CID format validation works');
+    it('должен блокировать повторный businessId', async () => {
+      console.log('Фаза 1: Подготовка исходного продукта');
+      const { productRegistry, seller, sellerComponentIds } = suite;
+      const businessId = 'e2e-duplicate';
+
+      await productRegistry
+        .connect(seller)
+        .createProduct(businessId, [sellerComponentIds[0]], 'QmDupCID');
+
+      console.log('Фаза 2: Проверка повторного использования businessId');
+      await expectRevertCustom(
+        productRegistry
+          .connect(seller)
+          .createProduct(businessId, [sellerComponentIds[1]], 'QmDupCID2'),
+        'BusinessIdExists',
+        productRegistry
+      );
+
+      console.log('Фаза 3: Ошибка BusinessIdExists подтверждена');
+    });
+
+    it('должен очищать businessId mapping после clearSellerCatalog', async () => {
+      console.log('Фаза 1: Создаём продукт для проверки очистки');
+      const { productRegistry, seller, sellerComponentIds } = suite;
+      const businessId = 'e2e-clear';
+
+      await productRegistry
+        .connect(seller)
+        .createProduct(businessId, [sellerComponentIds[0]], 'QmClearCID');
+
+      console.log('Фаза 2: Проверяем наличие записи в mapping');
+      await assertBusinessIdMapping(productRegistry, businessId, 1);
+
+      console.log('Фаза 3: Очищаем каталог от имени продавца');
+      const sellerAddress = await seller.getAddress();
+      await productRegistry.connect(seller).clearSellerCatalog(sellerAddress);
+
+      console.log('Фаза 4: Проверяем, что businessId очищен');
+      await assertBusinessIdCleared(productRegistry, businessId);
+
+      console.log('Фаза 5: Очистка каталога проверена');
     });
   });
 
   describe('Performance', () => {
-    it('должен регистрировать products быстро', async () => {
-      const timer = harness.measureExecutionTime('Product Registration');
-      
-      // Simulate registration
-      const productIds = ['p1', 'p2', 'p3'];
-      const cid = 'QmTestCID';
-      
+    let suite;
+
+    beforeEach(async () => {
+      suite = await harness.deployProductSuite({ forceRedeploy: true });
+    });
+
+    it('должен регистрировать продукт < 1s', async () => {
+      const { productRegistry, seller, sellerComponentIds } = suite;
+      const timer = harness.measureExecutionTime('Action 43 product registration');
+
+      await productRegistry
+        .connect(seller)
+        .createProduct('e2e-perf', [sellerComponentIds[0]], 'QmPerfCID');
+
       const duration = timer.end();
       expect(duration).to.be.lessThan(1000);
     });

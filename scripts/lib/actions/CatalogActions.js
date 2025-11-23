@@ -513,8 +513,12 @@ class CatalogActions {
         logger.info(`[${i+1}/${productsData.length}] Creating product: ${product.id}`);
         logger.info(`  componentIds: ${product.componentIds?.join(', ') || '[]'}`);
         logger.info(`  metadataCID: ${product.metadataCID}`);
+        if (!product.id || typeof product.id !== 'string') {
+          throw new Error(`Product ${i + 1} is missing string id for businessId`);
+        }
         
         const tx = await productRegistryWithSigner.createProduct(
+          product.id,
           product.componentIds || [],
           product.metadataCID,
           { gasLimit: 1000000 }
@@ -801,6 +805,7 @@ class CatalogActions {
       // Estimate for first product
       const firstProduct = productsData[0];
       const gasEstimate = await productRegistry.createProduct.estimateGas(
+        firstProduct.id,
         firstProduct.componentIds || [],
         firstProduct.metadataCID,
         { from: sellerAddress }

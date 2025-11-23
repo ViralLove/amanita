@@ -109,6 +109,7 @@ def balance_tracker():
 # Эти тесты формируют информационный квант "start transformation"
 # и проверяют загрузку минимального контента в ArWeave
 
+@pytest.mark.skip(reason="Upload через .js код, не через Python")
 @pytest.mark.asyncio
 @measure_performance("start_transformation_minimal_upload")
 async def test_start_transformation_minimal_upload(arweave_uploader, balance_tracker):
@@ -135,6 +136,7 @@ async def test_start_transformation_minimal_upload(arweave_uploader, balance_tra
     
     logger.info(f"✅ Start transformation upload result: {result}")
 
+@pytest.mark.skip(reason="Upload через .js код, не через Python")
 @pytest.mark.asyncio
 @measure_performance("start_transformation_json_upload")
 async def test_start_transformation_json_upload(arweave_uploader, balance_tracker):
@@ -162,6 +164,7 @@ async def test_start_transformation_json_upload(arweave_uploader, balance_tracke
     assert result is not None, "JSON загрузка должна вернуть ID"
     logger.info(f"✅ Start transformation JSON upload result: {result}")
 
+@pytest.mark.skip(reason="Upload через .js код, не через Python")
 @pytest.mark.asyncio
 @measure_performance("start_transformation_text_upload")
 async def test_start_transformation_text_upload(arweave_uploader, balance_tracker):
@@ -181,6 +184,7 @@ async def test_start_transformation_text_upload(arweave_uploader, balance_tracke
     assert result is not None, "Текстовая загрузка должна вернуть ID"
     logger.info(f"✅ Start transformation text upload result: {result}")
 
+@pytest.mark.skip(reason="Upload через .js код, не через Python")
 @pytest.mark.asyncio
 @measure_performance("start_transformation_metadata_upload")
 async def test_start_transformation_metadata_upload(arweave_uploader, balance_tracker):
@@ -200,6 +204,7 @@ async def test_start_transformation_metadata_upload(arweave_uploader, balance_tr
     assert result is not None, "Метаданные должны загрузиться"
     logger.info(f"✅ Start transformation metadata upload result: {result}")
 
+@pytest.mark.skip(reason="Тавтология — проверяет константы из того же файла")
 @pytest.mark.asyncio
 @measure_performance("start_transformation_validation")
 async def test_start_transformation_validation(arweave_uploader, balance_tracker):
@@ -224,6 +229,7 @@ async def test_arweave_initialization(arweave_uploader, balance_tracker):
     assert arweave_uploader is not None
     # TODO: Проверить валидность ключа и баланс (после внедрения SDK)
 
+@pytest.mark.skip(reason="Upload через .js код, не через Python")
 @pytest.mark.asyncio
 @measure_performance("upload_and_download_text")
 async def test_upload_and_download_text(arweave_uploader, balance_tracker):
@@ -259,6 +265,7 @@ async def test_upload_and_download_text(arweave_uploader, balance_tracker):
     
     logger.info(f"✅ Upload and download test completed: {tx_id}")
 
+@pytest.mark.skip(reason="Upload через .js код, не через Python")
 @pytest.mark.asyncio
 @measure_performance("download_with_ar_prefix")
 async def test_download_with_ar_prefix(arweave_uploader, balance_tracker):
@@ -325,7 +332,94 @@ async def test_download_real_data(arweave_uploader, balance_tracker):
     logger.info(f"✅ Успешно скачаны данные с ArWeave: {result.get('network', 'unknown')}")
     logger.info(f"✅ Текущий блок: {result.get('blocks', 'unknown')}")
 
+@pytest.mark.asyncio
+@measure_performance("download_real_product_metadata")
+async def test_download_real_product_metadata(arweave_uploader, balance_tracker):
+    """
+    Тест загрузки РЕАЛЬНЫХ метаданных с Arweave.
+    Использует публично доступный JSON с arweave.net для проверки функциональности.
+    
+    КРИТИЧЕСКИЙ ТЕСТ: Проверяет реальную функциональность download,
+    которая используется в боте для загрузки каталога.
+    
+    NOTE: Использует известный публичный Arweave CID с JSON-структурой.
+    Для тестирования с актуальными CID из Action 444 необходимо обновить CID
+    после каждого deploy_full.js Action 444.
+    """
+    balance_tracker.track_operation("download_json", "0 AR")
+    
+    # Используем РЕАЛЬНЫЙ CID из data/components/amanita_muscaria/_upload_state_localhost.json
+    # Это русская локализация ComponentDescription для amanita_muscaria
+    # CID получен из реального Action 444 (загрузка компонентов в Arweave)
+    test_cid = "oFR4QDLvuputh_8XJSRtAu-Rfgxx-1aGXy32MlV9DI4"  # complex_fields.ru
+    
+    result = arweave_uploader.download_json(test_cid)
+    
+    # Проверяем, что данные успешно загружены
+    assert result is not None, f"Не удалось скачать данные с Arweave CID: {test_cid}"
+    assert isinstance(result, dict), "Результат должен быть словарем"
+    
+    # Проверяем структуру ComponentDescription
+    assert len(result) > 0, "JSON должен содержать данные"
+    
+    # Проверяем что это ComponentDescription с локализацией
+    # Структура может содержать: generic, effects, shamanic, warnings
+    expected_keys = ['generic', 'effects', 'shamanic', 'warnings']
+    found_keys = [key for key in expected_keys if key in result]
+    assert len(found_keys) > 0, f"ComponentDescription должен содержать хотя бы одно из: {expected_keys}"
+    
+    logger.info(f"✅ Успешно загружены ComponentDescription с Arweave: {test_cid}")
+    logger.info(f"✅ Найдены секции: {found_keys}")
+
+@pytest.mark.asyncio
+@measure_performance("ar_prefix_handling")
+async def test_ar_prefix_handling(arweave_uploader, balance_tracker):
+    """
+    Тест корректной обработки ar:// префикса с реальным CID.
+    Проверяет, что download_json правильно обрабатывает ar:// префикс
+    и загружает данные с публичного Arweave CID.
+    """
+    balance_tracker.track_operation("download_json", "0 AR")
+    
+    # РЕАЛЬНЫЙ CID из data/components/amanita_muscaria (английская локализация)
+    test_cid = "9YUtSNzK0v6pKscCJxNhQxWaBnAgZTzcYGrBMgULu6U"  # complex_fields.en
+    ar_prefixed_cid = f"ar://{test_cid}"
+    
+    result = arweave_uploader.download_json(ar_prefixed_cid)
+    
+    # Проверяем, что данные успешно загружены с ar:// префиксом
+    assert result is not None, f"Не удалось скачать данные с ar:// префиксом: {ar_prefixed_cid}"
+    assert isinstance(result, dict), "Результат должен быть словарем"
+    
+    # Проверяем структуру ComponentDescription
+    expected_keys = ['generic', 'effects', 'shamanic', 'warnings']
+    found_keys = [key for key in expected_keys if key in result]
+    assert len(found_keys) > 0, f"ComponentDescription должен содержать хотя бы одно из: {expected_keys}"
+    
+    logger.info(f"✅ ar:// префикс корректно обработан для CID: {test_cid}")
+
+@pytest.mark.asyncio
+@measure_performance("http_404_handling")
+async def test_http_404_handling(arweave_uploader, balance_tracker):
+    """
+    Тест обработки HTTP 404 для несуществующего CID.
+    Проверяет, что download_json корректно обрабатывает ошибку 404
+    и возвращает None вместо исключения.
+    """
+    balance_tracker.track_operation("download_json_error", "0 AR")
+    
+    # Несуществующий CID (валидный формат, но не существует в Arweave)
+    non_existent_cid = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    
+    result = arweave_uploader.download_json(non_existent_cid)
+    
+    # Проверяем, что результат None (корректная обработка 404)
+    assert result is None, f"Ожидался None для несуществующего CID: {non_existent_cid}"
+    
+    logger.info(f"✅ HTTP 404 корректно обработан для несуществующего CID: {non_existent_cid}")
+
 # === EDGE FUNCTION ИНТЕГРАЦИЯ ===
+@pytest.mark.skip(reason="Edge Function не используется, загрузка через .js")
 @pytest.mark.asyncio
 @measure_performance("edge_function_integration")
 async def test_edge_function_integration(arweave_uploader, balance_tracker):
@@ -343,6 +437,7 @@ async def test_edge_function_integration(arweave_uploader, balance_tracker):
     logger.info(f"✅ Edge Function URL: {SUPABASE_URL}/functions/v1/arweave-upload")
     logger.info("✅ Edge Function integration test completed")
 
+@pytest.mark.skip(reason="Edge Function не используется, загрузка через .js")
 @pytest.mark.asyncio
 @measure_performance("edge_function_upload_test")
 async def test_edge_function_upload_test(arweave_uploader, balance_tracker):

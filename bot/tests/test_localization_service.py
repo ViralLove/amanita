@@ -9,6 +9,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
 # Добавляем путь к модулям бота
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -17,6 +18,7 @@ from services.common.localization_service import LocalizationService
 from services.common.localization import Localization
 from services.common.product_localization import ProductLocalizationService
 from services.common.component_localization import ComponentLocalizationService
+from services.common.fallback_localization_service import FallbackResult, FallbackLevel
 
 
 class TestLocalizationService(unittest.TestCase):
@@ -171,6 +173,16 @@ class TestLocalizationService(unittest.TestCase):
         self.assertTrue(hasattr(loc, 't'))
         self.assertTrue(hasattr(loc, 'lang'))
         self.assertTrue(hasattr(loc, 'labels'))
+
+    def test_switch_language_runtime(self):
+        """Тест: Один объект LocalizationService переключает язык без пересоздания"""
+        loc = LocalizationService('ru')
+
+        loc.switch_language('en')
+
+        self.assertEqual(loc.lang, 'en')
+        self.assertEqual(loc.product_localization.language, 'en')
+        self.assertEqual(loc.component_localization.language, 'en')
     
     def test_error_handling(self):
         """Тест: Реализована обработка ошибок и fallback стратегии"""
@@ -184,8 +196,8 @@ class TestLocalizationService(unittest.TestCase):
         # ✅ ПРАВИЛЬНО: Тестируем обработку граничных случаев
         self.assertEqual(loc.t('product..field'), '[field]')  # Пустой business_id
         self.assertEqual(loc.t('product.business_id.'), '[field]')  # Пустое поле
-        self.assertEqual(loc.t('component..field'), '[field]')  # Пустой biounit_id
-        self.assertEqual(loc.t('component.biounit_id.'), '[field]')  # Пустое поле
+        self.assertEqual(loc.t('component..field'), '[field]')  # Пустой component_id
+        self.assertEqual(loc.t('component.component_id.'), '[field]')  # Пустое поле
     
     def test_performance_requirements(self):
         """Тест: Обеспечена производительность не хуже существующей"""
@@ -452,6 +464,22 @@ class TestProductLocalizationService(unittest.TestCase):
         self.assertEqual(service.get_translation('product.new_product.title'), 'Новый продукт')
         self.assertEqual(service.get_translation('product.new_product.description'), 'Новое описание')
 
+    def test_uses_fallback_service_when_cache_miss(self):
+        """ProductLocalizationService обязан вызывать FallbackLocalizationService"""
+        fallback_service = MagicMock()
+        fallback_service.get_translation_with_fallback.return_value = FallbackResult(
+            translation='Fallback product title',
+            level=FallbackLevel.DEFAULT_LANGUAGE,
+            source='language_ru',
+            confidence=0.8
+        )
+        service = ProductLocalizationService('en', fallback_service=fallback_service)
+
+        result = service.get_translation('product.test_product.title')
+
+        fallback_service.get_translation_with_fallback.assert_called_once()
+        self.assertEqual(result, 'Fallback product title')
+
 
 class TestComponentLocalizationService(unittest.TestCase):
     """Тесты для ComponentLocalizationService"""
@@ -513,6 +541,168 @@ class TestComponentLocalizationService(unittest.TestCase):
         # Проверяем, что данные установлены
         self.assertEqual(service.get_translation('component.new_component.common_name'), 'Новый компонент')
         self.assertEqual(service.get_translation('component.new_component.scientific_name'), 'Novus componentus')
+
+    def test_uses_fallback_service_when_cache_miss(self):
+        """ComponentLocalizationService обязан вызывать FallbackLocalizationService"""
+        fallback_service = MagicMock()
+        fallback_service.get_translation_with_fallback.return_value = FallbackResult(
+            translation='Fallback component name',
+            level=FallbackLevel.DEFAULT_LANGUAGE,
+            source='language_ru',
+            confidence=0.8
+        )
+        service = ComponentLocalizationService('en', fallback_service=fallback_service)
+
+        result = service.get_translation('component.test_component.common_name')
+
+        fallback_service.get_translation_with_fallback.assert_called_once()
+        self.assertEqual(result, 'Fallback component name')
+
+    def test_loads_simple_field_from_ipfs(self):
+        """Тест: простые поля загружаются через get_component_translations (обратная совместимость)"""
+        ipfs_service = MagicMock(name="MultilingualIPFSService")
+        service = ComponentLocalizationService('ru', ipfs_service=ipfs_service)
+        
+        # Mock для simple field
+        component_data = {'title': 'Test Title', 'common_name': 'Test Component'}
+        ipfs_service.get_component_translations.return_value = component_data
+        
+        # Загружаем simple field
+        result = service._load_from_ipfs('test_component', 'title')
+        
+        # Проверяем, что использовался get_component_translations
+        ipfs_service.get_component_translations.assert_called_once_with('test_component', 'ru')
+        self.assertEqual(result, 'Test Title')
+
+    def test_loads_per_component_field_from_ipfs(self):
+        """Тест: per-component fields загружаются через get_component_translations()"""
+        ipfs_service = MagicMock(name="MultilingualIPFSService")
+        service = ComponentLocalizationService('ru', ipfs_service=ipfs_service)
+        
+        biounit_id = "amanita_muscaria"  # строка, biounit_id
+        
+        # Mock для per-component simple field
+        component_data = {
+            'generic_description': 'Описание для amanita_muscaria',
+            'effects': 'Эффекты для amanita_muscaria',
+            'title': 'Мухомор красный'
+        }
+        ipfs_service.get_component_translations.return_value = component_data
+        
+        # Загружаем per-component field
+        result = service._load_from_ipfs(biounit_id, 'generic_description')
+        
+        # Проверяем, что использовался get_component_translations С biounit_id
+        ipfs_service.get_component_translations.assert_called_once_with(biounit_id, 'ru')
+        # Проверяем, что get_component_description_template НЕ вызывался
+        ipfs_service.get_component_description_template.assert_not_called()
+        self.assertEqual(result, 'Описание для amanita_muscaria')
+
+    def test_is_complex_field(self):
+        """Тест: метод _is_complex_field корректно определяет тип поля"""
+        service = ComponentLocalizationService('ru')
+        
+        # Проверяем, что per-component поля НЕ являются complex fields
+        # (они должны быть simple fields через get_component_translations)
+        self.assertFalse(service._is_complex_field('generic_description'))
+        self.assertFalse(service._is_complex_field('effects'))
+        self.assertFalse(service._is_complex_field('shamanic'))
+        self.assertFalse(service._is_complex_field('warnings'))
+        self.assertFalse(service._is_complex_field('description'))
+        
+        # Проверяем simple fields
+        self.assertFalse(service._is_complex_field('title'))
+        self.assertFalse(service._is_complex_field('common_name'))
+        self.assertFalse(service._is_complex_field('scientific_name'))
+        
+        # Проверяем, что complex fields пустое множество (глобальные шаблоны не используются)
+        self.assertEqual(service.COMPLEX_COMPONENT_FIELDS, set())
+
+    def test_extract_field_from_complex_data(self):
+        """Тест: метод _extract_field_from_complex_data корректно извлекает поля"""
+        service = ComponentLocalizationService('ru')
+        
+        complex_data = {
+            'generic_description': 'Test generic description',
+            'effects': 'Test effects',
+            'shamanic': 'Test shamanic',
+            'warnings': 'Test warnings'
+        }
+        
+        # Проверяем извлечение полей
+        self.assertEqual(service._extract_field_from_complex_data(complex_data, 'generic_description'), 
+                        'Test generic description')
+        self.assertEqual(service._extract_field_from_complex_data(complex_data, 'effects'), 'Test effects')
+        
+        # Проверяем отсутствующие поля
+        self.assertIsNone(service._extract_field_from_complex_data(complex_data, 'nonexistent'))
+        
+        # Проверяем обработку пустых данных
+        self.assertIsNone(service._extract_field_from_complex_data({}, 'generic_description'))
+        self.assertIsNone(service._extract_field_from_complex_data(None, 'generic_description'))
+
+    def test_fallback_for_per_component_fields(self):
+        """Тест: fallback логика работает для per-component fields"""
+        ipfs_service = MagicMock(name="MultilingualIPFSService")
+        fallback_service = MagicMock(name="FallbackLocalizationService")
+        fallback_service.get_translation_with_fallback.return_value = FallbackResult(
+            translation='Fallback generic description',
+            level=FallbackLevel.DEFAULT_LANGUAGE,
+            source='language_ru',
+            confidence=0.8
+        )
+        
+        service = ComponentLocalizationService(
+            'en',
+            ipfs_service=ipfs_service,
+            fallback_service=fallback_service
+        )
+        
+        biounit_id = "test_component"
+        
+        # Mock: per-component field не найден в IPFS
+        ipfs_service.get_component_translations.return_value = None
+        
+        # Запрашиваем per-component field
+        result = service.get_translation(f'component.{biounit_id}.generic_description')
+        
+        # Проверяем, что использовался fallback
+        self.assertEqual(result, 'Fallback generic description')
+        # Проверяем, что get_component_translations вызывался для fallback (для requested и default языка)
+        # Вызывается для 'en' (requested) и 'ru' (default)
+        self.assertTrue(ipfs_service.get_component_translations.called)
+        calls = ipfs_service.get_component_translations.call_args_list
+        # Проверяем, что был вызов для requested языка 'en'
+        self.assertTrue(any(call[0] == (biounit_id, 'en') for call in calls), 
+                       f"Expected call with ('{biounit_id}', 'en'), got calls: {calls}")
+
+    def test_caches_per_component_field(self):
+        """Тест: per-component fields кэшируются"""
+        ipfs_service = MagicMock(name="MultilingualIPFSService")
+        cache_service = MagicMock(name="TranslationCacheService")
+        # Настраиваем cache_service.get() чтобы возвращал None (кэш пуст)
+        cache_service.get.return_value = None
+        service = ComponentLocalizationService(
+            'ru',
+            ipfs_service=ipfs_service,
+            cache_service=cache_service
+        )
+        
+        biounit_id = "test_component"
+        
+        # Mock для per-component simple field
+        component_data = {'generic_description': 'Test generic description', 'effects': 'Test effects'}
+        ipfs_service.get_component_translations.return_value = component_data
+        
+        # Первый вызов - должен загрузить и закэшировать
+        result1 = service.get_translation(f'component.{biounit_id}.generic_description')
+        self.assertEqual(result1, 'Test generic description')
+        
+        # Проверяем, что get_component_translations вызывался с biounit_id
+        ipfs_service.get_component_translations.assert_called_with(biounit_id, 'ru')
+        
+        # Проверяем, что кэш вызывался
+        cache_service.set.assert_called()
 
 
 if __name__ == '__main__':

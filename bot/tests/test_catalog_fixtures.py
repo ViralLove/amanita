@@ -177,12 +177,12 @@ def test_product_validation_data():
             # Проверяем, что сумма пропорций не равна 100%
             proportions = [float(c.get("proportion", "0").replace("%", "")) for c in organic_components]
             assert sum(proportions) != 100, "Сумма пропорций не должна быть равна 100%"
-        elif product_id == "invalid_duplicate_biounit_id":
-            # Дублирующиеся biounit_id
+        elif product_id == "invalid_duplicate_component_id":
+            # Дублирующиеся component_id
             organic_components = product.get("organic_components", [])
             assert organic_components, "Должны быть органические компоненты для проверки"
-            biounit_ids = [c.get("biounit_id") for c in organic_components]
-            assert len(biounit_ids) != len(set(biounit_ids)), "Должны быть дублирующиеся biounit_id"
+            component_ids = [c.get("component_id") for c in organic_components]
+            assert len(component_ids) != len(set(component_ids)), "Должны быть дублирующиеся component_id"
         
         logger.info(f"✅ Невалидный продукт {product_id} проверен")
     

@@ -452,7 +452,7 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
             )
         
         # Проверяем обязательные поля компонента
-        required_component_fields = ['biounit_id', 'description_cid', 'proportion']
+        required_component_fields = ['component_id', 'description_cid', 'proportion']
         for field in required_component_fields:
             if field not in component:
                 return ValidationResult.failure(
@@ -462,13 +462,13 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
                     error_code="MISSING_COMPONENT_FIELD"
                 )
         
-        # Валидируем biounit_id
-        biounit_id = component.get('biounit_id')
-        if not biounit_id or not biounit_id.strip():
+        # Валидируем component_id
+        component_id = component.get('component_id')
+        if not component_id or not component_id.strip():
             return ValidationResult.failure(
-                "biounit_id не может быть пустым",
-                field_name=f"organic_components[{index}].biounit_id",
-                field_value=biounit_id,
+                "component_id не может быть пустым",
+                field_name=f"organic_components[{index}].component_id",
+                field_value=component_id,
                 error_code="EMPTY_BIOUNIT_ID"
             )
         

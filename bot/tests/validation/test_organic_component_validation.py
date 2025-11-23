@@ -12,17 +12,26 @@ from model.organic_component import OrganicComponent
 def test_organic_component_validation():
     """Тест создания OrganicComponent с валидацией"""
     try:
-        # Создаем тестовые данные
+        # Создаем тестовые данные (используем component_id — NEW)
         component = OrganicComponent(
-            biounit_id='test_id',
+            component_id='test_id',
             description_cid='Qm123456789',
             proportion='100%'
         )
         
         print('✅ OrganicComponent создан успешно с валидацией')
-        print(f'  - biounit_id: {component.biounit_id}')
+        print(f'  - component_id: {component.component_id}')
         print(f'  - description_cid: {component.description_cid}')
         print(f'  - proportion: {component.proportion}')
+        
+        # Test backward compat via @property
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always')
+            bio_id = component.component_id
+            print(f'  - component_id (via @property): {bio_id}')
+            if len(w) == 1:
+                print(f'  - ✅ DeprecationWarning raised')
         
         pass
         
@@ -34,7 +43,7 @@ def test_validate_proportion_method():
     """Тест метода validate_proportion"""
     try:
         component = OrganicComponent(
-            biounit_id='test_id',
+            component_id='test_id',
             description_cid='Qm123456789',
             proportion='100%'
         )

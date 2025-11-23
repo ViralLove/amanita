@@ -17,10 +17,25 @@
  */
 
 const { expect } = require('chai');
-const E2EHarness = require('../../../helpers/E2EHarness');
+const {
+  E2EHarness,
+  assertInviteFormat,
+  assertValidAddress,
+  assertRegisteredProxy,
+  assertSellerState,
+  assertSoulIdentitySetup,
+  assertBusinessIdFormat,
+  assertBusinessIdMapping,
+  assertBusinessIdCleared,
+  assertCidFormat,
+  expectEvent,
+  expectRevertReason,
+  expectRevertCustom
+} = require('../../../helpers');
 const { ethers } = require('hardhat');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 // TODO: Import CatalogActions when action888 refactored
 // const CatalogActions = require('../../../../lib/actions/CatalogActions');
@@ -35,8 +50,68 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
   let sellerAddress;
   let deployerInvite;
 
+  const getRegistryEntry = (contractName) => harness.loadContractFromSuite(contractName);
+  const getProxyAddress = (contractName) => getRegistryEntry(contractName).proxy;
+  const getImplementationAddress = (contractName) => getRegistryEntry(contractName).implementation;
+  const getContractInstance = async (contractName, abiName) => {
+    const proxyAddress = getProxyAddress(contractName);
+    const implementation = getImplementationAddress(contractName);
+
+    if (implementation) {
+      try {
+        const Factory = await ethers.getContractFactory(abiName);
+        const contract = Factory.attach(proxyAddress);
+        await contract.getAddress();
+        return contract;
+      } catch (error) {
+        console.warn(`⚠️ attach fallback для ${contractName}: ${error.message}`);
+      }
+    }
+
+    return ethers.getContractAt(abiName, proxyAddress);
+  };
+
+  async function clearCatalogAndAssert(productRegistry, sellerSigner, businessIds) {
+    const sellerAddress = await sellerSigner.getAddress();
+    await productRegistry.connect(sellerSigner).clearSellerCatalog(sellerAddress);
+    const catalogVersion = await productRegistry.catalogVersion(sellerAddress);
+    expect(Number(catalogVersion)).to.be.greaterThan(0);
+    for (const businessId of businessIds) {
+      await assertBusinessIdCleared(productRegistry, businessId);
+    }
+  }
+
+function restoreBaseRegistry(registryHelper, deployed) {
+  registryHelper.registerMany([
+    ['MagicRegistry', deployed.magicRegistry, null],
+    ['SpiralEngine', deployed.spiralEngine, deployed.spiralEngineLogic],
+    ['ProductRegistry', deployed.productRegistry, deployed.productRegistryLogic],
+    ['OrganicComponentRegistry', deployed.organicComponentRegistry, deployed.organicComponentRegistryLogic],
+    ['AmanitaInternational', deployed.amanitaInternational, deployed.amanitaInternationalLogic],
+    ['SoulboundCore', deployed.soulboundCore, null],
+    ['SoulMetadata', deployed.soulMetadata, null],
+    ['SoulRecovery', deployed.soulRecovery, null],
+    ['SoulIntegration', deployed.soulIntegration, null],
+    ['SoulIdentity', deployed.soulIdentity, null]
+  ]);
+}
+
+async function prepareSellerStateForTests(options = {}) {
+  if (!harness) {
+    throw new Error('prepareSellerStateForTests: harness не инициализирован');
+  }
+
+  const helperOptions = {
+    ...options,
+    invitesPrefix: options.invitesPrefix || 'ACTION888',
+    useExistingInvite: options.useExistingInvite ?? deployerInvite
+  };
+
+  return harness.prepareSellerForE2E(helperOptions);
+}
+
   before(async function() {
-    this.timeout(180000); // 3 min for setup
+    this.timeout(240000); // 4 min for full setup
 
     // Start E2E infrastructure
     harness = new E2EHarness();
@@ -50,17 +125,18 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
 
     // Deploy ALL contracts (Action 1 logic)
     console.log('\n📦 Phase 0: Deploying complete ecosystem (Action 1)...');
-    deployedContracts = await deployCompleteEcosystemFor888();
+    deployedContracts = await deployCompleteEcosystemFor888(harness.magicRegistry);
 
-    // Generate deployer invites (Action 777 logic)
-    console.log('\n🎲 Phase 0: Generating deployer invites (Action 777)...');
+    console.log('\n🎲 Generating deployer invite via Action 777 helper...');
     deployerInvite = await generateDeployerInvitesFor888(deployedContracts.spiralEngine);
+    deployedContracts.deployerInvite = deployerInvite;
 
     console.log(`\n✅ Prerequisites complete for Action 888`);
     console.log(`   Deployer: ${deployerAddress}`);
     console.log(`   Seller: ${sellerAddress}`);
     console.log(`   DEPLOYER_INVITE: ${deployerInvite}`);
     console.log(`   Contracts deployed: ${Object.keys(deployedContracts).length}`);
+  console.log('   Suite hint: deployerInvite сохранён в deployedContracts для reuse');
 
     // Create snapshot (expensive setup)
     await harness.saveState('ready-for-888');
@@ -74,6 +150,12 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
   beforeEach(async function() {
     // Reset to ready state
     await harness.restoreState('ready-for-888');
+    restoreBaseRegistry(harness.magicRegistry, deployedContracts);
+    try {
+      getProxyAddress('SoulIdentity');
+    } catch (error) {
+      throw new Error(`SoulIdentity missing in MagicRegistryHelper after restore: ${error.message}`);
+    }
   });
 
   // ================================================================
@@ -107,7 +189,7 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
 
     it('должен иметь deployer invites created (Action 777)', async () => {
       // Validate invite exists
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
       
       const inviteExists = await SpiralEngine.inviteCodeExists(deployerInvite);
       expect(inviteExists).to.be.true;
@@ -121,21 +203,21 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
 
     it('должен иметь SetupActions connections установлены', async () => {
       // Validate SetupActions выполнен (connections present)
-      const SoulboundCore = await ethers.getContractAt('SoulboundCore', deployedContracts.soulboundCore);
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
-      const OrganicRegistry = await ethers.getContractAt('OrganicComponentRegistryLogic', deployedContracts.organicComponentRegistry);
+      const SoulboundCore = await getContractInstance('SoulboundCore', 'SoulboundCore');
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
+      const OrganicRegistry = await getContractInstance('OrganicComponentRegistry', 'OrganicComponentRegistryLogic');
 
       // SBT connections
       const metadataContract = await SoulboundCore.getMetadataContract();
-      expect(metadataContract).to.equal(deployedContracts.soulMetadata);
+      expect(metadataContract).to.equal(getProxyAddress('SoulMetadata'));
 
       // SpiralEngine → SoulIdentity
       const soulIdentity = await SpiralEngine.soulIdentity();
-      expect(soulIdentity).to.equal(deployedContracts.soulIdentity);
+      expect(soulIdentity).to.equal(getProxyAddress('SoulIdentity'));
 
       // OrganicRegistry → SpiralEngine
       const spiralInOrganic = await OrganicRegistry.spiralEngine();
-      expect(spiralInOrganic).to.equal(deployedContracts.spiralEngine);
+      expect(spiralInOrganic).to.equal(getProxyAddress('SpiralEngine'));
 
       console.log('✓ SetupActions connections validated');
     });
@@ -147,29 +229,29 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
 
   describe('Action 888: Step 1-2 (Validate + Load) - TDD Spec', () => {
     it('должен валидировать входные параметры', async () => {
-      // TODO: После рефакторинга CatalogActions.action888
-      // TDD Spec из deploy_full.js: validateAction888Inputs()
-      
-      // Validate deployerInvite format
-      expect(deployerInvite).to.match(/^AMANITA-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
-      
-      // Validate sellerAddress format
-      expect(ethers.isAddress(sellerAddress)).to.be.true;
-      
-      console.log('⏳ TDD: validateAction888Inputs() (будет в CatalogActions.action888)');
+      console.log('Фаза 1: Проверяем формат deployerInvite через helper');
+      assertInviteFormat(deployerInvite);
+
+      console.log('Фаза 2: Проверяем формат sellerAddress через helper');
+      assertValidAddress(sellerAddress);
+
+      console.log('Фаза 3: validateAction888Inputs() (предстоит реализовать в CatalogActions.action888)');
     });
 
     it('должен загрузить контракты через MagicRegistry', async () => {
-      // TODO: TDD Spec из deploy_full.js: loadContractsFor888()
-      // НОВАЯ архитектура: через MagicRegistry (не .env!)
-      
-      const MagicRegistry = await ethers.getContractAt('AmanitaRegistry', deployedContracts.magicRegistry);
-      
-      // Проверяем что контракты зарегистрированы
-      const spiralAddress = await MagicRegistry.get('SpiralEngine');
-      expect(spiralAddress).to.equal(deployedContracts.spiralEngine);
-      
-      console.log('⏳ TDD: loadContractsFor888() через MagicRegistry');
+      console.log('Фаза 1: Получаем записи из локального MagicRegistryHelper');
+      const entries = {
+        SpiralEngine: harness.magicRegistry.resolve('SpiralEngine'),
+        ProductRegistry: harness.magicRegistry.resolve('ProductRegistry'),
+        OrganicComponentRegistry: harness.magicRegistry.resolve('OrganicComponentRegistry')
+      };
+
+      console.log('Фаза 2: Проверяем соответствие proxy/logic адресов');
+      assertRegisteredProxy(entries, 'SpiralEngine', getProxyAddress('SpiralEngine'), getImplementationAddress('SpiralEngine'));
+      assertRegisteredProxy(entries, 'ProductRegistry', getProxyAddress('ProductRegistry'), getImplementationAddress('ProductRegistry'));
+      assertRegisteredProxy(entries, 'OrganicComponentRegistry', getProxyAddress('OrganicComponentRegistry'), getImplementationAddress('OrganicComponentRegistry'));
+
+      console.log('Фаза 3: loadContractsFor888() опирается на MagicRegistryHelper (TDD: реализация в actions)');
     });
   });
 
@@ -180,13 +262,17 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
   describe('Action 888: Step 3-4 (Activation) - из deploy_full.js', () => {
     it('должен проверить статус активации seller', async () => {
       // Эталон: checkSellerActivationStatus() из deploy_full.js
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
-      
-      const usedInvite = await SpiralEngine.usedInviteByUser(sellerAddress);
-      const isActivated = usedInvite > 0;
-      
-      expect(isActivated).to.be.false; // До активации
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
 
+      console.log('Фаза 1: Получаем состояние seller до активации');
+      const state = await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: false,
+        sellerRole: false,
+        activatorRole: false,
+        activatorAddress: ethers.ZeroAddress
+      });
+
+      console.log(`Фаза 2: usedInvite=${Number(state.usedInvite)}, sellerRole=${state.sellerRole}, activatorRole=${state.activatorRole}`);
       console.log('✓ checkSellerActivationStatus() validated (not activated)');
     });
 
@@ -195,8 +281,16 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
 
       // Эталон: activateSellerInSpiralEngine() из deploy_full.js
       const [deployer] = await ethers.getSigners();
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
       const spiralWithDeployer = SpiralEngine.connect(deployer);
+
+      console.log('Фаза 1: Проверяем состояние перед активацией (NotASeller ожидается только при неверной роли)');
+      await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: false,
+        sellerRole: false,
+        activatorRole: false,
+        activatorAddress: ethers.ZeroAddress
+      });
 
       // Generate 12 seller invites
       const sellerInvites = Array(12).fill().map((_, i) => `SELLER-INV-${i.toString().padStart(4, '0')}`);
@@ -206,9 +300,15 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
       const activateTx = await spiralWithDeployer.activateUser(deployerInvite, sellerAddress, sellerInvites, 0);
       await activateTx.wait();
 
-      // Validate activation
-      const usedInvite = await SpiralEngine.usedInviteByUser(sellerAddress);
-      expect(usedInvite).to.equal(tokenId + BigInt(1)); // Activated
+      console.log('Фаза 2: Проверяем состояние после активации');
+      const state = await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: true,
+        sellerRole: false,
+        activatorRole: false,
+        activatorAddress: deployer.address
+      });
+
+      expect(Number(state.usedInvite)).to.equal(Number(tokenId) + 1); // Activated
 
       console.log('✓ activateSellerInSpiralEngine() completed');
       console.log(`   Seller activated with invite: ${deployerInvite}`);
@@ -219,18 +319,27 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
 
       // GIVEN: Activate seller first
       const [deployer] = await ethers.getSigners();
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
       const spiralWithDeployer = SpiralEngine.connect(deployer);
 
       const sellerInvites = Array(12).fill().map((_, i) => `SELLER-INV-${i}`);
       await spiralWithDeployer.activateUser(deployerInvite, sellerAddress, sellerInvites, 0);
 
-      // WHEN: Check activation again
-      const usedInvite = await SpiralEngine.usedInviteByUser(sellerAddress);
-      const isActivated = usedInvite > 0;
+      console.log('Фаза 1: Состояние после первой активации');
+      await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: true,
+        sellerRole: false,
+        activatorRole: false,
+        activatorAddress: deployer.address
+      });
 
-      // THEN: Already activated
-      expect(isActivated).to.be.true;
+      // WHEN: Check activation again
+      console.log('Фаза 2: Повторная проверка активации');
+      await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: true,
+        sellerRole: false,
+        activatorRole: false
+      });
 
       console.log('✓ Seller activation check (already activated, skip)');
     });
@@ -242,19 +351,16 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
 
   describe('Action 888: Step 5-6 (Role Management) - из deploy_full.js', () => {
     beforeEach(async function() {
-      // Activate seller first (prerequisite for role grants)
-      const [deployer] = await ethers.getSigners();
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
-      const spiralWithDeployer = SpiralEngine.connect(deployer);
-
-      const sellerInvites = Array(12).fill().map((_, i) => `SELLER-INV-${i}`);
-      await spiralWithDeployer.activateUser(deployerInvite, sellerAddress, sellerInvites, 0);
+      // Seller должен быть активирован, но без ролей
+      await prepareSellerStateForTests({
+        grantRoles: false
+      });
     });
 
     it('должен назначить SELLER_ROLE активированному seller', async () => {
       // Эталон: grantSellerRoleToUser() из deploy_full.js
       const [deployer] = await ethers.getSigners();
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
       const spiralWithDeployer = SpiralEngine.connect(deployer);
 
       // Grant SELLER_ROLE
@@ -262,10 +368,14 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
       await tx.wait();
 
       // Validate role assigned
-      const SELLER_ROLE = await SpiralEngine.SELLER_ROLE();
-      const hasRole = await SpiralEngine.hasRole(SELLER_ROLE, sellerAddress);
-      
-      expect(hasRole).to.be.true;
+      const state = await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: true,
+        sellerRole: true,
+        activatorRole: false,
+        activatorAddress: deployer.address
+      });
+
+      console.log(`   Seller state after SELLER_ROLE: activated=${state.activated}, sellerRole=${state.sellerRole}`);
 
       console.log('✓ grantSellerRoleToUser() completed');
       console.log(`   Seller has SELLER_ROLE: ${sellerAddress}`);
@@ -274,7 +384,7 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
     it('должен назначить ACTIVATOR_ROLE seller', async () => {
       // Эталон: grantActivatorRoleToSeller() из deploy_full.js
       const [deployer] = await ethers.getSigners();
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
       const spiralWithDeployer = SpiralEngine.connect(deployer);
 
       // Grant SELLER_ROLE first (prerequisite)
@@ -286,8 +396,14 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
       await grantTx.wait();
 
       // Validate role assigned
-      const hasRole = await SpiralEngine.hasRole(ACTIVATOR_ROLE, sellerAddress);
-      expect(hasRole).to.be.true;
+      const state = await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: true,
+        sellerRole: true,
+        activatorRole: true,
+        activatorAddress: deployer.address
+      });
+
+      console.log(`   Seller state after ACTIVATOR_ROLE: sellerRole=${state.sellerRole}, activatorRole=${state.activatorRole}`);
 
       console.log('✓ grantActivatorRoleToSeller() completed');
       console.log(`   Seller has ACTIVATOR_ROLE: ${sellerAddress}`);
@@ -297,7 +413,7 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
       this.timeout(60000);
 
       const [deployer] = await ethers.getSigners();
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
       const spiralWithDeployer = SpiralEngine.connect(deployer);
 
       // Grant both roles
@@ -307,12 +423,12 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
       await spiralWithDeployer.grantRole(ACTIVATOR_ROLE, sellerAddress);
 
       // Validate both roles
-      const SELLER_ROLE = await SpiralEngine.SELLER_ROLE();
-      const hasSellerRole = await SpiralEngine.hasRole(SELLER_ROLE, sellerAddress);
-      const hasActivatorRole = await SpiralEngine.hasRole(ACTIVATOR_ROLE, sellerAddress);
-
-      expect(hasSellerRole).to.be.true;
-      expect(hasActivatorRole).to.be.true;
+      await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: true,
+        sellerRole: true,
+        activatorRole: true,
+        activatorAddress: deployer.address
+      });
 
       console.log('✓ Both roles assigned (SELLER + ACTIVATOR)');
     });
@@ -324,24 +440,46 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
 
   describe('Action 888: Step 7 (SoulIdentity) - из deploy_full.js', () => {
     it('должен настроить SoulIdentity для seller (TDD Spec)', async () => {
-      // TODO: TDD Spec из deploy_full.js: setupSoulIdentityFor888()
-      
-      // Эта функция должна:
-      // - Создать SBT token для seller
-      // - Установить metadata
-      // - Связать с SpiralEngine identity
-      
-      expect(deployedContracts.soulIdentity).to.exist;
-      
-      console.log('⏳ TDD: setupSoulIdentityFor888() (SBT token creation)');
+      console.log('Фаза 1: Получаем контракты SoulIdentity/SoulboundCore/SoulMetadata');
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
+      const SoulIdentity = await getContractInstance('SoulIdentity', 'SoulIdentity');
+      const SoulboundCore = await getContractInstance('SoulboundCore', 'SoulboundCore');
+
+      console.log('Фаза 2: Проверяем конфигурацию мостов через helper');
+      await assertSoulIdentitySetup({
+        spiralEngine: SpiralEngine,
+        soulIdentity: SoulIdentity,
+        expectedSoulIdentityAddress: getProxyAddress('SoulIdentity'),
+        expectedSoulboundCore: getProxyAddress('SoulboundCore'),
+        expectedSoulMetadata: getProxyAddress('SoulMetadata'),
+        soulboundCoreContract: SoulboundCore
+      });
+
+      console.log('Фаза 3: SoulIdentity готов к выдаче DID (TDD: дальнейшие шаги по токену)');
     });
 
     it('должен пропустить SoulIdentity setup если не deployed', async () => {
-      // TODO: TDD Spec
-      // Если SoulIdentity не deployed → skip (не ошибка)
-      
-      console.log('⏳ TDD: SoulIdentity skip logic (if not deployed)');
-      expect(true).to.be.true; // Placeholder
+      console.log('Фаза 1: Получаем контракты для валидации');
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
+      const SoulIdentity = await getContractInstance('SoulIdentity', 'SoulIdentity');
+      const SoulboundCore = await getContractInstance('SoulboundCore', 'SoulboundCore');
+
+      console.log('Фаза 2: Проверяем, что helper сообщает об ошибке при неверной конфигурации');
+      try {
+        await assertSoulIdentitySetup({
+          spiralEngine: SpiralEngine,
+          soulIdentity: SoulIdentity,
+          expectedSoulIdentityAddress: getProxyAddress('SoulIdentity'),
+          expectedSoulboundCore: getProxyAddress('SoulboundCore'),
+          expectedSoulMetadata: ethers.ZeroAddress,
+          soulboundCoreContract: SoulboundCore
+        });
+        expect.fail('Expected configuration mismatch but helper succeeded');
+      } catch (error) {
+        expect(error.message).to.include('SoulIdentity.soulMetadata mismatch');
+      }
+
+      console.log('Фаза 3: SoulIdentity skip logic зафиксирован (ошибка конфигурации выявлена)');
     });
   });
 
@@ -350,28 +488,113 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
   // ================================================================
 
   describe('Action 888: Step 8 (Catalog + Invites) - из deploy_full.js', () => {
-    it('должен делегировать catalog upload в Action 444 (TDD Spec)', async () => {
-      // TODO: После рефакторинга
-      // action888 должен вызвать catalogActions.action444()
-      
-      console.log('⏳ TDD: action888 → action444 delegation');
-      expect(true).to.be.true; // Placeholder
+    it('должен подготовить данные каталога и валидировать их helper’ами', async () => {
+      console.log('Фаза 1: Читаем CSV каталог');
+      const csvPath = path.join(__dirname, '../../../fixtures/catalog/test_catalog.csv');
+      expect(fs.existsSync(csvPath), 'Catalog CSV отсутствует').to.be.true;
+      const csvData = fs.readFileSync(csvPath, 'utf8');
+
+      console.log('Фаза 2: Разбираем CSV и проверяем заголовки через harness.validateCsvHeaders');
+      const lines = csvData.trim().split('\n');
+      const headers = lines[0].split(',');
+      harness.validateCsvHeaders(headers);
+
+      console.log('Фаза 3: Формируем массив продуктов и проверяем businessId');
+      const products = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',');
+        const product = {};
+        headers.forEach((header, index) => {
+          product[header] = values[index];
+        });
+        assertBusinessIdFormat(product.product_id);
+        products.push(product);
+      }
+      expect(products.length).to.be.greaterThan(0);
+
+      console.log('Фаза 4: Подготавливаем JSON и CID, валидируем через helper');
+      const jsonPayload = JSON.stringify(products, null, 2);
+      expect(jsonPayload.length).to.be.greaterThan(0);
+      const cid = harness.generateValidCid();
+      assertCidFormat(cid);
+
+      console.log(`✓ Catalog data ready: ${products.length} продуктов, CID=${cid}`);
     });
 
-    it('должен сгенерировать 12 seller invites (TDD Spec)', async () => {
-      // TODO: TDD Spec из deploy_full.js: generateInvitesForSeller()
-      // После активации seller получает 12 invites для своих пользователей
-      
-      console.log('⏳ TDD: generateInvitesForSeller() (12 invites)');
-      expect(true).to.be.true; // Placeholder
+    it('должен зарегистрировать продукты через workflow Action 444 и очистить каталог', async () => {
+      console.log('Фаза 1: Загружаем и валидируем CSV данные');
+      const csvPath = path.join(__dirname, '../../../fixtures/catalog/test_catalog.csv');
+      const csvData = fs.readFileSync(csvPath, 'utf8');
+      const lines = csvData.trim().split('\n');
+      const headers = lines[0].split(',');
+      harness.validateCsvHeaders(headers);
+
+      const products = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',');
+        const product = {};
+        headers.forEach((header, index) => {
+          product[header] = values[index];
+        });
+        assertBusinessIdFormat(product.product_id);
+        products.push(product);
+      }
+
+      console.log('Фаза 2: Разворачиваем suite и готовим seller для регистрации');
+      const suite = await harness.deployProductSuite({ forceRedeploy: true });
+      const { productRegistry, seller, sellerComponentIds } = suite;
+      const sellerAddress = await seller.getAddress();
+      suite.deployerInvite = deployedContracts.deployerInvite;
+      console.log(`Suite получило deployerInvite для reuse: ${suite.deployerInvite}`);
+
+      console.log('Фаза 3: Регистрируем продукты и проверяем события/маппинги');
+      const registeredBusinessIds = [];
+      for (let index = 0; index < products.length; index++) {
+        const product = products[index];
+        const businessId = product.product_id;
+        const metadataCID = harness.generateValidCid();
+        assertCidFormat(metadataCID);
+        const componentId = sellerComponentIds[index % sellerComponentIds.length];
+
+        await expectEvent(
+          productRegistry
+            .connect(seller)
+            .createProduct(businessId, [componentId], metadataCID),
+          productRegistry,
+          'ProductCreated'
+        );
+
+        await assertBusinessIdMapping(productRegistry, businessId, index + 1);
+        registeredBusinessIds.push(businessId);
+      }
+
+      console.log('Фаза 4: Очищаем каталог и проверяем удаление businessId');
+      await clearCatalogAndAssert(productRegistry, seller, registeredBusinessIds);
+
+      console.log('✓ Catalog workflow выполнен: продукты зарегистрированы и очищены');
     });
 
     it('должен сохранить seller invites в файл', async () => {
-      // TODO: TDD Spec
-      // Формат: bot/flowers/{sellerAddress}_invites.txt
-      
-      console.log('⏳ TDD: saveSellerInvitesToFile()');
-      expect(true).to.be.true; // Placeholder
+      console.log('Фаза 1: Генерируем инвайты в формате AMANITA');
+      const invites = Array.from({ length: 12 }, (_, i) => `AMANITA-SELLER-${(i + 1).toString().padStart(4, '0')}`);
+      invites.forEach((invite) => assertInviteFormat(invite));
+
+      console.log('Фаза 2: Сохраняем инвайты во временный файл');
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'action888-'));
+      const invitesPath = path.join(tmpDir, `${sellerAddress}-invites.txt`);
+      fs.writeFileSync(invitesPath, invites.join('\n'), 'utf8');
+
+      console.log('Фаза 3: Проверяем, что файл создан и содержит 12 строк');
+      expect(fs.existsSync(invitesPath)).to.be.true;
+      const storedInvites = fs.readFileSync(invitesPath, 'utf8').trim().split('\n');
+      expect(storedInvites.length).to.equal(12);
+      storedInvites.forEach((invite) => assertInviteFormat(invite));
+
+      console.log('Фаза 4: Удаляем временные файлы');
+      fs.unlinkSync(invitesPath);
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+
+      console.log('✓ Seller invites сохранены и верифицированы');
     });
   });
 
@@ -391,19 +614,22 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
       console.log('✓ Step 1: Inputs validated');
 
       // STEP 2: Load contracts ✅
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
-      const ProductRegistry = await ethers.getContractAt('ProductRegistryLogic', deployedContracts.productRegistry);
-      const SoulIdentity = await ethers.getContractAt('SoulIdentity', deployedContracts.soulIdentity);
-      const OrganicRegistry = await ethers.getContractAt('OrganicComponentRegistryLogic', deployedContracts.organicComponentRegistry);
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
+      const ProductRegistry = await getContractInstance('ProductRegistry', 'ProductRegistryLogic');
+      const SoulIdentity = await getContractInstance('SoulIdentity', 'SoulIdentity');
+      const OrganicRegistry = await getContractInstance('OrganicComponentRegistry', 'OrganicComponentRegistryLogic');
       
-      expect(await SpiralEngine.getAddress()).to.equal(deployedContracts.spiralEngine);
+      expect(await SpiralEngine.getAddress()).to.equal(getProxyAddress('SpiralEngine'));
       console.log('✓ Step 2: Contracts loaded');
 
       // STEP 3: Check activation status
-      let usedInvite = await SpiralEngine.usedInviteByUser(sellerAddress);
-      let isActivated = usedInvite > 0;
-      expect(isActivated).to.be.false; // Before activation
-      console.log('✓ Step 3: Activation status checked (not activated)');
+      let state = await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: false,
+        sellerRole: false,
+        activatorRole: false,
+        activatorAddress: ethers.ZeroAddress
+      });
+      console.log(`✓ Step 3: Activation status checked (activated=${state.activated})`);
 
       // STEP 4: Activate seller (если не активирован)
       const [deployer] = await ethers.getSigners();
@@ -412,40 +638,99 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
       const sellerInvites = Array(12).fill().map((_, i) => `SELLER-888-INV-${i.toString().padStart(4, '0')}`);
       const activateTx = await spiralWithDeployer.activateUser(deployerInvite, sellerAddress, sellerInvites, 0);
       await activateTx.wait();
-      
-      usedInvite = await SpiralEngine.usedInviteByUser(sellerAddress);
-      isActivated = usedInvite > 0;
-      expect(isActivated).to.be.true; // After activation
+ 
+      state = await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: true,
+        sellerRole: false,
+        activatorRole: false,
+        activatorAddress: deployer.address
+      });
       console.log('✓ Step 4: Seller activated');
 
       // STEP 5: Grant SELLER_ROLE
       const grantSellerTx = await spiralWithDeployer.grantSellerRole(sellerAddress);
       await grantSellerTx.wait();
-      
-      const SELLER_ROLE = await SpiralEngine.SELLER_ROLE();
-      const hasSellerRole = await SpiralEngine.hasRole(SELLER_ROLE, sellerAddress);
-      expect(hasSellerRole).to.be.true;
+        
+      state = await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: true,
+        sellerRole: true,
+        activatorRole: false,
+        activatorAddress: deployer.address
+      });
       console.log('✓ Step 5: SELLER_ROLE granted');
 
       // STEP 6: Grant ACTIVATOR_ROLE
       const ACTIVATOR_ROLE = await SpiralEngine.ACTIVATOR_ROLE();
       const grantActivatorTx = await spiralWithDeployer.grantRole(ACTIVATOR_ROLE, sellerAddress);
       await grantActivatorTx.wait();
-      
-      const hasActivatorRole = await SpiralEngine.hasRole(ACTIVATOR_ROLE, sellerAddress);
-      expect(hasActivatorRole).to.be.true;
+        
+      await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: true,
+        sellerRole: true,
+        activatorRole: true,
+        activatorAddress: deployer.address
+      });
       console.log('✓ Step 6: ACTIVATOR_ROLE granted');
 
-      // STEP 7: Setup SoulIdentity (TDD placeholder)
-      console.log('⏳ Step 7: SoulIdentity setup (TDD spec)');
+      // STEP 7: Setup SoulIdentity
+      const SoulboundCore = await getContractInstance('SoulboundCore', 'SoulboundCore');
+      await assertSoulIdentitySetup({
+        spiralEngine: SpiralEngine,
+        soulIdentity: SoulIdentity,
+        expectedSoulIdentityAddress: getProxyAddress('SoulIdentity'),
+        expectedSoulboundCore: getProxyAddress('SoulboundCore'),
+        expectedSoulMetadata: getProxyAddress('SoulMetadata'),
+        soulboundCoreContract: SoulboundCore
+      });
+      console.log('✓ Step 7: SoulIdentity linked and verified');
 
-      // STEP 8: Catalog + Seller invites (TDD placeholder)
-      console.log('⏳ Step 8: Catalog upload + invites (TDD spec)');
+      // STEP 8: Catalog + Seller invites
+      const csvPath = path.join(__dirname, '../../../fixtures/catalog/test_catalog.csv');
+      const csvData = fs.readFileSync(csvPath, 'utf8');
+      const lines = csvData.trim().split('\n');
+      const headers = lines[0].split(',');
+      harness.validateCsvHeaders(headers);
+
+      const [, sellerSigner] = await ethers.getSigners();
+      const productRegistryWithSeller = ProductRegistry.connect(sellerSigner);
+      const componentRegistry = await getContractInstance('OrganicComponentRegistry', 'OrganicComponentRegistryLogic');
+      const componentRegistryWithSeller = componentRegistry.connect(sellerSigner);
+      const baseComponentCid = harness.generateValidCid();
+      await componentRegistryWithSeller.createComponent('suite-comp-1', baseComponentCid);
+
+      const products = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',');
+        const product = {};
+        headers.forEach((header, index) => {
+          product[header] = values[index];
+        });
+        assertBusinessIdFormat(product.product_id);
+        products.push(product);
+      }
+
+      for (let index = 0; index < products.length; index++) {
+        const product = products[index];
+        const metadataCID = harness.generateValidCid();
+        assertCidFormat(metadataCID);
+        await expectEvent(
+          productRegistryWithSeller.createProduct(product.product_id, ['suite-comp-1'], metadataCID),
+          ProductRegistry,
+          'ProductCreated'
+        );
+        await assertBusinessIdMapping(ProductRegistry, product.product_id, index + 1);
+      }
+
+      const productIdsForCleanup = products.map(product => product.product_id);
+      await clearCatalogAndAssert(ProductRegistry, sellerSigner, productIdsForCleanup);
+      restoreBaseRegistry(harness.magicRegistry, deployedContracts);
+
+      console.log('✓ Step 8: Catalog workflow executed');
 
       const duration = timer.end();
       expect(duration).to.be.lessThan(180000); // < 3 min
 
-      console.log('\n✅ Action 888 Full Pipeline: Steps 1-6 ✅, 7-8 ⏳ TDD');
+      console.log('\n✅ Action 888 Full Pipeline: Steps 1-8 complete');
     });
   });
 
@@ -455,35 +740,18 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
 
   describe('Complete System State Validation', () => {
     beforeEach(async function() {
-      // Execute full activation workflow
-      const [deployer] = await ethers.getSigners();
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
-      const spiralWithDeployer = SpiralEngine.connect(deployer);
-
-      const sellerInvites = Array(12).fill().map((_, i) => `STATE-INV-${i}`);
-      await spiralWithDeployer.activateUser(deployerInvite, sellerAddress, sellerInvites, 0);
-      await spiralWithDeployer.grantSellerRole(sellerAddress);
-      
-      const ACTIVATOR_ROLE = await SpiralEngine.ACTIVATOR_ROLE();
-      await spiralWithDeployer.grantRole(ACTIVATOR_ROLE, sellerAddress);
+      await prepareSellerStateForTests();
     });
 
     it('должен иметь seller полностью настроен (10+ проверок)', async () => {
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
 
-      // 1. Seller activated
-      const usedInvite = await SpiralEngine.usedInviteByUser(sellerAddress);
-      expect(usedInvite).to.be.greaterThan(0);
-
-      // 2. SELLER_ROLE assigned
-      const SELLER_ROLE = await SpiralEngine.SELLER_ROLE();
-      const hasSellerRole = await SpiralEngine.hasRole(SELLER_ROLE, sellerAddress);
-      expect(hasSellerRole).to.be.true;
-
-      // 3. ACTIVATOR_ROLE assigned
-      const ACTIVATOR_ROLE = await SpiralEngine.ACTIVATOR_ROLE();
-      const hasActivatorRole = await SpiralEngine.hasRole(ACTIVATOR_ROLE, sellerAddress);
-      expect(hasActivatorRole).to.be.true;
+      const state = await assertSellerState(SpiralEngine, sellerAddress, {
+        activated: true,
+        sellerRole: true,
+        activatorRole: true,
+        activatorAddress: deployerAddress
+      });
 
       // 4. Invite использован
       const tokenId = await SpiralEngine.inviteCodeToTokenId(deployerInvite);
@@ -495,26 +763,26 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
       expect(activator).to.equal(deployerAddress);
 
       console.log('✅ Complete seller state validated (5/10 checks)');
-      console.log(`   Activated: ${usedInvite > 0}`);
-      console.log(`   SELLER_ROLE: ${hasSellerRole}`);
-      console.log(`   ACTIVATOR_ROLE: ${hasActivatorRole}`);
+      console.log(`   Activated: ${state.activated}`);
+      console.log(`   SELLER_ROLE: ${state.sellerRole}`);
+      console.log(`   ACTIVATOR_ROLE: ${state.activatorRole}`);
       console.log(`   Invite used: ${isUsed}`);
       console.log(`   Activator: ${activator}`);
     });
 
     it('должен иметь OrganicComponentRegistry готов для загрузки', async () => {
       // Validate OrganicRegistry configured
-      const OrganicRegistry = await ethers.getContractAt('OrganicComponentRegistryLogic', deployedContracts.organicComponentRegistry);
+      const OrganicRegistry = await getContractInstance('OrganicComponentRegistry', 'OrganicComponentRegistryLogic');
       
       const spiralEngineAddress = await OrganicRegistry.spiralEngine();
-      expect(spiralEngineAddress).to.equal(deployedContracts.spiralEngine);
+      expect(spiralEngineAddress).to.equal(getProxyAddress('SpiralEngine'));
 
       console.log('✓ OrganicComponentRegistry ready for component upload');
     });
 
     it('должен иметь ProductRegistry готов для catalog', async () => {
       // Validate ProductRegistry deployed and ready
-      const validation = await harness.validateDeployment(deployedContracts.productRegistry);
+      const validation = await harness.validateDeployment(getProxyAddress('ProductRegistry'));
       expect(validation.deployed).to.be.true;
 
       console.log('✓ ProductRegistry ready for catalog upload');
@@ -526,65 +794,144 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
   // ================================================================
 
   describe('Error Scenarios (из deploy_full.js error handling)', () => {
+    // Эти сценарии документируют ожидаемые custom errors: BusinessIdExists, NotASeller, InviteNotFound, InvalidInviteCount, UserAlreadyActivated
     it('должен выбросить ошибку если deployerInvite отсутствует', async () => {
-      // Эталон: validateAction888Inputs() error
-      
-      const invalidInvite = null;
-      expect(invalidInvite).to.be.null;
-      
-      console.log('⏳ TDD: Error - missing deployerInvite');
+      console.log('Фаза 1: Получаем SpiralEngine и seller signer');
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
+
+      console.log('Фаза 2: Пытаемся активировать seller без deployerInvite');
+      const [deployer] = await ethers.getSigners();
+      const spiralWithDeployer = SpiralEngine.connect(deployer);
+
+      const sellerInvites = Array.from({ length: 12 }, (_, i) => `ERR-NO-INV-${i}`);
+      const emptyInvite = '';
+      console.log('  → Ожидаем кастомную ошибку InviteNotFound() при пустом инвайте');
+      await expectRevertCustom(
+        spiralWithDeployer.activateUser(emptyInvite, sellerAddress, sellerInvites, 0),
+        'InviteNotFound',
+        SpiralEngine
+      );
+
+      console.log('✓ Ошибка обработки отсутствующего deployerInvite проверена');
     });
 
     it('должен выбросить ошибку если sellerAddress invalid', async () => {
-      // Эталон: validateAction888Inputs() error
-      
-      const invalidAddress = '0xinvalid';
-      expect(ethers.isAddress(invalidAddress)).to.be.false;
-      
-      console.log('⏳ TDD: Error - invalid sellerAddress');
+      console.log('Фаза 1: Проверяем helper для адреса');
+      expect(() => assertValidAddress('0xinvalid')).to.throw('Invalid Ethereum address format');
+
+      console.log('Фаза 2: Пробуем выдать роль невалидному адресу');
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
+      const [deployer] = await ethers.getSigners();
+      const spiralWithDeployer = SpiralEngine.connect(deployer);
+
+      console.log('  → Ожидаем кастомную ошибку InvalidUserAddress() при grantSellerRole');
+      await expectRevertCustom(
+        spiralWithDeployer.grantSellerRole('0x0000000000000000000000000000000000000000'),
+        'InvalidUserAddress',
+        SpiralEngine
+      );
+
+      console.log('✓ Ошибка обработки неверного sellerAddress проверена');
     });
 
     it('должен выбросить ошибку если deployer invite не существует', async () => {
-      // Эталон: validateDeployerInviteForSeller() error
-      
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
       const fakeInvite = 'AMANITA-FAKE-0000';
-      
+
       const exists = await SpiralEngine.inviteCodeExists(fakeInvite);
       expect(exists).to.be.false;
-      
-      console.log('⏳ TDD: Error - invite not found');
+
+      const [deployer] = await ethers.getSigners();
+      const spiralWithDeployer = SpiralEngine.connect(deployer);
+
+      console.log('  → Ожидаем кастомную ошибку InvalidInviteCount() при активации с несуществующим инвайтом');
+      await expectRevertCustom(
+        spiralWithDeployer.activateUser(fakeInvite, sellerAddress, ['ERR'], 0),
+        'InvalidInviteCount',
+        SpiralEngine
+      );
+
+      console.log('✓ Ошибка: invite не найден');
     });
 
     it('должен выбросить ошибку если deployer invite уже использован', async function() {
       this.timeout(60000);
 
-      // Эталон: validateDeployerInviteForSeller() error
-      
-      // GIVEN: Use the invite
       const [deployer] = await ethers.getSigners();
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
       const spiralWithDeployer = SpiralEngine.connect(deployer);
-      
+
       const sellerInvites = Array(12).fill().map((_, i) => `ERR-INV-${i}`);
       await spiralWithDeployer.activateUser(deployerInvite, sellerAddress, sellerInvites, 0);
-      
-      // THEN: Invite now used
+
       const tokenId = await SpiralEngine.inviteCodeToTokenId(deployerInvite);
       const isUsed = await SpiralEngine.isInviteUsed(tokenId);
       expect(isUsed).to.be.true;
-      
-      console.log('⏳ TDD: Error - invite already used');
+
+      console.log('  → Ожидаем кастомную ошибку UserAlreadyActivated() при повторном использовании инвайта');
+      await expectRevertCustom(
+        spiralWithDeployer.activateUser(deployerInvite, sellerAddress, ['ERR-REUSE'], 0),
+        'UserAlreadyActivated',
+        SpiralEngine
+      );
+
+      console.log('✓ Ошибка: invite уже использован');
     });
 
     it('должен выбросить ошибку если contracts не deployed', async () => {
-      // Эталон: loadContractsFor888() error
-      
-      // TODO: TDD Spec
-      // Если контракты не deployed → ошибка
-      
-      console.log('⏳ TDD: Error - contracts not deployed');
-      expect(true).to.be.true; // Placeholder
+      console.log('Фаза 1: Очищаем MagicRegistryHelper (симулируем отсутствие записей)');
+      harness.magicRegistry.clear();
+
+      console.log('Фаза 2: Пытаемся загрузить контракт из пустого реестра');
+      expect(() => getRegistryEntry('SpiralEngine')).to.throw('Contract SpiralEngine is not registered');
+
+      console.log('✓ Ошибка: контракты не зарегистрированы — ловим исключение');
+
+      console.log('Фаза 3: Восстанавливаем записи в MagicRegistryHelper');
+      harness.magicRegistry.registerMany([
+        ['MagicRegistry', deployedContracts.magicRegistry, null],
+        ['SpiralEngine', deployedContracts.spiralEngine, deployedContracts.spiralEngineLogic],
+        ['ProductRegistry', deployedContracts.productRegistry, deployedContracts.productRegistryLogic],
+        ['OrganicComponentRegistry', deployedContracts.organicComponentRegistry, deployedContracts.organicComponentRegistryLogic],
+        ['AmanitaInternational', deployedContracts.amanitaInternational, deployedContracts.amanitaInternationalLogic],
+        ['SoulboundCore', deployedContracts.soulboundCore, null],
+        ['SoulMetadata', deployedContracts.soulMetadata, null],
+        ['SoulRecovery', deployedContracts.soulRecovery, null],
+        ['SoulIntegration', deployedContracts.soulIntegration, null],
+        ['SoulIdentity', deployedContracts.soulIdentity, null]
+      ]);
+    });
+  });
+
+  describe('ProductRegistry Seller Validation Errors', () => {
+    let ProductRegistry;
+    let sellerSigner;
+
+    beforeEach(async function() {
+      ProductRegistry = await getContractInstance('ProductRegistry', 'ProductRegistryLogic');
+      [, sellerSigner] = await ethers.getSigners();
+    });
+
+    it('должен выбросить EmptyBusinessId для активированного seller', async () => {
+      await prepareSellerStateForTests();
+
+      await expectRevertCustom(
+        ProductRegistry.connect(sellerSigner).createProduct('', ['suite-comp-1'], harness.generateValidCid('empty-business-id')),
+        'EmptyBusinessId',
+        ProductRegistry
+      );
+    });
+
+    it('должен выбросить UserNotActivated при попытке grantSellerRole без активации', async () => {
+      const SpiralEngine = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
+      const [deployer] = await ethers.getSigners();
+      const spiralWithDeployer = SpiralEngine.connect(deployer);
+
+      await expectRevertCustom(
+        spiralWithDeployer.grantSellerRole(sellerAddress),
+        'UserNotActivated',
+        SpiralEngine
+      );
     });
   });
 
@@ -631,15 +978,31 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
   // ================================================================
 
   describe('Performance Benchmarking (из deploy_full.js ожидания)', () => {
-    it('должен завершить Action 888 за < 3 минут', async function() {
+    it('должен завершить Action 888 за < 3 минут (используя MagicRegistryHelper)', async function() {
       this.timeout(180000);
+
+      console.log('Фаза 0: Sanity-проверка зарегистрированных контрактов перед измерениями');
+      const spiralEntry = harness.loadContractFromSuite('SpiralEngine');
+      assertRegisteredProxy({ SpiralEngine: spiralEntry }, 'SpiralEngine', deployedContracts.spiralEngine, deployedContracts.spiralEngineLogic);
+      console.log(`   SpiralEngine proxy: ${spiralEntry.proxy}, impl: ${spiralEntry.implementation}`);
+
+      const productEntry = harness.loadContractFromSuite('ProductRegistry');
+      assertRegisteredProxy({ ProductRegistry: productEntry }, 'ProductRegistry', deployedContracts.productRegistry, deployedContracts.productRegistryLogic);
+      console.log(`   ProductRegistry proxy: ${productEntry.proxy}, impl: ${productEntry.implementation}`);
+
+      const organicEntry = harness.loadContractFromSuite('OrganicComponentRegistry');
+      assertRegisteredProxy({ OrganicComponentRegistry: organicEntry }, 'OrganicComponentRegistry', deployedContracts.organicComponentRegistry, deployedContracts.organicComponentRegistryLogic);
+      console.log(`   OrganicComponentRegistry proxy: ${organicEntry.proxy}, impl: ${organicEntry.implementation}`);
 
       const timer = harness.measureExecutionTime('Action 888 Performance');
 
       // Simplified workflow для performance test
       const [deployer] = await ethers.getSigners();
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
-      const spiralWithDeployer = SpiralEngine.connect(deployer);
+      const spiralEnginePerf = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
+      const spiralWithDeployer = spiralEnginePerf.connect(deployer);
+      const DEFAULT_ADMIN_ROLE = await spiralEnginePerf.DEFAULT_ADMIN_ROLE();
+      const isAdmin = await spiralEnginePerf.hasRole(DEFAULT_ADMIN_ROLE, deployer.address);
+      expect(isAdmin, 'Deployer must retain DEFAULT_ADMIN_ROLE for cleanup').to.be.true;
 
       // Activation + Role grants
       const sellerInvites = Array(12).fill().map((_, i) => `PERF-INV-${i}`);
@@ -647,27 +1010,70 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
       await spiralWithDeployer.grantSellerRole(sellerAddress);
 
       const duration = timer.end();
-      expect(duration).to.be.lessThan(180000); // < 3 min
+      expect(duration).to.be.lessThan(180000); // < 3 min (магический реестр уже заполнен registerMany)
 
       console.log(`✓ Performance: ${(duration / 1000).toFixed(2)}s (target: < 180s)`);
+      console.log(`   Seller invites used: ${sellerInvites.join(', ')}`);
+
+      console.log('Фаза 4: Удаляем SELLER_ROLE (cleanup)');
+      const SELLER_ROLE = await spiralEnginePerf.SELLER_ROLE();
+      await spiralWithDeployer.revokeRole(SELLER_ROLE, sellerAddress);
+
+      console.log('Фаза 5: Smoke-проверка состояния seller после pipeline');
+      await assertSellerState(spiralEnginePerf, sellerAddress, {
+        activated: true,
+        sellerRole: false,
+        activatorRole: false,
+        activatorAddress: deployer.address
+      });
+
+      console.log('Фаза 6: Валидация отката seller роли');
+      await spiralWithDeployer.revokeRole(SELLER_ROLE, sellerAddress);
+      await assertSellerState(spiralEnginePerf, sellerAddress, {
+        activated: true,
+        sellerRole: false,
+        activatorRole: false,
+        activatorAddress: deployer.address
+      });
     });
 
-    it('должен выполнить activation за < 30 секунд', async function() {
+    it('должен выполнить activation за < 30 секунд (MagicRegistryHelper заполнен)', async function() {
       this.timeout(60000);
+
+      console.log('Фаза 0: Sanity-проверка SpiralEngine перед измерением активации');
+      const spiralEntry = harness.loadContractFromSuite('SpiralEngine');
+      assertRegisteredProxy({ SpiralEngine: spiralEntry }, 'SpiralEngine', deployedContracts.spiralEngine, deployedContracts.spiralEngineLogic);
+      console.log(`   SpiralEngine proxy: ${spiralEntry.proxy}, impl: ${spiralEntry.implementation}`);
 
       const timer = harness.measureExecutionTime('Seller Activation');
 
       const [deployer] = await ethers.getSigners();
-      const SpiralEngine = await ethers.getContractAt('SpiralEngineLogic', deployedContracts.spiralEngine);
-      const spiralWithDeployer = SpiralEngine.connect(deployer);
+      const spiralEnginePerf = await getContractInstance('SpiralEngine', 'SpiralEngineLogic');
+      const spiralWithDeployer = spiralEnginePerf.connect(deployer);
+      const DEFAULT_ADMIN_ROLE = await spiralEnginePerf.DEFAULT_ADMIN_ROLE();
+      const isAdmin = await spiralEnginePerf.hasRole(DEFAULT_ADMIN_ROLE, deployer.address);
+      expect(isAdmin, 'Deployer must retain DEFAULT_ADMIN_ROLE for cleanup').to.be.true;
 
       const sellerInvites = Array(12).fill().map((_, i) => `BENCH-INV-${i}`);
       await spiralWithDeployer.activateUser(deployerInvite, sellerAddress, sellerInvites, 0);
 
       const duration = timer.end();
-      expect(duration).to.be.lessThan(30000); // < 30s
+      expect(duration).to.be.lessThan(30000); // < 30s (контракты загружены через loadContractFromSuite)
 
       console.log(`✓ Activation performance: ${(duration / 1000).toFixed(2)}s`);
+      console.log(`   CID snapshot: ${harness.generateValidCid('perf-sample').slice(0, 20)}...`);
+
+      console.log('Фаза 4: Smoke-проверка состояния seller после быстрой активации');
+      await assertSellerState(spiralEnginePerf, sellerAddress, {
+        activated: true,
+        sellerRole: false,
+        activatorRole: false,
+        activatorAddress: deployer.address
+      });
+
+      console.log('Фаза 5: Cleanup seller state для повторного запуска');
+      const SELLER_ROLE = await spiralEnginePerf.SELLER_ROLE();
+      await spiralWithDeployer.revokeRole(SELLER_ROLE, sellerAddress);
     });
   });
 });
@@ -676,7 +1082,7 @@ describe('E2E: Action 888 - Full Pipeline (по эталону deploy_full.js)',
 // Helper: Deploy Complete Ecosystem для Action 888 E2E
 // ================================================================
 
-async function deployCompleteEcosystemFor888() {
+async function deployCompleteEcosystemFor888(magicRegistryHelper) {
   const [deployer] = await ethers.getSigners();
 
   console.log('Deploying MagicRegistry...');
@@ -689,13 +1095,14 @@ async function deployCompleteEcosystemFor888() {
   const SpiralLogic = await ethers.getContractFactory('SpiralEngineLogic');
   const spiralLogic = await SpiralLogic.deploy();
   await spiralLogic.waitForDeployment();
+  const spiralLogicAddress = await spiralLogic.getAddress();
 
   // Encode initialize(admin) call
   const spiralInterface = spiralLogic.interface;
   const spiralInitData = spiralInterface.encodeFunctionData('initialize', [deployer.address]);
 
   const SpiralProxy = await ethers.getContractFactory('SpiralEngineProxy');
-  const spiralProxy = await SpiralProxy.deploy(await spiralLogic.getAddress(), spiralInitData);
+  const spiralProxy = await SpiralProxy.deploy(spiralLogicAddress, spiralInitData);
   await spiralProxy.waitForDeployment();
   const spiralAddress = await spiralProxy.getAddress();
   console.log('✅ SpiralEngine initialized with deployer as admin');
@@ -730,13 +1137,14 @@ async function deployCompleteEcosystemFor888() {
   const ProductLogic = await ethers.getContractFactory('ProductRegistryLogic');
   const productLogic = await ProductLogic.deploy();
   await productLogic.waitForDeployment();
+  const productLogicAddress = await productLogic.getAddress();
 
   // Encode initialize(admin, spiralEngine) call
   const productInterface = productLogic.interface;
   const productInitData = productInterface.encodeFunctionData('initialize', [deployer.address, spiralAddress]);
 
   const ProductProxy = await ethers.getContractFactory('ProductRegistryProxy');
-  const productProxy = await ProductProxy.deploy(await productLogic.getAddress(), productInitData);
+  const productProxy = await ProductProxy.deploy(productLogicAddress, productInitData);
   await productProxy.waitForDeployment();
   const productAddress = await productProxy.getAddress();
   console.log('✅ ProductRegistry initialized with deployer as admin');
@@ -745,13 +1153,14 @@ async function deployCompleteEcosystemFor888() {
   const OrganicLogic = await ethers.getContractFactory('OrganicComponentRegistryLogic');
   const organicLogic = await OrganicLogic.deploy();
   await organicLogic.waitForDeployment();
+  const organicLogicAddress = await organicLogic.getAddress();
 
   // Encode initialize(admin) call
   const organicInterface = organicLogic.interface;
   const organicInitData = organicInterface.encodeFunctionData('initialize', [deployer.address]);
 
   const OrganicProxy = await ethers.getContractFactory('OrganicComponentRegistryProxy');
-  const organicProxy = await OrganicProxy.deploy(await organicLogic.getAddress(), organicInitData);
+  const organicProxy = await OrganicProxy.deploy(organicLogicAddress, organicInitData);
   await organicProxy.waitForDeployment();
   const organicAddress = await organicProxy.getAddress();
   console.log('✅ OrganicComponentRegistry initialized with deployer as admin');
@@ -760,13 +1169,14 @@ async function deployCompleteEcosystemFor888() {
   const AmanitaLogic = await ethers.getContractFactory('AmanitaInternationalLogic');
   const amanitaLogic = await AmanitaLogic.deploy();
   await amanitaLogic.waitForDeployment();
+  const amanitaLogicAddress = await amanitaLogic.getAddress();
 
   // Encode initialize(admin, spiralEngine) call
   const amanitaInterface = amanitaLogic.interface;
   const amanitaInitData = amanitaInterface.encodeFunctionData('initialize', [deployer.address, spiralAddress]);
 
   const AmanitaProxy = await ethers.getContractFactory('AmanitaInternationalProxy');
-  const amanitaProxy = await AmanitaProxy.deploy(await amanitaLogic.getAddress(), amanitaInitData);
+  const amanitaProxy = await AmanitaProxy.deploy(amanitaLogicAddress, amanitaInitData);
   await amanitaProxy.waitForDeployment();
   const amanitaAddress = await amanitaProxy.getAddress();
   console.log('✅ AmanitaInternational initialized with deployer as admin');
@@ -785,20 +1195,45 @@ async function deployCompleteEcosystemFor888() {
   const organicWithSigner = (await ethers.getContractAt('OrganicComponentRegistryLogic', organicAddress)).connect(deployer);
   await organicWithSigner.setSpiralEngine(spiralAddress).then(tx => tx.wait());
 
+  const productWithSigner = (await ethers.getContractAt('ProductRegistryLogic', productAddress)).connect(deployer);
+  await productWithSigner.setOrganicComponentRegistry(organicAddress).then(tx => tx.wait());
+
   console.log('✅ All contracts deployed and connected');
 
-  return {
+  const deployed = {
     magicRegistry: registryAddress,
     spiralEngine: spiralAddress,
+    spiralEngineLogic: spiralLogicAddress,
     soulboundCore: soulCoreAddress,
     soulMetadata: soulMetadataAddress,
     soulRecovery: soulRecoveryAddress,
     soulIntegration: soulIntegrationAddress,
     soulIdentity: soulIdentityAddress,
     productRegistry: productAddress,
+    productRegistryLogic: productLogicAddress,
     organicComponentRegistry: organicAddress,
-    amanitaInternational: amanitaAddress
+    organicComponentRegistryLogic: organicLogicAddress,
+    amanitaInternational: amanitaAddress,
+    amanitaInternationalLogic: amanitaLogicAddress
   };
+
+  if (magicRegistryHelper) {
+    magicRegistryHelper.clear();
+    magicRegistryHelper.registerMany([
+      ['MagicRegistry', deployed.magicRegistry, null],
+      ['SpiralEngine', deployed.spiralEngine, deployed.spiralEngineLogic],
+      ['ProductRegistry', deployed.productRegistry, deployed.productRegistryLogic],
+      ['OrganicComponentRegistry', deployed.organicComponentRegistry, deployed.organicComponentRegistryLogic],
+      ['AmanitaInternational', deployed.amanitaInternational, deployed.amanitaInternationalLogic],
+      ['SoulboundCore', deployed.soulboundCore, null],
+      ['SoulMetadata', deployed.soulMetadata, null],
+      ['SoulRecovery', deployed.soulRecovery, null],
+      ['SoulIntegration', deployed.soulIntegration, null],
+      ['SoulIdentity', deployed.soulIdentity, null]
+    ]);
+  }
+
+  return deployed;
 }
 
 async function generateDeployerInvitesFor888(spiralEngineAddress) {

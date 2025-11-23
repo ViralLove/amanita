@@ -281,7 +281,7 @@ class TestProductValidator:
             "species": "Amanita muscaria",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "Qm123456789",
                     "proportion": "100%"
                 }
@@ -322,7 +322,7 @@ class TestProductValidator:
             "species": "Amanita muscaria",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "Qm123456789",
                     "proportion": "100%"
                 }
@@ -342,7 +342,7 @@ class TestProductValidator:
             "species": "Amanita muscaria",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "Qm123456789",
                     "proportion": "100%"
                 }
@@ -376,7 +376,7 @@ class TestProductValidator:
             "species": "Amanita muscaria",
             "organic_components": [
                 {
-                    "biounit_id": "",  # пустой biounit_id
+                    "component_id": "",  # пустой component_id
                     "description_cid": "Qm123456789",
                     "proportion": "100%"
                 }
@@ -396,7 +396,7 @@ class TestProductValidator:
             "species": "Amanita muscaria",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "Qm123456789",
                     "proportion": "100%"
                 }
@@ -416,7 +416,7 @@ class TestProductValidator:
             "species": "Amanita muscaria",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "Qm123456789",
                     "proportion": "100%"
                 }

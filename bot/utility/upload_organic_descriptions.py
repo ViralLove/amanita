@@ -94,7 +94,7 @@ class ProductDescriptionUploader:
         Загружает описания продуктов в IPFS и создает маппинг CID
         
         Returns:
-            Dict[str, str]: Упрощенный маппинг biounit_id -> cid
+            Dict[str, str]: Упрощенный маппинг component_id -> cid
         """
         organic_items = self.load_descriptions()
         logger.info(f"Загружено {len(organic_items)} описаний для обработки")
@@ -185,7 +185,7 @@ def process_organic_descriptions(
         output_mapping_json: Путь для сохранения маппинга CID'ов
         
     Returns:
-        Dict[str, str]: Маппинг biounit_id и их CID'ов
+        Dict[str, str]: Маппинг component_id и их CID'ов
     """
     # Создаем и запускаем загрузчик с указанными путями
     uploader = ProductDescriptionUploader(descriptions_json, output_mapping_json)
