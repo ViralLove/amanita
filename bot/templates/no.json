@@ -22,5 +22,17 @@
     "invite_friend": "Inviter en venn",
     "help": "Hjelp",
     "faq": "Ofte stilte spørsmål"
+  },
+  "catalog": {
+    "product": {
+      "single_component_marker": "Enkomponentprodukt",
+      "component_features_title": "Funksjoner:",
+      "component_forms_title": "Tilgjengelige skjemaer:",
+      "component_features_more": "... (+{0} mer)",
+      "multi_component_marker": "Flerkomponentprodukt ({0} komponenter)",
+      "component_number": "Komponent {0}: {1}",
+      "component_proportion": "Proporsjon:",
+      "component_scientific_name": "Vitenskapelig navn:"
+    }
   }
 }

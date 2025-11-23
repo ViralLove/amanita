@@ -22,5 +22,17 @@
     "invite_friend": "Kutsu ystävä",
     "help": "Apua",
     "faq": "Usein kysytyt kysymykset"
+  },
+  "catalog": {
+    "product": {
+      "single_component_marker": "Yhden komponentin tuote",
+      "component_features_title": "Ominaisuudet:",
+      "component_forms_title": "Saatavilla olevat lomakkeet:",
+      "component_features_more": "... (+{0} lisää)",
+      "multi_component_marker": "Monen komponentin tuote ({0} komponenttia)",
+      "component_number": "Komponentti {0}: {1}",
+      "component_proportion": "Osuus:",
+      "component_scientific_name": "Tieteellinen nimi:"
+    }
   }
 }

@@ -22,5 +22,17 @@
     "invite_friend": "Zaproś znajomego",
     "help": "Pomoc",
     "faq": "Często zadawane pytania"
+  },
+  "catalog": {
+    "product": {
+      "single_component_marker": "Produkt jednokomponentowy",
+      "component_features_title": "Funkcje:",
+      "component_forms_title": "Dostępne formularze:",
+      "component_features_more": "... (+{0} więcej)",
+      "multi_component_marker": "Produkt wielokomponentowy ({0} komponentów)",
+      "component_number": "Komponent {0}: {1}",
+      "component_proportion": "Proporcja:",
+      "component_scientific_name": "Nazwa naukowa:"
+    }
   }
 }

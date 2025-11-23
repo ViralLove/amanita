@@ -118,7 +118,32 @@
       "details": "Детали:",
       "forms_label": "Формы",
       "category_label": "Категория",
-      "image": "Изображение"
+      "image": "Изображение",
+      "single_component_marker": "Монокомпонентный продукт",
+      "component_features_title": "Особенности:",
+      "component_forms_title": "Доступные формы:",
+      "component_features_more": "... (+{0} еще)",
+      "multi_component_marker": "Мультикомпонентный продукт ({0} компонента)",
+      "component_number": "Компонент {0}: {1}",
+      "component_proportion": "Пропорция:",
+      "component_scientific_name": "Научное название:",
+      "component_description": {
+        "section_generic": "🔬 Активные компоненты",
+        "section_effects": "🌿 Целительное действие",
+        "section_shamanic": "🌀 Шаманская перспектива",
+        "section_warnings": "⚠️ Предостережения",
+        "unavailable": "❌ Описание недоступно",
+        "section_empty": "❌ Секция пуста",
+        "error_loading": "❌ Ошибка при загрузке описания",
+        "select_section": "Выберите раздел:",
+        "menu_title": "📖 Описание компонента",
+        "nav_back": "⬅️ Назад",
+        "nav_next": "➡️",
+        "close": "⬅️ Закрыть",
+        "error_format": "❌ Неверный формат данных",
+        "component_not_found": "❌ Компонент не найден",
+        "error_menu": "❌ Ошибка при загрузке меню"
+      }
     }
   },
   "error": {

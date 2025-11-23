@@ -26,5 +26,17 @@
     "communication_button": "Enlace",
     "validation": "verdadero",
     "communication_confirmation": "Lo tengo todo. Me tomó un tiempo, lo siento, amor. Te quiero. Tu Liaz."
+  },
+  "catalog": {
+    "product": {
+      "single_component_marker": "Producto monocomponente",
+      "component_features_title": "Características:",
+      "component_forms_title": "Formas disponibles:",
+      "component_features_more": "... (+{0} más)",
+      "multi_component_marker": "Producto multicomponente ({0} componentes)",
+      "component_number": "Componente {0}: {1}",
+      "component_proportion": "Proporción:",
+      "component_scientific_name": "Nombre científico:"
+    }
   }
 }

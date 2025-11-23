@@ -22,5 +22,17 @@
     "invite_friend": "Kutsu sõber",
     "help": "Abi",
     "faq": "Korduma kippuvad küsimused"
+  },
+  "catalog": {
+    "product": {
+      "single_component_marker": "Ühe komponendiga toode",
+      "component_features_title": "Omadused:",
+      "component_forms_title": "Saadaolevad vormid:",
+      "component_features_more": "... (+{0} veel)",
+      "multi_component_marker": "Mitme komponendiga toode ({0} komponenti)",
+      "component_number": "Komponent {0}: {1}",
+      "component_proportion": "Proportsioon:",
+      "component_scientific_name": "Teaduslik nimetus:"
+    }
   }
 }

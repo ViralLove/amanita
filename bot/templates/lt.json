@@ -22,5 +22,17 @@
     "invite_friend": "Pakvieskite draugą",
     "help": "Pagalba",
     "faq": "Dažnai užduodami klausimai"
+  },
+  "catalog": {
+    "product": {
+      "single_component_marker": "Vieno komponento produktas",
+      "component_features_title": "Savybės:",
+      "component_forms_title": "Galimos formos:",
+      "component_features_more": "... (+{0} daugiau)",
+      "multi_component_marker": "Kelių komponentų produktas ({0} komponentų)",
+      "component_number": "Komponentas {0}: {1}",
+      "component_proportion": "Proporcija:",
+      "component_scientific_name": "Mokslinis pavadinimas:"
+    }
   }
 }

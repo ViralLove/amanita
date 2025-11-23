@@ -22,5 +22,17 @@
     "invite_friend": "Uzaicināt draugu",
     "help": "Palīdzība",
     "faq": "Biežāk uzdotie jautājumi"
+  },
+  "catalog": {
+    "product": {
+      "single_component_marker": "Vienas sastāvdaļas produkts",
+      "component_features_title": "Īpašības:",
+      "component_forms_title": "Pieejamās formas:",
+      "component_features_more": "... (+{0} vairāk)",
+      "multi_component_marker": "Vairāku sastāvdaļu produkts ({0} sastāvdaļas)",
+      "component_number": "Sastāvdaļa {0}: {1}",
+      "component_proportion": "Proporcija:",
+      "component_scientific_name": "Zinātniskais nosaukums:"
+    }
   }
 }

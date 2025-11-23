@@ -50,5 +50,17 @@
     "help": "Hilfe",
     "faq": "Häufig gestellte Fragen"
   },
-  "changed_welcome": "Willkommen bei AMANITA!"
+  "changed_welcome": "Willkommen bei AMANITA!",
+  "catalog": {
+    "product": {
+      "single_component_marker": "Einzelkomponentenprodukt",
+      "component_features_title": "Eigenschaften:",
+      "component_forms_title": "Verfügbare Formen:",
+      "component_features_more": "... (+{0} mehr)",
+      "multi_component_marker": "Mehrkomponentenprodukt ({0} Komponenten)",
+      "component_number": "Komponente {0}: {1}",
+      "component_proportion": "Anteil:",
+      "component_scientific_name": "Wissenschaftlicher Name:"
+    }
+  }
 }

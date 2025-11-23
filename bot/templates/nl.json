@@ -22,5 +22,17 @@
     "invite_friend": "Nodig een vriend uit",
     "help": "Help",
     "faq": "Veelgestelde vragen"
+  },
+  "catalog": {
+    "product": {
+      "single_component_marker": "Enkel-component product",
+      "component_features_title": "Kenmerken:",
+      "component_forms_title": "Beschikbare formulieren:",
+      "component_features_more": "... (+{0} meer)",
+      "multi_component_marker": "Multi-component product ({0} componenten)",
+      "component_number": "Component {0}: {1}",
+      "component_proportion": "Verhouding:",
+      "component_scientific_name": "Wetenschappelijke naam:"
+    }
   }
 }

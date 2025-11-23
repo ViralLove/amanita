@@ -22,5 +22,17 @@
     "invite_friend": "Bjud in en vän",
     "help": "Hjälp",
     "faq": "Vanliga frågor och svar"
+  },
+  "catalog": {
+    "product": {
+      "single_component_marker": "Enkomponentsprodukt",
+      "component_features_title": "Funktioner:",
+      "component_forms_title": "Tillgängliga formulär:",
+      "component_features_more": "... (+{0} fler)",
+      "multi_component_marker": "Flerkomponentsprodukt ({0} komponenter)",
+      "component_number": "Komponent {0}: {1}",
+      "component_proportion": "Andel:",
+      "component_scientific_name": "Vetenskapligt namn:"
+    }
   }
 }

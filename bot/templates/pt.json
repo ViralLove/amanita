@@ -22,5 +22,17 @@
     "invite_friend": "Convidar um amigo",
     "help": "Ajuda",
     "faq": "Perguntas mais frequentes"
+  },
+  "catalog": {
+    "product": {
+      "single_component_marker": "Produto monocomponente",
+      "component_features_title": "Características:",
+      "component_forms_title": "Formas disponíveis:",
+      "component_features_more": "... (+{0} mais)",
+      "multi_component_marker": "Produto multicomponente ({0} componentes)",
+      "component_number": "Componente {0}: {1}",
+      "component_proportion": "Proporção:",
+      "component_scientific_name": "Nome científico:"
+    }
   }
 }

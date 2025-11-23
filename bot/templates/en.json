@@ -30,5 +30,17 @@
     "error": "❌ There was an error while verifying the invite code. Please try again later.",
     "user_already_activated": "❌ You have already activated the invite code before.",
     "invalid_format": "❌ Incorrect code format. The Invite code must consist of 12 characters (letters and numbers)."
+  },
+  "catalog": {
+    "product": {
+      "single_component_marker": "Single-component product",
+      "component_features_title": "Features:",
+      "component_forms_title": "Available forms:",
+      "component_features_more": "... (+{0} more)",
+      "multi_component_marker": "Multi-component product ({0} components)",
+      "component_number": "Component {0}: {1}",
+      "component_proportion": "Proportion:",
+      "component_scientific_name": "Scientific name:"
+    }
   }
 }
