@@ -267,7 +267,7 @@ class ComponentActions {
       try {
         // Создаем context для upload_steps (ethers.js версия)
         const context = {
-          componentId: componentId,
+          biounit_id: componentId,  // ✅ biounit_id - текстовое значение из имени директории (например "amanita_muscaria")
           componentDir: componentDir,
           network: networkName,
           dryRun: dryRun,
@@ -294,7 +294,7 @@ class ComponentActions {
         // Загрузка state
         let state = stateManager.loadComponentState(componentDir, networkName) || {
           steps_completed: [],
-          componentId: componentId,
+          biounit_id: componentId,  // ✅ biounit_id - текстовое значение (например "amanita_muscaria")
           network: networkName,
           created_at: new Date().toISOString()
         };
@@ -304,7 +304,7 @@ class ComponentActions {
           return state.steps_completed && state.steps_completed.includes(stepName);
         };
         
-        console.log(`💾 Загрузка component state: ${componentId}`);
+        console.log(`💾 Загрузка component state: ${componentId} (biounit_id: ${context.biounit_id})`);
         if (state.steps_completed && state.steps_completed.length > 0) {
           console.log(`✅ State найден, шагов завершено: ${state.steps_completed.length}`);
           console.log(`   → Завершенные шаги: ${state.steps_completed.join(', ')}`);
@@ -367,13 +367,13 @@ class ComponentActions {
           console.log(`   State file: зарегистрирован (block ${state.contract_registration?.blockNumber || 'N/A'})`);
           
           try {
-            const componentExists = await context.contracts.organicComponentRegistry.componentExists(context.componentId);
+            const componentExists = await context.contracts.organicComponentRegistry.componentExists(context.biounit_id);
             
             if (componentExists) {
               // Component confirmed in contract - safe to skip
               console.log(`   ✅ Подтверждено в контракте: componentExists() = TRUE`);
               
-              const blockchainId = await context.contracts.organicComponentRegistry.businessIdToComponentId(context.componentId);
+              const blockchainId = await context.contracts.organicComponentRegistry.businessIdToComponentId(context.biounit_id);
               console.log(`   ✅ Blockchain ID: ${blockchainId}`);
               console.log(`   → Пропуск регистрации (компонент уже в контракте)`);
               

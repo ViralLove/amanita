@@ -24,7 +24,7 @@ const stateManager = require('./state_manager');
  * @dev После обновления AmanitaInternational с SELLER_ROLE support
  * 
  * @param {Object} context - Upload context
- * @param {string} context.componentId - ID компонента
+ * @param {string} context.biounit_id - biounit_id компонента (текстовое значение, например "amanita_muscaria")
  * @param {string} context.componentDir - Путь к директории компонента
  * @param {string} context.network - Название сети
  * @param {boolean} context.dryRun - Режим dry-run
@@ -56,10 +56,10 @@ async function uploadSimpleFields(context, state, onProgress = null) {
       onProgress({ step: 'simple_fields', substep: 'title', progress: 0, status: 'started' });
     }
     
-    const titleFilePath = `simple_fields/${context.componentId}.ComponentDescription.title.json`;
+    const titleFilePath = `simple_fields/${context.biounit_id}.ComponentDescription.title.json`;
     const titleData = utils.readJSON(context.componentDir, titleFilePath);
     
-    const titleFilename = `${context.componentId}_ComponentDescription_title.json`;
+    const titleFilename = `${context.biounit_id}_ComponentDescription_title.json`;
     const titleResult = await uploadToArweave(
       context,
       titleData,
@@ -108,10 +108,10 @@ async function uploadSimpleFields(context, state, onProgress = null) {
       onProgress({ step: 'simple_fields', substep: 'dosage', progress: 50, status: 'started' });
     }
     
-    const dosageFilePath = `simple_fields/${context.componentId}.DosageInstruction.description.json`;
+    const dosageFilePath = `simple_fields/${context.biounit_id}.DosageInstruction.description.json`;
     const dosageData = utils.readJSON(context.componentDir, dosageFilePath);
     
-    const dosageFilename = `${context.componentId}_DosageInstruction_description.json`;
+    const dosageFilename = `${context.biounit_id}_DosageInstruction_description.json`;
     const dosageResult = await uploadToArweave(
       context,
       dosageData,
@@ -209,13 +209,13 @@ async function uploadComplexFields(context, state, onProgress = null) {
         onProgress({ step: 'complex_fields', language: lang, progress, status: 'started' });
       }
       
-      const filePath = `complex_fields/${context.componentId}.ComponentDescription.${lang}.json`;
+      const filePath = `complex_fields/${context.biounit_id}.ComponentDescription.${lang}.json`;
       
       try {
         // Читаем файл описания для текущего языка
         const descData = utils.readJSON(context.componentDir, filePath);
         
-        const filename = `${context.componentId}_ComponentDescription_${lang}.json`;
+        const filename = `${context.biounit_id}_ComponentDescription_${lang}.json`;
         const descResult = await uploadToArweave(
           context,
           descData,
@@ -240,14 +240,19 @@ async function uploadComplexFields(context, state, onProgress = null) {
           const signer = context.seller.signer;
           const amanitaIntlWithSigner = context.contracts.amanitaInternational.connect(signer);
           
+          // ✅ FIX: Включаем biounit_id в className для уникальности ключа
+          const classNameWithBiounitId = `ComponentDescription.${context.biounit_id}`;
+          // Пример: "ComponentDescription.amanita_muscaria"
+          // Результат в контракте: complexFieldCIDs["ComponentDescription.amanita_muscaria.ru"] = cid
+          
           const tx = await amanitaIntlWithSigner.setComplexFieldCID(
-            "ComponentDescription",
+            classNameWithBiounitId,  // ✅ С biounit_id → уникальный ключ для каждого компонента
             lang,
             descCID
           );
           
           await tx.wait();
-          console.log(`✅ CID сохранен в контракте (owner: seller, ${lang})`);
+          console.log(`✅ CID сохранен в контракте (owner: seller, ${lang}, key: ${classNameWithBiounitId}.${lang})`);
         } else if (context.arweaveOnly) {
           console.log("🔷 [ARWEAVE_ONLY] Пропускаем сохранение в контракт");
         } else {
@@ -448,8 +453,8 @@ function updateRootMetadata(context, simpleFieldCIDs, complexFieldCIDs, state) {
     const path = require('path');
     
     // 1. Читаем оригинальный root файл
-    console.log(`📖 Чтение оригинального файла: ${context.componentId}.json`);
-    const rootData = utils.readJSON(context.componentDir, `${context.componentId}.json`);
+    console.log(`📖 Чтение оригинального файла: ${context.biounit_id}.json`);
+    const rootData = utils.readJSON(context.componentDir, `${context.biounit_id}.json`);
     
     // 2. Создаем финальную структуру с CID references
     const finalRootData = {
@@ -463,7 +468,7 @@ function updateRootMetadata(context, simpleFieldCIDs, complexFieldCIDs, state) {
     };
     
     // 3. Сохраняем финальный root файл локально (для истории)
-    const finalFileName = `${context.componentId}_final_${context.network}.json`;
+    const finalFileName = `${context.biounit_id}_final_${context.network}.json`;
     const finalRootPath = path.join(context.componentDir, finalFileName);
     
     fs.writeFileSync(finalRootPath, JSON.stringify(finalRootData, null, 2), 'utf8');
@@ -530,7 +535,7 @@ async function uploadRootMetadata(context, rootData, state, onProgress = null) {
     }
     
     // Загружаем root metadata в Arweave
-    const filename = `${context.componentId}_root_metadata.json`;
+    const filename = `${context.biounit_id}_root_metadata.json`;
     const rootResult = await uploadToArweave(context, rootData, filename);
     
     const rootCID = rootResult.txId || rootResult;
@@ -577,20 +582,20 @@ async function registerComponent(context, rootCID, state, onProgress = null) {
   // В dry-run режиме не регистрируем в контракте
   if (context.dryRun) {
     console.log("🔷 [DRY-RUN] Пропускаем регистрацию в контракте");
-    const mockComponentId = 999;
+    const mockBlockchainId = 999;
     
     state.contract_registration = {
-      componentId: mockComponentId,
+      blockchain_id: mockBlockchainId,  // ✅ Числовой ID из контракта (не biounit_id!)
       txHash: "DRYRUN_TX_HASH",
       dry_run: true
     };
     stateManager.markStepCompleted(state, 'component_registered');
     stateManager.saveComponentState(context.componentDir, context.network, state);
     
-    console.log(`🔷 [DRY-RUN] Mock Component ID: ${mockComponentId}`);
+    console.log(`🔷 [DRY-RUN] Mock Blockchain ID: ${mockBlockchainId}`);
     console.log("\n✅ ШАГ 6 завершен (DRY-RUN)");
     
-    return mockComponentId;
+    return mockBlockchainId;
   }
   
   try {
@@ -599,7 +604,7 @@ async function registerComponent(context, rootCID, state, onProgress = null) {
     }
     
     // Детальное логирование для отладки
-    console.log(`📝 Регистрируем компонент: ${context.componentId}`);
+    console.log(`📝 Регистрируем компонент: ${context.biounit_id}`);
     console.log(`📄 Root CID: ${rootCID}`);
     console.log(`🔍 Тип Root CID: ${typeof rootCID}`);
     console.log(`✅ Root CID валиден: ${!!rootCID}`);
@@ -617,7 +622,7 @@ async function registerComponent(context, rootCID, state, onProgress = null) {
     console.log(`   → Deployer: ${context.deployer.address}`);
     console.log(`   → Seller (создатель компонента): ${context.seller.address}`);
     
-    console.log(`\n🚀 Вызов createComponent("${context.componentId}", "${rootCID}")...`);
+    console.log(`\n🚀 Вызов createComponent("${context.biounit_id}", "${rootCID}")...`);
     console.log(`   → От имени seller: ${context.seller.address}`);
     
     // ✅ ethers.js: регистрация компонента от seller
@@ -630,7 +635,7 @@ async function registerComponent(context, rootCID, state, onProgress = null) {
     await new Promise(resolve => setTimeout(resolve, 500));
     
     const tx = await organicRegistryWithSigner.createComponent(
-      context.componentId,
+      context.biounit_id,  // ✅ biounit_id - текстовое значение (например "amanita_muscaria")
       rootCID
     );
     
@@ -678,7 +683,7 @@ async function registerComponent(context, rootCID, state, onProgress = null) {
     
     // Сохраняем в state
     state.contract_registration = {
-      componentId: componentId,
+      blockchain_id: componentId,  // ✅ Числовой ID из контракта (не biounit_id!)
       txHash: receipt.hash,
       blockNumber: receipt.blockNumber
     };

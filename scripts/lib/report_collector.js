@@ -139,12 +139,12 @@ function reportGlobalDictionaries(report, featuresCID, formsCID, featuresVersion
 
 /**
  * Создать component report entry
- * @param {string} componentId - ID компонента
+ * @param {string} biounit_id - biounit_id компонента (текстовое значение, например "amanita_muscaria")
  * @returns {Object} Пустой component report
  */
-function createComponentReport(componentId) {
+function createComponentReport(biounit_id) {
   return {
-    component_id: componentId,
+    biounit_id: biounit_id,  // ✅ biounit_id - текстовое значение
     status: "pending",
     started_at: null,
     completed_at: null,
@@ -160,7 +160,7 @@ function createComponentReport(componentId) {
     },
     
     blockchain: {
-      component_id: null,
+      blockchain_id: null,  // ✅ Числовой ID из контракта
       registration_tx: null,
       registration_block: null,
       total_gas_used: 0,
@@ -187,36 +187,36 @@ function createComponentReport(componentId) {
 /**
  * Начать tracking компонента
  * @param {Object} report - Report object
- * @param {string} componentId - ID компонента
+ * @param {string} biounit_id - biounit_id компонента (текстовое значение, например "amanita_muscaria")
  */
-function startComponentTracking(report, componentId) {
+function startComponentTracking(report, biounit_id) {
   // Проверяем, есть ли уже этот компонент
-  const existing = report.components.find(c => c.component_id === componentId);
+  const existing = report.components.find(c => c.biounit_id === biounit_id);
   
   if (existing) {
     existing.status = "in_progress";
     existing.started_at = new Date().toISOString();
   } else {
-    const componentReport = createComponentReport(componentId);
+    const componentReport = createComponentReport(biounit_id);
     componentReport.status = "in_progress";
     componentReport.started_at = new Date().toISOString();
     report.components.push(componentReport);
   }
   
-  console.log(`📊 Report: Начат tracking для ${componentId}`);
+  console.log(`📊 Report: Начат tracking для ${biounit_id}`);
 }
 
 /**
  * Добавить Arweave метрики для компонента
  * @param {Object} report - Report object
- * @param {string} componentId - ID компонента
+ * @param {string} biounit_id - biounit_id компонента (текстовое значение, например "amanita_muscaria")
  * @param {Object} arweaveData - Данные из Arweave
  */
-function addArweaveMetrics(report, componentId, arweaveData) {
-  const componentReport = report.components.find(c => c.component_id === componentId);
+function addArweaveMetrics(report, biounit_id, arweaveData) {
+  const componentReport = report.components.find(c => c.biounit_id === biounit_id);
   
   if (!componentReport) {
-    console.warn(`⚠️ Компонент ${componentId} не найден в report`);
+    console.warn(`⚠️ Компонент ${biounit_id} не найден в report`);
     return;
   }
   
@@ -229,25 +229,25 @@ function addArweaveMetrics(report, componentId, arweaveData) {
     upload_duration_seconds: arweaveData.upload_duration_seconds || null
   };
   
-  console.log(`📊 Report: Добавлены Arweave метрики для ${componentId}`);
+  console.log(`📊 Report: Добавлены Arweave метрики для ${biounit_id}`);
 }
 
 /**
  * Добавить Blockchain метрики для компонента
  * @param {Object} report - Report object
- * @param {string} componentId - ID компонента
+ * @param {string} biounit_id - biounit_id компонента (текстовое значение, например "amanita_muscaria")
  * @param {Object} blockchainData - Данные из blockchain
  */
-function addBlockchainMetrics(report, componentId, blockchainData) {
-  const componentReport = report.components.find(c => c.component_id === componentId);
+function addBlockchainMetrics(report, biounit_id, blockchainData) {
+  const componentReport = report.components.find(c => c.biounit_id === biounit_id);
   
   if (!componentReport) {
-    console.warn(`⚠️ Компонент ${componentId} не найден в report`);
+    console.warn(`⚠️ Компонент ${biounit_id} не найден в report`);
     return;
   }
   
   componentReport.blockchain = {
-    component_id: blockchainData.component_id || null,
+    blockchain_id: blockchainData.blockchain_id || null,  // ✅ Числовой ID из контракта
     registration_tx: blockchainData.registration_tx || null,
     registration_block: blockchainData.registration_block || null,
     total_gas_used: blockchainData.total_gas_used || 0,
@@ -255,24 +255,25 @@ function addBlockchainMetrics(report, componentId, blockchainData) {
     total_cost_usd: blockchainData.total_cost_usd || "0"
   };
   
-  console.log(`📊 Report: Добавлены Blockchain метрики для ${componentId}`);
+  console.log(`📊 Report: Добавлены Blockchain метрики для ${biounit_id}`);
 }
 
 /**
  * Добавить Metadata для компонента
  * @param {Object} report - Report object
- * @param {string} componentId - ID компонента
+ * @param {string} biounit_id - biounit_id компонента (текстовое значение, например "amanita_muscaria")
  * @param {Object} metadata - Метаданные компонента
  */
-function addComponentMetadata(report, componentId, metadata) {
-  const componentReport = report.components.find(c => c.component_id === componentId);
+function addComponentMetadata(report, biounit_id, metadata) {
+  const componentReport = report.components.find(c => c.biounit_id === biounit_id);
   
   if (!componentReport) {
-    console.warn(`⚠️ Компонент ${componentId} не найден в report`);
+    console.warn(`⚠️ Компонент ${biounit_id} не найден в report`);
     return;
   }
   
   componentReport.metadata = {
+    biounit_id: biounit_id,  // ✅ biounit_id из метаданных
     scientific_title: metadata.scientific_title || null,
     forms_count: metadata.forms?.length || 0,
     features_common_count: metadata.features?.common?.length || 0,
@@ -280,19 +281,19 @@ function addComponentMetadata(report, componentId, metadata) {
     languages_count: metadata.languages_count || 0
   };
   
-  console.log(`📊 Report: Добавлены Metadata для ${componentId}`);
+  console.log(`📊 Report: Добавлены Metadata для ${biounit_id}`);
 }
 
 /**
  * Завершить tracking компонента (успех)
  * @param {Object} report - Report object
- * @param {string} componentId - ID компонента
+ * @param {string} biounit_id - biounit_id компонента (текстовое значение, например "amanita_muscaria")
  */
-function completeComponentTracking(report, componentId) {
-  const componentReport = report.components.find(c => c.component_id === componentId);
+function completeComponentTracking(report, biounit_id) {
+  const componentReport = report.components.find(c => c.biounit_id === biounit_id);
   
   if (!componentReport) {
-    console.warn(`⚠️ Компонент ${componentId} не найден в report`);
+    console.warn(`⚠️ Компонент ${biounit_id} не найден в report`);
     return;
   }
   
@@ -306,21 +307,21 @@ function completeComponentTracking(report, componentId) {
     componentReport.duration_seconds = Math.round((end - start) / 1000);
   }
   
-  console.log(`📊 Report: ${componentId} завершен (${componentReport.duration_seconds}s)`);
+  console.log(`📊 Report: ${biounit_id} завершен (${componentReport.duration_seconds}s)`);
 }
 
 /**
  * Отметить компонент как failed
  * @param {Object} report - Report object
- * @param {string} componentId - ID компонента
+ * @param {string} biounit_id - biounit_id компонента (текстовое значение, например "amanita_muscaria")
  * @param {Error} error - Объект ошибки
  */
-function failComponentTracking(report, componentId, error) {
-  const componentReport = report.components.find(c => c.component_id === componentId);
+function failComponentTracking(report, biounit_id, error) {
+  const componentReport = report.components.find(c => c.biounit_id === biounit_id);
   
   if (!componentReport) {
     // Создаем новый если не существует
-    const newReport = createComponentReport(componentId);
+    const newReport = createComponentReport(biounit_id);
     newReport.status = "failed";
     newReport.completed_at = new Date().toISOString();
     report.components.push(newReport);
@@ -337,13 +338,13 @@ function failComponentTracking(report, componentId, error) {
   
   // Добавляем ошибку в общий список
   report.errors.push({
-    component_id: componentId,
+    biounit_id: biounit_id,  // ✅ biounit_id - текстовое значение
     timestamp: new Date().toISOString(),
     message: error.message,
     stack: error.stack
   });
   
-  console.log(`📊 Report: ${componentId} failed - ${error.message}`);
+  console.log(`📊 Report: ${biounit_id} failed - ${error.message}`);
 }
 
 // ====================================================================
@@ -445,7 +446,7 @@ function extractMetricsFromState(componentState, rootData) {
       total_size_bytes: 0
     },
     blockchain: {
-      component_id: componentState.contract_registration?.componentId || null,
+      blockchain_id: componentState.contract_registration?.blockchain_id || null,  // ✅ Числовой ID из контракта
       registration_tx: componentState.contract_registration?.txHash || null,
       registration_block: componentState.contract_registration?.blockNumber || null,
       total_gas_used: 0,
@@ -568,7 +569,7 @@ function printSummary(report) {
   if (report.errors.length > 0) {
     console.log("\n❌ Errors:");
     report.errors.forEach((err, index) => {
-      console.log(`   ${index + 1}. ${err.component_id}: ${err.message}`);
+      console.log(`   ${index + 1}. ${err.biounit_id}: ${err.message}`);
     });
   }
   
@@ -580,7 +581,7 @@ function printSummary(report) {
  * @param {Object} componentReport - Component report
  */
 function printComponentDetails(componentReport) {
-  console.log(`\n📦 Component: ${componentReport.component_id}`);
+  console.log(`\n📦 Component (biounit_id): ${componentReport.biounit_id}`);
   console.log(`   Status: ${componentReport.status}`);
   
   if (componentReport.duration_seconds) {
@@ -601,8 +602,8 @@ function printComponentDetails(componentReport) {
     console.log(`   Size: ${formatBytes(componentReport.arweave.total_size_bytes)}`);
   }
   
-  if (componentReport.blockchain.component_id) {
-    console.log(`   Blockchain ID: ${componentReport.blockchain.component_id}`);
+  if (componentReport.blockchain.blockchain_id) {
+    console.log(`   Blockchain ID: ${componentReport.blockchain.blockchain_id}`);
     console.log(`   TX Hash: ${componentReport.blockchain.registration_tx}`);
     console.log(`   Gas Used: ${componentReport.blockchain.total_gas_used.toLocaleString()}`);
   }

@@ -58,10 +58,10 @@ function loadComponentState(componentDir, network) {
  * @returns {Object} Новый state объект
  */
 function createComponentState(componentDir, network) {
-  const componentId = path.basename(componentDir);
+  const biounit_id = path.basename(componentDir);  // ✅ biounit_id - текстовое значение из имени директории
   
   return {
-    component_id: componentId,
+    biounit_id: biounit_id,  // ✅ biounit_id - текстовое значение (например "amanita_muscaria")
     network: network,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -130,10 +130,10 @@ function isStepCompleted(state, stepName) {
  * @returns {boolean} True если Step 6 нужно выполнить
  */
 function needsBlockchainRegistration(componentState, verbose = false) {
-  const componentId = componentState.component_id || 'unknown';
+  const biounit_id = componentState.biounit_id || 'unknown';
   
   if (verbose) {
-    console.log(`\n🔍 Проверка needsBlockchainRegistration для ${componentId}:`);
+    console.log(`\n🔍 Проверка needsBlockchainRegistration для ${biounit_id}:`);
     console.log(`   → steps_completed:`, componentState.steps_completed);
     console.log(`   → contract_registration:`, componentState.contract_registration);
     console.log(`   → root_metadata.cid:`, componentState.root_metadata?.cid);
@@ -239,7 +239,7 @@ function createBatchState(config) {
       skipped: []
     },
     
-    components: initializeComponentsData(config.components),
+    components: initializeComponentsData(config.components),  // config.components содержит biounit_ids
     
     metrics: {
       components_processed: 0,
@@ -255,14 +255,14 @@ function createBatchState(config) {
 
 /**
  * Инициализация данных компонентов в batch state
- * @param {Array<string>} componentIds - Список component IDs
+ * @param {Array<string>} biounit_ids - Список biounit_id (текстовые значения, например ["amanita_muscaria", "reishi"])
  * @returns {Object} Объект с компонентами
  */
-function initializeComponentsData(componentIds) {
+function initializeComponentsData(biounit_ids) {
   const components = {};
   
-  for (const id of componentIds) {
-    components[id] = {
+  for (const biounit_id of biounit_ids) {
+    components[biounit_id] = {
       status: "pending",
       started_at: null,
       completed_at: null,

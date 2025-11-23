@@ -351,8 +351,8 @@ function logOperationStart(operation, context = {}) {
   console.log(`\n${"=".repeat(60)}`);
   console.log(`🚀 ${operation}`);
   
-  if (context.componentId) {
-    console.log(`   → Component: ${context.componentId}`);
+  if (context.biounit_id) {
+    console.log(`   → Component (biounit_id): ${context.biounit_id}`);
   }
   if (context.network) {
     console.log(`   → Network: ${context.network}`);
