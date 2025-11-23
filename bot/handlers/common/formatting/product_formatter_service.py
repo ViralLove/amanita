@@ -82,8 +82,9 @@ class ProductFormatterService(IProductFormatter):
             str: Отформатированная основная информация
         """
         try:
-            # 🏷️ Название продукта - самое важное
-            main_info = f"{self.config.get_emoji('product')} <b>{product.title}</b>{self.config.get_template('section_separator')}"
+            # 🏷️ Название продукта - самое важное (используем локализованное название)
+            product_title = self._get_product_title(product, loc)
+            main_info = f"{self.config.get_emoji('product')} <b>{product_title}</b>{self.config.get_template('section_separator')}"
             
             # 🌿 Вид продукта - важно для понимания что это
             if product.species:
@@ -107,14 +108,17 @@ class ProductFormatterService(IProductFormatter):
     
     def format_composition_ux(self, product: Any, loc: Localization) -> str:
         """
-        Форматирует состав продукта для покупателей.
+        Форматирует состав продукта для покупателей (краткая версия для каталога).
+        
+        Использует новую логику SINGLE/MULTI детекции с type detection.
+        Backward compatible с продуктами без scientific_title.
         
         Args:
             product: Объект Product
             loc: Объект локализации
             
         Returns:
-            str: Отформатированный состав
+            str: Отформатированный состав (краткий)
         """
         try:
             if not hasattr(product, 'organic_components') or not product.organic_components:
@@ -122,17 +126,34 @@ class ProductFormatterService(IProductFormatter):
                 composition_text = f"{composition_emoji} <b>{loc.t('catalog.product.composition')}</b>: {loc.t('catalog.product.composition_not_specified')}{self.config.get_template('section_separator')}"
                 return composition_text
             
+            # Детекция типа продукта (SINGLE/MULTI)
+            product_type = self._detect_product_type(product)
+            
             composition_text = f"{self.config.get_emoji('composition')} <b>{loc.t('catalog.product.composition_title')}</b>{self.config.get_template('section_separator')}"
             
-            for i, component in enumerate(product.organic_components, 1):
-                # Основная информация о компоненте
-                composition_text += f"   {i}. <b>{component.biounit_id}</b>"
+            if product_type == "SINGLE":
+                # Краткое отображение для монокомпонентного
+                component = product.organic_components[0]
                 
-                # Пропорция - важно для понимания концентрации
+                if hasattr(component, 'scientific_title') and component.scientific_title:
+                    composition_text += f"   🧬 <b>{component.scientific_title}</b>"
+                else:
+                    composition_text += f"   {component.component_id}"
+                
                 if hasattr(component, 'proportion') and component.proportion:
                     composition_text += f" • {component.proportion}"
                 
                 composition_text += self.config.get_template('component_separator')
+            else:
+                # Список для мультикомпонентного (MULTI)
+                for i, component in enumerate(product.organic_components, 1):
+                    comp_name = self._get_component_display_name(component, loc)
+                    composition_text += f"   {i}. <b>{comp_name}</b>"
+                    
+                    if hasattr(component, 'proportion') and component.proportion:
+                        composition_text += f" • {component.proportion}"
+                    
+                    composition_text += self.config.get_template('component_separator')
             
             return composition_text
             
@@ -214,7 +235,7 @@ class ProductFormatterService(IProductFormatter):
             self.logger.error(f"[ProductFormatterService] Ошибка при форматировании деталей: {e}")
             return f"{self.config.get_emoji('details')} <b>{loc.t('catalog.product.details')}</b>"
     
-    def format_product_details_for_telegram(self, product: Any, loc: Localization) -> str:
+    def format_product_details_for_telegram(self, product: Any, loc: Localization):
         """
         Форматирует детальную информацию о продукте для Telegram.
         
@@ -223,7 +244,8 @@ class ProductFormatterService(IProductFormatter):
             loc: Объект локализации
             
         Returns:
-            str: Отформатированный HTML текст с детальной информацией
+            Dict or str: Словарь с 'text' и 'inline_keyboard' (если есть description)
+                        или строка (для backward compatibility)
         """
         try:
             self.logger.debug(f"[ProductFormatterService] Детальное форматирование продукта: {getattr(product, 'title', 'unknown')}")
@@ -231,8 +253,9 @@ class ProductFormatterService(IProductFormatter):
             # Инициализация отслеживания секций для предотвращения дублирования
             section_tracker = SectionTracker()
             
-            # 🏷️ Заголовок и основная информация
-            details_text = f"{self.config.get_emoji('product')} <b>{product.title}</b>{self.config.get_template('section_separator')}"
+            # 🏷️ Заголовок и основная информация (используем локализованное название)
+            product_title = self._get_product_title(product, loc)
+            details_text = f"{self.config.get_emoji('product')} <b>{product_title}</b>{self.config.get_template('section_separator')}"
             details_text += f"{self.config.get_emoji('species')} <b>Вид:</b> {product.species}{self.config.get_template('section_separator')}"
             
             # ✅ Статус продукта
@@ -252,65 +275,29 @@ class ProductFormatterService(IProductFormatter):
             
             details_text += self.config.get_template('section_separator')
             
-            # 🔬 Состав продукта - детальная информация о компонентах
+            # 🔬 Состав продукта - НОВАЯ ЛОГИКА с детекцией типа продукта
             if hasattr(product, 'organic_components') and product.organic_components:
-                details_text += f"{self.config.get_emoji('composition')} <b>Состав</b>{self.config.get_template('section_separator')}"
+                # Детекция типа продукта (SINGLE/MULTI)
+                product_type = self._detect_product_type(product)
+                self.logger.info(f"[ProductFormatterService] Detected product type: {product_type}")
                 
-                # Добавляем картинку продукта в секцию состава для лучшего визуального восприятия
-                if hasattr(product, 'cover_image_url') and product.cover_image_url:
-                    details_text += f"🖼️ <i>Визуальное представление продукта</i>{self.config.get_template('section_separator')}{self.config.get_template('section_separator')}"
+                # Роутинг на соответствующий форматтер
+                if product_type == "SINGLE":
+                    # ✅ Task 2.1 DONE: используем новый SINGLE форматтер
+                    self.logger.info("[ProductFormatterService] Using SINGLE component formatter")
+                    composition_text = self._format_single_component_product(product, loc, section_tracker)
+                    
+                elif product_type == "MULTI":
+                    # ✅ Task 3.1 DONE: используем новый MULTI форматтер
+                    self.logger.info("[ProductFormatterService] Using MULTI component formatter")
+                    composition_text = self._format_multi_component_product(product, loc, section_tracker)
+                    
+                else:
+                    # Fallback для EMPTY/UNKNOWN
+                    self.logger.warning(f"[ProductFormatterService] Product type {product_type}, showing fallback")
+                    composition_text = f"{self.config.get_emoji('composition')} <b>Состав:</b> информация недоступна{self.config.get_template('section_separator')}"
                 
-                for i, component in enumerate(product.organic_components, 1):
-                    details_text += f"• <b>{component.biounit_id}</b> - <b>{component.proportion}</b>{self.config.get_template('component_separator')}"
-                    
-                    # Детальное описание компонента из ComponentDescription
-                    if hasattr(component, 'description') and component.description:
-                        desc = component.description
-                        
-                        # Основное описание компонента
-                        if (hasattr(desc, 'generic_description') and desc.generic_description and 
-                            section_tracker.can_output_section(SectionTypes.GENERIC_DESCRIPTION, 'component')):
-                            details_text += f"  {self.config.get_emoji('description')} <b>Описание</b>{self.config.get_template('section_separator')}    {desc.generic_description}{self.config.get_template('component_separator')}"
-                            section_tracker.mark_section_outputted(SectionTypes.GENERIC_DESCRIPTION)
-                        
-                        # Эффекты компонента
-                        if (hasattr(desc, 'effects') and desc.effects and 
-                            section_tracker.can_output_section(SectionTypes.EFFECTS, 'component')):
-                            details_text += f"  {self.config.get_emoji('effects')} <b>Эффекты</b>{self.config.get_template('section_separator')}    {desc.effects}{self.config.get_template('component_separator')}"
-                            section_tracker.mark_section_outputted(SectionTypes.EFFECTS)
-                        
-                        # Шаманская перспектива компонента (приоритет)
-                        if (hasattr(desc, 'shamanic') and desc.shamanic and 
-                            section_tracker.can_output_section(SectionTypes.SHAMANIC, 'component')):
-                            details_text += f"  {self.config.get_emoji('shamanic')} <b>Шаманская перспектива</b>{self.config.get_template('section_separator')}    {desc.shamanic}{self.config.get_template('component_separator')}"
-                            section_tracker.mark_section_outputted(SectionTypes.SHAMANIC)
-                        
-                        # Предупреждения компонента (приоритет)
-                        if (hasattr(desc, 'warnings') and desc.warnings and 
-                            section_tracker.can_output_section(SectionTypes.WARNINGS, 'component')):
-                            details_text += f"  {self.config.get_emoji('warnings')} <b>Предупреждения</b>{self.config.get_template('section_separator')}    {desc.warnings}{self.config.get_template('component_separator')}"
-                            section_tracker.mark_section_outputted(SectionTypes.WARNINGS)
-                        
-                        # Инструкции по дозировке компонента
-                        if (hasattr(desc, 'dosage_instructions') and desc.dosage_instructions and 
-                            section_tracker.can_output_section(SectionTypes.DOSAGE_INSTRUCTIONS, 'component')):
-                            details_text += f"  {self.config.get_emoji('dosage')} <b>Дозировка</b>{self.config.get_template('section_separator')}"
-                            for instruction in desc.dosage_instructions:
-                                details_text += f"    • {instruction.title}: {instruction.description}{self.config.get_template('component_separator')}"
-                            section_tracker.mark_section_outputted(SectionTypes.DOSAGE_INSTRUCTIONS)
-                        
-                        # Особенности компонента
-                        if (hasattr(desc, 'features') and desc.features and 
-                            section_tracker.can_output_section(SectionTypes.FEATURES, 'component')):
-                            details_text += f"  {self.config.get_emoji('features')} <b>Особенности</b>{self.config.get_template('section_separator')}    {', '.join(desc.features)}{self.config.get_template('component_separator')}"
-                            section_tracker.mark_section_outputted(SectionTypes.FEATURES)
-                    
-                    # Дополнительные свойства компонента
-                    if hasattr(component, 'properties') and component.properties:
-                        details_text += f"  {component.properties}{self.config.get_template('component_separator')}"
-                    
-                    # Добавляем "воздух" между ингредиентами
-                    details_text += self.config.get_template('section_separator')
+                details_text += composition_text
                 details_text += self.config.get_template('section_separator')
             
             # 📝 Общее описание продукта (только если не выведено компонентами)
@@ -405,8 +392,65 @@ class ProductFormatterService(IProductFormatter):
                 final_length = len(details_text)
                 self.logger.info(f"[ProductFormatterService] Текст обрезан: {original_length} -> {final_length} символов")
             
+            # 🆕 Task 10.3 + 11.1: Create inline keyboard if description available
+            inline_keyboard = None
+            
+            if hasattr(product, 'organic_components') and product.organic_components:
+                component_count = len(product.organic_components)
+                
+                # SINGLE component product
+                if component_count == 1:
+                    component = product.organic_components[0]
+                    
+                    # Check if component has description
+                    if (hasattr(component, 'description') and 
+                        component.description and 
+                        hasattr(component, 'component_id')):
+                        
+                        self.logger.info(f"[ProductFormatterService] Adding description keyboard for SINGLE component: {component.component_id}")
+                        
+                        inline_keyboard = self._create_component_description_keyboard(
+                            component.component_id,
+                            loc.language,
+                            getattr(product, 'business_id', '')
+                        )
+                
+                # 🆕 Task 11.1: MULTI component product
+                elif component_count > 1:
+                    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                    
+                    inline_keyboard_rows = []
+                    
+                    for component in product.organic_components:
+                        # Only add button if description available
+                        if (hasattr(component, 'description') and 
+                            component.description and 
+                            hasattr(component, 'component_id')):
+                            
+                            # Get display name (scientific title or component_id)
+                            display_name = self._get_component_display_name(component, loc)
+                            
+                            inline_keyboard_rows.append([
+                                InlineKeyboardButton(
+                                    text=f"📖 {display_name}",
+                                    callback_data=f"component_menu:{component.component_id}:{loc.language}"
+                                )
+                            ])
+                    
+                    if inline_keyboard_rows:
+                        inline_keyboard = InlineKeyboardMarkup(inline_keyboard=inline_keyboard_rows)
+                        self.logger.info(f"[ProductFormatterService] Adding description keyboard for MULTI product: {len(inline_keyboard_rows)} components")
+            
             self.logger.debug(f"[ProductFormatterService] Детальное форматирование завершено успешно")
-            return details_text
+            
+            # Return dict if keyboard present, str for backward compatibility
+            if inline_keyboard:
+                return {
+                    'text': details_text,
+                    'inline_keyboard': inline_keyboard
+                }
+            else:
+                return details_text
             
         except Exception as e:
             self.logger.error(f"[ProductFormatterService] Ошибка при детальном форматировании: {e}")
@@ -430,8 +474,9 @@ class ProductFormatterService(IProductFormatter):
             # Инициализация отслеживания секций для предотвращения дублирования
             section_tracker = SectionTracker()
             
-            # 🏷️ Заголовок и основная информация
-            main_info_text = f"{self.config.get_emoji('product')} <b>{product.title}</b>{self.config.get_template('section_separator')}"
+            # 🏷️ Заголовок и основная информация (используем локализованное название)
+            product_title = self._get_product_title(product, loc)
+            main_info_text = f"{self.config.get_emoji('product')} <b>{product_title}</b>{self.config.get_template('section_separator')}"
             main_info_text += f"{self.config.get_emoji('species')} <b>Вид:</b> {product.species}{self.config.get_template('section_separator')}"
             
             # ✅ Статус продукта
@@ -460,7 +505,7 @@ class ProductFormatterService(IProductFormatter):
                     main_info_text += f"🖼️ <i>Визуальное представление продукта</i>{self.config.get_template('section_separator')}{self.config.get_template('section_separator')}"
                 
                 for i, component in enumerate(product.organic_components, 1):
-                    main_info_text += f"• <b>{component.biounit_id}</b> - <b>{component.proportion}</b>{self.config.get_template('component_separator')}"
+                    main_info_text += f"• <b>{component.component_id}</b> - <b>{component.proportion}</b>{self.config.get_template('component_separator')}"
                     
                     # Добавляем "воздух" между ингредиентами
                     main_info_text += self.config.get_template('section_separator')
@@ -534,7 +579,7 @@ class ProductFormatterService(IProductFormatter):
                 description_text += f"{self.config.get_emoji('composition')} <b>Детальный состав</b>{self.config.get_template('section_separator')}"
                 
                 for i, component in enumerate(product.organic_components, 1):
-                    description_text += f"• <b>{component.biounit_id}</b> - <b>{component.proportion}</b>{self.config.get_template('component_separator')}"
+                    description_text += f"• <b>{component.component_id}</b> - <b>{component.proportion}</b>{self.config.get_template('component_separator')}"
                     
                     # Детальное описание компонента из ComponentDescription
                     if hasattr(component, 'description') and component.description:
@@ -754,7 +799,7 @@ class ProductFormatterService(IProductFormatter):
             
             # Пытаемся получить локализованное название
             if self.localization_service:
-                localized_title = self.localization_service.t(f'product.{business_id}.title', **kwargs)
+                localized_title = self.localization_service.t(f'product.{business_id}.title')
                 if localized_title and localized_title != f'product.{business_id}.title':
                     return localized_title
             
@@ -781,7 +826,7 @@ class ProductFormatterService(IProductFormatter):
             
             # Пытаемся получить локализованное описание
             if self.localization_service:
-                localized_description = self.localization_service.t(f'product.{business_id}.description', **kwargs)
+                localized_description = self.localization_service.t(f'product.{business_id}.description')
                 if localized_description and localized_description != f'product.{business_id}.description':
                     return localized_description
             
@@ -804,12 +849,12 @@ class ProductFormatterService(IProductFormatter):
             str: Локализованное название
         """
         try:
-            biounit_id = getattr(component, 'biounit_id', getattr(component, 'id', 'unknown'))
+            component_id = getattr(component, 'component_id', getattr(component, 'id', 'unknown'))
             
             # Пытаемся получить локализованное название
             if self.localization_service:
-                localized_name = self.localization_service.t(f'component.{biounit_id}.name', **kwargs)
-                if localized_name and localized_name != f'component.{biounit_id}.name':
+                localized_name = self.localization_service.t(f'component.{component_id}.name')
+                if localized_name and localized_name != f'component.{component_id}.name':
                     return localized_name
             
             # Fallback на оригинальное название
@@ -831,12 +876,12 @@ class ProductFormatterService(IProductFormatter):
             str: Локализованное описание
         """
         try:
-            biounit_id = getattr(component, 'biounit_id', getattr(component, 'id', 'unknown'))
+            component_id = getattr(component, 'component_id', getattr(component, 'id', 'unknown'))
             
             # Пытаемся получить локализованное описание
             if self.localization_service:
-                localized_description = self.localization_service.t(f'component.{biounit_id}.description', **kwargs)
-                if localized_description and localized_description != f'component.{biounit_id}.description':
+                localized_description = self.localization_service.t(f'component.{component_id}.description')
+                if localized_description and localized_description != f'component.{component_id}.description':
                     return localized_description
             
             # Fallback на оригинальное описание
@@ -845,3 +890,411 @@ class ProductFormatterService(IProductFormatter):
         except Exception as e:
             self.logger.error(f"[ProductFormatterService] Ошибка получения описания компонента: {e}")
             return getattr(component, 'description', 'Описание недоступно')
+    
+    def _detect_product_type(self, product: Any) -> str:
+        """
+        Определяет тип продукта: SINGLE или MULTI.
+        
+        Используется для выбора стратегии форматирования:
+        - SINGLE: монокомпонентный продукт (1 компонент)
+        - MULTI: мультикомпонентный продукт (2+ компонента)
+        - EMPTY: продукт без компонентов
+        - UNKNOWN: organic_components поле отсутствует
+        
+        Args:
+            product: Объект Product
+            
+        Returns:
+            str: "SINGLE" | "MULTI" | "EMPTY" | "UNKNOWN"
+        """
+        try:
+            # Проверка наличия поля organic_components
+            if not hasattr(product, 'organic_components'):
+                self.logger.warning(f"[ProductFormatterService] Product без поля organic_components")
+                return "UNKNOWN"
+            
+            # Получение количества компонентов
+            component_count = len(product.organic_components)
+            
+            # Детекция типа
+            if component_count == 0:
+                self.logger.debug(f"[ProductFormatterService] Product type: EMPTY (0 components)")
+                return "EMPTY"
+            elif component_count == 1:
+                self.logger.debug(f"[ProductFormatterService] Product type: SINGLE (1 component)")
+                return "SINGLE"
+            else:
+                self.logger.debug(f"[ProductFormatterService] Product type: MULTI ({component_count} components)")
+                return "MULTI"
+                
+        except Exception as e:
+            self.logger.error(f"[ProductFormatterService] Ошибка при детекции типа продукта: {e}")
+            return "UNKNOWN"
+    
+    def _format_single_component_product(self, product: Any, loc: Localization, section_tracker: SectionTracker) -> str:
+        """
+        Форматирует монокомпонентный продукт.
+        
+        Отображает:
+        - Маркер "Монокомпонентный продукт"
+        - Научное название компонента (или component_id как fallback)
+        - Features компонента (топ-5 + счётчик оставшихся)
+        - Доступные формы компонента
+        
+        Args:
+            product: Объект Product с 1 компонентом
+            loc: Объект локализации
+            section_tracker: Трекер секций для предотвращения дублирования
+            
+        Returns:
+            str: Отформатированный текст для монокомпонентного продукта
+        """
+        component = product.organic_components[0]
+        
+        text = ""
+        
+        # Маркер монокомпонентного продукта
+        marker_text = loc.t('catalog.product.single_component_marker')
+        text += f"{self.config.get_emoji('composition')} <b>{marker_text}</b>{self.config.get_template('section_separator')}"
+        
+        # Научное название + component_id
+        if hasattr(component, 'scientific_title') and component.scientific_title:
+            text += f"🧬 <b>{component.scientific_title}</b> <i>({component.component_id})</i>"
+        else:
+            text += f"🧬 <b>{component.component_id}</b>"
+        
+        # Пропорция (если есть)
+        if hasattr(component, 'proportion') and component.proportion:
+            text += f" • {component.proportion}"
+        
+        text += self.config.get_template('section_separator')
+        text += self.config.get_template('section_separator')
+        
+        # Features компонента
+        features_text = self._format_component_features(component, loc, max_features=5)
+        if features_text:
+            text += features_text
+            text += self.config.get_template('section_separator')
+        
+        # Формы компонента
+        forms_text = self._format_component_forms(component, loc)
+        if forms_text:
+            text += forms_text
+            text += self.config.get_template('section_separator')
+        
+        # 🆕 Task 10.3: Hint about detailed description (if available)
+        if hasattr(component, 'description') and component.description:
+            text += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            text += "📖 <i>Детальное описание компонента доступно через кнопки ниже</i>\n"
+            text += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            self.logger.info(f"[ProductFormatterService] Added description hint for component: {component.component_id}")
+        
+        self.logger.debug(f"[ProductFormatterService] Formatted SINGLE component: {component.component_id}")
+        
+        return text
+    
+    def _format_multi_component_product(self, product: Any, loc: Localization, section_tracker: SectionTracker) -> str:
+        """
+        Форматирует мультикомпонентный продукт.
+        
+        Отображает:
+        - Локализованный маркер "Мультикомпонентный продукт (N компонентов)"
+        - Для каждого компонента:
+          - Разделитель с научным названием
+          - Пропорция
+          - Features (адаптивное количество)
+          - Доступные формы
+        
+        Args:
+            product: Объект Product с 2+ компонентами
+            loc: Объект локализации
+            section_tracker: Трекер секций для предотвращения дублирования
+            
+        Returns:
+            str: Отформатированный текст для мультикомпонентного продукта
+        """
+        comp_count = len(product.organic_components)
+        
+        text = ""
+        
+        # Маркер с количеством компонентов (локализованный)
+        marker_text = loc.t('catalog.product.multi_component_marker').format(comp_count)
+        text += f"{self.config.get_emoji('composition')} <b>{marker_text}</b>{self.config.get_template('section_separator')}"
+        text += self.config.get_template('section_separator')
+        
+        # Адаптивное количество features на компонент
+        max_features = self._calculate_max_features_per_component(comp_count)
+        
+        # Каждый компонент
+        for i, component in enumerate(product.organic_components, 1):
+            # Разделитель с названием компонента
+            comp_name = self._get_component_display_name(component, loc)
+            component_header = loc.t('catalog.product.component_number').format(i, comp_name)
+            text += f"━━━ <b>{component_header}</b> ━━━{self.config.get_template('section_separator')}"
+            
+            # Пропорция
+            if hasattr(component, 'proportion') and component.proportion:
+                proportion_label = loc.t('catalog.product.component_proportion')
+                text += f"📊 <b>{proportion_label}</b> {component.proportion}{self.config.get_template('section_separator')}"
+            
+            # Научное название (если не совпадает с заголовком)
+            if hasattr(component, 'scientific_title') and component.scientific_title and component.scientific_title != comp_name:
+                sci_name_label = loc.t('catalog.product.component_scientific_name')
+                text += f"{self.config.get_emoji('scientific_name')} <b>{sci_name_label}</b> {component.scientific_title} <i>({component.component_id})</i>{self.config.get_template('section_separator')}"
+            
+            # Features (адаптивное количество)
+            features_text = self._format_component_features(component, loc, max_features=max_features)
+            if features_text:
+                text += features_text
+            
+            # Forms
+            forms_text = self._format_component_forms(component, loc)
+            if forms_text:
+                text += forms_text
+            
+            # 🆕 Task 11.1: Hint about detailed description (if available)
+            if hasattr(component, 'description') and component.description:
+                text += f"\n📖 <i>[Описание доступно через кнопку ниже]</i>\n"
+            
+            # Разделитель между компонентами
+            text += self.config.get_template('section_separator')
+        
+        # 🆕 Task 11.1: Global hint if any component has description
+        descriptions_count = sum(
+            1 for comp in product.organic_components 
+            if hasattr(comp, 'description') and comp.description
+        )
+        
+        if descriptions_count > 0:
+            text += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            text += f"📖 <i>Детальные описания {descriptions_count} компонент(ов) доступны через кнопки ниже</i>\n"
+            text += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        
+        self.logger.debug(f"[ProductFormatterService] Formatted MULTI product: {comp_count} components, {descriptions_count} with descriptions")
+        
+        return text
+    
+    def _format_component_features(self, component: Any, loc: Localization, max_features: int = 5) -> str:
+        """
+        Форматирует features компонента.
+        
+        Args:
+            component: Объект OrganicComponent
+            loc: Объект локализации
+            max_features: Максимум features для отображения
+            
+        Returns:
+            str: Отформатированные features или пустая строка
+        """
+        if not hasattr(component, 'features') or not component.features:
+            return ""
+        
+        common_features = component.features.get('common', [])
+        if not common_features:
+            return ""
+        
+        features_title = loc.t('catalog.product.component_features_title')
+        text = f"{self.config.get_emoji('features')} <b>{features_title}</b>{self.config.get_template('section_separator')}"
+        
+        # Показываем первые N features
+        features_to_show = common_features[:max_features]
+        for feature in features_to_show:
+            text += f"   • {feature}{self.config.get_template('component_separator')}"
+        
+        # Счётчик оставшихся
+        if len(common_features) > max_features:
+            remaining = len(common_features) - max_features
+            remaining_text = loc.t('catalog.product.component_features_more').format(remaining)
+            text += f"   <i>{remaining_text}</i>{self.config.get_template('component_separator')}"
+        
+        return text
+    
+    def _format_component_forms(self, component: Any, loc: Localization) -> str:
+        """
+        Форматирует доступные формы компонента.
+        
+        Args:
+            component: Объект OrganicComponent
+            loc: Объект локализации
+            
+        Returns:
+            str: Отформатированные формы или пустая строка
+        """
+        if not hasattr(component, 'forms') or not component.forms:
+            return ""
+        
+        forms_title = loc.t('catalog.product.component_forms_title')
+        forms_text = ", ".join(component.forms)
+        return f"{self.config.get_emoji('forms')} <b>{forms_title}</b> {forms_text}{self.config.get_template('component_separator')}"
+    
+    def _calculate_max_features_per_component(self, component_count: int) -> int:
+        """
+        Вычисляет максимальное количество features на компонент.
+        Адаптивная логика: чем больше компонентов, тем меньше features.
+        
+        Args:
+            component_count: Количество компонентов в продукте
+            
+        Returns:
+            int: Макс. количество features для отображения
+        """
+        if component_count <= 2:
+            return 5  # До 5 features для 1-2 компонентов
+        elif component_count <= 4:
+            return 3  # До 3 features для 3-4 компонентов
+        else:
+            return 2  # До 2 features для 5+ компонентов
+    
+    def _get_component_display_name(self, component: Any, loc: Localization = None) -> str:
+        """
+        Получает отображаемое название компонента с локализацией.
+        
+        Приоритет:
+        1. Локализованное название через LocalizationService (если доступно)
+        2. scientific_title (если есть)
+        3. component_id (fallback)
+        
+        Args:
+            component: Объект OrganicComponent
+            loc: Объект локализации (опционально, для обратной совместимости)
+            
+        Returns:
+            str: Название для отображения
+        """
+        # Используем локализованное название, если доступно
+        if self.localization_service and loc:
+            try:
+                component_id = getattr(component, 'component_id', getattr(component, 'id', 'unknown'))
+                localized_name = self.localization_service.t(f'component.{component_id}.name')
+                if localized_name and localized_name != f'component.{component_id}.name':
+                    return localized_name
+            except Exception as e:
+                self.logger.debug(f"[ProductFormatterService] Ошибка получения локализованного названия компонента: {e}")
+        
+        # Fallback на scientific_title или component_id
+        if hasattr(component, 'scientific_title') and component.scientific_title:
+            return component.scientific_title
+        else:
+            return getattr(component, 'component_id', getattr(component, 'id', 'unknown'))
+    
+    def _format_composition_legacy(self, product: Any, loc: Localization, section_tracker: SectionTracker) -> str:
+        """
+        LEGACY: Старая логика форматирования состава.
+        Используется временно до реализации _format_single_component_product() и _format_multi_component_product().
+        
+        TODO: Удалить после реализации Tasks 2.1 и 3.1
+        
+        Args:
+            product: Объект продукта
+            loc: Объект локализации
+            section_tracker: Трекер секций для предотвращения дублирования
+            
+        Returns:
+            str: Отформатированный состав (legacy format)
+        """
+        details_text = f"{self.config.get_emoji('composition')} <b>Состав</b>{self.config.get_template('section_separator')}"
+        
+        # Добавляем картинку продукта в секцию состава для лучшего визуального восприятия
+        if hasattr(product, 'cover_image_url') and product.cover_image_url:
+            details_text += f"🖼️ <i>Визуальное представление продукта</i>{self.config.get_template('section_separator')}{self.config.get_template('section_separator')}"
+        
+        for i, component in enumerate(product.organic_components, 1):
+            details_text += f"• <b>{component.component_id}</b> - <b>{component.proportion}</b>{self.config.get_template('component_separator')}"
+            
+            # Детальное описание компонента из ComponentDescription
+            if hasattr(component, 'description') and component.description:
+                desc = component.description
+                
+                # Основное описание компонента
+                if (hasattr(desc, 'generic_description') and desc.generic_description and 
+                    section_tracker.can_output_section(SectionTypes.GENERIC_DESCRIPTION, 'component')):
+                    details_text += f"  {self.config.get_emoji('description')} <b>Описание</b>{self.config.get_template('section_separator')}    {desc.generic_description}{self.config.get_template('component_separator')}"
+                    section_tracker.mark_section_outputted(SectionTypes.GENERIC_DESCRIPTION)
+                
+                # Эффекты компонента
+                if (hasattr(desc, 'effects') and desc.effects and 
+                    section_tracker.can_output_section(SectionTypes.EFFECTS, 'component')):
+                    details_text += f"  {self.config.get_emoji('effects')} <b>Эффекты</b>{self.config.get_template('section_separator')}    {desc.effects}{self.config.get_template('component_separator')}"
+                    section_tracker.mark_section_outputted(SectionTypes.EFFECTS)
+                
+                # Шаманская перспектива компонента (приоритет)
+                if (hasattr(desc, 'shamanic') and desc.shamanic and 
+                    section_tracker.can_output_section(SectionTypes.SHAMANIC, 'component')):
+                    details_text += f"  {self.config.get_emoji('shamanic')} <b>Шаманская перспектива</b>{self.config.get_template('section_separator')}    {desc.shamanic}{self.config.get_template('component_separator')}"
+                    section_tracker.mark_section_outputted(SectionTypes.SHAMANIC)
+                
+                # Предупреждения компонента (приоритет)
+                if (hasattr(desc, 'warnings') and desc.warnings and 
+                    section_tracker.can_output_section(SectionTypes.WARNINGS, 'component')):
+                    details_text += f"  {self.config.get_emoji('warnings')} <b>Предупреждения</b>{self.config.get_template('section_separator')}    {desc.warnings}{self.config.get_template('component_separator')}"
+                    section_tracker.mark_section_outputted(SectionTypes.WARNINGS)
+                
+                # Инструкции по дозировке компонента
+                if (hasattr(desc, 'dosage_instructions') and desc.dosage_instructions and 
+                    section_tracker.can_output_section(SectionTypes.DOSAGE_INSTRUCTIONS, 'component')):
+                    details_text += f"  {self.config.get_emoji('dosage')} <b>Дозировка</b>{self.config.get_template('section_separator')}"
+                    for instruction in desc.dosage_instructions:
+                        details_text += f"    • {instruction.title}: {instruction.description}{self.config.get_template('component_separator')}"
+                    section_tracker.mark_section_outputted(SectionTypes.DOSAGE_INSTRUCTIONS)
+                
+                # Особенности компонента
+                if (hasattr(desc, 'features') and desc.features and 
+                    section_tracker.can_output_section(SectionTypes.FEATURES, 'component')):
+                    details_text += f"  {self.config.get_emoji('features')} <b>Особенности</b>{self.config.get_template('section_separator')}    {', '.join(desc.features)}{self.config.get_template('component_separator')}"
+                    section_tracker.mark_section_outputted(SectionTypes.FEATURES)
+            
+            # Дополнительные свойства компонента
+            if hasattr(component, 'properties') and component.properties:
+                details_text += f"  {component.properties}{self.config.get_template('component_separator')}"
+            
+            # Добавляем "воздух" между ингредиентами
+            details_text += self.config.get_template('section_separator')
+        
+        return details_text
+    
+    def _create_component_description_keyboard(
+        self, 
+        component_id: str, 
+        language: str,
+        product_id: str
+    ):
+        """
+        Создаёт inline клавиатуру для секций ComponentDescription.
+        
+        Args:
+            component_id: ID компонента
+            language: Язык для отображения
+            product_id: ID продукта (для навигации назад)
+            
+        Returns:
+            InlineKeyboardMarkup with 4 section buttons
+            
+        Note: Button text uses hardcoded localization since inline keyboard
+        is created outside of handler context where loc is available.
+        Alternative would be to pass loc as parameter, but buttons are
+        static and don't require dynamic localization.
+        """
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        # Note: Hardcoded for now (inline keyboard text is less critical)
+        # TODO: Consider passing loc parameter if dynamic localization needed
+        buttons = [
+            [InlineKeyboardButton(
+                text="🔬 Активные компоненты",
+                callback_data=f"component_desc:{component_id}:generic:{language}"
+            )],
+            [InlineKeyboardButton(
+                text="🌿 Целительное действие",
+                callback_data=f"component_desc:{component_id}:effects:{language}"
+            )],
+            [InlineKeyboardButton(
+                text="🌀 Шаманская перспектива",
+                callback_data=f"component_desc:{component_id}:shamanic:{language}"
+            )],
+            [InlineKeyboardButton(
+                text="⚠️ Предостережения",
+                callback_data=f"component_desc:{component_id}:warnings:{language}"
+            )]
+        ]
+        
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
