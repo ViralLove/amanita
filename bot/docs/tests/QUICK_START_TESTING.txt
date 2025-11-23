@@ -1,0 +1,688 @@
+═══════════════════════════════════════════════════════════════════════════════
+  AMANITA PROJECT — QUICK START TESTING GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+Автор: Zeya888
+Дата: 2025-10-29
+Цель: Простой гайд по запуску тестов в проекте Amanita
+
+═══════════════════════════════════════════════════════════════════════════════
+  СТРУКТУРА ТЕСТОВ В ПРОЕКТЕ
+═══════════════════════════════════════════════════════════════════════════════
+
+Проект Amanita имеет ДВА тестовых контекста:
+
+1. bot/tests/ — Python тесты (pytest)
+   - Unit тесты: tests/unit/
+   - API тесты: tests/api/
+   - Integration тесты: tests/integration/
+   - Validation тесты: tests/validation/
+   - Telegram тесты: tests/telegram/
+
+2. scripts/tests/ — JavaScript тесты (Mocha)
+   - Unit тесты: scripts/tests/unit/
+   - Integration тесты: scripts/tests/integration/
+   - E2E тесты: scripts/tests/e2e/
+
+═══════════════════════════════════════════════════════════════════════════════
+  БАЗОВЫЕ КОМАНДЫ (Python Tests — bot/)
+═══════════════════════════════════════════════════════════════════════════════
+
+ВАЖНО: Всегда запускать ИЗ директории bot/
+
+──────────────────────────────────────────────────────────────────────────────
+1. ЗАПУСК ВСЕХ ТЕСТОВ
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/ -v
+
+Что делает:
+- Запускает ВСЕ тесты в bot/tests/
+- Verbose режим (-v) показывает каждый тест
+- Включает unit, api, validation, telegram, integration
+
+Ожидаемый результат:
+- Видишь список всех тестов
+- Статус PASSED или FAILED для каждого
+- Итоговую статистику внизу
+
+──────────────────────────────────────────────────────────────────────────────
+2. ЗАПУСК ТОЛЬКО UNIT ТЕСТОВ
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/unit/ -v -m unit
+
+Что делает:
+- Запускает только unit тесты (tests/unit/)
+- Фильтрует по маркеру -m unit
+- Быстрое выполнение (< 1 секунды)
+
+Для конкретного файла:
+python3 -m pytest tests/unit/test_organic_components.py -v
+
+Что делает:
+- Запускает только тесты компонентов (18 тестов)
+- Время: < 0.1 секунды
+- Без network (работает offline)
+
+──────────────────────────────────────────────────────────────────────────────
+3. ЗАПУСК API ТЕСТОВ
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/api/ -v
+
+Что делает:
+- Запускает все API тесты (~200 тестов)
+- Тестирует REST API endpoints
+- Проверяет auth, validation, converters
+
+──────────────────────────────────────────────────────────────────────────────
+4. ЗАПУСК INTEGRATION ТЕСТОВ
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/integration/ -v -m integration
+
+Что делает:
+- Запускает интеграционные тесты
+- Тестирует взаимодействие компонентов
+- Может требовать больше времени
+
+──────────────────────────────────────────────────────────────────────────────
+5. ЗАПУСК С ПОКРЫТИЕМ КОДА
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/ --cov=bot --cov-report=html
+
+Что делает:
+- Запускает все тесты
+- Измеряет покрытие кода (code coverage)
+- Создает HTML отчет в htmlcov/
+
+Как посмотреть отчет:
+open htmlcov/index.html
+
+──────────────────────────────────────────────────────────────────────────────
+6. ЗАПУСК КОНКРЕТНОГО ТЕСТА
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/unit/test_organic_components.py::TestComponentExists::test_returns_true_for_existing_component -v
+
+Что делает:
+- Запускает ОДИН конкретный тест
+- Полный путь: файл::Класс::метод
+- Полезно для отладки
+
+──────────────────────────────────────────────────────────────────────────────
+7. ЗАПУСК С ФИЛЬТРАЦИЕЙ ПО ИМЕНИ
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/ -k "component" -v
+
+Что делает:
+- Запускает тесты с "component" в названии
+- -k фильтрует по ключевому слову
+- Находит тесты в разных директориях
+
+Примеры:
+python3 -m pytest tests/ -k "error" -v        # Только error handling тесты
+python3 -m pytest tests/ -k "api" -v          # Только API тесты
+python3 -m pytest tests/ -k "catalog" -v      # Только catalog тесты
+
+──────────────────────────────────────────────────────────────────────────────
+8. ЗАПУСК С МАРКЕРАМИ
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/ -m unit -v          # Только unit тесты
+python3 -m pytest tests/ -m integration -v   # Только integration тесты
+python3 -m pytest tests/ -m slow -v          # Только медленные тесты
+python3 -m pytest tests/ -m "not slow" -v    # Без медленных тестов
+
+Доступные маркеры (из pytest.ini):
+- unit: unit тесты
+- integration: integration тесты
+- e2e: end-to-end тесты
+- slow: медленные тесты
+- auth: authentication тесты
+- health: health check тесты
+- error: error handling тесты
+- performance: performance тесты
+
+──────────────────────────────────────────────────────────────────────────────
+9. ОТЛАДКА УПАВШИХ ТЕСТОВ
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/unit/test_organic_components.py -v --tb=short
+
+Опции traceback:
+--tb=short   # Короткий traceback (рекомендуется)
+--tb=long    # Полный traceback (для детальной отладки)
+--tb=line    # Только строка с ошибкой (минимальный вывод)
+--tb=no      # Без traceback (только статус)
+
+Для одного упавшего теста:
+python3 -m pytest tests/unit/test_organic_components.py::TestComponentExists::test_returns_true_for_existing_component -v -s
+
+Опция -s показывает print() output во время теста
+
+──────────────────────────────────────────────────────────────────────────────
+10. ПАРАЛЛЕЛЬНОЕ ВЫПОЛНЕНИЕ
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/unit/ -n auto -v
+
+Что делает:
+- Запускает тесты параллельно (использует все CPU)
+- -n auto определяет количество процессов автоматически
+- Значительно ускоряет выполнение больших тест-сьютов
+
+Для конкретного числа процессов:
+python3 -m pytest tests/unit/ -n 4 -v    # 4 параллельных процесса
+
+═══════════════════════════════════════════════════════════════════════════════
+  СПЕЦИФИЧНЫЕ СЦЕНАРИИ
+═══════════════════════════════════════════════════════════════════════════════
+
+──────────────────────────────────────────────────────────────────────────────
+Сценарий 1: Тестирую новый код компонентов
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+
+# Запускаю только компонентные тесты (быстро, offline)
+python3 -m pytest tests/unit/test_organic_components.py -v
+
+Результат:
+======================== 18 passed in 0.07s ========================
+
+Если упали — смотрю детали:
+python3 -m pytest tests/unit/test_organic_components.py -v --tb=short
+
+──────────────────────────────────────────────────────────────────────────────
+Сценарий 2: Проверяю не сломала ли я что-то
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+
+# Быстрая проверка (только unit тесты)
+python3 -m pytest tests/unit/ -v -m unit
+
+# Полная проверка (все тесты)
+python3 -m pytest tests/ -v
+
+# С остановкой на первой ошибке
+python3 -m pytest tests/ -v -x
+
+Опция -x останавливает выполнение при первом FAILED тесте
+
+──────────────────────────────────────────────────────────────────────────────
+Сценарий 3: Отлаживаю конкретный упавший тест
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+
+# Запускаю ТОЛЬКО этот тест с детальным выводом
+python3 -m pytest tests/unit/test_organic_components.py::TestGetComponent::test_returns_valid_structure_for_existing_component -v -s --tb=long
+
+Опции:
+-v = verbose (показывает имя теста)
+-s = показывает print() output
+--tb=long = полный traceback
+
+──────────────────────────────────────────────────────────────────────────────
+Сценарий 4: Хочу посмотреть покрытие кода
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+
+# Запускаю с измерением покрытия
+python3 -m pytest tests/unit/ --cov=services/core/blockchain --cov-report=term
+
+Показывает:
+- Какие строки покрыты тестами
+- Процент покрытия
+- Uncovered lines (непокрытые строки)
+
+Для HTML отчета:
+python3 -m pytest tests/unit/ --cov=services/core/blockchain --cov-report=html
+open htmlcov/index.html
+
+──────────────────────────────────────────────────────────────────────────────
+Сценарий 5: Хочу запустить только быстрые тесты
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+
+# Исключаю медленные тесты
+python3 -m pytest tests/ -m "not slow" -v
+
+Или запускаю только unit (они всегда быстрые):
+python3 -m pytest tests/unit/ -v
+
+═══════════════════════════════════════════════════════════════════════════════
+  COMPONENT TESTS — СПЕЦИФИКА
+═══════════════════════════════════════════════════════════════════════════════
+
+Локация:
+/Users/eslinko/Development/Amanita/bot/tests/unit/test_organic_components.py
+
+Что тестируют:
+- blockchain.py методы для OrganicComponentRegistry
+- component_exists()
+- get_component()
+- get_component_root_metadata_cid()
+- get_all_components()
+
+Особенности:
+✓ Работают OFFLINE (без Hardhat node)
+✓ Используют mock_blockchain_service из conftest.py
+✓ Быстрые (< 0.1 секунды)
+✓ 18 тестов, 100% passing
+
+──────────────────────────────────────────────────────────────────────────────
+Базовый запуск:
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/unit/test_organic_components.py -v
+
+──────────────────────────────────────────────────────────────────────────────
+Запуск с деталями:
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/unit/test_organic_components.py -v --tb=short -s
+
+Опция -s показывает логи (если добавишь print в тестах)
+
+──────────────────────────────────────────────────────────────────────────────
+Запуск одного класса тестов:
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/unit/test_organic_components.py::TestComponentExists -v
+
+Что делает:
+- Запускает только TestComponentExists (3 теста)
+- Игнорирует остальные 15 тестов
+
+──────────────────────────────────────────────────────────────────────────────
+Запуск одного метода:
+──────────────────────────────────────────────────────────────────────────────
+
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/unit/test_organic_components.py::TestGetComponent::test_cid_format_is_valid -v
+
+Что делает:
+- Запускает ОДИН конкретный тест
+- Полный путь: файл::Класс::метод
+
+═══════════════════════════════════════════════════════════════════════════════
+  ПОЛЕЗНЫЕ КОМБИНАЦИИ ОПЦИЙ
+═══════════════════════════════════════════════════════════════════════════════
+
+──────────────────────────────────────────────────────────────────────────────
+Быстрая проверка (первые N упавших):
+──────────────────────────────────────────────────────────────────────────────
+
+python3 -m pytest tests/ -v --maxfail=5
+
+Останавливается после 5 failed тестов (не ждёт до конца)
+
+──────────────────────────────────────────────────────────────────────────────
+Показать самые медленные тесты:
+──────────────────────────────────────────────────────────────────────────────
+
+python3 -m pytest tests/ -v --durations=10
+
+Показывает топ-10 самых медленных тестов
+
+──────────────────────────────────────────────────────────────────────────────
+Запуск только упавших тестов (повторный прогон):
+──────────────────────────────────────────────────────────────────────────────
+
+python3 -m pytest tests/ -v --lf
+
+Опция --lf (last failed) запускает только тесты, которые упали в прошлый раз
+
+──────────────────────────────────────────────────────────────────────────────
+Тихий режим (минимальный output):
+──────────────────────────────────────────────────────────────────────────────
+
+python3 -m pytest tests/unit/ -q
+
+Опция -q (quiet) показывает только итоговую статистику
+
+──────────────────────────────────────────────────────────────────────────────
+Детальный режим (подробный traceback):
+──────────────────────────────────────────────────────────────────────────────
+
+python3 -m pytest tests/unit/test_organic_components.py -vv --tb=long
+
+Опции:
+-vv = extra verbose (показывает assert детали)
+--tb=long = полный traceback со всеми переменными
+
+═══════════════════════════════════════════════════════════════════════════════
+  ТЕСТИРОВАНИЕ BLOCKCHAIN INTEGRATION
+═══════════════════════════════════════════════════════════════════════════════
+
+Для тестов, требующих реальную blockchain (НЕ unit тесты):
+
+──────────────────────────────────────────────────────────────────────────────
+Шаг 1: Запустить Hardhat node
+──────────────────────────────────────────────────────────────────────────────
+
+# Terminal 1
+cd /Users/eslinko/Development/Amanita
+npx hardhat node
+
+Оставляем запущенным в фоне
+
+──────────────────────────────────────────────────────────────────────────────
+Шаг 2: Задеплоить контракты
+──────────────────────────────────────────────────────────────────────────────
+
+# Terminal 2
+cd /Users/eslinko/Development/Amanita
+node scripts/deploy_full.js --action deploy-all
+
+Ждем пока задеплоятся все контракты
+
+──────────────────────────────────────────────────────────────────────────────
+Шаг 3: Загрузить компоненты (Action 555)
+──────────────────────────────────────────────────────────────────────────────
+
+# Terminal 2 (продолжаем)
+export DEPLOYER_INVITE="your_invite_code_here"
+export SELLER_ADDRESS="0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+node scripts/deploy_full.js --action 555
+
+Загружает компоненты в OrganicComponentRegistry
+
+──────────────────────────────────────────────────────────────────────────────
+Шаг 4: Запустить integration тесты
+──────────────────────────────────────────────────────────────────────────────
+
+# Terminal 3
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/test_component_integration.py -v
+
+Это тесты с РЕАЛЬНЫМ blockchain (требуют ноду)
+
+═══════════════════════════════════════════════════════════════════════════════
+  ТИПИЧНЫЕ ПРОБЛЕМЫ И РЕШЕНИЯ
+═══════════════════════════════════════════════════════════════════════════════
+
+──────────────────────────────────────────────────────────────────────────────
+Проблема: ModuleNotFoundError: No module named 'bot'
+──────────────────────────────────────────────────────────────────────────────
+
+Причина: Запускаешь не из bot/ директории
+
+Решение:
+cd /Users/eslinko/Development/Amanita/bot
+python3 -m pytest tests/unit/test_organic_components.py -v
+
+ВАЖНО: Всегда запускать из bot/, не из корня проекта
+
+──────────────────────────────────────────────────────────────────────────────
+Проблема: Failed to connect to Web3
+──────────────────────────────────────────────────────────────────────────────
+
+Причина: Hardhat node не запущен (для integration тестов)
+
+Решение:
+1. Для UNIT тестов — игнорируй (они работают offline)
+2. Для INTEGRATION тестов — запусти Hardhat node:
+   npx hardhat node
+
+──────────────────────────────────────────────────────────────────────────────
+Проблема: conftest.py import errors
+──────────────────────────────────────────────────────────────────────────────
+
+Причина: Была ошибка в dataclass (уже исправлена)
+
+Проверка:
+cd /Users/eslinko/Development/Amanita
+python3 -c "import sys; sys.path.insert(0, 'bot'); import tests.conftest; print('✅ OK')"
+
+Должно быть: ✅ OK
+
+──────────────────────────────────────────────────────────────────────────────
+Проблема: Тесты упали после моих изменений
+──────────────────────────────────────────────────────────────────────────────
+
+Шаг 1: Запусти конкретный упавший тест с деталями
+python3 -m pytest tests/unit/test_organic_components.py::FailedTest -v --tb=long
+
+Шаг 2: Смотри на assertion error
+Например:
+  assert result == "expected"
+  AssertionError: assert 'actual' == 'expected'
+
+Шаг 3: Проверь что изменила в коде
+Если изменила blockchain.py — проверь что:
+- Методы component_exists(), get_component() не сломаны
+- Возвращают правильный формат (tuple, bool, str)
+
+Шаг 4: Если нужно обновить mock
+Отредактируй bot/tests/conftest.py:
+- MockBlockchainService._call_component_registry_function()
+- Обнови тестовые данные в component_registry_state
+
+═══════════════════════════════════════════════════════════════════════════════
+  БЫСТРАЯ СПРАВКА — КОМАНДЫ ДЛЯ КОПИРОВАНИЯ
+═══════════════════════════════════════════════════════════════════════════════
+
+# Перейти в bot директорию (ВСЕГДА ПЕРВЫЙ ШАГ)
+cd /Users/eslinko/Development/Amanita/bot
+
+# Запустить компонентные тесты (самое частое)
+python3 -m pytest tests/unit/test_organic_components.py -v
+
+# Запустить все unit тесты
+python3 -m pytest tests/unit/ -v -m unit
+
+# Запустить все тесты
+python3 -m pytest tests/ -v
+
+# Запустить с покрытием
+python3 -m pytest tests/ --cov=bot --cov-report=html
+
+# Запустить конкретный тест
+python3 -m pytest tests/unit/test_organic_components.py::TestComponentExists::test_returns_true_for_existing_component -v
+
+# Запустить с фильтром по имени
+python3 -m pytest tests/ -k "component" -v
+
+# Запустить с остановкой на первой ошибке
+python3 -m pytest tests/ -v -x
+
+# Запустить только упавшие (повторный прогон)
+python3 -m pytest tests/ -v --lf
+
+# Запустить параллельно
+python3 -m pytest tests/unit/ -n auto -v
+
+═══════════════════════════════════════════════════════════════════════════════
+  СТРУКТУРА КОМПОНЕНТНЫХ ТЕСТОВ
+═══════════════════════════════════════════════════════════════════════════════
+
+tests/unit/test_organic_components.py содержит:
+
+TestComponentExists (3 теста)
+  - test_returns_true_for_existing_component
+  - test_returns_false_for_nonexistent_component
+  - test_handles_empty_string
+
+TestGetComponent (3 теста)
+  - test_returns_valid_structure_for_existing_component
+  - test_returns_none_for_nonexistent_component
+  - test_cid_format_is_valid
+
+TestGetComponentRootMetadataCID (4 теста)
+  - test_extracts_cid_from_tuple_structure
+  - test_returns_none_for_nonexistent_component
+  - test_handles_dict_structure
+  - test_returns_none_for_malformed_structure
+
+TestGetAllComponents (4 теста)
+  - test_returns_all_components_from_registry
+  - test_validates_component_structure
+  - test_returns_empty_list_when_no_components
+  - test_skips_invalid_components
+
+TestErrorHandling (1 тест)
+  - test_get_cid_handles_none_component
+
+TestIntegrationScenarios (3 теста)
+  - test_check_then_fetch_pattern
+  - test_fetch_cid_for_arweave_retrieval
+  - test_list_all_then_fetch_details
+
+ИТОГО: 18 тестов
+
+═══════════════════════════════════════════════════════════════════════════════
+  ЧТО ДЕЛАТЬ ЕСЛИ...
+═══════════════════════════════════════════════════════════════════════════════
+
+──────────────────────────────────────────────────────────────────────────────
+Если нужно добавить новый тест:
+──────────────────────────────────────────────────────────────────────────────
+
+1. Открой bot/tests/unit/test_organic_components.py
+2. Найди подходящий Test класс (например, TestComponentExists)
+3. Добавь новый метод:
+
+   def test_my_new_test(self, mock_blockchain_service):
+       """Should do something"""
+       # GIVEN: Setup
+       # WHEN: Action
+       result = mock_blockchain_service.component_exists("test")
+       # THEN: Assertion
+       assert result is False
+
+4. Запусти:
+   python3 -m pytest tests/unit/test_organic_components.py -v
+
+──────────────────────────────────────────────────────────────────────────────
+Если нужно обновить тестовые данные:
+──────────────────────────────────────────────────────────────────────────────
+
+1. Открой bot/tests/conftest.py
+2. Найди _initialize_component_test_data() (около строки 178)
+3. Добавь новый компонент в components:
+
+   "new_component": {
+       "id": 3,
+       "businessId": "new_component",
+       "creator": "0x...",
+       "rootMetadataCID": "ar://...",
+       "active": True,
+       "createdAt": 1730000200
+   }
+
+4. Обнови total_components: 2 → 3
+5. Запусти тесты для проверки:
+   python3 -m pytest tests/unit/test_organic_components.py -v
+
+──────────────────────────────────────────────────────────────────────────────
+Если хочешь запустить тесты в CI/CD:
+──────────────────────────────────────────────────────────────────────────────
+
+Unit тесты ГОТОВЫ для CI/CD:
+
+# В CI pipeline добавь:
+cd bot
+python3 -m pytest tests/unit/ -v -m unit --tb=short
+
+Не требуют:
+✗ Hardhat node
+✗ Deployed contracts
+✗ Network connection
+✗ .env файлы (моки используют тестовые значения)
+
+═══════════════════════════════════════════════════════════════════════════════
+  ПОЛЕЗНЫЕ ССЫЛКИ
+═══════════════════════════════════════════════════════════════════════════════
+
+Документация pytest:
+https://docs.pytest.org/
+
+pytest маркеры:
+https://docs.pytest.org/en/stable/how-to/mark.html
+
+pytest fixtures:
+https://docs.pytest.org/en/stable/how-to/fixtures.html
+
+Документация проекта:
+/Users/eslinko/Development/Amanita/bot/docs/tests/overview.md
+
+═══════════════════════════════════════════════════════════════════════════════
+  ФИНАЛЬНЫЙ ЧЕКЛИСТ
+═══════════════════════════════════════════════════════════════════════════════
+
+Перед коммитом изменений:
+
+[ ] Запустить unit тесты:
+    cd /Users/eslinko/Development/Amanita/bot
+    python3 -m pytest tests/unit/ -v -m unit
+
+[ ] Проверить что все проходят:
+    Должно быть: "X passed in Y seconds"
+    Не должно быть: "FAILED"
+
+[ ] Если добавила новые методы в blockchain.py:
+    - Добавить тесты в test_organic_components.py
+    - Обновить mock в conftest.py (если нужно)
+
+[ ] Если изменила структуру данных:
+    - Обновить тестовые данные в conftest.py
+    - Проверить что тесты проходят
+
+[ ] Запустить быструю проверку:
+    python3 -m pytest tests/unit/test_organic_components.py -v
+
+[ ] Если всё OK — коммитить! ✅
+
+═══════════════════════════════════════════════════════════════════════════════
+  КОНТАКТЫ И ПОМОЩЬ
+═══════════════════════════════════════════════════════════════════════════════
+
+Если что-то не работает:
+
+1. Проверь что находишься в bot/ директории:
+   pwd
+   # Должно быть: /Users/eslinko/Development/Amanita/bot
+
+2. Проверь что conftest.py загружается:
+   cd /Users/eslinko/Development/Amanita
+   python3 -c "import sys; sys.path.insert(0, 'bot'); import tests.conftest; print('✅ OK')"
+
+3. Запусти тесты с детальным traceback:
+   cd /Users/eslinko/Development/Amanita/bot
+   python3 -m pytest tests/unit/test_organic_components.py -v --tb=long
+
+4. Посмотри логи в output (опция -s):
+   python3 -m pytest tests/unit/test_organic_components.py -v -s
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Создано: 2025-10-29
+Автор: Zeya888
+Версия: 1.0
+Проект: Amanita Ecosystem
+Тестовая система: pytest + conftest.py fixtures
+
+═══════════════════════════════════════════════════════════════════════════════
+

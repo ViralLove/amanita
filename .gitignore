@@ -63,8 +63,7 @@ AIJournal.md
 **/Bridge.md
 Bridge.md
 **/bridge-prompt.md
-**/bridge.md
-bridge.md
+# Note: bot/docs/bridge.md is permanent documentation, not temporary
 
 # Data и каталоги (не в Git)
 /data
