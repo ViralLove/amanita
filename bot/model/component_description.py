@@ -10,18 +10,18 @@ class ComponentDescription:
     Структура для хранения расширенного описания компонента продукта.
     
     Attributes:
+        generic_description (str): Общее описание компонента (ОБЯЗАТЕЛЬНОЕ ПОЛЕ)
         title (Optional[str]): Локализованное название компонента (SIMPLE поле)
         scientific_title (Optional[str]): Латинское научное название (не локализуется)
-        generic_description (str): Общее описание компонента
         effects (Optional[str]): Описание эффектов и воздействия
         shamanic (Optional[str]): Шаманская перспектива и традиционное использование
         warnings (Optional[str]): Предупреждения и меры безопасности
         dosage_instructions (Optional[List[DosageInstruction]]): Инструкции по дозировке
         features (Optional[List[str]]): Особенности и характеристики компонента
     """
+    generic_description: str
     title: Optional[str] = None
     scientific_title: Optional[str] = None
-    generic_description: str
     effects: Optional[str] = None
     shamanic: Optional[str] = None
     warnings: Optional[str] = None

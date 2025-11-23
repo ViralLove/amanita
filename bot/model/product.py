@@ -583,7 +583,7 @@ class Product:
             # Старый формат: создаем один компонент из description
             logger.info(f"🔬 Используем старый формат с description")
             organic_components = [OrganicComponent(
-                biounit_id=data.get('species', 'unknown'),
+                component_id=data.get('species', 'unknown'),
                 description_cid=data['description_cid'],
                 proportion='100%'
             )]
@@ -725,18 +725,18 @@ class Product:
                     return price_info
         return None
 
-    def get_component_by_biounit_id(self, biounit_id: str) -> Optional[OrganicComponent]:
+    def get_component_by_component_id(self, component_id: str) -> Optional[OrganicComponent]:
         """
-        Получает компонент по biounit_id.
+        Получает компонент по component_id.
         
         Args:
-            biounit_id: Идентификатор биологической единицы
+            component_id: Идентификатор биологической единицы
             
         Returns:
             Optional[OrganicComponent]: Компонент или None, если не найден
         """
         for component in self.organic_components:
-            if component.biounit_id == biounit_id:
+            if component.component_id == component_id:
                 return component
         return None
 
