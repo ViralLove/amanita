@@ -18,8 +18,17 @@
 | Файл | Назначение | Тип |
 |------|------------|-----|
 | `tests/__init__.py` | Инициализация пакета тестов | Package |
-| `tests/conftest.py` | Общие фикстуры pytest | Fixtures |
+| `tests/conftest.py` | Общие фикстуры pytest (MockBlockchainService, MockIPFS, etc.) | Fixtures |
+| `tests/pytest.ini` | Конфигурация pytest (маркеры, пути) | Config |
 | `tests/test_*.py` | Основные тесты сервисов | Unit/Integration |
+
+### 🧪 Unit тесты (`tests/unit/`)
+
+| Файл | Назначение | Количество тестов |
+|------|------------|-------------------|
+| `test_organic_components.py` | Unit тесты OrganicComponentRegistry integration | 18 |
+
+**Общее количество unit тестов: ~18**
 
 ### 🌐 API тесты (`tests/api/`)
 
@@ -125,13 +134,14 @@
 
 ## 📊 Статистика тестов
 
-### Общее количество тестов: **595**
+### Общее количество тестов: **613**
 
-- **API тесты**: ~200 (34%)
-- **Сервисные тесты**: ~200 (34%)
-- **Валидационные тесты**: ~150 (25%)
+- **API тесты**: ~200 (33%)
+- **Сервисные тесты**: ~200 (33%)
+- **Валидационные тесты**: ~150 (24%)
 - **Telegram тесты**: 30 (5%)
-- **Интеграционные тесты**: ~15 (3%)
+- **Unit тесты**: 18 (3%) ✅ NEW
+- **Интеграционные тесты**: ~15 (2%)
 - **Общие тесты**: 5 (1%)
 
 ### Покрытие по типам
@@ -144,6 +154,11 @@
 
 ### 1. **Mock архитектура**
 - Использование готовых моков из `conftest.py`
+  - `MockBlockchainService` поддерживает:
+    - ✅ SpiralEngine (invite codes, activation, roles)
+    - ✅ ProductRegistry (products, catalog)
+    - ✅ OrganicComponentRegistry (components, metadata CIDs) ✅ NEW
+    - ✅ SoulIdentity (identity, SBT)
 - Изоляция от внешних зависимостей
 - Детерминированные результаты
 
@@ -176,6 +191,9 @@ python3 -m pytest tests/ -v
 
 ### Запуск по категориям
 ```bash
+# Unit тесты
+python3 -m pytest tests/unit/ -v -m unit
+
 # API тесты
 python3 -m pytest tests/api/ -v
 
@@ -187,6 +205,9 @@ python3 -m pytest tests/validation/ -v
 
 # Telegram тесты
 python3 -m pytest tests/telegram/ -v
+
+# Интеграционные тесты
+python3 -m pytest tests/integration/ -v -m integration
 ```
 
 ### Запуск с покрытием

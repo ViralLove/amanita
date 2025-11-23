@@ -24,7 +24,7 @@ python3 bot/utility/catalog_csv2json.py
 ```
 - ✅ Получим /catalog/active_catalog.json
 
-4. **Подготовка к загрузке в смарт-контракт**
+4. **Подготовка к загрузке в смарт-контракт (формирование componentIds[])**
 ```bash
 # Подготовка JSON файлов для IPFS и создание маппинга для контракта
 python3 bot/utility/prepare_products_for_registry.py
@@ -33,9 +33,13 @@ python3 bot/utility/prepare_products_for_registry.py
 - ✅ Убедиться в уникальности всех product_id
 - ✅ Проверить корректность CID'ов изображений и описаний
 - ✅ Проверить структуру цен и поддерживаемые валюты
+- ✅ **Собрать `componentIds[]`**:
+  - Для SINGLE: `componentIds = [metadata["component_id"]]`
+  - Для MULTI: `componentIds = [comp["component_id"] for comp in metadata["organic_components"]]`
+- ✅ Провалидировать, что каждый `component_id` зарегистрирован в `OrganicComponentRegistry` (иначе `createProduct` вернёт `ComponentNotFound`)
 - ✅ Получим:
   - Отдельные JSON файлы в `bot/catalog/product_jsons/`
-  - Маппинг для контракта в `product_registry_upload_data.json`
+  - Маппинг для контракта в `product_registry_upload_data.json` (**каждая запись содержит `id`, `componentIds[]`, `metadataCID`, `active`**)
 
 5. **Загрузка в смарт-контракт**
 ```bash
@@ -186,6 +190,8 @@ python3 bot/utility/upload_organic_descriptions.py --log-cli-level DEBUG
 
 ## 3.1 Подготовка данных
 
+> ℹ️ Начиная с UUPS-версии `ProductRegistry`, метаданные продукта **не** содержат полных описаний компонентов — только ссылки (`component_id` / `organic_components[].component_id`). Обогащение происходит off-chain, а список компонентов хранится на блокчейне в `componentIds[]`.
+
 ### CSV с базовой информацией
 Начальные данные о продуктах хранятся в `bot/catalog/Iveta_catalog.csv`. Этот файл содержит базовую информацию:
 - Business ID продукта (уникальный строковый идентификатор)
@@ -234,18 +240,24 @@ python3 bot/utility/upload_organic_descriptions.py --log-cli-level DEBUG
 - Логируем процесс загрузки
 
 3. **Формирование данных для контракта**:
-Создается `product_registry_upload_data.json`:
+Создаётся `product_registry_upload_data.json`, где каждая запись содержит бизнес-id, список компонент и CID метаданных:
 ```json
 [
   {
     "id": "amanita_powder",
-    "ipfsCID": "QmRqMjpkLihEsCSJJS4B3WjwW5ZhGm33PHfVw6MxQuo1ru",
+    "componentIds": ["amanita_muscaria"],
+    "metadataCID": "QmRqMjpkLihEsCSJJS4B3WjwW5ZhGm33PHfVw6MxQuo1ru",
+    "active": true
+  },
+  {
+    "id": "relaxation_blend",
+    "componentIds": ["amanita_muscaria", "lions_mane", "passionflower"],
+    "metadataCID": "QmRelaxBlendCID",
     "active": true
   }
-  // ... другие продукты
 ]
 ```
-Это исходная структура данных для хранения в контракте. Поле `id` здесь соответствует `business_id` из метаданных.
+`componentIds` формируются из метаданных (см. правила выше) и соответствуют бизнес-id в `OrganicComponentRegistry`. Они же будут переданы в `ProductRegistry.createProduct(...)`.
 
 ## 3.3 Интеграция с биологическими единицами
 
@@ -300,6 +312,7 @@ TODO Я пока проставляла ссылки на CID описаний �
 ```bash
 DEPLOY_ACTION=4 npx hardhat run scripts/deploy_full.js
 ```
+Скрипт вызывает `CatalogActions` → `productRegistry.createProduct(businessId, componentIds, metadataCID)` для каждого продукта. При необходимости можно выполнить dry-run той же командой с `DRY_RUN=true`.
 
 ## 3.5 Обновление каталога
 
@@ -394,6 +407,8 @@ graph TD
     B -->|Ручная структуризация цен| C[active_catalog.json]
     D[Изображения] -->|upload_catalog_images.py| E[catalog_images.json]
     E -->|CID маппинг| C
+    C -->|collect_component_ids()| F[componentIds per product]
+    F -->|prepare_products_for_registry.py| G[product_registry_upload_data.json]
 ```
 
 ### 2. Создание отдельных JSON файлов
@@ -494,12 +509,13 @@ graph TD
    - Поддерживаются Pinata и Arweave
 
 3. **Формирование данных для контракта**
-   - Создается `product_registry_upload_data.json`
+   - Создаётся `product_registry_upload_data.json`
    - Каждая запись содержит:
      ```json
      {
        "id": "product_id",
-       "ipfsCID": "полученный_cid",
+       "componentIds": ["component_business_id", "..."],
+       "metadataCID": "полученный_cid",
        "active": true
      }
      ```
@@ -535,7 +551,8 @@ graph TD
 [
   {
     "id": "blue_lotus_flowers",
-    "ipfsCID": "Qmf4iQKJms9nZvYTLrDRfZn7L59BPAZzUyFJQYkunSnnum",
+    "componentIds": ["blue_lotus"],
+    "metadataCID": "Qmf4iQKJms9nZvYTLrDRfZn7L59BPAZzUyFJQYkunSnnum",
     "active": true
   }
 ]
@@ -550,12 +567,15 @@ graph TD
 1. **Смарт-контракт (On-chain)**
 ```solidity
 struct Product {
-    uint256 id;          // Уникальный идентификатор
-    address seller;      // Адрес продавца
-    string ipfsCID;      // CID метаданных в IPFS
-    bool active;         // Статус активности
+    uint256 id;            // Уникальный идентификатор
+    address seller;        // Адрес продавца
+    string businessId;     // Бизнес-ID продукта
+    string[] componentIds; // Список компонентов из OrganicComponentRegistry
+    string metadataCID;    // CID метаданных (без вложенных компонентов)
+    bool active;           // Статус активности
 }
 ```
+> Метаданные остаются «тонкими»: они содержат только ссылки на компоненты. Полные данные подтягиваются на backend через `componentIds[]`.
 
 2. **IPFS Метаданные (Off-chain)**
 ```json

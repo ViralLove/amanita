@@ -27,16 +27,20 @@
 Создание продукта → Валидация уникальности → Сохранение в метаданных → Использование в API
 ```
 
+На уровне контракта `ProductRegistryLogic` уникальность поддерживается через маппинг `businessIdToProductId`. При вызове `createProduct` проверяется, что `businessIdToProductId[businessId] == 0`, иначе выбрасывается `BusinessIdExists`. Это гарантирует, что бизнес-идентификатор остаётся глобально уникальным и быстро разрешается в on-chain `productId`.
+
 ## Blockchain ID (`blockchain_id`)
 
 ### Определение
 `blockchain_id` - это числовой идентификатор продукта в смарт-контракте ProductRegistry. Это автоматически генерируемый uint256, который присваивается при записи в блокчейн.
 
 ### Логика получения
-1. **Создание в блокчейне**: Вызывается `createProduct(ipfsCID)` в контракте
-2. **Генерация ID**: Контракт увеличивает `_productIdCounter` и присваивает новый ID
-3. **Извлечение из транзакции**: Через `get_product_id_from_tx(tx_hash)` парсится событие `ProductCreated`
-4. **Проверка существования**: Валидируется через `_check_blockchain_product_exists(blockchain_id)`
+1. **Подготовка данных**: формируется `metadataCID` с метаданными продукта без дублирования компонентов.
+2. **Формирование `componentIds[]`**: из метаданных собираются `component_id`/`organic_components[].component_id`, соответствующие бизнес-id в `OrganicComponentRegistry`.
+3. **Запись в блокчейн**: вызывается `createProduct(businessId, componentIds, metadataCID)` на смарт-контракте `ProductRegistryLogic`.
+4. **Генерация ID**: контракт увеличивает `_productIdCounter`, сохраняет `businessId`, `componentIds` и `metadataCID`, затем возвращает `productId`.
+5. **Извлечение из транзакции**: через событие `ProductCreated` или `getProductIdByBusinessId`.
+6. **Проверка существования**: вызывается `getProduct(productId)` либо `businessIdToProductId[businessId]` для валидации и чтения статуса.
 
 ### Назначение
 - Уникальная идентификация продукта в блокчейне
@@ -63,32 +67,63 @@ metadata = {
 # 2. Загрузка в IPFS
 metadata_cid = await storage_service.upload_json(metadata)
 
-# 3. Запись в блокчейн
-tx_hash = await blockchain_service.create_product(metadata_cid)
+# 3. Сбор componentIds
+component_ids = metadata_utils.collect_component_ids(metadata)
 
-# 4. Получение blockchain_id
+# 4. Запись в блокчейн
+tx_hash = await blockchain_service.create_product(
+    business_id=metadata["id"],
+    component_ids=component_ids,
+    metadata_cid=metadata_cid
+)
+
+# 5. Получение blockchain_id
 blockchain_id = await blockchain_service.get_product_id_from_tx(tx_hash)
 ```
 
 ### Структура в блокчейне
 ```solidity
+// contracts/interfaces/IProductRegistry.sol
 struct Product {
-    uint256 id;          // blockchain_id
-    address seller;      // Адрес продавца
-    string ipfsCID;      // CID метаданных в IPFS
-    bool active;         // Статус активности
+    uint256 id;            // blockchain_id
+    address seller;        // адрес продавца
+    string businessId;     // бизнес-идентификатор продукта
+    string[] componentIds; // бизнес-id компонентов из OrganicComponentRegistry
+    string metadataCID;    // CID метаданных без вложенных компонентов
+    bool active;           // статус активности
 }
 ```
+
+> ⚠️ `businessId` и `componentIds` теперь являются on-chain источником правды. Метаданные в Arweave/Pinata содержат только ссылки на компоненты, а обогащение выполняется на backend через `ComponentService`.
 
 ### Событие ProductCreated
 ```solidity
 event ProductCreated(
     address indexed seller,
-    uint256 productId,   // blockchain_id
-    string ipfsCID,      // CID метаданных
-    uint256 status       // Статус (0 - неактивный)
+    uint256 productId,
+    string businessId,
+    string[] componentIds,
+    string metadataCID,
+    uint256 status // 0 - неактивный, 1 - активный
 );
 ```
+
+Событие сразу содержит `businessId` и набор `componentIds`, поэтому фронтенд/бот может синхронизировать все идентификаторы сразу после майнинга транзакции.
+
+### Индексация `businessId`
+```solidity
+mapping(string => uint256) public businessIdToProductId;
+
+function getProductIdByBusinessId(string calldata businessId)
+    external
+    view
+    returns (uint256 productId);
+```
+
+Контракт поддерживает двунаправленное соответствие:
+- `businessIdToProductId[businessId]` возвращает `productId` или ревертит `BusinessIdUnknown`.
+- `getProductComponents(productId)` отдаёт точный массив `componentIds`.
+- `_validateComponents(componentIds)` проверяет наличие компонентов в `componentRegistry`.
 
 ## Валидация и проверки
 
@@ -105,15 +140,36 @@ event ProductCreated(
 ## Использование в API
 
 ### Создание продукта
+```javascript
+const metadata = buildProductMetadata(payload);  // содержит ссылки на component_id
+const metadataCID = await storage.uploadJson(metadata);
+const componentIds = extractComponentIds(metadata); // ['blue_lotus', 'passionflower']
+
+const tx = await productRegistry
+  .connect(sellerSigner)
+  .createProduct(metadata.id, componentIds, metadataCID);
+
+const receipt = await tx.wait();
+const productId = receipt.logs[0].args.productId;
+```
+
 ```python
-result = await registry.create_product(product_data)
-# Возвращает:
-{
-    "id": "business_id",
-    "metadata_cid": "Qm...",
-    "blockchain_id": "123",
-    "tx_hash": "0x...",
-    "status": "success"
+# backend-поток (service layer)
+metadata = registry_service.create_product_metadata(product_data)
+metadata_cid = storage_service.upload_json(metadata)
+component_ids = metadata_utils.collect_component_ids(metadata)
+
+tx_hash = await blockchain_service.create_product(
+    business_id=metadata["id"],
+    component_ids=component_ids,
+    metadata_cid=metadata_cid
+)
+
+return {
+    "business_id": metadata["id"],
+    "blockchain_id": blockchain_service.get_product_id_from_tx(tx_hash),
+    "metadata_cid": metadata_cid,
+    "tx_hash": tx_hash
 }
 ```
 
