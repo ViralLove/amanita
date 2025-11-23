@@ -43,7 +43,7 @@ async def create_test_product_for_update(mock_service, product_id: str, base_dat
             "title": f"Test Product {product_id}",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": f"QmTestDescriptionCID{product_id}",
                     "proportion": "100%"
                 }
@@ -134,7 +134,7 @@ async def test_create_product_with_mock_ipfs_success(mock_product_registry_servi
         "title": "Test Product",
         "organic_components": [
             {
-                "biounit_id": "test_component",
+                "component_id": "test_component",
                 "description_cid": "QmTestDescriptionCID",
                 "proportion": "100%"
             }
@@ -304,7 +304,7 @@ async def test_create_product_success(test_app, mock_blockchain_service):
         "title": "Amanita muscaria — sliced caps and gills (1st grade)",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -400,7 +400,7 @@ async def test_create_product_validation_error(mock_product_registry_service):
         # "title": "Amanita muscaria — powder",  # Отсутствует!
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -439,7 +439,7 @@ async def test_create_product_ipfs_upload_failure(mock_product_registry_service)
         "title": "Amanita muscaria — powder",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -482,7 +482,7 @@ async def test_create_product_blockchain_write_failure(mock_product_registry_ser
         "title": "Amanita muscaria — powder",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -526,7 +526,7 @@ async def test_create_product_blockchain_id_retrieval_failure(mock_product_regis
         "title": "Amanita muscaria — powder",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -565,7 +565,7 @@ async def test_create_product_idempotency(mock_product_registry_service):
         "title": "Amanita muscaria — powder",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -624,7 +624,7 @@ async def test_update_product_success(mock_product_registry_service):
         "title": "Updated Amanita muscaria — powder",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmUpdatedDescriptionCID",
                 "proportion": "100%"
             }
@@ -680,7 +680,7 @@ async def test_update_product_validation_error(mock_product_registry_service):
         # Отсутствует title - должно вызвать ошибку валидации
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -726,7 +726,7 @@ async def test_update_product_not_found(mock_product_registry_service):
         "title": "Test Product",
         "organic_components": [
             {
-                "biounit_id": "test_component",
+                "component_id": "test_component",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -781,7 +781,7 @@ async def test_update_product_access_denied(mock_product_registry_service):
         "title": "Test Product - Access Denied",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -1028,7 +1028,7 @@ async def test_update_product_invalid_cid_format(mock_product_registry_service):
             "species": "Amanita muscaria",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     "proportion": "100%"
                 }
@@ -1078,7 +1078,7 @@ async def test_update_product_invalid_price_format(mock_product_registry_service
         "species": "Amanita muscaria",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -1153,7 +1153,7 @@ async def test_update_product_empty_categories_validation_fails(mock_product_reg
         "title": "Test Product",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -1201,7 +1201,7 @@ async def test_update_product_404_error(mock_product_registry_service):
         "title": "Test Product",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -1256,7 +1256,7 @@ async def test_update_product_403_error(mock_product_registry_service):
         "title": "Test Product - Permission Denied",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -1316,7 +1316,7 @@ async def test_update_product_missing_title_validation_fails(mock_product_regist
         "species": "Amanita muscaria",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -1361,7 +1361,7 @@ async def test_update_product_internal_server_error(mock_product_registry_servic
         "title": "Test Product",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -1445,7 +1445,7 @@ def test_get_seller_catalog_success(test_app, mock_product_registry_service):
             title="Amanita Muscaria Powder",
             organic_components=[
                 OrganicComponent(
-                    biounit_id="amanita_muscaria",
+                    component_id="amanita_muscaria",
                     description_cid="QmDescCID",
                     proportion="100%"
                 )
@@ -1661,7 +1661,7 @@ def test_get_seller_catalog_real_product_structure(test_app, mock_product_regist
         title="Test Product",
         organic_components=[
             OrganicComponent(
-                biounit_id="amanita_muscaria",
+                component_id="amanita_muscaria",
                 description_cid="QmDescCID",
                 proportion="100%"
             )
@@ -1796,7 +1796,7 @@ def test_get_seller_catalog_case_insensitive_address(test_app, mock_product_regi
             title="Test Product",
             organic_components=[
                 OrganicComponent(
-                    biounit_id="amanita_muscaria",
+                    component_id="amanita_muscaria",
                     description_cid="QmDescCID",
                     proportion="100%"
                 )
@@ -1877,7 +1877,7 @@ async def test_get_seller_catalog_logic_success(mock_product_registry_service):
             title="Amanita Muscaria Powder",
             organic_components=[
                 OrganicComponent(
-                    biounit_id="amanita_muscaria",
+                    component_id="amanita_muscaria",
                     description_cid="QmDescCID",
                     proportion="100%"
                 )
@@ -2117,7 +2117,7 @@ async def test_create_product_integration_blockchain_ipfs_failures(test_app, moc
         "title": "Amanita muscaria — integration test",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -2171,7 +2171,7 @@ async def test_create_product_network_timeout_error(test_app, mock_blockchain_se
         "title": "Amanita muscaria — timeout test",
         "organic_components": [
             {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }

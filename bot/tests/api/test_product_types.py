@@ -24,18 +24,18 @@ class TestBasicTypes:
         """Тест строковых типов"""
         # Валидные строки
         component = OrganicComponentAPI(
-            biounit_id="amanita_muscaria",
+            component_id="amanita_muscaria",
             description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             proportion="100%"
         )
-        assert isinstance(component.biounit_id, str)
+        assert isinstance(component.component_id, str)
         assert isinstance(component.description_cid, str)
         assert isinstance(component.proportion, str)
         
         # Пустые строки должны отклоняться
         with pytest.raises(ValidationError):
             OrganicComponentAPI(
-                biounit_id="",
+                component_id="",
                 description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 proportion="100%"
             )
@@ -60,7 +60,7 @@ class TestBasicTypes:
             title="Test Product",
             organic_components=[
                 OrganicComponentAPI(
-                    biounit_id="amanita_muscaria",
+                    component_id="amanita_muscaria",
                     description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     proportion="100%"
                 )
@@ -85,7 +85,7 @@ class TestBasicTypes:
             title="Test Product",
             organic_components=[
                 OrganicComponentAPI(
-                    biounit_id="amanita_muscaria",
+                    component_id="amanita_muscaria",
                     description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     proportion="100%"
                 )
@@ -112,7 +112,7 @@ class TestValidation:
         # Валидный CID
         valid_cid = "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG"
         component = OrganicComponentAPI(
-            biounit_id="test",
+            component_id="test",
             description_cid=valid_cid,
             proportion="100%"
         )
@@ -121,7 +121,7 @@ class TestValidation:
         # Некорректный CID (не начинается с Qm)
         with pytest.raises(InvalidCIDError):
             OrganicComponentAPI(
-                biounit_id="test",
+                component_id="test",
                 description_cid="invalid_cid",
                 proportion="100%"
             )
@@ -129,7 +129,7 @@ class TestValidation:
         # Некорректный CID (слишком короткий)
         with pytest.raises(ValueError):
             OrganicComponentAPI(
-                biounit_id="test",
+                component_id="test",
                 description_cid="Qm123",
                 proportion="100%"
             )
@@ -143,7 +143,7 @@ class TestValidation:
             title="Test Product",
             organic_components=[
                 OrganicComponentAPI(
-                    biounit_id="amanita_muscaria",
+                    component_id="amanita_muscaria",
                     description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     proportion="100%"
                 )
@@ -164,7 +164,7 @@ class TestValidation:
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -184,7 +184,7 @@ class TestValidation:
         
         for proportion in valid_proportions:
             component = OrganicComponentAPI(
-                biounit_id="test",
+                component_id="test",
                 description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 proportion=proportion
             )
@@ -196,7 +196,7 @@ class TestValidation:
         for proportion in invalid_proportions:
             with pytest.raises(ValidationError):
                 OrganicComponentAPI(
-                    biounit_id="test",
+                    component_id="test",
                     description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     proportion=proportion
                 )
@@ -214,7 +214,7 @@ class TestValidation:
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -237,7 +237,7 @@ class TestValidation:
                     title="Test Product",
                     organic_components=[
                         OrganicComponentAPI(
-                            biounit_id="amanita_muscaria",
+                            component_id="amanita_muscaria",
                             description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                             proportion="100%"
                         )
@@ -249,21 +249,21 @@ class TestValidation:
                     prices=[PriceModel(price=80, currency='EUR')]
                 )
     
-    def test_biounit_id_uniqueness(self):
-        """Тест уникальности biounit_id"""
-        # Дублирующиеся biounit_id должны отклоняться
+    def test_component_id_uniqueness(self):
+        """Тест уникальности component_id"""
+        # Дублирующиеся component_id должны отклоняться
         with pytest.raises(ValidationError):
             ProductUploadIn(
                 id=1,
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     ),
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",  # Дублирующийся ID
+                        component_id="amanita_muscaria",  # Дублирующийся ID
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="50%"
                     )
@@ -292,7 +292,7 @@ class TestBoundaryValues:
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -315,7 +315,7 @@ class TestBoundaryValues:
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -348,7 +348,7 @@ class TestBoundaryValues:
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -369,7 +369,7 @@ class TestBoundaryValues:
                 title="",  # Пустая строка
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -398,7 +398,7 @@ class TestNegativeCases:
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -419,7 +419,7 @@ class TestNegativeCases:
         # Некорректный CID
         with pytest.raises(InvalidCIDError):
             OrganicComponentAPI(
-                biounit_id="test",
+                component_id="test",
                 description_cid="invalid_cid_format",
                 proportion="100%"
             )
@@ -431,7 +431,7 @@ class TestNegativeCases:
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -456,7 +456,7 @@ class TestIntegration:
         """Тест цепочки создания продукта"""
         # Создание компонента
         component = OrganicComponentAPI(
-            biounit_id="amanita_muscaria",
+            component_id="amanita_muscaria",
             description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             proportion="100%"
         )
@@ -479,7 +479,7 @@ class TestIntegration:
         # Проверка цепочки
         assert product.organic_components[0] == component
         assert product.prices[0] == price
-        assert product.organic_components[0].biounit_id == "amanita_muscaria"
+        assert product.organic_components[0].component_id == "amanita_muscaria"
         assert product.prices[0].price == 80
     
     def test_product_update_partial(self):
@@ -490,7 +490,7 @@ class TestIntegration:
             title="Original Title",
             organic_components=[
                 OrganicComponentAPI(
-                    biounit_id="amanita_muscaria",
+                    component_id="amanita_muscaria",
                     description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     proportion="100%"
                 )
@@ -521,7 +521,7 @@ class TestIntegration:
             "title": "Test Product",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     "proportion": "100%"
                 }
@@ -545,7 +545,7 @@ class TestIntegration:
         assert product.id == 1
         assert product.title == "Test Product"
         assert len(product.organic_components) == 1
-        assert product.organic_components[0]["biounit_id"] == "amanita_muscaria"
+        assert product.organic_components[0]["component_id"] == "amanita_muscaria"
         assert len(product.prices) == 1
         assert product.prices[0]["price"] == 80
 

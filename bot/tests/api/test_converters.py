@@ -58,7 +58,7 @@ class TestOrganicComponentConverter:
     def test_valid_api_to_service(self):
         """Тест конвертации валидной API модели в Service модель"""
         api_model = OrganicComponentAPI(
-            biounit_id="amanita_muscaria",
+            component_id="amanita_muscaria",
             description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             proportion="100%"
         )
@@ -66,14 +66,14 @@ class TestOrganicComponentConverter:
         service_model = self.converter.api_to_service(api_model)
         
         assert isinstance(service_model, OrganicComponent)
-        assert service_model.biounit_id == "amanita_muscaria"
+        assert service_model.component_id == "amanita_muscaria"
         assert service_model.description_cid == "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG"
         assert service_model.proportion == "100%"
     
     def test_valid_service_to_api(self):
         """Тест конвертации валидной Service модели в API модель"""
         service_model = OrganicComponent(
-            biounit_id="amanita_muscaria",
+            component_id="amanita_muscaria",
             description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             proportion="100%"
         )
@@ -81,14 +81,14 @@ class TestOrganicComponentConverter:
         api_model = self.converter.service_to_api(service_model)
         
         assert isinstance(api_model, OrganicComponentAPI)
-        assert api_model.biounit_id == "amanita_muscaria"
+        assert api_model.component_id == "amanita_muscaria"
         assert api_model.description_cid == "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG"
         assert api_model.proportion == "100%"
     
     def test_api_to_dict(self):
         """Тест конвертации API модели в словарь"""
         api_model = OrganicComponentAPI(
-            biounit_id="amanita_muscaria",
+            component_id="amanita_muscaria",
             description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             proportion="100%"
         )
@@ -96,14 +96,14 @@ class TestOrganicComponentConverter:
         result = self.converter.api_to_dict(api_model)
         
         assert isinstance(result, dict)
-        assert result["biounit_id"] == "amanita_muscaria"
+        assert result["component_id"] == "amanita_muscaria"
         assert result["description_cid"] == "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG"
         assert result["proportion"] == "100%"
     
     def test_dict_to_api(self):
         """Тест конвертации словаря в API модель"""
         data = {
-            "biounit_id": "amanita_muscaria",
+            "component_id": "amanita_muscaria",
             "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "proportion": "100%"
         }
@@ -111,7 +111,7 @@ class TestOrganicComponentConverter:
         api_model = self.converter.dict_to_api(data)
         
         assert isinstance(api_model, OrganicComponentAPI)
-        assert api_model.biounit_id == "amanita_muscaria"
+        assert api_model.component_id == "amanita_muscaria"
         assert api_model.description_cid == "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG"
         assert api_model.proportion == "100%"
     
@@ -141,7 +141,7 @@ class TestOrganicComponentConverter:
             
             # Тестируем валидацию
             api_model = OrganicComponentAPI(
-                biounit_id="amanita_muscaria",
+                component_id="amanita_muscaria",
                 description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 proportion="100%"
             )
@@ -176,7 +176,7 @@ class TestOrganicComponentConverter:
             
             # Тестируем валидацию с валидными данными для создания модели
             api_model = OrganicComponentAPI(
-                biounit_id="amanita_muscaria",
+                component_id="amanita_muscaria",
                 description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 proportion="100%"
             )
@@ -214,7 +214,7 @@ class TestOrganicComponentConverter:
             
             # Тестируем валидацию
             service_model = OrganicComponent(
-                biounit_id="amanita_muscaria",
+                component_id="amanita_muscaria",
                 description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 proportion="100%"
             )
@@ -249,7 +249,7 @@ class TestOrganicComponentConverter:
             
             # Тестируем валидацию с валидными данными для создания модели
             service_model = OrganicComponent(
-                biounit_id="amanita_muscaria",
+                component_id="amanita_muscaria",
                 description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 proportion="100%"
             )
@@ -266,7 +266,7 @@ class TestOrganicComponentConverter:
         # Pydantic валидация происходит при создании модели
         with pytest.raises(Exception):  # InvalidCIDError или ValidationError
             api_model = OrganicComponentAPI(
-                biounit_id="amanita_muscaria",
+                component_id="amanita_muscaria",
                 description_cid="invalid_cid",
                 proportion="100%"
             )
@@ -276,7 +276,7 @@ class TestOrganicComponentConverter:
         # Pydantic валидация происходит при создании модели
         with pytest.raises(Exception):  # ValidationError
             api_model = OrganicComponentAPI(
-                biounit_id="amanita_muscaria",
+                component_id="amanita_muscaria",
                 description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 proportion="invalid"
             )
@@ -552,7 +552,7 @@ class TestProductConverter:
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -584,7 +584,7 @@ class TestProductConverter:
             title="Test Product",
             organic_components=[
                 OrganicComponent(
-                    biounit_id="amanita_muscaria",
+                    component_id="amanita_muscaria",
                     description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     proportion="100%"
                 )
@@ -613,7 +613,7 @@ class TestProductConverter:
             title="Test Product",
             organic_components=[
                 OrganicComponentAPI(
-                    biounit_id="amanita_muscaria",
+                    component_id="amanita_muscaria",
                     description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     proportion="100%"
                 )
@@ -642,7 +642,7 @@ class TestProductConverter:
             "title": "Test Product",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
+                    "component_id": "amanita_muscaria",
                     "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                     "proportion": "100%"
                 }
@@ -676,7 +676,7 @@ class TestProductConverter:
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -713,7 +713,7 @@ class TestProductConverter:
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -758,7 +758,7 @@ class TestProductConverter:
                 title="Test Product",
                 organic_components=[
                     OrganicComponentAPI(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -805,7 +805,7 @@ class TestProductConverter:
                 title="Test Product",
                 organic_components=[
                     OrganicComponent(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
@@ -853,7 +853,7 @@ class TestProductConverter:
                 title="Test Product",
                 organic_components=[
                     OrganicComponent(
-                        biounit_id="amanita_muscaria",
+                        component_id="amanita_muscaria",
                         description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         proportion="100%"
                     )
