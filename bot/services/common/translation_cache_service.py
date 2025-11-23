@@ -51,6 +51,7 @@ class TranslationCacheService:
         # Уровни кэширования
         self.memory_cache: Dict[str, CacheEntry] = {}
         self.file_cache_path = self.cache_dir / "translations.json"
+        self.ipfs_cache_path = self.cache_dir / "ipfs.json"
         
         # TTL для разных типов данных
         self.ttl_config = {
@@ -72,6 +73,13 @@ class TranslationCacheService:
         
         # Загружаем файловый кэш при инициализации
         self._load_file_cache()
+        # Прогреваем ipfs-файл (создание директории уже выполнено)
+        if not self.ipfs_cache_path.exists():
+            try:
+                with open(self.ipfs_cache_path, 'w', encoding='utf-8') as f:
+                    json.dump({}, f)
+            except Exception as e:
+                logger.warning(f"[TranslationCacheService] Не удалось подготовить IPFS кэш: {e}")
         
         logger.info(f"[TranslationCacheService] Инициализирован с кэш-директорией: {self.cache_dir}")
     
@@ -105,7 +113,7 @@ class TranslationCacheService:
             return file_result
         
         # 3. Проверяем IPFS Cache (если применимо)
-        if cache_type in ['product', 'component']:
+        if cache_type in ['product', 'component', 'ipfs']:
             ipfs_result = self._get_from_ipfs_cache(key, cache_type)
             if ipfs_result is not None:
                 self.stats['ipfs_hits'] += 1
@@ -133,12 +141,17 @@ class TranslationCacheService:
             True если успешно сохранено
         """
         try:
+            if data is None:
+                logger.warning(f"[TranslationCacheService] Попытка записи None в кэш: key={key}, type={cache_type}")
+                return False
             if ttl is None:
                 ttl = self.ttl_config.get(cache_type, self.default_ttl)
             
             # Сохраняем во все уровни кэша
             self._set_memory_cache(key, data, cache_type, ttl)
             self._set_file_cache(key, data, cache_type, ttl)
+            if cache_type == 'ipfs':
+                self._set_ipfs_cache(key, data, ttl)
             
             logger.debug(f"[TranslationCacheService] Данные сохранены в кэш: {key}, type: {cache_type}")
             return True
@@ -166,6 +179,9 @@ class TranslationCacheService:
             
             # Удаляем из file cache
             self._remove_from_file_cache(key, cache_type)
+            # Удаляем из ipfs cache
+            if cache_type == 'ipfs':
+                self._remove_from_ipfs_cache(key)
             
             logger.debug(f"[TranslationCacheService] Данные удалены из кэша: {key}")
             return True
@@ -189,13 +205,17 @@ class TranslationCacheService:
                 # Очищаем все
                 self.memory_cache.clear()
                 self._clear_file_cache()
+                self._clear_ipfs_cache()
                 logger.info("[TranslationCacheService] Весь кэш очищен")
             else:
                 # Очищаем конкретный тип
                 keys_to_remove = [k for k in self.memory_cache.keys() if k.startswith(f"{cache_type}:")]
                 for key in keys_to_remove:
                     del self.memory_cache[key]
-                self._clear_file_cache_by_type(cache_type)
+                if cache_type == 'ipfs':
+                    self._clear_ipfs_cache()
+                else:
+                    self._clear_file_cache_by_type(cache_type)
                 logger.info(f"[TranslationCacheService] Кэш типа '{cache_type}' очищен")
             
             return True
@@ -305,10 +325,65 @@ class TranslationCacheService:
             logger.error(f"[TranslationCacheService] Ошибка сохранения в файловый кэш: {e}")
     
     def _get_from_ipfs_cache(self, key: str, cache_type: str) -> Optional[Any]:
-        """Получает данные из IPFS cache (заглушка для будущей интеграции)"""
-        # TODO: Интеграция с IPFS для кэширования переводов
-        # Пока возвращаем None - будет реализовано в следующих этапах
+        """Получает данные из IPFS cache (отдельный файловый слой ipfs.json + TTL)"""
+        try:
+            if not self.ipfs_cache_path.exists():
+                logger.debug(f"[TranslationCacheService] IPFS cache MISS (no file): {key}")
+                return None
+            with open(self.ipfs_cache_path, 'r', encoding='utf-8') as f:
+                ipfs_cache = json.load(f)
+            cache_key = f"{cache_type}:{key}"
+            if cache_key in ipfs_cache:
+                entry = ipfs_cache[cache_key]
+                entry_ttl = entry.get('ttl', self.ttl_config.get('ipfs', self.default_ttl))
+                if time.time() - entry.get('timestamp', 0) <= entry_ttl:
+                    logger.debug(f"[TranslationCacheService] IPFS cache HIT: {key}")
+                    return entry.get('data')
+                # TTL истёк — удалить запись
+                logger.debug(f"[TranslationCacheService] IPFS cache EXPIRED: {key}")
+                del ipfs_cache[cache_key]
+                self._save_ipfs_cache(ipfs_cache)
+            else:
+                logger.debug(f"[TranslationCacheService] IPFS cache MISS: {key}")
+            return None
+        except Exception as e:
+            logger.warning(f"[TranslationCacheService] Ошибка чтения IPFS кэша: {e}")
         return None
+
+    def _set_ipfs_cache(self, key: str, data: Any, ttl: Optional[int] = None) -> None:
+        """Сохраняет данные в IPFS cache"""
+        try:
+            if ttl is None:
+                ttl = self.ttl_config.get('ipfs', self.default_ttl)
+            ipfs_cache = {}
+            if self.ipfs_cache_path.exists():
+                with open(self.ipfs_cache_path, 'r', encoding='utf-8') as f:
+                    ipfs_cache = json.load(f)
+            cache_key = f"ipfs:{key}"
+            ipfs_cache[cache_key] = {
+                'data': data,
+                'timestamp': time.time(),
+                'ttl': ttl,
+                'source': 'ipfs'
+            }
+            self._save_ipfs_cache(ipfs_cache)
+            logger.debug(f"[TranslationCacheService] IPFS cache WRITE: {key}, TTL={ttl}s")
+        except Exception as e:
+            logger.warning(f"[TranslationCacheService] Ошибка записи в IPFS кэш: {e}")
+
+    def _remove_from_ipfs_cache(self, key: str) -> None:
+        """Удаляет данные из IPFS cache"""
+        try:
+            if not self.ipfs_cache_path.exists():
+                return
+            with open(self.ipfs_cache_path, 'r', encoding='utf-8') as f:
+                ipfs_cache = json.load(f)
+            cache_key = f"ipfs:{key}"
+            if cache_key in ipfs_cache:
+                del ipfs_cache[cache_key]
+                self._save_ipfs_cache(ipfs_cache)
+        except Exception as e:
+            logger.warning(f"[TranslationCacheService] Ошибка удаления из IPFS кэша: {e}")
     
     def _remove_from_file_cache(self, key: str, cache_type: str) -> None:
         """Удаляет данные из file cache"""
@@ -334,6 +409,17 @@ class TranslationCacheService:
                 self.file_cache_path.unlink()
         except Exception as e:
             logger.error(f"[TranslationCacheService] Ошибка очистки файлового кэша: {e}")
+    
+    def _clear_ipfs_cache(self) -> None:
+        """Очищает весь IPFS файловый кэш"""
+        try:
+            if self.ipfs_cache_path.exists():
+                self.ipfs_cache_path.unlink()
+                # Пересоздаём пустой файл
+                with open(self.ipfs_cache_path, 'w', encoding='utf-8') as f:
+                    json.dump({}, f)
+        except Exception as e:
+            logger.error(f"[TranslationCacheService] Ошибка очистки IPFS кэша: {e}")
     
     def _clear_file_cache_by_type(self, cache_type: str) -> None:
         """Очищает файловый кэш по типу"""
@@ -387,3 +473,11 @@ class TranslationCacheService:
                 json.dump(file_cache, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.error(f"[TranslationCacheService] Ошибка сохранения файлового кэша: {e}")
+    
+    def _save_ipfs_cache(self, ipfs_cache: Dict[str, Any]) -> None:
+        """Сохраняет IPFS кэш"""
+        try:
+            with open(self.ipfs_cache_path, 'w', encoding='utf-8') as f:
+                json.dump(ipfs_cache, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"[TranslationCacheService] Ошибка сохранения IPFS кэша: {e}")

@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any
 from .localization import Localization
 from .product_localization import ProductLocalizationService
 from .component_localization import ComponentLocalizationService
@@ -20,23 +20,78 @@ class LocalizationService(Localization):
     и добавляет поддержку переводов продуктов и компонентов.
     """
     
-    def __init__(self, lang: str = 'ru'):
+    def __init__(
+        self,
+        lang: str = 'ru',
+        cache_service: Any = None,
+        fallback_service: Any = None,
+        ipfs_service: Any = None
+    ):
         """
         Инициализация сервиса локализации
         
         Args:
             lang: Язык локализации (по умолчанию 'ru')
+            cache_service: Сервис кэширования (TranslationCacheService) - используется в ProductLocalizationService
+            fallback_service: Сервис fallback стратегий (FallbackLocalizationService) - используется в ProductLocalizationService
+            ipfs_service: Сервис работы с IPFS (MultilingualIPFSService) - содержит все зависимости включая blockchain_gateway
         """
         logger.info(f"[LocalizationService] Инициализация с языком: {lang}")
         
         # Инициализируем базовый Localization
         super().__init__(lang)
         
+        # Храним зависимости для переиспользования при смене языка
+        self._deps: Dict[str, Any] = {
+            "cache_service": cache_service,
+            "fallback_service": fallback_service,
+            "ipfs_service": ipfs_service
+        }
         # Инициализируем сервисы для продуктов и компонентов
-        self.product_localization = ProductLocalizationService(lang)
-        self.component_localization = ComponentLocalizationService(lang)
+        self._build_children(self.lang)
         
         logger.info("[LocalizationService] Сервисы локализации инициализированы")
+
+    def _build_children(self, lang: str) -> None:
+        """
+        Создаёт/пересоздаёт дочерние сервисы с заданным языком и сохранёнными зависимостями.
+        """
+        logger.debug(f"[LocalizationService] Построение дочерних сервисов для языка: {lang}")
+        self.product_localization = ProductLocalizationService(
+            lang,
+            cache_service=self._deps.get("cache_service"),
+            fallback_service=self._deps.get("fallback_service"),
+            ipfs_service=self._deps.get("ipfs_service"),
+        )
+        self.component_localization = ComponentLocalizationService(
+            lang,
+            cache_service=self._deps.get("cache_service"),
+            fallback_service=self._deps.get("fallback_service"),
+            ipfs_service=self._deps.get("ipfs_service"),
+        )
+
+    def switch_language(self, lang: str) -> None:
+        """
+        Переключает язык рантайм: обновляет текущий язык и пересобирает дочерние сервисы.
+        Инвалидирует кэши и перезагружает fallback-данные.
+        """
+        try:
+            if not self.is_language_supported(lang):
+                logger.warning(f"[LocalizationService] Неподдерживаемый язык: {lang}")
+                return
+            logger.debug(f"[LocalizationService] Переключение языка: {self.lang} → {lang}")
+            self.lang = lang
+            # Пересоздаём дочерние сервисы с новым языком
+            self._build_children(lang)
+            # Инвалидируем кэши на всякий случай
+            if hasattr(self.product_localization, "clear_cache"):
+                self.product_localization.clear_cache()
+            if hasattr(self.component_localization, "clear_cache"):
+                self.component_localization.clear_cache()
+            logger.info(f"[LocalizationService] Язык переключён на: {lang}")
+        except Exception as e:
+            logger.error(f"[LocalizationService] Ошибка при переключении языка на '{lang}': {e}")
+            raise
     
     def t(self, key: str, default: Optional[str] = None, **kwargs) -> str:
         """
@@ -68,11 +123,12 @@ class LocalizationService(Localization):
                 return self.component_localization.get_translation(key, default, **kwargs)
             
             else:
-                # Интерфейсные переводы - используем базовый функционал
-                logger.debug("[LocalizationService] Обработка как интерфейсный перевод")
-                # ✅ ИСПРАВЛЕНИЕ: Localization.t() принимает только key, без default
+                # Интерфейсные переводы — быстрый путь без лишнего логирования базового класса
+                value = self._fast_lookup_interface(key)
+                if isinstance(value, str):
+                    return value
+                # fallback на базовую реализацию, если структура изменена
                 result = super().t(key)
-                # Если результат равен ключу (fallback), используем default
                 if result == key and default is not None:
                     return default
                 return result
@@ -80,6 +136,24 @@ class LocalizationService(Localization):
         except Exception as e:
             logger.error(f"[LocalizationService] Ошибка при получении перевода '{key}': {e}")
             return default or key
+    
+    def _fast_lookup_interface(self, key: str) -> Optional[str]:
+        """
+        Быстрый поиск интерфейсного ключа по self.labels, избегая лишних логов базового класса.
+        """
+        try:
+            parts = key.split('.')
+            if not parts or not isinstance(self.labels, dict):
+                return None
+            node: Any = self.labels
+            for part in parts:
+                if isinstance(node, dict) and part in node:
+                    node = node[part]
+                else:
+                    return None
+            return node if isinstance(node, str) else None
+        except Exception:
+            return None
     
     def get_product_translation(self, business_id: str, field: str, default: Optional[str] = None, **kwargs) -> str:
         """
@@ -97,12 +171,12 @@ class LocalizationService(Localization):
         key = f"product.{business_id}.{field}"
         return self.t(key, default, **kwargs)
     
-    def get_component_translation(self, biounit_id: str, field: str, default: Optional[str] = None, **kwargs) -> str:
+    def get_component_translation(self, component_id: str, field: str, default: Optional[str] = None, **kwargs) -> str:
         """
         Получает перевод поля компонента
         
         Args:
-            biounit_id: ID биологической единицы (например, 'amanita_muscaria')
+            component_id: ID биологической единицы (например, 'amanita_muscaria')
             field: Поле для перевода (например, 'common_name', 'generic_description')
             default: Значение по умолчанию
             **kwargs: Параметры для подстановки
@@ -110,7 +184,7 @@ class LocalizationService(Localization):
         Returns:
             str: Переведенный текст
         """
-        key = f"component.{biounit_id}.{field}"
+        key = f"component.{component_id}.{field}"
         return self.t(key, default, **kwargs)
     
     def set_product_data(self, business_id: str, language: str, data: Dict[str, Any]) -> None:
@@ -125,17 +199,17 @@ class LocalizationService(Localization):
         logger.info(f"[LocalizationService] Установка данных продукта: {business_id}, язык: {language}")
         self.product_localization.set_data(business_id, language, data)
     
-    def set_component_data(self, biounit_id: str, language: str, data: Dict[str, Any]) -> None:
+    def set_component_data(self, component_id: str, language: str, data: Dict[str, Any]) -> None:
         """
         Устанавливает данные перевода компонента
         
         Args:
-            biounit_id: ID биологической единицы
+            component_id: ID биологической единицы
             language: Язык перевода
             data: Словарь с переводами полей
         """
-        logger.info(f"[LocalizationService] Установка данных компонента: {biounit_id}, язык: {language}")
-        self.component_localization.set_data(biounit_id, language, data)
+        logger.info(f"[LocalizationService] Установка данных компонента: {component_id}, язык: {language}")
+        self.component_localization.set_data(component_id, language, data)
     
     def get_supported_languages(self) -> list:
         """

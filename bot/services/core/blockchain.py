@@ -38,10 +38,26 @@ def load_abi(contract_name):
     Универсальная загрузка ABI с подробным логированием:
     - Если ABI лежит в формате Hardhat: <base_dir>/<ContractName>.sol/<ContractName>.json
     - Если ABI лежит в плоской папке: <base_dir>/<ContractName>.json
+    - Для UUPS контрактов: используется Logic ABI (OrganicComponentRegistryLogic, etc.)
     """
-    hh_path = os.path.join(ABI_BASE_DIR, f"{contract_name}.sol", f"{contract_name}.json")
-    flat_path = os.path.join(ABI_BASE_DIR, f"{contract_name}.json")
+    # UUPS контракты — используем Logic ABI
+    uups_contracts = {
+        "OrganicComponentRegistry": "OrganicComponentRegistryLogic",
+        "SpiralEngine": "SpiralEngineLogic",
+        "ProductRegistry": "ProductRegistryLogic",
+        "AmanitaInternational": "AmanitaInternationalLogic"
+    }
+    
+    # Если это UUPS контракт, загружаем Logic ABI
+    actual_contract_name = uups_contracts.get(contract_name, contract_name)
+    
+    hh_path = os.path.join(ABI_BASE_DIR, f"{actual_contract_name}.sol", f"{actual_contract_name}.json")
+    flat_path = os.path.join(ABI_BASE_DIR, f"{actual_contract_name}.json")
 
+    # Логируем если используется Logic ABI для UUPS
+    if actual_contract_name != contract_name:
+        print(f"[ABI] {contract_name} — UUPS контракт, используем {actual_contract_name} ABI")
+    
     print(f"[ABI] Проверка путей для {contract_name}:")
     print(f"  - Hardhat: {hh_path} {'✅' if os.path.exists(hh_path) else '❌'}")
     print(f"  - Flat:    {flat_path} {'✅' if os.path.exists(flat_path) else '❌'}")
@@ -241,7 +257,7 @@ class BlockchainService:
             contracts = {}
             
             # Получаем список всех контрактов из реестра
-            contract_names = ["SpiralEngine", "ProductRegistry", "SoulIdentity"]
+            contract_names = ["SpiralEngine", "ProductRegistry", "OrganicComponentRegistry", "SoulIdentity", "AmanitaInternational"]
             
             for name in contract_names:
                 try:
@@ -892,4 +908,224 @@ class BlockchainService:
         except Exception as e:
             logger.error(f"[Web3] Ошибка при парсинге логов ProductCreated: {e}")
             return None
+
+    # ==========================================
+    # OrganicComponentRegistry Methods
+    # ==========================================
+
+    def get_component(self, component_id: str) -> Optional[dict]:
+        """
+        Получает компонент по business ID из OrganicComponentRegistry
+        
+        Args:
+            component_id: Business ID компонента (например, "amanita_muscaria")
+            
+        Returns:
+            dict: Данные компонента (id, businessId, creator, rootMetadataCID, active, createdAt)
+            None: Если компонент не найден или произошла ошибка
+        """
+        try:
+            component = self._call_contract_read_function(
+                "OrganicComponentRegistry",
+                "getComponentByBusinessId",
+                None,
+                component_id
+            )
+            if component:
+                logger.info(f"Got component '{component_id}' from blockchain")
+            else:
+                logger.warning(f"Component '{component_id}' not found")
+            return component
+        except Exception as e:
+            logger.error(f"Error getting component '{component_id}': {e}")
+            return None
+
+    def get_component_root_metadata(self, component_id: str) -> Optional[str]:
+        """
+        Получает rootMetadataCID компонента из отдельного mapping в контракте.
+
+        Contract function: getComponentRootMetadata(string businessId)
+
+        Args:
+            component_id: Business ID компонента (например, "amanita_muscaria")
+
+        Returns:
+            str | None: IPFS/Arweave CID (например, "oFR4QDLvuputh_8XJSRtAu-Rfgxx-1aGXy32MlV9DI4")
+        """
+
+        try:
+            cid = self._call_contract_read_function(
+                "OrganicComponentRegistry",
+                "getComponentRootMetadata",
+                None,
+                component_id,
+            )
+
+            if cid:
+                logger.info(
+                    "Got root CID for component '%s': %s...",
+                    component_id,
+                    cid[:20],
+                )
+            else:
+                logger.warning(
+                    "No root CID for component '%s'",
+                    component_id,
+                )
+
+            return cid if cid else None
+
+        except Exception as e:
+            logger.error(
+                "Error getting root CID for '%s': %s",
+                component_id,
+                e,
+            )
+            return None
+
+    def get_component_business_id(self, blockchain_id: int) -> Optional[str]:
+        """
+        Получает businessId компонента по его числовому ID из контракта.
+
+        Contract mapping: componentBusinessIds (public auto-getter)
+
+        Args:
+            blockchain_id: Числовой ID компонента в реестре
+
+        Returns:
+            str | None: Business ID (например, "amanita_muscaria")
+        """
+
+        try:
+            business_id = self._call_contract_read_function(
+                "OrganicComponentRegistry",
+                "componentBusinessIds",
+                None,
+                blockchain_id,
+            )
+
+            if business_id:
+                logger.info(
+                    "Got business_id for component ID %s: %s",
+                    blockchain_id,
+                    business_id,
+                )
+            else:
+                logger.warning(
+                    "No business_id for component ID %s",
+                    blockchain_id,
+                )
+
+            return business_id if business_id else None
+
+        except Exception as e:
+            logger.error(
+                "Error getting business_id for ID %s: %s",
+                blockchain_id,
+                e,
+            )
+            return None
+
+    def component_exists(self, component_id: str) -> bool:
+        """
+        Проверяет существование компонента по business ID
+        
+        Args:
+            component_id: Business ID компонента
+            
+        Returns:
+            bool: True если компонент существует, False иначе
+        """
+        try:
+            exists = self._call_contract_read_function(
+                "OrganicComponentRegistry",
+                "componentExists",
+                False,
+                component_id
+            )
+            logger.info(f"Component '{component_id}' exists: {exists}")
+            return exists
+        except Exception as e:
+            logger.error(f"Error checking component existence '{component_id}': {e}")
+            return False
+
+    def get_component_root_metadata_cid(self, component_id: str) -> Optional[str]:
+        """
+        Получает CID корневых метаданных компонента из Arweave
+        
+        Args:
+            component_id: Business ID компонента
+            
+        Returns:
+            str: Arweave transaction ID (CID) метаданных
+            None: Если компонент не найден или произошла ошибка
+        """
+        try:
+            # Сначала получаем полные данные компонента
+            component = self.get_component(component_id)
+            if not component:
+                logger.warning(f"Cannot get CID: component '{component_id}' not found")
+                return None
+            
+            # Извлекаем rootMetadataCID из структуры Component
+            # Component structure: (id, businessId, creator, rootMetadataCID, active, createdAt)
+            if isinstance(component, (list, tuple)) and len(component) >= 4:
+                cid = component[3]  # rootMetadataCID is 4th field (index 3)
+                logger.info(f"Component '{component_id}' root metadata CID: {cid}")
+                return cid
+            elif isinstance(component, dict):
+                cid = component.get('rootMetadataCID')
+                logger.info(f"Component '{component_id}' root metadata CID: {cid}")
+                return cid
+            else:
+                logger.error(f"Unexpected component structure for '{component_id}': {type(component)}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting component CID '{component_id}': {e}")
+            return None
+
+    def get_all_components(self) -> List[dict]:
+        """
+        Получает все компоненты из OrganicComponentRegistry
+        
+        Returns:
+            List[dict]: Список всех компонентов
+        """
+        try:
+            # Получаем общее количество компонентов
+            total = self._call_contract_read_function(
+                "OrganicComponentRegistry",
+                "totalComponents",
+                0
+            )
+            logger.info(f"Total components in registry: {total}")
+            
+            components = []
+            # Перебираем все ID (начиная с 1, так как 0 обычно reserved)
+            for i in range(1, total + 1):
+                try:
+                    # Получаем business_id по blockchain ID
+                    business_id = self._call_contract_read_function(
+                        "OrganicComponentRegistry",
+                        "componentBusinessIds",
+                        None,
+                        i
+                    )
+                    
+                    if business_id:
+                        # Получаем полные данные компонента
+                        component = self.get_component(business_id)
+                        if component:
+                            components.append(component)
+                except Exception as e:
+                    logger.warning(f"Error getting component at index {i}: {e}")
+                    continue
+            
+            logger.info(f"Retrieved {len(components)} components from blockchain")
+            return components
+            
+        except Exception as e:
+            logger.error(f"Error getting all components: {e}")
+            return []
 
