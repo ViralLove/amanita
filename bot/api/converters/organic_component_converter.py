@@ -41,7 +41,7 @@ class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicCompon
             
             # Создаем Service модель
             service_model = OrganicComponent(
-                biounit_id=api_model.biounit_id,
+                component_id=api_model.component_id,
                 description_cid=api_model.description_cid,
                 proportion=api_model.proportion
             )
@@ -75,7 +75,7 @@ class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicCompon
             
             # Создаем API модель
             api_model = OrganicComponentAPI(
-                biounit_id=service_model.biounit_id,
+                component_id=service_model.component_id,
                 description_cid=service_model.description_cid,
                 proportion=service_model.proportion
             )
@@ -109,7 +109,7 @@ class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicCompon
             
             # Конвертируем в словарь
             return {
-                "biounit_id": api_model.biounit_id,
+                "component_id": api_model.component_id,
                 "description_cid": api_model.description_cid,
                 "proportion": api_model.proportion
             }
@@ -132,14 +132,14 @@ class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicCompon
         """
         try:
             # Проверяем наличие обязательных полей
-            required_fields = ["biounit_id", "description_cid", "proportion"]
+            required_fields = ["component_id", "description_cid", "proportion"]
             for field in required_fields:
                 if field not in data:
                     raise ValueError(f"Отсутствует обязательное поле: {field}")
             
             # Создаем API модель
             api_model = OrganicComponentAPI(
-                biounit_id=data["biounit_id"],
+                component_id=data["component_id"],
                 description_cid=data["description_cid"],
                 proportion=data["proportion"]
             )
@@ -166,13 +166,13 @@ class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicCompon
         try:
             # Конвертируем API модель в словарь для валидации
             data = {
-                'biounit_id': api_model.biounit_id,
+                'component_id': api_model.component_id,
                 'description_cid': api_model.description_cid,
                 'proportion': api_model.proportion
             }
             
-            # Валидируем biounit_id (обязательное поле)
-            if not data['biounit_id'] or not data['biounit_id'].strip():
+            # Валидируем component_id (обязательное поле)
+            if not data['component_id'] or not data['component_id'].strip():
                 return False
             
             # Валидируем description_cid через CIDValidator
@@ -205,13 +205,13 @@ class OrganicComponentConverter(BaseConverter[OrganicComponentAPI, OrganicCompon
         try:
             # Конвертируем Service модель в словарь для валидации
             data = {
-                'biounit_id': service_model.biounit_id,
+                'component_id': service_model.component_id,
                 'description_cid': service_model.description_cid,
                 'proportion': service_model.proportion
             }
             
-            # Валидируем biounit_id (обязательное поле)
-            if not data['biounit_id'] or not data['biounit_id'].strip():
+            # Валидируем component_id (обязательное поле)
+            if not data['component_id'] or not data['component_id'].strip():
                 return False
             
             # Валидируем description_cid через CIDValidator

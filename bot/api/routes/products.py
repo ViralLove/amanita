@@ -100,7 +100,7 @@ async def get_seller_catalog(
                     "cover_image_url": product.cover_image_url,
                     "organic_components": [
                         {
-                            "biounit_id": component.biounit_id,
+                            "component_id": component.component_id,
                             "description_cid": component.description_cid,
                             "proportion": component.proportion
                         } for component in product.organic_components

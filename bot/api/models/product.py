@@ -32,20 +32,20 @@ class OrganicComponentAPI(BaseModel):
     Pydantic модель для API схемы органического компонента
     
     Attributes:
-        biounit_id (str): Уникальный идентификатор биологической единицы
+        component_id (str): Уникальный идентификатор биологической единицы
         description_cid (str): CID описания биоединицы в IPFS
         proportion (str): Пропорция компонента (например, "50%", "100g", "30ml")
     """
-    biounit_id: str = Field(..., min_length=1, description="Уникальный идентификатор биологической единицы")
+    component_id: str = Field(..., min_length=1, description="Уникальный идентификатор биологической единицы")
     description_cid: str = Field(..., min_length=1, description="CID описания биоединицы в IPFS")
     proportion: str = Field(..., min_length=1, description="Пропорция компонента (например, '50%', '100g', '30ml')")
     
-    @field_validator('biounit_id')
+    @field_validator('component_id')
     @classmethod
-    def validate_biounit_id(cls, v):
-        """Валидация biounit_id"""
+    def validate_component_id(cls, v):
+        """Валидация component_id"""
         if not v or not v.strip():
-            raise ValueError("biounit_id: Поле обязательно для заполнения")
+            raise ValueError("component_id: Поле обязательно для заполнения")
         return v.strip()
     
     @field_validator('description_cid')
@@ -85,7 +85,7 @@ class OrganicComponentAPI(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "biounit_id": "amanita_muscaria",
+                "component_id": "amanita_muscaria",
                 "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                 "proportion": "100%"
             }
@@ -145,11 +145,11 @@ class ProductUploadIn(BaseModel):
             if not isinstance(component, OrganicComponentAPI):
                 raise ValueError(f"organic_components[{i}]: Должен быть экземпляром OrganicComponentAPI, получен: {type(component)}")
         
-        # Проверяем уникальность biounit_id
-        biounit_ids = [comp.biounit_id for comp in v]
-        if len(biounit_ids) != len(set(biounit_ids)):
-            duplicate_ids = [bid for bid in set(biounit_ids) if biounit_ids.count(bid) > 1]
-            raise ValueError(f"organic_components: biounit_id должен быть уникальным. Дублирующиеся ID: {duplicate_ids}")
+        # Проверяем уникальность component_id
+        component_ids = [comp.component_id for comp in v]
+        if len(component_ids) != len(set(component_ids)):
+            duplicate_ids = [bid for bid in set(component_ids) if component_ids.count(bid) > 1]
+            raise ValueError(f"organic_components: component_id должен быть уникальным. Дублирующиеся ID: {duplicate_ids}")
         
         return v
 
@@ -218,7 +218,7 @@ class ProductUploadIn(BaseModel):
         
         component_summaries = []
         for comp in self.organic_components:
-            component_summaries.append(f"{comp.biounit_id} ({comp.proportion})")
+            component_summaries.append(f"{comp.component_id} ({comp.proportion})")
         
         return ", ".join(component_summaries)
     
@@ -229,7 +229,7 @@ class ProductUploadIn(BaseModel):
                 "title": "Amanita Muscaria — Powder",
                 "organic_components": [
                     {
-                        "biounit_id": "amanita_muscaria",
+                        "component_id": "amanita_muscaria",
                         "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         "proportion": "100%"
                     }
@@ -299,11 +299,11 @@ class ProductUpdateIn(BaseModel):
                 if not isinstance(component, OrganicComponentAPI):
                     raise ValueError(f"organic_components[{i}]: Должен быть экземпляром OrganicComponentAPI, получен: {type(component)}")
             
-            # Проверяем уникальность biounit_id
-            biounit_ids = [comp.biounit_id for comp in v]
-            if len(biounit_ids) != len(set(biounit_ids)):
-                duplicate_ids = [bid for bid in set(biounit_ids) if biounit_ids.count(bid) > 1]
-                raise ValueError(f"organic_components: biounit_id должен быть уникальным. Дублирующиеся ID: {duplicate_ids}")
+            # Проверяем уникальность component_id
+            component_ids = [comp.component_id for comp in v]
+            if len(component_ids) != len(set(component_ids)):
+                duplicate_ids = [bid for bid in set(component_ids) if component_ids.count(bid) > 1]
+                raise ValueError(f"organic_components: component_id должен быть уникальным. Дублирующиеся ID: {duplicate_ids}")
         
         return v
 
@@ -332,7 +332,7 @@ class ProductUpdateIn(BaseModel):
                 "title": "Amanita Muscaria — Premium Powder",
                 "organic_components": [
                     {
-                        "biounit_id": "amanita_muscaria",
+                        "component_id": "amanita_muscaria",
                         "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
                         "proportion": "100%"
                     }
@@ -386,13 +386,13 @@ class ProductCreateFromDict(BaseModel):
             if not isinstance(component, dict):
                 raise ValueError(f"organic_components[{i}]: Должен быть словарем, получен: {type(component)}")
             
-            required_fields = ['biounit_id', 'description_cid', 'proportion']
+            required_fields = ['component_id', 'description_cid', 'proportion']
             for field in required_fields:
                 if field not in component:
                     raise ValueError(f"organic_components[{i}]: Отсутствует обязательное поле '{field}'")
             
-            if not component['biounit_id'] or not str(component['biounit_id']).strip():
-                raise ValueError(f"organic_components[{i}].biounit_id: Поле обязательно для заполнения")
+            if not component['component_id'] or not str(component['component_id']).strip():
+                raise ValueError(f"organic_components[{i}].component_id: Поле обязательно для заполнения")
             
             if not component['description_cid'] or not str(component['description_cid']).strip():
                 raise ValueError(f"organic_components[{i}].description_cid: Поле обязательно для заполнения")
@@ -400,11 +400,11 @@ class ProductCreateFromDict(BaseModel):
             if not component['proportion'] or not str(component['proportion']).strip():
                 raise ValueError(f"organic_components[{i}].proportion: Поле обязательно для заполнения")
         
-        # Проверяем уникальность biounit_id
-        biounit_ids = [comp['biounit_id'] for comp in v]
-        if len(biounit_ids) != len(set(biounit_ids)):
-            duplicate_ids = [bid for bid in set(biounit_ids) if biounit_ids.count(bid) > 1]
-            raise ValueError(f"organic_components: biounit_id должен быть уникальным. Дублирующиеся ID: {duplicate_ids}")
+        # Проверяем уникальность component_id
+        component_ids = [comp['component_id'] for comp in v]
+        if len(component_ids) != len(set(component_ids)):
+            duplicate_ids = [bid for bid in set(component_ids) if component_ids.count(bid) > 1]
+            raise ValueError(f"organic_components: component_id должен быть уникальным. Дублирующиеся ID: {duplicate_ids}")
         
         return v
 
@@ -454,7 +454,7 @@ class ProductCreateFromDict(BaseModel):
         
         component_summaries = []
         for comp in self.organic_components:
-            component_summaries.append(f"{comp['biounit_id']} ({comp['proportion']})")
+            component_summaries.append(f"{comp['component_id']} ({comp['proportion']})")
         
         return ", ".join(component_summaries)
     
@@ -465,7 +465,7 @@ class ProductCreateFromDict(BaseModel):
                 "title": "Test Product",
                 "organic_components": [
                     {
-                        "biounit_id": "test_component",
+                        "component_id": "test_component",
                         "description_cid": "QmTestCID0011234567890123456789012345678901234567890",
                         "proportion": "100%"
                     }

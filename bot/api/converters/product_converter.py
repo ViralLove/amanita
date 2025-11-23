@@ -205,7 +205,7 @@ class ProductConverter(BaseConverter[ProductUploadIn, Product]):
                 'title': service_model.title,
                 'organic_components': [
                     {
-                        'biounit_id': component.biounit_id,
+                        'component_id': component.component_id,
                         'description_cid': component.description_cid,
                         'proportion': component.proportion
                     }
