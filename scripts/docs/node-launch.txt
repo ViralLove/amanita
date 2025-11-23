@@ -61,16 +61,18 @@ DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
 #   Invite #1 (для Action 555): _________________________
 #   Invite #2 (для Action 888): _________________________
 
-# 5. Загрузка компонентов (с реальными CID)
+# 5. Загрузка компонентов + активация seller (БЕЗ роли активатора)
 DEPLOY_ACTION=555 DEPLOYER_INVITE=<PASTE_INVITE_1_HERE> \
 npx hardhat run scripts/deploy_full.js --network localhost
 
 # Пример (НЕ КОПИРОВАТЬ, использовать свой invite!):
-DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-9Z1P-I5WM npx hardhat run scripts/deploy_full.js --network localhost
+DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-F9X1-13MD npx hardhat run scripts/deploy_full.js --network localhost
 
 # ✓ ОЖИДАЕТСЯ В ЛОГАХ:
+#   → Seller активирован в SpiralEngine ✅
+#   → Seller получил SELLER_ROLE ✅
 #   → CID источник: arweave_state (переиспользование) ✅
-#   → Компоненты регистрируются с РЕАЛЬНЫМИ Arweave CID
+#   → Компоненты регистрируются с РЕАЛЬНЫМИ Arweave CID ✅
 
 # ✓ ВАЛИДАЦИЯ КОМПОНЕНТОВ (после Action 555):
 node scripts/validate_component_upload.js --component amanita_muscaria --network localhost
@@ -79,7 +81,21 @@ for comp in data/components/*; do
   [ -d "$comp" ] && node scripts/validate_component_upload.js --component $(basename $comp) --network localhost
 done
 
-5.a Инициализация каталога
+# 5.1 🔑 КРИТИЧЕСКИЙ ШАГ: Назначение ACTIVATOR_ROLE для seller
+# ⚠️ БЕЗ ЭТОГО ШАГА ОНБОРДИНГ НЕ РАБОТАЕТ!
+DEPLOY_ACTION=9 npx hardhat run scripts/deploy_full.js --network localhost
+
+# ✓ ОЖИДАЕТСЯ В ЛОГАХ:
+#   → ACTIVATOR_ROLE назначена успешно ✅
+#   → Verification passed ✅
+
+# ✓ ПРОВЕРКА РОЛЕЙ:
+DEPLOY_ACTION=13 npx hardhat run scripts/deploy_full.js --network localhost
+# Ожидается в выводе:
+#   SELLER_ROLE: ✅ Есть
+#   ACTIVATOR_ROLE: ✅ Есть
+
+# 5.2 Инициализация каталога
 DEPLOY_ACTION=444 npx hardhat run scripts/deploy_full.js --network localhost
 
 # ✓ ВАЛИДАЦИЯ КАТАЛОГА (после Action 444):
@@ -159,9 +175,13 @@ DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
 
 # → Скопировать 2 invites из вывода
 
-# Затем с real invites:
+# Затем с real invites (полная цепочка):
 DEPLOY_ACTION=555 DEPLOYER_INVITE=<INVITE_1> npx hardhat run scripts/deploy_full.js --network localhost && \
+DEPLOY_ACTION=9 npx hardhat run scripts/deploy_full.js --network localhost && \
+DEPLOY_ACTION=444 npx hardhat run scripts/deploy_full.js --network localhost && \
 DEPLOY_ACTION=888 DEPLOYER_INVITE=<INVITE_2> npx hardhat run scripts/deploy_full.js --network localhost
+
+# ⚠️ ВАЖНО: Action 9 назначает ACTIVATOR_ROLE — БЕЗ НЕГО ОНБОРДИНГ НЕ РАБОТАЕТ!
 
 # ========================================
 # ВАЛИДАЦИЯ РЕЗУЛЬТАТА
@@ -234,6 +254,12 @@ jq '.validation_report.summary.quality_score' validation_report.json
 #   → Проверить DEPLOYER_INVITE корректный (из Шага 4)
 #   → Проверить SELLER_ADDRESS, SELLER_PRIVATE_KEY в .env
 #   → Проверить _upload_state_*.json существуют (для keep-cids)
+
+# 🔴 Если онбординг в боте падает с AccessControlUnauthorizedAccount:
+#   → ПРИЧИНА: Seller НЕ имеет ACTIVATOR_ROLE!
+#   → ПРОВЕРКА: DEPLOY_ACTION=13 npx hardhat run scripts/deploy_full.js --network localhost
+#   → РЕШЕНИЕ: DEPLOY_ACTION=9 npx hardhat run scripts/deploy_full.js --network localhost
+#   → ВАЖНО: Action 9 (Шаг 5.1) ОБЯЗАТЕЛЕН после каждого node restart!
 
 # Если Шаг 6 провалился:
 #   → Проверить DEPLOYER_INVITE ДРУГОЙ (не тот же что в Шаге 5!)

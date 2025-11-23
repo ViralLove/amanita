@@ -1274,3 +1274,24 @@ DEPLOY_ACTION=555 DEPLOYER_INVITE=XXXX node scripts/deploy_full.js 555
 - ✅ **UUPS upgradeable contracts (v3.0)** для долгосрочной эволюции экосистемы
 - ✅ **Component-based architecture (v3.1)** для масштабируемого каталога
 - ⚠️ **Development mode** - Action 555 с placeholder CIDs (production требует upload_all_components.js)
+
+Готовность к production:Вставить после строки 1266
++### 🔁 Критический порядок для MVP (Regression Priority)
++Для минимального жизнеспособного релиза (MVP) обязательно прогоняйте действия в следующей последовательности:
++
++1. **Action 0** — деплой `MagicRegistry` (если сеть пустая).
++2. **Action 1** — полный деплой экосистемы (UUPS + SBT + связи).
++3. **Action 2** — повторная настройка связей; подтверждает корректность после деплоя.
++4. **Action 777** — генерация рутовых инвайтов.
++5. **Action 555** — загрузка компонентов (component-based архитектура).
++6. **Action 444** — автоматический каталог-пайплайн; включает вложенные шаги `41 → 42 → 43`.
++7. **Action 888** — полный end-to-end pipeline для seller (опирается на предыдущие шаги).
++
++🧪 **Тестовое покрытие:** все перечисленные действия имеют e2e-тесты (deploy/actions, component/actions, catalog/actions, full/action888). Выполняйте проверки именно в указанном порядке — каждый шаг опирается на артефакты предыдущего.
++
++✅ **Последние успешные прогоны:**
++- 2025-11-13 12:48 (UTC) — e2e `Action 0`, `Action 1`, `Action 2` (зелёные).
++- 2025-11-13 12:52 (UTC) — e2e `Action 777` (генерация рутовых инвайтов, 12 кодов).
++- 2025-11-13 12:54 (UTC) — e2e `Action 555` (component upload, placeholders + error cases).
++- 2025-11-13 12:56 (UTC) — e2e `Action 444` (automatic pipeline CSV → JSON → CID, 3 продукта, rollback-гард).
++- Остальные этапы (888) запланированы к проверке после закрепления ролей/инфраструктуры.
