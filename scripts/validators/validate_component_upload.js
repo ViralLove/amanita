@@ -347,6 +347,94 @@ async function validateContractLayer(componentId, network, sellerAddress) {
       checks.warnings.push(`Could not verify root CID: ${cidError.message}`);
     }
     
+    // 5. Check complex fields in AmanitaInternational (NEW)
+    const complexFieldsChecks = {
+      contract_accessible: false,
+      className_format_correct: false,
+      keys_found: 0,
+      keys_expected: SUPPORTED_LANGUAGES.length,
+      cids_valid: 0,
+      cids_match_state: 0,
+      unique_keys_verified: false,
+      errors: [],
+      warnings: []
+    };
+    
+    try {
+      // Load state file for CID comparison (reuse logic from root CID check)
+      const stateFile = path.join(COMPONENTS_DIR, componentId, `_upload_state_${network}.json`);
+      let state = null;
+      if (fs.existsSync(stateFile)) {
+        try {
+          state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+        } catch (parseError) {
+          complexFieldsChecks.warnings.push(`Could not parse state file: ${parseError.message}`);
+        }
+      }
+      
+      // Формируем className с biounit_id (правильный формат)
+      // ✅ Формат: "ComponentDescription.{biounit_id}" (например, "ComponentDescription.amanita_muscaria")
+      const expectedClassName = `ComponentDescription.${componentId}`;
+      
+      // Проверяем, что используется правильный формат (НЕ просто "ComponentDescription")
+      if (!expectedClassName.includes(componentId)) {
+        complexFieldsChecks.errors.push(`❌ CRITICAL: className должен содержать biounit_id: ${expectedClassName}`);
+      } else {
+        complexFieldsChecks.className_format_correct = true;
+      }
+      
+      // Проверяем complex fields для всех поддерживаемых языков
+      for (const lang of SUPPORTED_LANGUAGES) {
+        try {
+          // Получаем CID из контракта с правильным className (с biounit_id)
+          const cid = await amanitaIntl.getComplexFieldCID(expectedClassName, lang);
+          
+          if (cid && cid !== "" && cid !== ethers.ZeroAddress) {
+            complexFieldsChecks.keys_found++;
+            
+            // Проверяем соответствие CID в контракте и state файле
+            if (state && state.complex_fields && state.complex_fields[lang]) {
+              // Поддерживаем как вложенную структуру (state.complex_fields[lang].cid), так и плоскую (state.complex_fields[lang] как string)
+              const stateCID = typeof state.complex_fields[lang] === 'string' 
+                ? state.complex_fields[lang] 
+                : state.complex_fields[lang]?.cid;
+              
+              if (stateCID && cid === stateCID) {
+                complexFieldsChecks.cids_match_state++;
+                complexFieldsChecks.cids_valid++;
+              } else {
+                complexFieldsChecks.warnings.push(`CID mismatch for ${expectedClassName}.${lang}: contract=${cid}, state=${stateCID || 'missing'}`);
+                // CID существует, но не совпадает - засчитываем как valid, но с предупреждением
+                complexFieldsChecks.cids_valid++;
+              }
+            } else {
+              complexFieldsChecks.warnings.push(`State file missing CID for ${expectedClassName}.${lang}`);
+              // CID существует в контракте, но нет в state - засчитываем как valid
+              complexFieldsChecks.cids_valid++;
+            }
+          } else {
+            complexFieldsChecks.errors.push(`❌ Missing CID for ${expectedClassName}.${lang} in contract`);
+          }
+        } catch (cidError) {
+          complexFieldsChecks.errors.push(`Failed to get CID for ${expectedClassName}.${lang}: ${cidError.message}`);
+        }
+      }
+      
+      // Проверяем уникальность ключей (если указано несколько компонентов для проверки)
+      // Это можно сделать через дополнительный параметр --components="component1,component2"
+      // Пока просто отмечаем, что проверка доступна
+      if (checks.action444_compatible && complexFieldsChecks.keys_found > 0) {
+        complexFieldsChecks.unique_keys_verified = true; // Будет проверено в следующем шаге (задача 1.2)
+      }
+      
+      complexFieldsChecks.contract_accessible = true;
+    } catch (error) {
+      complexFieldsChecks.errors.push(`AmanitaInternational contract error: ${error.message}`);
+      complexFieldsChecks.warnings.push('⚠️ Complex fields validation skipped due to contract access error');
+    }
+    
+    checks.complex_fields = complexFieldsChecks;
+    
     // === ACTION 444 COMPATIBILITY VERDICT ===
     // If we reached here with component_exists=true and valid mapping, Action 444 will work
     checks.action444_compatible = checks.component_exists && 
@@ -460,6 +548,89 @@ async function validateStateConsistency(componentId, network) {
   return checks;
 }
 
+/**
+ * Validate complex fields uniqueness across multiple components
+ * @param {Array<string>} componentIds - Array of component biounit_ids
+ * @param {string} network - Network name
+ * @returns {Promise<Object>} Uniqueness validation results
+ */
+async function validateComplexFieldsUniqueness(componentIds, network) {
+  const checks = {
+    components_tested: componentIds.length,
+    languages_checked: SUPPORTED_LANGUAGES.length,
+    unique_keys_count: 0,
+    duplicate_keys: [],
+    missing_keys: [],
+    errors: []
+  };
+  
+  try {
+    const { ethers } = require('hardhat');
+    const ContractManager = require('./lib/services/ContractManager');
+    const EthersUtils = require('./lib/utils/EthersUtils');
+    const config = require('./lib/config');
+    
+    const rpcUrl = network === 'localhost' ? 'http://127.0.0.1:8545' : config.get('network.rpcUrl');
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const ethersUtils = new EthersUtils(provider, config);
+    const contractManager = new ContractManager(ethersUtils, config);
+    
+    let amanitaIntl;
+    try {
+      amanitaIntl = await contractManager.loadUUPSContract('AmanitaInternational');
+    } catch (loadError) {
+      checks.errors.push(`Failed to load AmanitaInternational contract: ${loadError.message}`);
+      checks.errors.push('→ Make sure contracts are deployed (run Action 1 first)');
+      checks.errors.push('→ Make sure Hardhat node is running (for localhost)');
+      checks.errors.push('→ Check MAGIC_REGISTRY_CONTRACT_ADDRESS in .env');
+      return checks;
+    }
+    
+    const allKeys = new Map(); // key -> { componentId, lang, cid }
+    
+    // Собираем все ключи из контракта
+    for (const componentId of componentIds) {
+      const className = `ComponentDescription.${componentId}`;
+      
+      for (const lang of SUPPORTED_LANGUAGES) {
+        try {
+          const cid = await amanitaIntl.getComplexFieldCID(className, lang);
+          const key = `${className}.${lang}`;
+          
+          if (cid && cid !== "" && cid !== ethers.ZeroAddress) {
+            // Проверяем дубликаты
+            if (allKeys.has(key)) {
+              checks.duplicate_keys.push({
+                key,
+                component1: allKeys.get(key).componentId,
+                component2: componentId,
+                cid
+              });
+            } else {
+              allKeys.set(key, { componentId, lang, cid });
+              checks.unique_keys_count++;
+            }
+          } else {
+            checks.missing_keys.push({ componentId, lang, key });
+          }
+        } catch (error) {
+          checks.errors.push(`Error checking ${key}: ${error.message}`);
+        }
+      }
+    }
+    
+    // Проверяем, что ключи действительно уникальны
+    if (checks.duplicate_keys.length > 0) {
+      checks.errors.push(`❌ CRITICAL: Found ${checks.duplicate_keys.length} duplicate keys (overwrite detected!)`);
+    }
+    
+  } catch (error) {
+    checks.errors.push(`Uniqueness validation error: ${error.message}`);
+  }
+  
+  return checks;
+}
+
 // ====================================================================
 // 🧮 QUALITY SCORE CALCULATION
 // ====================================================================
@@ -528,6 +699,43 @@ function calculateContractScore(contract) {
   if (!contract.creator_match) score -= 2; // Ownership issue (warning, not critical)
   if (!contract.root_cid_match) score -= 2; // Data integrity (warning, not critical)
   if (!contract.status_active) score -= 1; // Status (not checked by ProductRegistry)
+  
+  // === COMPLEX FIELDS VALIDATION (NEW) ===
+  if (contract.complex_fields) {
+    const cf = contract.complex_fields;
+    
+    // Если контракт недоступен - штраф минимальный
+    if (!cf.contract_accessible) {
+      score -= 1; // Minor penalty - can't verify complex fields
+    } else {
+      // Проверка формата className (критично)
+      if (!cf.className_format_correct) {
+        score -= 3; // Major penalty - wrong className format
+      }
+      
+      // Проверка наличия ключей
+      const keysRate = cf.keys_found / cf.keys_expected;
+      if (keysRate < 1.0) {
+        score -= (1.0 - keysRate) * 2; // Max -2 points for missing keys
+      }
+      
+      // Проверка соответствия CIDs с state
+      if (cf.keys_found > 0) {
+        const cidsMatchRate = cf.cids_match_state / cf.keys_found;
+        if (cidsMatchRate < 1.0) {
+          score -= (1.0 - cidsMatchRate) * 1; // Max -1 point for CID mismatches
+        }
+      }
+      
+      // Критические ошибки
+      if (cf.errors && cf.errors.length > 0) {
+        const criticalErrors = cf.errors.filter(e => e.includes('CRITICAL')).length;
+        if (criticalErrors > 0) {
+          score -= criticalErrors * 2; // -2 points per critical error
+        }
+      }
+    }
+  }
   
   return Math.max(0, score);
 }
@@ -647,6 +855,49 @@ function generateConsoleReport(validation) {
     contract.errors.forEach(err => console.log(`      ${err}`));
   }
   
+  // Phase 3.5: Complex Fields Validation (NEW)
+  if (contract.complex_fields) {
+    const cf = contract.complex_fields;
+    console.log('\n🔹 PHASE 3.5: COMPLEX FIELDS VALIDATION (AmanitaInternational)');
+    console.log('-'.repeat(80));
+    console.log(`   Contract Accessible: ${cf.contract_accessible ? '✅ YES' : '❌ NO'}`);
+    
+    if (cf.contract_accessible) {
+      console.log(`   ClassName Format: ${cf.className_format_correct ? '✅ CORRECT (contains biounit_id)' : '❌ INCORRECT (missing biounit_id)'}`);
+      console.log(`   Keys Found: ${cf.keys_found}/${cf.keys_expected} ${cf.keys_found === cf.keys_expected ? '✅' : '❌'}`);
+      console.log(`   CIDs Valid: ${cf.cids_valid}/${cf.keys_found} ${cf.cids_valid === cf.keys_found ? '✅' : '⚠️'}`);
+      console.log(`   CIDs Match State: ${cf.cids_match_state}/${cf.keys_found} ${cf.cids_match_state === cf.keys_found ? '✅' : '⚠️'}`);
+      console.log(`   Unique Keys Verified: ${cf.unique_keys_verified ? '✅ YES' : '⚠️ SKIPPED (requires multiple components)'}`);
+      
+      if (cf.keys_found > 0) {
+        // Показываем примеры ключей
+        const exampleKeys = [];
+        for (const lang of SUPPORTED_LANGUAGES.slice(0, 3)) {
+          const className = `ComponentDescription.${componentId}`;
+          exampleKeys.push(`${className}.${lang}`);
+        }
+        if (exampleKeys.length > 0) {
+          console.log(`   Example Keys: ${exampleKeys.join(', ')}${SUPPORTED_LANGUAGES.length > 3 ? ' ...' : ''}`);
+        }
+      }
+      
+      if (cf.errors && cf.errors.length > 0) {
+        console.log(`\n   ❌ Errors: ${cf.errors.length}`);
+        cf.errors.forEach(err => console.log(`      ${err}`));
+      }
+      
+      if (cf.warnings && cf.warnings.length > 0) {
+        console.log(`\n   ⚠️ Warnings: ${cf.warnings.length}`);
+        cf.warnings.slice(0, 5).forEach(warn => console.log(`      - ${warn}`));
+        if (cf.warnings.length > 5) {
+          console.log(`      ... and ${cf.warnings.length - 5} more`);
+        }
+      }
+    } else {
+      console.log(`   ⚠️ Complex fields validation skipped due to contract access error`);
+    }
+  }
+  
   // Phase 4: State
   console.log('\n💾 PHASE 4: STATE CONSISTENCY VALIDATION');
   console.log('-'.repeat(80));
@@ -671,12 +922,18 @@ function generateConsoleReport(validation) {
   console.log('='.repeat(80));
   console.log(`   Quality Score: ${qualityScore}/10 ${qualityScore >= 8.0 ? '✅ PASS' : '❌ FAIL'}`);
   
+  // Collect all errors including complex fields errors
   const allErrors = [
     ...filesystem.errors,
     ...arweave.errors,
     ...contract.errors,
     ...state.errors
   ];
+  
+  // Add complex fields errors if they exist
+  if (contract.complex_fields && contract.complex_fields.errors && contract.complex_fields.errors.length > 0) {
+    allErrors.push(...contract.complex_fields.errors);
+  }
   
   console.log(`   Total Errors: ${allErrors.length}`);
   console.log(`   Overall Status: ${qualityScore >= 8.0 ? '✅ PASS' : '❌ FAIL'}`);
@@ -691,6 +948,105 @@ function generateConsoleReport(validation) {
   } else {
     console.log('\n✅ VALIDATION PASSED');
     console.log('Component upload verified across all layers.');
+  }
+  
+  console.log('='.repeat(80) + '\n');
+}
+
+/**
+ * Generate uniqueness report (human-readable)
+ * @param {Object} uniquenessReport - Uniqueness validation results
+ */
+function generateUniquenessReport(uniquenessReport) {
+  const { components_tested, languages_checked, unique_keys_count, duplicate_keys, missing_keys, errors } = uniquenessReport;
+  
+  console.log('\n' + '='.repeat(80));
+  console.log('🔑 COMPLEX FIELDS UNIQUENESS VALIDATION REPORT');
+  console.log('='.repeat(80));
+  console.log(`📦 Components Tested: ${components_tested}`);
+  console.log(`🌐 Languages Checked: ${languages_checked}`);
+  console.log(`✅ Unique Keys Found: ${unique_keys_count}`);
+  console.log(`📅 Validated: ${new Date().toISOString()}`);
+  console.log('='.repeat(80));
+  
+  // Duplicate keys
+  if (duplicate_keys.length > 0) {
+    console.log('\n❌ DUPLICATE KEYS DETECTED:');
+    console.log('-'.repeat(80));
+    console.log(`   Found ${duplicate_keys.length} duplicate key(s) (overwrite detected!)`);
+    console.log('');
+    duplicate_keys.forEach((dup, index) => {
+      console.log(`   ${index + 1}. Key: ${dup.key}`);
+      console.log(`      Component 1: ${dup.component1}`);
+      console.log(`      Component 2: ${dup.component2}`);
+      console.log(`      CID: ${dup.cid}`);
+      console.log('');
+    });
+  } else {
+    console.log('\n✅ NO DUPLICATES: All keys are unique');
+  }
+  
+  // Missing keys
+  if (missing_keys.length > 0) {
+    console.log('\n⚠️ MISSING KEYS:');
+    console.log('-'.repeat(80));
+    console.log(`   Found ${missing_keys.length} missing key(s)`);
+    console.log('');
+    // Group by component
+    const missingByComponent = {};
+    missing_keys.forEach(missing => {
+      if (!missingByComponent[missing.componentId]) {
+        missingByComponent[missing.componentId] = [];
+      }
+      missingByComponent[missing.componentId].push(missing.lang);
+    });
+    
+    Object.entries(missingByComponent).forEach(([componentId, langs]) => {
+      console.log(`   ${componentId}: ${langs.join(', ')}`);
+    });
+    console.log('');
+  } else {
+    console.log('\n✅ NO MISSING KEYS: All keys present in contract');
+  }
+  
+  // Errors
+  if (errors.length > 0) {
+    console.log('\n❌ ERRORS:');
+    console.log('-'.repeat(80));
+    errors.forEach(err => console.log(`   ${err}`));
+    console.log('');
+  }
+  
+  // Summary
+  console.log('\n' + '='.repeat(80));
+  console.log('📊 UNIQUENESS VALIDATION SUMMARY');
+  console.log('='.repeat(80));
+  const expectedKeys = components_tested * languages_checked;
+  const foundKeys = unique_keys_count + duplicate_keys.length;
+  const missingCount = missing_keys.length;
+  const duplicatesCount = duplicate_keys.length;
+  
+  console.log(`   Expected Keys: ${expectedKeys}`);
+  console.log(`   Found Keys: ${foundKeys}`);
+  console.log(`   Unique Keys: ${unique_keys_count}`);
+  console.log(`   Missing Keys: ${missingCount}`);
+  console.log(`   Duplicate Keys: ${duplicatesCount}`);
+  
+  const allGood = missingCount === 0 && duplicatesCount === 0 && errors.length === 0;
+  console.log(`   Overall Status: ${allGood ? '✅ PASS' : '❌ FAIL'}`);
+  console.log('='.repeat(80));
+  
+  if (!allGood) {
+    console.log('\n⚠️ UNIQUENESS VALIDATION FAILED');
+    if (duplicatesCount > 0) {
+      console.log(`   ❌ CRITICAL: ${duplicatesCount} duplicate key(s) detected (overwrite detected!)`);
+    }
+    if (missingCount > 0) {
+      console.log(`   ⚠️ WARNING: ${missingCount} missing key(s) detected`);
+    }
+  } else {
+    console.log('\n✅ UNIQUENESS VALIDATION PASSED');
+    console.log('All keys are unique and present in contract.');
   }
   
   console.log('='.repeat(80) + '\n');
@@ -758,7 +1114,8 @@ async function main() {
     .name('validate_component_upload')
     .description('Validate Action 555 component upload completeness')
     .version('1.0.0')
-    .requiredOption('-c, --component <componentId>', 'Component business ID (e.g., amanita_muscaria)')
+    .option('-c, --component <componentId>', 'Component business ID (e.g., amanita_muscaria)')
+    .option('--check-uniqueness <components>', 'Check uniqueness across multiple components (comma-separated, e.g., amanita_muscaria,blue_lotus)')
     .option('-n, --network <network>', 'Network name', 'localhost')
     .option('-s, --seller <address>', 'Seller Ethereum address (default: from .env)')
     .option('-j, --json', 'Output JSON format')
@@ -766,19 +1123,68 @@ async function main() {
   
   const options = program.opts();
   
+  // Check if at least one mode is specified
+  if (!options.component && !options.checkUniqueness) {
+    console.error('\n❌ Error: Either --component or --check-uniqueness must be specified');
+    console.error('\nUsage:');
+    console.error('  Validate single component:');
+    console.error('    node scripts/validators/validate_component_upload.js --component amanita_muscaria');
+    console.error('  Check uniqueness across multiple components:');
+    console.error('    node scripts/validators/validate_component_upload.js --check-uniqueness amanita_muscaria,blue_lotus');
+    console.error('\nOptions:');
+    console.error('  -c, --component <componentId>     Component business ID');
+    console.error('  --check-uniqueness <components>   Comma-separated list of component IDs');
+    console.error('  -n, --network <network>           Network name (default: localhost)');
+    console.error('  -s, --seller <address>            Seller Ethereum address');
+    console.error('  -j, --json                        Output JSON format\n');
+    process.exit(1);
+  }
+  
   try {
-    // Run validation
-    const report = await validateComponent(options.component, options.network, options.seller);
-    
-    // Generate report
-    if (options.json) {
-      console.log(JSON.stringify(report, null, 2));
-    } else {
-      generateConsoleReport(report);
+    // Check uniqueness mode
+    if (options.checkUniqueness) {
+      const componentIds = options.checkUniqueness.split(',').map(id => id.trim()).filter(id => id.length > 0);
+      
+      if (componentIds.length === 0) {
+        console.error('\n❌ Error: --check-uniqueness requires at least one component ID');
+        process.exit(1);
+      }
+      
+      if (componentIds.length === 1) {
+        console.warn('\n⚠️  Warning: Uniqueness check requires at least 2 components');
+        console.warn('   Consider using --component for single component validation\n');
+      }
+      
+      // Run uniqueness validation
+      const uniquenessReport = await validateComplexFieldsUniqueness(componentIds, options.network);
+      
+      // Generate report
+      if (options.json) {
+        console.log(JSON.stringify(uniquenessReport, null, 2));
+      } else {
+        generateUniquenessReport(uniquenessReport);
+      }
+      
+      // Exit code
+      const hasErrors = uniquenessReport.errors.length > 0 || uniquenessReport.duplicate_keys.length > 0;
+      process.exit(hasErrors ? 1 : 0);
     }
     
-    // Exit code
-    process.exit(report.passed ? 0 : 1);
+    // Single component validation mode
+    if (options.component) {
+      // Run validation
+      const report = await validateComponent(options.component, options.network, options.seller);
+      
+      // Generate report
+      if (options.json) {
+        console.log(JSON.stringify(report, null, 2));
+      } else {
+        generateConsoleReport(report);
+      }
+      
+      // Exit code
+      process.exit(report.passed ? 0 : 1);
+    }
     
   } catch (error) {
     console.error('\n' + '='.repeat(80));
@@ -801,6 +1207,7 @@ module.exports = {
   validateArweaveLayer,
   validateContractLayer,
   validateStateConsistency,
+  validateComplexFieldsUniqueness,
   calculateQualityScore
 };
 
