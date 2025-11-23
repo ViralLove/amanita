@@ -8,10 +8,11 @@
 const logger = require('../utils/Logger');
 
 class CoreLogic {
-  constructor(contractManager, ethersUtils, config) {
+  constructor(contractManager, ethersUtils, config, inviteActions = null) {
     this.contractManager = contractManager;
     this.ethersUtils = ethersUtils;
     this.config = config;
+    this.inviteActions = inviteActions; // ✅ НОВОЕ: Опциональная зависимость
   }
 
   /**
@@ -45,12 +46,13 @@ class CoreLogic {
   }
 
   /**
-   * Activate seller basic
+   * Activate seller basic (legacy implementation)
+   * @private
    * @param {string} sellerAddress - Seller address to activate
    * @param {Array} inviteCodes - Invite codes for activation
    * @returns {Promise<Object>} - Activation result
    */
-  async activateSellerBasic(sellerAddress = null, inviteCodes = null) {
+  async _activateSellerDirect(sellerAddress = null, inviteCodes = null) {
     try {
       const spiralEngine = await this.contractManager.getContract('SpiralEngine');
       if (!spiralEngine) {
@@ -84,6 +86,93 @@ class CoreLogic {
       logger.error('Failed to activate seller:', error.message);
       throw error;
     }
+  }
+
+  /**
+   * Activate seller via InviteActions (delegation)
+   * @private
+   * @param {string} sellerAddress - Seller address to activate
+   * @param {Array} inviteCodes - Invite codes for activation (deprecated: будет использован первый как inviteCode)
+   * @returns {Promise<Object>} - Activation result (adapted to old structure)
+   */
+  async _activateSellerViaInviteActions(sellerAddress = null, inviteCodes = null) {
+    try {
+      // 1. Получаем SpiralEngine через ContractManager
+      const spiralEngine = await this.contractManager.getContract('SpiralEngine');
+      if (!spiralEngine) {
+        throw new Error('SpiralEngine contract not found');
+      }
+
+      // 2. Определяем targetSellerAddress
+      const targetSellerAddress = sellerAddress || this.config.get('seller.address');
+      if (!targetSellerAddress) {
+        throw new Error('Seller address not provided');
+      }
+
+      // 3. Определяем inviteCode
+      // Логика: если inviteCodes предоставлены, используем первый как inviteCode
+      // Иначе берем из конфига или используем 'ROOT_INVITE' как fallback
+      let inviteCode;
+      if (inviteCodes && inviteCodes.length > 0) {
+        // ⚠️ DEPRECATED: inviteCodes параметр используется для обратной совместимости
+        // В новой архитектуре используется только один inviteCode
+        inviteCode = inviteCodes[0];
+        logger.warn(
+          `CoreLogic.activateSellerBasic: Параметр inviteCodes deprecated. ` +
+          `Используется первый код "${inviteCode}" как inviteCode. ` +
+          `Рекомендуется использовать InviteActions.activateSeller() напрямую.`
+        );
+      } else {
+        // Пытаемся получить из конфига
+        inviteCode = this.config.get('deployer.invite') || 
+                     this.config.get('invite.deployer') ||
+                     'ROOT_INVITE'; // Fallback на старый жестко закодированный invite
+        
+        if (inviteCode === 'ROOT_INVITE') {
+          logger.warn(
+            `CoreLogic.activateSellerBasic: Используется fallback inviteCode "ROOT_INVITE". ` +
+            `Рекомендуется настроить deployer.invite в конфиге или использовать InviteActions.activateSeller() напрямую.`
+          );
+        }
+      }
+
+      // 4. Делегируем в InviteActions.activateSeller()
+      logger.info(`CoreLogic.activateSellerBasic: Делегирование в InviteActions.activateSeller()`);
+      const result = await this.inviteActions.activateSeller(
+        spiralEngine,
+        inviteCode,
+        targetSellerAddress
+      );
+
+      // 5. Адаптируем результат под старую структуру (для обратной совместимости)
+      // Старая структура: { success, transactionHash, inviteCodes, sellerAddress }
+      // Новая структура: { success, sellerAddress, wasActivated, wasRoleGranted, newInvites, activationResult }
+      return {
+        success: result.success,
+        transactionHash: result.activationResult?.txHash || null,
+        inviteCodes: result.newInvites || [],
+        sellerAddress: result.sellerAddress
+      };
+    } catch (error) {
+      logger.error('CoreLogic.activateSellerBasic: Ошибка при делегировании в InviteActions:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Activate seller basic
+   * @param {string} sellerAddress - Seller address to activate
+   * @param {Array} inviteCodes - Invite codes for activation (deprecated: будет использован первый как inviteCode)
+   * @returns {Promise<Object>} - Activation result
+   */
+  async activateSellerBasic(sellerAddress = null, inviteCodes = null) {
+    // ✅ НОВОЕ: Делегирование в InviteActions, если доступен
+    if (this.inviteActions) {
+      return await this._activateSellerViaInviteActions(sellerAddress, inviteCodes);
+    }
+    
+    // ✅ СТАРОЕ: Fallback на прямую реализацию (для обратной совместимости)
+    return await this._activateSellerDirect(sellerAddress, inviteCodes);
   }
 
   /**

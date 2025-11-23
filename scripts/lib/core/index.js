@@ -8,13 +8,14 @@
 const CoreLogic = require('./CoreLogic');
 
 class CoreManager {
-  constructor(contractManager, ethersUtils, config) {
+  constructor(contractManager, ethersUtils, config, inviteActions = null) {
     this.contractManager = contractManager;
     this.ethersUtils = ethersUtils;
     this.config = config;
     
     // Initialize core modules
-    this.coreLogic = new CoreLogic(contractManager, ethersUtils, config);
+    // ✅ НОВОЕ: Передаем InviteActions в CoreLogic
+    this.coreLogic = new CoreLogic(contractManager, ethersUtils, config, inviteActions);
   }
 
   /**
