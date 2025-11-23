@@ -14,6 +14,10 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const MagicRegistryHelper = require('./MagicRegistryHelper');
+
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 class E2EHarness {
   constructor() {
@@ -22,6 +26,8 @@ class E2EHarness {
     this.snapshotId = null;
     this.originalEnv = { ...process.env };
     this.testEnvPath = path.join(__dirname, '../fixtures/env/e2e.test.env');
+    this.productSuite = null;
+    this.magicRegistry = new MagicRegistryHelper();
   }
 
   /**
@@ -50,14 +56,32 @@ class E2EHarness {
       }
     }
     
-    console.log('🚀 Starting Hardhat node...');
+    const hardhatBin = path.join(
+      __dirname,
+      '../../..',
+      'node_modules',
+      '.bin',
+      process.platform === 'win32' ? 'hardhat.cmd' : 'hardhat'
+    );
+
+    if (!fs.existsSync(hardhatBin)) {
+      throw new Error(
+        `Hardhat binary not found at ${hardhatBin}. Install dependencies before running e2e tests.`
+      );
+    }
+
+    console.log(`🚀 Starting Hardhat node via ${hardhatBin}...`);
     
     return new Promise((resolve, reject) => {
       // Start Hardhat node as separate process
-      this.hardhatProcess = spawn('npx', ['hardhat', 'node'], {
+      this.hardhatProcess = spawn(hardhatBin, ['node'], {
         stdio: 'pipe',
         cwd: path.join(__dirname, '../../..'),
         env: process.env
+      });
+
+      this.hardhatProcess.on('error', (err) => {
+        console.error(`❌ Failed to launch Hardhat node: ${err.message}`);
       });
 
       // Capture stdout for ready signal
@@ -84,8 +108,10 @@ class E2EHarness {
       });
 
       // Handle process exit
-      this.hardhatProcess.on('exit', (code) => {
-        if (code !== 0 && code !== null) {
+      this.hardhatProcess.on('exit', (code, signal) => {
+        if (!this.networkReady) {
+          console.error(`❌ Hardhat node exited before ready (code=${code}, signal=${signal})`);
+        } else if (code !== 0 && code !== null) {
           console.error(`❌ Hardhat node exited with code ${code}`);
         }
       });
@@ -126,6 +152,8 @@ class E2EHarness {
       
       this.hardhatProcess = null;
       this.networkReady = false;
+      this.productSuite = null;
+      this.magicRegistry.clear();
     }
   }
 
@@ -673,6 +701,297 @@ class E2EHarness {
     console.log(`📊 Component state: ${componentId} owned by ${owner}`);
     
     return state;
+  }
+
+  /**
+   * Deploy ProductRegistry + OrganicComponentRegistry suite (real node)
+   * @param {Object} options
+   * @param {number} options.componentsPerSeller
+   * @param {Array<string>} options.componentIds
+   * @param {boolean} options.forceRedeploy
+   * @returns {Promise<Object>}
+   */
+  async deployProductSuite(options = {}) {
+    const {
+      componentsPerSeller = 3,
+      componentIds = null,
+      forceRedeploy = false
+    } = options;
+
+    if (this.productSuite && !forceRedeploy) {
+      return this.productSuite;
+    }
+
+    const { ethers } = require('hardhat');
+
+    const ids =
+      componentIds ||
+      Array.from({ length: componentsPerSeller }, (_, index) => `e2e-comp-${index + 1}`);
+
+    const [admin, seller, otherSeller] = await ethers.getSigners();
+
+    // Deploy SpiralEngine (UUPS)
+    const SpiralEngineLogic = await ethers.getContractFactory('SpiralEngineLogic');
+    const spiralLogic = await SpiralEngineLogic.deploy();
+    await spiralLogic.waitForDeployment();
+    const spiralLogicAddress = await spiralLogic.getAddress();
+
+    const spiralInitCalldata = spiralLogic.interface.encodeFunctionData('initialize', [
+      admin.address
+    ]);
+
+    const SpiralEngineProxy = await ethers.getContractFactory('SpiralEngineProxy');
+    const spiralProxy = await SpiralEngineProxy.deploy(spiralLogicAddress, spiralInitCalldata);
+    await spiralProxy.waitForDeployment();
+    const spiralEngineAddress = await spiralProxy.getAddress();
+    const spiralEngine = spiralLogic.attach(spiralEngineAddress);
+
+    // Deploy OrganicComponentRegistry (UUPS)
+    const OCRLogic = await ethers.getContractFactory('OrganicComponentRegistryLogic');
+    const ocrLogic = await OCRLogic.deploy();
+    await ocrLogic.waitForDeployment();
+    const ocrLogicAddress = await ocrLogic.getAddress();
+
+    const ocrInitCalldata = ocrLogic.interface.encodeFunctionData('initialize', [admin.address]);
+    const OCRProxy = await ethers.getContractFactory('OrganicComponentRegistryProxy');
+    const ocrProxy = await OCRProxy.deploy(ocrLogicAddress, ocrInitCalldata);
+    await ocrProxy.waitForDeployment();
+    const componentRegistryAddress = await ocrProxy.getAddress();
+    const componentRegistry = ocrLogic.attach(componentRegistryAddress);
+
+    await componentRegistry.connect(admin).setSpiralEngine(spiralEngineAddress);
+
+    // Deploy ProductRegistry (UUPS)
+    const ProductLogic = await ethers.getContractFactory('ProductRegistryLogic');
+    const productLogic = await ProductLogic.deploy();
+    await productLogic.waitForDeployment();
+    const productLogicAddress = await productLogic.getAddress();
+
+    const initCalldata = productLogic.interface.encodeFunctionData('initialize', [
+      admin.address,
+      spiralEngineAddress
+    ]);
+
+    const ProductProxy = await ethers.getContractFactory('ProductRegistryProxy');
+    const productProxy = await ProductProxy.deploy(productLogicAddress, initCalldata);
+    await productProxy.waitForDeployment();
+    const productProxyAddress = await productProxy.getAddress();
+    const productRegistry = productLogic.attach(productProxyAddress);
+
+    await productRegistry
+      .connect(admin)
+      .setOrganicComponentRegistry(componentRegistryAddress);
+
+    // Register contracts in MagicRegistry
+    const previousRegistryState = { ...this.magicRegistry.registry };
+
+    this.magicRegistry.registerMany([
+      ['SpiralEngine', spiralEngineAddress, spiralLogicAddress],
+      ['OrganicComponentRegistry', componentRegistryAddress, ocrLogicAddress],
+      ['ProductRegistry', productProxyAddress, productLogicAddress]
+    ]);
+
+    Object.entries(previousRegistryState).forEach(([name, entry]) => {
+      if (!this.magicRegistry.registry[name]) {
+        this.magicRegistry.registry[name] = entry;
+      }
+    });
+
+    // Prepare seller via shared helper
+    await this.prepareSellerForE2E({
+      spiralEngine,
+      sellerSigner: seller,
+      deployerSigner: admin,
+      invitesPrefix: options.invitesPrefix || 'ACTION444'
+    });
+
+    // Mint components for seller
+    for (const componentId of ids) {
+      await componentRegistry.connect(seller).createComponent(componentId, `Qm${componentId}`);
+    }
+
+    this.productSuite = {
+      admin,
+      seller,
+      otherSeller,
+      spiralEngine,
+      spiralEngineAddress,
+      componentRegistry,
+      componentRegistryAddress,
+      productRegistry,
+      productRegistryAddress: productProxyAddress,
+      productRegistryLogicAddress: productLogicAddress,
+      sellerComponentIds: ids
+    };
+
+    return this.productSuite;
+  }
+
+  getProductSuite() {
+    if (!this.productSuite) {
+      throw new Error('Product suite не инициализирован. Вызовите deployProductSuite() перед использованием.');
+    }
+    return this.productSuite;
+  }
+
+  clearProductSuite() {
+    this.productSuite = null;
+    this.magicRegistry.clear();
+  }
+
+  registerProxy(contractName, proxyAddress, logicAddress) {
+    this.magicRegistry.register(contractName, proxyAddress, logicAddress);
+  }
+
+  loadContractFromSuite(contractName) {
+    return this.magicRegistry.resolve(contractName);
+  }
+
+  generateValidCid(seed) {
+    const buffer = seed !== undefined
+      ? crypto.createHash('sha256').update(String(seed)).digest()
+      : crypto.randomBytes(44);
+
+    const chars = [];
+    for (let i = 0; i < 44; i++) {
+      const byte = buffer[i % buffer.length];
+      chars.push(BASE58_ALPHABET[byte % BASE58_ALPHABET.length]);
+    }
+
+    return `Qm${chars.join('')}`;
+  }
+
+  assertCidFormat(cid) {
+    const base58Pattern = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
+    if (!base58Pattern.test(cid)) {
+      throw new Error(`Invalid CID format: ${cid}`);
+    }
+    return true;
+  }
+
+  validateCsvHeaders(headers, required = ['product_id', 'name', 'description', 'price', 'category']) {
+    const missing = required.filter((key) => !headers.includes(key));
+    if (missing.length > 0) {
+      throw new Error(`CSV headers missing required columns: ${missing.join(', ')}`);
+    }
+    return true;
+  }
+
+  async prepareSellerForE2E(options = {}) {
+    const {
+      spiralEngine: providedSpiralEngine,
+      sellerSigner: providedSellerSigner,
+      deployerSigner: providedDeployerSigner,
+      invitesPrefix = 'AMANITA-SELLER',
+      sellerInviteCount = 12,
+      skipActivation = false,
+      grantRoles = true,
+      useExistingInvite = null
+    } = options;
+
+    const { ethers } = require('hardhat');
+    const [defaultDeployer, defaultSeller] = await ethers.getSigners();
+
+    const deployer = providedDeployerSigner || defaultDeployer;
+    const seller = providedSellerSigner || defaultSeller;
+    const sellerAddress = await seller.getAddress();
+
+    let spiralEngine = providedSpiralEngine;
+    if (!spiralEngine) {
+      const registryEntry = this.magicRegistry.resolve('SpiralEngine');
+      if (!registryEntry || !registryEntry.proxy) {
+        throw new Error('prepareSellerForE2E: SpiralEngine proxy address не зарегистрирован в MagicRegistry');
+      }
+
+      const SpiralEngineFactory = await ethers.getContractFactory('SpiralEngineLogic');
+      spiralEngine = SpiralEngineFactory.attach(registryEntry.proxy);
+    }
+
+    const deployerInvite = useExistingInvite || this.#generateInviteCode(`${invitesPrefix}-ROOT`);
+    const sellerInvites = Array.from({ length: sellerInviteCount }, (_, index) =>
+      this.#generateInviteCode(`${invitesPrefix}-${String(index).padStart(2, '0')}`)
+    );
+
+    const deployerConnected = spiralEngine.connect(deployer);
+
+    const inviteExists = await spiralEngine.inviteCodeExists(deployerInvite);
+    if (!inviteExists) {
+      const mintTx = await deployerConnected.mintInvite(deployerInvite, 0);
+      await mintTx.wait();
+    }
+
+    const initialState = await this.#readSellerState(spiralEngine, sellerAddress);
+
+    if (!skipActivation) {
+      if (!initialState.activated) {
+        const activateTx = await deployerConnected.activateUser(
+          deployerInvite,
+          sellerAddress,
+          sellerInvites,
+          0
+        );
+        await activateTx.wait();
+      }
+    }
+
+    let stateAfterActivation = initialState;
+    if (!skipActivation) {
+      stateAfterActivation = await this.#readSellerState(spiralEngine, sellerAddress);
+    }
+
+    if (grantRoles) {
+      if (!stateAfterActivation.activated) {
+        console.warn('⚠️ prepareSellerForE2E: пропускаем выдачу ролей — seller не активирован');
+      } else {
+        if (!stateAfterActivation.sellerRole) {
+          await (await deployerConnected.grantSellerRole(sellerAddress)).wait();
+        }
+        if (!stateAfterActivation.activatorRole) {
+          const ACTIVATOR_ROLE = await spiralEngine.ACTIVATOR_ROLE();
+          await (await deployerConnected.grantRole(ACTIVATOR_ROLE, sellerAddress)).wait();
+        }
+      }
+    }
+
+    const finalState = await this.#readSellerState(spiralEngine, sellerAddress);
+    const tokenIdBn = await spiralEngine.inviteCodeToTokenId(deployerInvite);
+
+    return {
+      sellerAddress,
+      deployerInvite,
+      sellerInvites,
+      tokenId: tokenIdBn,
+      state: finalState
+    };
+  }
+
+  #generateInviteCode(prefix) {
+    const random = crypto.randomBytes(4).toString('hex').toUpperCase();
+    return `${prefix}-${random}`.replace(/[^A-Z0-9-]/gi, '-');
+  }
+
+  async #readSellerState(spiralEngine, sellerAddress) {
+    const usedInvite = await spiralEngine.usedInviteByUser(sellerAddress);
+
+    const SELLER_ROLE = await spiralEngine.SELLER_ROLE();
+    const sellerRole = await spiralEngine.hasRole(SELLER_ROLE, sellerAddress);
+
+    const ACTIVATOR_ROLE = await spiralEngine.ACTIVATOR_ROLE();
+    const activatorRole = await spiralEngine.hasRole(ACTIVATOR_ROLE, sellerAddress);
+
+    const activator = await spiralEngine.userActivator(sellerAddress);
+
+    return {
+      usedInvite,
+      activated: Number(usedInvite) > 0,
+      sellerRole,
+      activatorRole,
+      activator
+    };
+  }
+
+  #registerProxy(contractName, proxyAddress, logicAddress) {
+    this.magicRegistry.register(contractName, proxyAddress, logicAddress);
   }
 }
 
