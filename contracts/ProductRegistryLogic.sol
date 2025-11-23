@@ -135,6 +135,17 @@ contract ProductRegistryLogic is
     /// @param businessId ID компонента
     error ComponentNotActive(string businessId);
     
+    /// @notice Ошибка: бизнес-идентификатор пустой
+    error EmptyBusinessId();
+
+    /// @notice Ошибка: бизнес-идентификатор уже существует
+    /// @param businessId Уникальный идентификатор продукта
+    error BusinessIdExists(string businessId);
+
+    /// @notice Ошибка: бизнес-идентификатор не найден
+    /// @param businessId Уникальный идентификатор продукта
+    error BusinessIdUnknown(string businessId);
+    
     // ================================
     // ====== STATE VARIABLES =========
     // ================================
@@ -153,6 +164,9 @@ contract ProductRegistryLogic is
     
     /// @notice Счётчик для генерации уникальных productId
     uint256 private _productIdCounter;
+
+    /// @notice Индекс productId по бизнес-идентификатору
+    mapping(string => uint256) public businessIdToProductId;
     
     /// @notice Индекс продуктов по продавцу (seller => productId[])
     /// Помогает быстро получить все товары продавца
@@ -171,8 +185,8 @@ contract ProductRegistryLogic is
     // Резервируем слоты для будущих переменных в апгрейдах
     // При добавлении новых state variables уменьшайте размер gap
     
-    /// @dev Резерв для будущих обновлений (49 слотов, было 50)
-    uint256[49] private __gap;
+    /// @dev Резерв для будущих обновлений (48 слотов, было 49)
+    uint256[48] private __gap;
     
     // ================================
     // ======== ИНИЦИАЛИЗАЦИЯ =========
@@ -289,6 +303,7 @@ contract ProductRegistryLogic is
      * @dev Gas optimized: unchecked для счётчика, calldata для arrays
      */
     function createProduct(
+        string calldata businessId,
         string[] calldata componentIds,
         string calldata metadataCID
     ) 
@@ -300,10 +315,13 @@ contract ProductRegistryLogic is
         returns (uint256 productId) 
     {
         // Валидация входных данных
+        if (bytes(businessId).length == 0) revert EmptyBusinessId();
         if (bytes(metadataCID).length == 0) revert EmptyCID();
         if (componentIds.length == 0) revert NoComponentsProvided();
         if (componentIds.length > MAX_COMPONENTS_PER_PRODUCT) revert TooManyComponents();
         if (address(componentRegistry) == address(0)) revert ComponentRegistryNotSet();
+
+        if (businessIdToProductId[businessId] != 0) revert BusinessIdExists(businessId);
         
         // Валидация компонентов
         _validateComponents(componentIds);
@@ -317,10 +335,13 @@ contract ProductRegistryLogic is
         products[productId] = Product({
             id: productId,
             seller: msg.sender,
+            businessId: businessId,
             componentIds: componentIds,
             metadataCID: metadataCID,
             active: false
         });
+        
+        businessIdToProductId[businessId] = productId;
         
         // Добавляем в индекс продавца
         productsBySeller[msg.sender].push(productId);
@@ -334,7 +355,7 @@ contract ProductRegistryLogic is
         _trackComponentUsage(componentIds, msg.sender);
         
         // Эмитим события
-        emit ProductCreated(msg.sender, productId, componentIds, metadataCID, 0);
+        emit ProductCreated(msg.sender, productId, businessId, componentIds, metadataCID, 0);
         emit CatalogUpdated(msg.sender, catalogVersion[msg.sender]);
     }
     
@@ -370,7 +391,7 @@ contract ProductRegistryLogic is
             catalogVersion[msg.sender]++;
         }
         
-        emit ProductUpdated(msg.sender, productId, newMetadataCID, newPrice, 1);
+        emit ProductUpdated(msg.sender, productId, product.businessId, newMetadataCID, newPrice, 1);
         emit CatalogUpdated(msg.sender, catalogVersion[msg.sender]);
     }
     
@@ -428,7 +449,7 @@ contract ProductRegistryLogic is
             catalogVersion[msg.sender]++;
         }
         
-        emit ProductUpdated(msg.sender, productId, product.metadataCID, 0, 1);
+        emit ProductUpdated(msg.sender, productId, product.businessId, product.metadataCID, 0, 1);
         emit CatalogUpdated(msg.sender, catalogVersion[msg.sender]);
     }
     
@@ -467,6 +488,8 @@ contract ProductRegistryLogic is
             if (product.id == 0) revert ProductDoesNotExist();
             if (product.seller != seller) revert ProductOwnershipMismatch();
             
+            string memory businessId = product.businessId;
+            
             // Удаляем из списка активных, если продукт активен
             if (product.active) {
                 _removeFromActiveProducts(productId);
@@ -474,6 +497,7 @@ contract ProductRegistryLogic is
             
             // Удаляем продукт
             delete products[productId];
+            delete businessIdToProductId[businessId];
             
             unchecked { ++i; }
         }
@@ -677,6 +701,19 @@ contract ProductRegistryLogic is
     {
         if (products[productId].id == 0) revert ProductDoesNotExist();
         return products[productId].componentIds;
+    }
+
+    /**
+     * @inheritdoc IProductRegistry
+     */
+    function getProductIdByBusinessId(string calldata businessId)
+        external
+        view
+        override
+        returns (uint256 productId)
+    {
+        productId = businessIdToProductId[businessId];
+        if (productId == 0) revert BusinessIdUnknown(businessId);
     }
     
     // ================================

@@ -32,6 +32,7 @@ interface IProductRegistry {
     struct Product {
         uint256 id;
         address seller;
+        string businessId;
         string[] componentIds;
         string metadataCID;
         bool active;
@@ -45,6 +46,7 @@ interface IProductRegistry {
      * @notice Событие создания нового продукта
      * @param seller Адрес продавца
      * @param productId ID созданного продукта
+     * @param businessId Уникальный бизнес-идентификатор продукта
      * @param componentIds Массив businessId компонентов
      * @param metadataCID IPFS CID с метаданными
      * @param status Статус продукта (0 - неактивный, 1 - активный)
@@ -52,6 +54,7 @@ interface IProductRegistry {
     event ProductCreated(
         address indexed seller,
         uint256 productId,
+        string businessId,
         string[] componentIds,
         string metadataCID,
         uint256 status
@@ -61,6 +64,7 @@ interface IProductRegistry {
      * @notice Событие обновления продукта
      * @param seller Адрес продавца
      * @param productId ID обновлённого продукта
+     * @param businessId Уникальный бизнес-идентификатор продукта
      * @param ipfsCID Новый IPFS CID с метаданными
      * @param price Цена (для совместимости, может быть 0)
      * @param status Новый статус продукта (0 - неактивный, 1 - активный)
@@ -68,6 +72,7 @@ interface IProductRegistry {
     event ProductUpdated(
         address indexed seller,
         uint256 productId,
+        string businessId,
         string ipfsCID,
         uint256 price,
         uint256 status
@@ -119,6 +124,7 @@ interface IProductRegistry {
     
     /**
      * @notice Создать новый продукт с компонентами
+     * @param businessId Уникальный бизнес-идентификатор продукта
      * @param componentIds Массив businessId компонентов из OrganicComponentRegistry
      * @param metadataCID IPFS CID с метаданными товара (БЕЗ компонентов)
      * @return productId ID созданного продукта
@@ -128,6 +134,7 @@ interface IProductRegistry {
      * @dev Создаёт продукт в неактивном состоянии
      */
     function createProduct(
+        string calldata businessId,
         string[] calldata componentIds,
         string calldata metadataCID
     ) external returns (uint256 productId);
@@ -226,6 +233,17 @@ interface IProductRegistry {
         external 
         view 
         returns (string[] memory componentIds);
+
+    /**
+     * @notice Получить productId по бизнес-идентификатору
+     * @param businessId Уникальный бизнес-идентификатор продукта
+     * @return productId ID продукта
+     * @dev Ревертится, если запись отсутствует
+     */
+    function getProductIdByBusinessId(string calldata businessId)
+        external
+        view
+        returns (uint256 productId);
     
     // ================================
     // ======= ADMIN ФУНКЦИИ ==========
