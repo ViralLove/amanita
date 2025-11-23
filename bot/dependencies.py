@@ -10,8 +10,11 @@ from services.core.account import AccountService
 from services.product.registry import ProductRegistryService
 from services.product.validation import ProductValidationService
 from services.product.assembler import ProductAssembler
+from services.product.component_service import ComponentService
 from services.core.ipfs_factory import IPFSFactory
 from services.application.catalog import CatalogService, ProductService, ImageService
+from services.service_factory import ServiceFactory
+from services.common.localization_service import LocalizationService
 from model.user_settings import UserSettings
 # Импорт будет добавлен позже для избежания циклических зависимостей
 # from handlers.dependencies import get_product_formatter_service
@@ -43,9 +46,9 @@ def get_product_validation_service() -> ProductValidationService:
 
 
 def get_product_assembler() -> ProductAssembler:
-    """Dependency provider для ProductAssembler"""
-    storage_service = get_ipfs_storage()
-    return ProductAssembler(storage_service=storage_service)
+    """Dependency provider для ProductAssembler (clean break: NEW system only)"""
+    component_service = ComponentService()
+    return ProductAssembler(component_service=component_service)
 
 
 def get_ipfs_factory() -> IPFSFactory:
@@ -138,7 +141,33 @@ def get_storage_service():
     return IPFSFactory().get_storage()
 
 
-def get_formatter_service():
-    """Dependency provider для ProductFormatterService"""
+def get_formatter_service(localization_service=None):
+    """
+    Dependency provider для ProductFormatterService с LocalizationService.
+    
+    Args:
+        localization_service: Сервис локализации (если не указан, создаётся через get_localization_service())
+        
+    Returns:
+        ProductFormatterService: Сервис форматирования с локализацией
+    """
     from handlers.common.formatting import ProductFormatterService
-    return ProductFormatterService() 
+    if localization_service is None:
+        localization_service = get_localization_service()  # Default lang='ru'
+    return ProductFormatterService(localization_service=localization_service)
+
+
+def get_localization_service(lang: str = 'ru') -> LocalizationService:
+    """
+    Dependency provider для LocalizationService с полной DI цепочкой зависимостей.
+    
+    Использует ServiceFactory для создания LocalizationService с IPFS/Blockchain/Cache/Fallback.
+    
+    Args:
+        lang: Язык локализации (по умолчанию 'ru')
+        
+    Returns:
+        LocalizationService: Сервис локализации с полной DI цепочкой
+    """
+    service_factory = ServiceFactory()
+    return service_factory.create_localization_service(lang=lang) 

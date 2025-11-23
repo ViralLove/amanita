@@ -15,6 +15,7 @@ from handlers.menu import router as menu_router
 from handlers.seller_product_creation_fsm import router as product_creation_router
 from handlers.seller_menu import router as seller_router
 from handlers.catalog import router as catalog_router
+from handlers.catalog.component_handlers import router as component_handlers_router
 from services.product.registry_singleton import product_registry_service
 from services.service_factory import ServiceFactory
 from api.main import create_api_app
@@ -86,6 +87,7 @@ async def main():
         logger.info("Регистрация обработчиков...")
         dp.include_router(onboarding_router)
         dp.include_router(catalog_router)
+        dp.include_router(component_handlers_router)  # 🆕 Task 10.4: Component description handlers
         dp.include_router(menu_router)
         dp.include_router(webapp_router)
         # dp.include_router(seller_router)

@@ -6,14 +6,20 @@ Dependency providers для handlers.
 from .common.formatting import ProductFormatterService, ProductFormatterConfig
 
 
-def get_product_formatter_service() -> ProductFormatterService:
+def get_product_formatter_service(localization_service=None) -> ProductFormatterService:
     """
-    Dependency provider для ProductFormatterService.
+    Dependency provider для ProductFormatterService с LocalizationService.
+    
+    Args:
+        localization_service: Сервис локализации (если не указан, создаётся через get_localization_service())
     
     Returns:
-        ProductFormatterService: Экземпляр сервиса форматирования с конфигурацией по умолчанию
+        ProductFormatterService: Экземпляр сервиса форматирования с локализацией
     """
-    return ProductFormatterService()
+    if localization_service is None:
+        from dependencies import get_localization_service
+        localization_service = get_localization_service()  # Default lang='ru'
+    return ProductFormatterService(localization_service=localization_service)
 
 
 def get_product_formatter_service_with_config(config: ProductFormatterConfig) -> ProductFormatterService:
