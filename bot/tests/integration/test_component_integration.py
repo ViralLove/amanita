@@ -1,3 +1,4 @@
+import pytest
 """
 Test script for OrganicComponentRegistry integration in blockchain.py
 
@@ -28,6 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+@pytest.mark.integration
 def test_contract_loading():
     """Test 1: OrganicComponentRegistry loads successfully"""
     print("\n" + "="*60)
@@ -43,16 +45,16 @@ def test_contract_loading():
         if component_registry:
             print("✅ SUCCESS: OrganicComponentRegistry contract loaded")
             print(f"   Contract address: {component_registry.address}")
-            return True
         else:
             print("❌ FAILED: OrganicComponentRegistry contract not loaded")
-            return False
+            assert False, "OrganicComponentRegistry contract not loaded"
             
     except Exception as e:
         print(f"❌ FAILED: Error loading contract: {e}")
-        return False
+        raise
 
 
+@pytest.mark.integration
 def test_component_exists():
     """Test 2: component_exists() method"""
     print("\n" + "="*60)
@@ -76,13 +78,12 @@ def test_component_exists():
         else:
             print(f"   ⚠️  Component '{test_component_id}' not found (may not be deployed yet)")
         
-        return True
-        
     except Exception as e:
         print(f"❌ FAILED: Error calling component_exists(): {e}")
-        return False
+        raise
 
 
+@pytest.mark.integration
 def test_get_component():
     """Test 3: get_component() method"""
     print("\n" + "="*60)
@@ -98,7 +99,7 @@ def test_get_component():
         if not bs.component_exists(test_component_id):
             print(f"⚠️  SKIPPED: Component '{test_component_id}' not deployed yet")
             print("   Deploy components first using Action 555")
-            return True
+            pytest.skip(f"Component '{test_component_id}' not deployed yet")
         
         print(f"Fetching component data for '{test_component_id}'...")
         component = bs.get_component(test_component_id)
@@ -121,16 +122,16 @@ def test_get_component():
                 for key, value in component.items():
                     print(f"     - {key}: {value}")
             
-            return True
         else:
             print(f"❌ FAILED: Component data not retrieved")
-            return False
+            assert False, "Component data not retrieved"
             
     except Exception as e:
         print(f"❌ FAILED: Error calling get_component(): {e}")
-        return False
+        raise
 
 
+@pytest.mark.integration
 def test_get_component_cid():
     """Test 4: get_component_root_metadata_cid() method"""
     print("\n" + "="*60)
@@ -144,7 +145,7 @@ def test_get_component_cid():
         
         if not bs.component_exists(test_component_id):
             print(f"⚠️  SKIPPED: Component '{test_component_id}' not deployed yet")
-            return True
+            pytest.skip(f"Component '{test_component_id}' not deployed yet")
         
         print(f"Fetching root metadata CID for '{test_component_id}'...")
         cid = bs.get_component_root_metadata_cid(test_component_id)
@@ -153,16 +154,16 @@ def test_get_component_cid():
             print(f"✅ SUCCESS: CID retrieved")
             print(f"   CID: {cid}")
             print(f"   Arweave URL: https://arweave.net/{cid}")
-            return True
         else:
             print(f"❌ FAILED: CID not retrieved")
-            return False
+            assert False, "CID not retrieved"
             
     except Exception as e:
         print(f"❌ FAILED: Error calling get_component_root_metadata_cid(): {e}")
-        return False
+        raise
 
 
+@pytest.mark.integration
 def test_get_all_components():
     """Test 5: get_all_components() method"""
     print("\n" + "="*60)
@@ -190,13 +191,12 @@ def test_get_all_components():
         else:
             print("   ⚠️  No components found (may not be deployed yet)")
         
-        return True
-        
     except Exception as e:
         print(f"❌ FAILED: Error calling get_all_components(): {e}")
-        return False
+        raise
 
 
+@pytest.mark.integration
 def test_nonexistent_component():
     """Test 6: Error handling for non-existent component"""
     print("\n" + "="*60)
@@ -223,11 +223,10 @@ def test_nonexistent_component():
         print(f"   get_component_root_metadata_cid(): {cid} ✅")
         
         print("✅ SUCCESS: Error handling works correctly")
-        return True
         
     except Exception as e:
         print(f"❌ FAILED: Unexpected exception: {e}")
-        return False
+        raise
 
 
 def main():

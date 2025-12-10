@@ -32,6 +32,7 @@ def sentry_mock(monkeypatch):
     if os.path.exists(SENTRY_MOCK_LOG):
         os.remove(SENTRY_MOCK_LOG)
 
+@pytest.mark.integration
 def test_sentry_capture_exception_and_message(sentry_mock):
     import sentry_sdk
     # Проверяем capture_exception
@@ -48,6 +49,7 @@ def test_sentry_capture_exception_and_message(sentry_mock):
     assert "capture_message: Test Sentry Message" in content
 
 
+@pytest.mark.integration
 def test_sentry_real_connection():
     """
     Проверяет реальное соединение с Sentry (отправляет тестовое сообщение).

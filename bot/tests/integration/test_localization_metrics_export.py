@@ -7,11 +7,20 @@
 - Интеграция с CacheManager для получения статистики
 """
 
+import sys
+from pathlib import Path
+
 import pytest
+
+# Add bot/ to Python path for imports (same pattern as test_multilingual_ipfs_blockchain_integration.py)
+bot_dir = Path(__file__).parent.parent
+if str(bot_dir) not in sys.path:
+    sys.path.insert(0, str(bot_dir))
 
 from services.common.cache_manager import CacheManager, CacheType
 
 
+@pytest.mark.integration
 def test_localization_service_exports_stats(localization_service, ipfs_factory, blockchain_service):
     """
     Тест: LocalizationService экспортирует метрики через дочерние сервисы
@@ -72,6 +81,7 @@ def test_localization_service_exports_stats(localization_service, ipfs_factory, 
         assert hasattr(fallback_service, 'get_stats')
 
 
+@pytest.mark.integration
 def test_stats_reflect_actual_usage(localization_service, ipfs_factory, blockchain_service):
     """
     Тест: Метрики отражают реальное использование сервисов
@@ -168,6 +178,7 @@ def test_stats_reflect_actual_usage(localization_service, ipfs_factory, blockcha
     assert final_ipfs_stats['ipfs_requests'] > initial_ipfs_stats['ipfs_requests']
 
 
+@pytest.mark.integration
 def test_cache_manager_can_access_ipfs_stats(multilingual_ipfs_service, translation_cache_service):
     """
     Тест: CacheManager может получить статистику через get_stats()

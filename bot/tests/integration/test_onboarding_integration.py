@@ -8,6 +8,7 @@ from bot.services.core.blockchain import BlockchainService
 from eth_account import Account
 from dotenv import load_dotenv
 from bot.tests.utils.invite_code_generator import generate_invite_code, validate_invite_code
+from bot.tests.fixtures.env_validator import EnvironmentValidator
 
 # Настройка логгера
 logging.basicConfig(
@@ -23,17 +24,16 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 # Устанавливаем профиль на localhost для теста
 os.environ["BLOCKCHAIN_PROFILE"] = "localhost"
 
-# Получаем адрес реестра из .env
+# Проверяем наличие необходимых переменных окружения через EnvironmentValidator
+required_vars = ["AMANITA_REGISTRY_CONTRACT_ADDRESS", "NODE_ADMIN_PRIVATE_KEY", "SELLER_PRIVATE_KEY"]
+all_present, missing = EnvironmentValidator.validate_environment_variables(required_vars)
+if not all_present:
+    pytest.skip(f"⚠️ Отсутствуют переменные окружения: {', '.join(missing)}", allow_module_level=True)
+
+# Получаем переменные окружения (после проверки)
 AMANITA_REGISTRY_CONTRACT_ADDRESS = os.getenv("AMANITA_REGISTRY_CONTRACT_ADDRESS")
-assert AMANITA_REGISTRY_CONTRACT_ADDRESS, "AMANITA_REGISTRY_CONTRACT_ADDRESS не найден в .env!"
-
-# Добавляем загрузку приватного ключа деплоера
 NODE_ADMIN_PRIVATE_KEY = os.getenv("NODE_ADMIN_PRIVATE_KEY")
-assert NODE_ADMIN_PRIVATE_KEY, "NODE_ADMIN_PRIVATE_KEY не найден в .env!"
-
-# Добавляем загрузку приватного ключа продавца
 SELLER_PRIVATE_KEY = os.getenv("SELLER_PRIVATE_KEY")
-assert SELLER_PRIVATE_KEY, "SELLER_PRIVATE_KEY не найден в .env!"
 
 @pytest.fixture
 def blockchain_service():
@@ -48,7 +48,8 @@ def blockchain_service():
 def seller_account():
     """Фикстура для получения аккаунта продавца"""
     seller_private_key = os.getenv("SELLER_PRIVATE_KEY")
-    assert seller_private_key, "SELLER_PRIVATE_KEY не найден в окружении"
+    if not seller_private_key:
+        pytest.skip("SELLER_PRIVATE_KEY не найден в окружении")
     return Account.from_key(seller_private_key)
 
 @pytest.fixture
@@ -108,6 +109,7 @@ def log_tx_result(tx_hash, operation, blockchain_service):
     logger.info(f"{status} {operation} (tx: {tx_hash[:10]}...)")
     return receipt
 
+@pytest.mark.integration
 def test_onboarding_flow(blockchain_service, seller_account, generate_account):
     """Тест полного процесса онбординга"""
     logger.info("🚀 Начало теста onboarding flow")
