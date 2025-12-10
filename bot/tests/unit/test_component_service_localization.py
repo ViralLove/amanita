@@ -765,24 +765,22 @@ class TestComponentServiceLocalizationService:
         )
     
     @pytest.mark.asyncio
-    async def test_uses_localization_service_for_complex_fields(self, real_component_service, mock_localization_service, monkeypatch):
-        """Тест: ComponentService использует LocalizationService для complex fields"""
-        from dependencies import get_localization_service
+    async def test_uses_multilingual_ipfs_service_for_complex_fields(self, real_component_service, monkeypatch):
+        """Тест: ComponentService использует MultilingualIPFSService._load_component_description_from_ipfs для complex fields"""
+        from unittest.mock import MagicMock
         
-        # Mock get_localization_service
-        def mock_get_localization_service(lang='ru'):
-            return mock_localization_service
+        # Mock MultilingualIPFSService._load_component_description_from_ipfs
+        expected_fields = {
+            'generic_description': 'Test generic description',
+            'effects': 'Test effects',
+            'shamanic': 'Test shamanic',
+            'warnings': 'Test warnings'
+        }
         
-        # Мокаем в модуле dependencies для избежания циклического импорта
-        monkeypatch.setattr('dependencies.get_localization_service', mock_get_localization_service)
-        
-        # Mock LocalizationService.t() для возврата полей
-        mock_localization_service.t.side_effect = lambda key, default='': {
-            'component.amanita_muscaria.generic_description': 'Test generic description',
-            'component.amanita_muscaria.effects': 'Test effects',
-            'component.amanita_muscaria.shamanic': 'Test shamanic',
-            'component.amanita_muscaria.warnings': 'Test warnings'
-        }.get(key, default)
+        # Mock метод _load_component_description_from_ipfs (синхронный метод, не async)
+        real_component_service.multilingual_ipfs_service._load_component_description_from_ipfs = MagicMock(
+            return_value=expected_fields
+        )
         
         # Настраиваем get_component_full чтобы возвращал компонент
         from model.organic_component import OrganicComponent
@@ -797,8 +795,11 @@ class TestComponentServiceLocalizationService:
         # Запрашиваем описание
         desc = await real_component_service.get_component_description("amanita_muscaria", "ru")
         
-        # Проверяем, что использовался LocalizationService
-        mock_localization_service.t.assert_called()
+        # Проверяем, что использовался MultilingualIPFSService._load_component_description_from_ipfs
+        real_component_service.multilingual_ipfs_service._load_component_description_from_ipfs.assert_called_once_with(
+            "amanita_muscaria",  # ✅ component_id передается напрямую
+            "ru"
+        )
         assert desc is not None
         assert desc.generic_description == 'Test generic description'
         assert desc.effects == 'Test effects'
@@ -806,23 +807,17 @@ class TestComponentServiceLocalizationService:
         assert desc.warnings == 'Test warnings'
     
     @pytest.mark.asyncio
-    async def test_returns_none_when_localization_service_fails(
+    async def test_returns_none_when_multilingual_ipfs_service_fails(
         self, 
-        real_component_service, 
-        mock_localization_service, 
-        monkeypatch
+        real_component_service
     ):
-        """Тест: возвращает None когда LocalizationService не вернул данные"""
-        from dependencies import get_localization_service
+        """Тест: возвращает None когда MultilingualIPFSService не вернул данные"""
+        from unittest.mock import MagicMock
         
-        # Mock get_localization_service
-        def mock_get_localization_service(lang='ru'):
-            return mock_localization_service
-        
-        monkeypatch.setattr('dependencies.get_localization_service', mock_get_localization_service)
-        
-        # Mock LocalizationService.t() возвращает пустые значения или ключи
-        mock_localization_service.t.return_value = 'component.amanita_muscaria.generic_description'  # Возвращает ключ = нет данных
+        # Mock MultilingualIPFSService._load_component_description_from_ipfs возвращает None (синхронный метод)
+        real_component_service.multilingual_ipfs_service._load_component_description_from_ipfs = MagicMock(
+            return_value=None
+        )
         
         # Настраиваем get_component_full чтобы возвращал компонент
         from model.organic_component import OrganicComponent
@@ -837,31 +832,31 @@ class TestComponentServiceLocalizationService:
         # Запрашиваем описание
         desc = await real_component_service.get_component_description("amanita_muscaria", "ru")
         
-        # Проверяем, что возвращается None (нет fallback)
+        # Проверяем, что возвращается None (нет данных)
         assert desc is None
+        
+        # Проверяем, что метод был вызван
+        real_component_service.multilingual_ipfs_service._load_component_description_from_ipfs.assert_called_once_with(
+            "amanita_muscaria", "ru"
+        )
     
     @pytest.mark.asyncio
-    async def test_returns_none_when_localization_service_returns_partial_data(
+    async def test_returns_none_when_multilingual_ipfs_service_returns_partial_data(
         self,
-        real_component_service,
-        mock_localization_service,
-        monkeypatch
+        real_component_service
     ):
-        """Тест: возвращает None когда LocalizationService вернул частичные данные"""
-        from dependencies import get_localization_service
+        """Тест: возвращает None когда MultilingualIPFSService вернул частичные данные (нет generic_description)"""
+        from unittest.mock import MagicMock
         
-        # Mock get_localization_service
-        def mock_get_localization_service(lang='ru'):
-            return mock_localization_service
-        
-        monkeypatch.setattr('dependencies.get_localization_service', mock_get_localization_service)
-        
-        # Mock LocalizationService.t() возвращает только часть полей (нет generic_description)
-        mock_localization_service.t.side_effect = lambda key, default='': {
-            'component.amanita_muscaria.effects': 'Test effects',
-            'component.amanita_muscaria.shamanic': 'Test shamanic',
+        # Mock MultilingualIPFSService._load_component_description_from_ipfs возвращает частичные данные (синхронный метод)
+        partial_fields = {
+            'effects': 'Test effects',
+            'shamanic': 'Test shamanic',
             # generic_description отсутствует - это обязательное поле
-        }.get(key, default)
+        }
+        real_component_service.multilingual_ipfs_service._load_component_description_from_ipfs = MagicMock(
+            return_value=partial_fields
+        )
         
         # Настраиваем get_component_full чтобы возвращал компонент
         from model.organic_component import OrganicComponent
@@ -878,31 +873,31 @@ class TestComponentServiceLocalizationService:
         
         # Проверяем, что возвращается None (так как generic_description отсутствует)
         assert desc is None
+        
+        # Проверяем, что метод был вызван
+        real_component_service.multilingual_ipfs_service._load_component_description_from_ipfs.assert_called_once_with(
+            "amanita_muscaria", "ru"
+        )
     
     @pytest.mark.asyncio
-    async def test_logs_localization_service_path(
+    async def test_logs_multilingual_ipfs_service_path(
         self,
         real_component_service,
-        mock_localization_service,
-        monkeypatch,
         caplog
     ):
-        """Тест: логируется выбор пути LocalizationService"""
-        from dependencies import get_localization_service
+        """Тест: логируется использование MultilingualIPFSService"""
+        from unittest.mock import MagicMock
         
-        # Mock get_localization_service
-        def mock_get_localization_service(lang='ru'):
-            return mock_localization_service
-        
-        monkeypatch.setattr('dependencies.get_localization_service', mock_get_localization_service)
-        
-        # Mock LocalizationService.t() для возврата полей
-        mock_localization_service.t.side_effect = lambda key, default='': {
-            'component.amanita_muscaria.generic_description': 'Test generic description',
-            'component.amanita_muscaria.effects': 'Test effects',
-            'component.amanita_muscaria.shamanic': 'Test shamanic',
-            'component.amanita_muscaria.warnings': 'Test warnings'
-        }.get(key, default)
+        # Mock MultilingualIPFSService._load_component_description_from_ipfs (синхронный метод)
+        expected_fields = {
+            'generic_description': 'Test generic description',
+            'effects': 'Test effects',
+            'shamanic': 'Test shamanic',
+            'warnings': 'Test warnings'
+        }
+        real_component_service.multilingual_ipfs_service._load_component_description_from_ipfs = MagicMock(
+            return_value=expected_fields
+        )
         
         # Настраиваем get_component_full чтобы возвращал компонент
         from model.organic_component import OrganicComponent
@@ -918,6 +913,7 @@ class TestComponentServiceLocalizationService:
         with caplog.at_level('INFO'):
             desc = await real_component_service.get_component_description("amanita_muscaria", "ru")
         
-        # Проверяем логирование выбора пути
-        assert any('LocalizationService (blockchain path)' in msg for msg in caplog.messages)
+        # Проверяем логирование использования MultilingualIPFSService
+        assert any('MultilingualIPFSService' in msg for msg in caplog.messages)
+        assert any('blockchain path' in msg for msg in caplog.messages)
 

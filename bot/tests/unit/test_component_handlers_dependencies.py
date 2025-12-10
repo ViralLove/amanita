@@ -15,28 +15,38 @@ import os
 import importlib.util
 
 
+@pytest.mark.unit
 class TestComponentHandlersDependencies:
     """Tests for component_handlers.py dependency injection"""
     
-    def test_get_product_formatter_service_creates_formatter_with_localization_service(self):
+    def test_get_product_formatter_service_creates_formatter_with_localization_service(
+        self,
+        mock_localization_service  # ← Используем фикстуру (следует паттерну mock_blockchain_service)
+    ):
         """
         Проверка: get_product_formatter_service() создаёт formatter с LocalizationService.
         
         AC: formatter.localization_service не равен None.
-        """
-        # Импортируем напрямую из модуля, избегая импорта handlers.__init__
-        # Это важно, так как handlers.__init__ импортирует catalog_handlers, 
-        # который создаёт ProductRegistryService, который создаёт BlockchainService
         
-        # Патчим dependencies.get_localization_service, чтобы избежать реальной инициализации
-        with patch('dependencies.get_localization_service') as mock_get_loc:
-            # Создаём мок LocalizationService
-            from services.common.localization_service import LocalizationService
-            mock_loc_service = MagicMock(spec=LocalizationService)
-            mock_get_loc.return_value = mock_loc_service
+        Изоляция: Использует mock_localization_service для изоляции от реальных зависимостей.
+        """
+        # ВАЖНО: Мокируем BlockchainService на уровне модуля ДО всех импортов
+        # Это предотвращает создание реального BlockchainService → Web3
+        # при выполнении exec_module (который может импортировать модули, создающие BlockchainService)
+        # Также мокируем ServiceFactory и dependencies.get_localization_service
+        with patch('services.core.blockchain.BlockchainService', new=Mock(), create=True) as mock_blockchain_class, \
+             patch('services.service_factory.ServiceFactory') as mock_service_factory_class, \
+             patch('dependencies.get_localization_service', return_value=mock_localization_service) as mock_get_loc, \
+             patch('services.product.registry_singleton.product_registry_service', new=Mock(), create=True):
+            
+            # Создаем мок ServiceFactory, который возвращает mock_localization_service
+            mock_factory_instance = Mock()
+            mock_factory_instance.create_localization_service = Mock(return_value=mock_localization_service)
+            mock_service_factory_class.return_value = mock_factory_instance
             
             # Импортируем factory метод напрямую из модуля
-            # Используем importlib для прямого импорта, минуя __init__.py
+            # Используем importlib для прямого импорта, минуя handlers.__init__
+            # (который может импортировать catalog_handlers → ProductRegistryService → BlockchainService)
             spec = importlib.util.spec_from_file_location(
                 "handlers.dependencies",
                 os.path.join(
@@ -46,37 +56,60 @@ class TestComponentHandlersDependencies:
             )
             handlers_deps = importlib.util.module_from_spec(spec)
             sys.modules['handlers.dependencies'] = handlers_deps
+            
+            # Выполняем exec_module - dependencies.get_localization_service уже замокирован
             spec.loader.exec_module(handlers_deps)
             
             get_product_formatter_service = handlers_deps.get_product_formatter_service
             
-            # Создаём formatter через factory (как в component_handlers.py строка 212)
+            # Создаём formatter через factory
+            # Внутри get_product_formatter_service() будет вызван
+            # dependencies.get_localization_service(), который мы замокировали
             formatter = get_product_formatter_service()
             
-            # Проверяем, что formatter создан
+            # Проверки структуры
             assert formatter is not None, "Formatter должен быть создан"
-            
-            # Проверяем, что LocalizationService инициализирован
             assert formatter.localization_service is not None, (
                 "LocalizationService должен быть инициализирован через DI"
             )
-            
-            # Проверяем, что использован правильный LocalizationService
-            assert formatter.localization_service == mock_loc_service, (
+            assert formatter.localization_service == mock_localization_service, (
                 "Должен использоваться LocalizationService через DI"
             )
+            
+            # ✅ P0 FIX: Проверка реального вызова get_localization_service()
+            mock_get_loc.assert_called_once(), (
+                "get_localization_service() должен быть вызван через DI"
+            )
+            
+            # ✅ P0 FIX: Проверка реального использования localization_service
+            assert formatter.localization_service.t('test.key') == 'Mock Translation', (
+                "localization_service должен реально использоваться в formatter"
+            )
     
-    def test_create_component_description_keyboard_works(self):
+    def test_create_component_description_keyboard_works(
+        self,
+        mock_localization_service  # ← Используем фикстуру (следует паттерну mock_blockchain_service)
+    ):
         """
         Проверка: _create_component_description_keyboard() работает корректно.
         
         AC: Keyboard создаётся без ошибок, содержит 4 кнопки.
+        
+        Изоляция: Использует mock_localization_service для изоляции от реальных зависимостей.
         """
-        # Патчим dependencies.get_localization_service
-        with patch('dependencies.get_localization_service') as mock_get_loc:
-            from services.common.localization_service import LocalizationService
-            mock_loc_service = MagicMock(spec=LocalizationService)
-            mock_get_loc.return_value = mock_loc_service
+        # ВАЖНО: Мокируем BlockchainService на уровне модуля ДО всех импортов
+        # Это предотвращает создание реального BlockchainService → Web3
+        # при выполнении exec_module (который может импортировать модули, создающие BlockchainService)
+        # Также мокируем ServiceFactory и dependencies.get_localization_service
+        with patch('services.core.blockchain.BlockchainService', new=Mock(), create=True) as mock_blockchain_class, \
+             patch('services.service_factory.ServiceFactory') as mock_service_factory_class, \
+             patch('dependencies.get_localization_service', return_value=mock_localization_service), \
+             patch('services.product.registry_singleton.product_registry_service', new=Mock(), create=True):
+            
+            # Создаем мок ServiceFactory, который возвращает mock_localization_service
+            mock_factory_instance = Mock()
+            mock_factory_instance.create_localization_service = Mock(return_value=mock_localization_service)
+            mock_service_factory_class.return_value = mock_factory_instance
             
             # Импортируем напрямую из модуля
             spec = importlib.util.spec_from_file_location(

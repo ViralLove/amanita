@@ -16,12 +16,22 @@ Method: @integration-test-build.core.mdc
 """
 
 import pytest
+import sys
+from pathlib import Path
 from unittest.mock import Mock, MagicMock
+
+# Add bot/ to Python path for imports (same pattern as conftest.py)
+bot_dir = Path(__file__).parent.parent
+if str(bot_dir) not in sys.path:
+    sys.path.insert(0, str(bot_dir))
+
 from bot.services.common.multilingual_ipfs_service import MultilingualIPFSService
-from tests.integration.blockchain_stub import BlockchainServiceStub, AmanitaInternationalContractStub
-from tests.integration.ipfs_stub import IPFSFactoryStub
+# Use bot.tests.integration imports when PYTHONPATH=bot (matches other test files)
+from bot.tests.integration.blockchain_stub import BlockchainServiceStub, AmanitaInternationalContractStub
+from bot.tests.integration.ipfs_stub import IPFSFactoryStub
 
 
+@pytest.mark.integration
 class TestMultilingualIPFSServiceBlockchainIntegration:
     """Integration tests for MultilingualIPFSService → BlockchainService for complex fields"""
     
@@ -310,5 +320,196 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
         # THEN: Cache hit was recorded
         stats = multilingual_ipfs_service.get_stats()
         assert stats.get('cache_hits', 0) >= 1
+
+    # ===== Per-component complex fields tests (with biounit_id) =====
+    
+    def test_load_component_description_from_ipfs_success(self, multilingual_ipfs_service, blockchain_service, ipfs_factory):
+        """Test successful loading of per-component description through blockchain"""
+        # GIVEN: Blockchain contract returns CID for per-component complex field
+        component_id = "amanita_muscaria"
+        language = "ru"
+        className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
+        cid = "QmTestCID123456789"
+        
+        contract = blockchain_service.get_contract("AmanitaInternational")
+        
+        # Set CID in blockchain stub with className containing biounit_id
+        contract.functions.setComplexFieldCID(className, language, cid).transact()
+        
+        # GIVEN: IPFS service returns valid JSON with fields
+        ipfs_service = ipfs_factory.get_service()
+        valid_payload = {
+            "label": "ComponentDescription",
+            "type": "complex",
+            "fields": {
+                "generic_description": "Test description",
+                "effects": "Test effects",
+                "shamanic": "Test shamanic",
+                "warnings": "Test warnings"
+            }
+        }
+        ipfs_service._storage[cid] = valid_payload
+        
+        # WHEN: Loading component description
+        result = multilingual_ipfs_service._load_component_description_from_ipfs(component_id, language)
+        
+        # THEN: BlockchainService.get_contract called with correct contract name
+        contract_from_service = blockchain_service.get_contract("AmanitaInternational")
+        assert contract_from_service is not None
+        
+        # THEN: Contract was called with correct className (with biounit_id)
+        # Verify that setComplexFieldCID was called with className containing biounit_id
+        assert contract.get_complex_cid_calls >= 1
+        
+        # THEN: IPFS download_json called with CID
+        assert cid in ipfs_service._storage
+        
+        # THEN: Result contains fields (not full complex data)
+        assert result is not None
+        assert isinstance(result, dict)
+        assert "generic_description" in result
+        assert "effects" in result
+        assert result["generic_description"] == "Test description"
+        assert result["effects"] == "Test effects"
+        # Result should be fields only, not full complex data structure
+        assert "label" not in result
+        assert "type" not in result
+
+    def test_load_component_description_from_ipfs_uses_cache(self, multilingual_ipfs_service, blockchain_service, ipfs_factory, translation_cache_service):
+        """Test that _load_component_description_from_ipfs uses cache"""
+        # GIVEN: Data already in cache
+        component_id = "amanita_muscaria"
+        language = "ru"
+        className = f"ComponentDescription.{component_id}"
+        cache_key = f"complex_{className}_{language}"
+        
+        cached_complex_data = {
+            "label": "ComponentDescription",
+            "type": "complex",
+            "fields": {
+                "generic_description": "Cached description",
+                "effects": "Cached effects"
+            }
+        }
+        
+        # Save to external cache
+        translation_cache_service.set(cache_key, cached_complex_data, 'ipfs')
+        
+        # WHEN: Loading component description
+        result = multilingual_ipfs_service._load_component_description_from_ipfs(component_id, language)
+        
+        # THEN: Result from cache (fields only)
+        assert result is not None
+        assert result == cached_complex_data["fields"]
+        assert result["generic_description"] == "Cached description"
+        
+        # THEN: BlockchainService NOT called (cache hit)
+        contract = blockchain_service.get_contract("AmanitaInternational")
+        initial_calls = contract.get_complex_cid_calls
+        
+        # Second call should also use cache
+        result2 = multilingual_ipfs_service._load_component_description_from_ipfs(component_id, language)
+        assert result2 == result
+        
+        # Verify no additional blockchain calls
+        assert contract.get_complex_cid_calls == initial_calls
+
+    def test_load_component_description_from_ipfs_empty_cid(self, multilingual_ipfs_service, blockchain_service):
+        """Test handling of empty CID for per-component description"""
+        # GIVEN: Blockchain contract returns empty CID
+        component_id = "amanita_muscaria"
+        language = "ru"
+        className = f"ComponentDescription.{component_id}"
+        
+        contract = blockchain_service.get_contract("AmanitaInternational")
+        
+        # Set empty CID in blockchain stub
+        contract.functions.setComplexFieldCID(className, language, "").transact()
+        
+        # WHEN: Loading component description
+        result = multilingual_ipfs_service._load_component_description_from_ipfs(component_id, language)
+        
+        # THEN: Result is None (empty CID handled)
+        assert result is None
+
+    def test_get_component_translations_uses_complex_fields(self, multilingual_ipfs_service, blockchain_service, ipfs_factory):
+        """Test that get_component_translations() uses complex fields"""
+        # GIVEN: Blockchain contract returns CID for per-component complex field
+        component_id = "amanita_muscaria"
+        language = "ru"
+        className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
+        cid = "QmTranslationsCID"
+        
+        contract = blockchain_service.get_contract("AmanitaInternational")
+        
+        # Set CID in blockchain stub with className containing biounit_id
+        contract.functions.setComplexFieldCID(className, language, cid).transact()
+        
+        # GIVEN: IPFS service returns valid JSON with translations
+        ipfs_service = ipfs_factory.get_service()
+        translations = {
+            "generic_description": "Test description",
+            "effects": "Test effects",
+            "shamanic": "Test shamanic",
+            "warnings": "Test warnings"
+        }
+        valid_payload = {
+            "label": "ComponentDescription",
+            "type": "complex",
+            "fields": translations
+        }
+        ipfs_service._storage[cid] = valid_payload
+        
+        # WHEN: Getting component translations
+        result = multilingual_ipfs_service.get_component_translations(component_id, language)
+        
+        # THEN: Contract was called with correct className (with biounit_id)
+        assert contract.get_complex_cid_calls >= 1
+        
+        # THEN: IPFS download_json called with CID
+        assert cid in ipfs_service._storage
+        
+        # THEN: Result contains translations from complex fields
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result == translations
+        assert result["generic_description"] == "Test description"
+        assert result["effects"] == "Test effects"
+        assert result["shamanic"] == "Test shamanic"
+        assert result["warnings"] == "Test warnings"
+
+    def test_get_component_translations_uses_cache_for_complex_fields(self, multilingual_ipfs_service, blockchain_service, ipfs_factory, translation_cache_service):
+        """Test that get_component_translations() uses cache for complex fields"""
+        # GIVEN: Data already in cache
+        component_id = "amanita_muscaria"
+        language = "ru"
+        cache_key = f"component_{component_id}_{language}"
+        cached_fields = {
+            "generic_description": "Cached description",
+            "effects": "Cached effects",
+            "shamanic": "Cached shamanic",
+            "warnings": "Cached warnings"
+        }
+        
+        # Save to external cache
+        translation_cache_service.set(cache_key, cached_fields, 'ipfs')
+        
+        # WHEN: Getting component translations
+        result = multilingual_ipfs_service.get_component_translations(component_id, language)
+        
+        # THEN: Result from cache
+        assert result is not None
+        assert result == cached_fields
+        
+        # THEN: BlockchainService NOT called (cache hit)
+        contract = blockchain_service.get_contract("AmanitaInternational")
+        initial_calls = contract.get_complex_cid_calls
+        
+        # Second call should also use cache
+        result2 = multilingual_ipfs_service.get_component_translations(component_id, language)
+        assert result2 == result
+        
+        # Verify no additional blockchain calls
+        assert contract.get_complex_cid_calls == initial_calls
 
 

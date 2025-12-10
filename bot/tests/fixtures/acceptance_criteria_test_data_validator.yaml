@@ -1,0 +1,35 @@
+acceptance_criteria:
+  - id: AC-001
+    description: TestDataValidator.validate_product_data() проверяет обязательные поля
+    conditions:
+      - Возвращает ValidationResult.success() если все обязательные поля присутствуют
+      - Возвращает ValidationResult.failure() если отсутствует обязательное поле
+      - Error code: MISSING_REQUIRED_FIELD
+      - Field name указывает на отсутствующее поле
+    validation:
+      - Валидный продукт проходит проверку
+      - Невалидный продукт (без поля) не проходит проверку
+  
+  - id: AC-002
+    description: TestDataValidator.validate_product_data() проверяет отсутствие legacy полей
+    conditions:
+      - Проверяет legacy поля на уровне продукта (form, component_id)
+      - Проверяет legacy поля в компонентах (description_cid)
+      - Возвращает ValidationResult.failure() если найдены legacy поля
+      - Error code: LEGACY_FIELD_DETECTED
+      - Field name указывает на legacy поле
+    validation:
+      - Продукт с legacy полями не проходит проверку
+      - Продукт без legacy полей проходит проверку
+  
+  - id: AC-003
+    description: TestDataValidator.validate_product_data() проверяет типы данных
+    conditions:
+      - Проверяет что forms - массив
+      - Проверяет что organic_components - массив
+      - Возвращает ValidationResult.failure() если тип неверный
+      - Error code: INVALID_FIELD_TYPE
+    validation:
+      - Продукт с правильными типами проходит проверку
+      - Продукт с неверными типами не проходит проверку
+

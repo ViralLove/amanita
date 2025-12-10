@@ -1,0 +1,24 @@
+acceptance_criteria:
+  - id: AC-001
+    description: fixtures/products.json содержит валидные продукты в едином формате
+    conditions:
+      - Все продукты используют business_id (не id)
+      - Все компоненты используют component_id (не biounit_id)
+      - Нет description_cid в компонентах
+      - Все обязательные поля присутствуют: business_id, title, cover_image_url, species, organic_components, forms
+      - forms всегда массив
+      - organic_components всегда массив
+    validation:
+      - Все продукты проходят валидацию через TestDataValidator
+      - Все продукты проходят валидацию через ProductValidator
+  
+  - id: AC-002
+    description: fixtures/products.json содержит невалидные продукты для тестирования
+    conditions:
+      - Невалидные продукты демонстрируют разные типы ошибок
+      - Каждый невалидный продукт имеет понятное название (invalid_*)
+      - Невалидные продукты используются для тестирования валидации
+    validation:
+      - Невалидные продукты НЕ проходят валидацию через ProductValidator
+      - Каждый невалидный продукт имеет уникальный тип ошибки
+

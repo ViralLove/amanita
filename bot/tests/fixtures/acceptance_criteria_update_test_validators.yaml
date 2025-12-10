@@ -1,0 +1,38 @@
+acceptance_criteria:
+  - id: AC-001
+    description: Все тесты используют TestDataFactory для создания тестовых данных
+    conditions:
+      - test_valid_product использует TestDataFactory.create_valid_product()
+      - test_invalid_product_id использует TestDataFactory.create_product_with_empty_field("business_id")
+      - test_empty_title использует TestDataFactory.create_product_with_empty_field("title")
+      - test_empty_organic_components использует TestDataFactory.create_product_with_empty_field("organic_components")
+      - test_invalid_component использует TestDataFactory с переопределением component_id
+      - test_invalid_cover_image использует TestDataFactory с переопределением cover_image_url
+      - test_invalid_price использует TestDataFactory.create_product_with_prices() с невалидной ценой
+    validation:
+      - Все тесты используют TestDataFactory
+      - Нет прямого создания словарей с тестовыми данными
+  
+  - id: AC-002
+    description: Все legacy поля удалены из тестовых данных
+    conditions:
+      - Нет description_cid в компонентах
+      - Нет form (единственное число)
+      - Нет component_id на уровне продукта
+    validation:
+      - TestDataValidator.validate_product_data() проходит для всех тестовых данных
+      - Нет упоминаний legacy полей в тестах
+  
+  - id: AC-003
+    description: Проверки error_code соответствуют реальной логике валидатора
+    conditions:
+      - test_invalid_product_id проверяет INVALID_BUSINESS_ID (не MISSING_BUSINESS_ID) для пустой строки
+      - test_empty_title проверяет EMPTY_TITLE (после добавления forms)
+      - test_empty_organic_components проверяет EMPTY_ORGANIC_COMPONENTS (после добавления forms)
+      - test_invalid_component проверяет EMPTY_BIOUNIT_ID (после добавления forms)
+      - test_invalid_cover_image проверяет INVALID_CID_PREFIX или другой код ошибки CID
+      - test_invalid_price проверяет PRICE_TOO_LOW
+    validation:
+      - Все тесты проходят с правильными error_code
+      - Тесты проверяют реальное поведение валидатора
+

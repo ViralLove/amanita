@@ -1,0 +1,31 @@
+acceptance_criteria:
+  - id: AC-001
+    description: Все прямые создания ProductRegistryService заменены на использование фикстуры
+    conditions:
+      - Нет прямых вызовов ProductRegistryService() в тестах
+      - Все тесты используют фикстуру mock_registry_service
+      - Тесты, которые уже используют фикстуры, остаются без изменений
+    validation:
+      - Нет вызовов ProductRegistryService() в test_product_registry_unit.py
+      - Все тесты используют mock_registry_service fixture
+  
+  - id: AC-002
+    description: Специфичные настройки моков сохранены
+    conditions:
+      - Тесты, которые настраивают специфичные моки, сохраняют эту функциональность
+      - Настройка моков выполняется через зависимости сервиса (registry_service.blockchain_service, registry_service.storage_service и т.д.)
+      - Логика тестов не изменена
+    validation:
+      - Тесты с настройками моков работают корректно
+      - Специфичные настройки применяются к зависимостям сервиса
+  
+  - id: AC-003
+    description: Тесты проходят без ошибок
+    conditions:
+      - Все тесты проходят успешно
+      - Нет ошибок подключения к Web3
+      - Нет ошибок создания реальных сервисов
+    validation:
+      - Тесты проходят без ошибок
+      - Нет попыток подключения к внешним сервисам
+

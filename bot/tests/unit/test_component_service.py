@@ -313,3 +313,192 @@ class TestComponentServiceHelpers:
         assert "amanita_muscaria" in service._cache
         assert len(service._cache) == 1  # Only one component cached
 
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestComponentServiceGetComponentDescription:
+    """Test get_component_description() method with complex fields"""
+    
+    @pytest.fixture
+    def mock_multilingual_ipfs_service(self):
+        """Mock MultilingualIPFSService для тестирования get_component_description"""
+        from unittest.mock import MagicMock
+        mock_service = MagicMock()
+        # _load_component_description_from_ipfs - синхронный метод, не async
+        mock_service._load_component_description_from_ipfs = MagicMock()
+        return mock_service
+    
+    async def test_get_component_description_success(
+        self, 
+        mock_blockchain_service, 
+        mock_storage_service,
+        mock_multilingual_ipfs_service
+    ):
+        """Test successful component description fetch via MultilingualIPFSService"""
+        from model.component_description import ComponentDescription
+        
+        # GIVEN: ComponentService with mocked MultilingualIPFSService
+        service = ComponentService(
+            blockchain_service=mock_blockchain_service,
+            storage_service=mock_storage_service,
+            multilingual_ipfs_service=mock_multilingual_ipfs_service
+        )
+        
+        component_id = "amanita_muscaria"
+        language = "ru"
+        expected_fields = {
+            "generic_description": "Test description",
+            "effects": "Test effects",
+            "shamanic": "Test shamanic",
+            "warnings": "Test warnings"
+        }
+        
+        # Mock _load_component_description_from_ipfs to return fields (синхронный метод)
+        mock_multilingual_ipfs_service._load_component_description_from_ipfs.return_value = expected_fields
+        
+        # WHEN: Getting component description
+        result = await service.get_component_description(component_id, language)
+        
+        # THEN: Method called with correct parameters (component_id, language)
+        mock_multilingual_ipfs_service._load_component_description_from_ipfs.assert_called_once_with(
+            component_id, language
+        )
+        
+        # THEN: Result is ComponentDescription
+        assert result is not None
+        assert isinstance(result, ComponentDescription)
+        assert result.generic_description == "Test description"
+        assert result.effects == "Test effects"
+        assert result.shamanic == "Test shamanic"
+        assert result.warnings == "Test warnings"
+    
+    async def test_get_component_description_uses_cache(
+        self,
+        mock_blockchain_service,
+        mock_storage_service,
+        mock_multilingual_ipfs_service
+    ):
+        """Test that get_component_description uses cache"""
+        service = ComponentService(
+            blockchain_service=mock_blockchain_service,
+            storage_service=mock_storage_service,
+            multilingual_ipfs_service=mock_multilingual_ipfs_service
+        )
+        
+        component_id = "amanita_muscaria"
+        language = "ru"
+        expected_fields = {
+            "generic_description": "Cached description",
+            "effects": "Cached effects"
+        }
+        
+        # First call - populate cache
+        mock_multilingual_ipfs_service._load_component_description_from_ipfs.return_value = expected_fields
+        result1 = await service.get_component_description(component_id, language)
+        
+        # Reset mock to verify second call uses cache
+        mock_multilingual_ipfs_service._load_component_description_from_ipfs.reset_mock()
+        # Не устанавливаем return_value, чтобы проверить что метод не вызывается
+        
+        # Second call - should use cache
+        result2 = await service.get_component_description(component_id, language)
+        
+        # THEN: Same result from cache
+        assert result1 is not None
+        assert result2 is not None
+        assert result1 is result2  # Same object from cache
+        
+        # THEN: MultilingualIPFSService NOT called second time
+        mock_multilingual_ipfs_service._load_component_description_from_ipfs.assert_not_called()
+    
+    async def test_get_component_description_returns_none_when_no_data(
+        self,
+        mock_blockchain_service,
+        mock_storage_service,
+        mock_multilingual_ipfs_service
+    ):
+        """Test that get_component_description returns None when no data available"""
+        service = ComponentService(
+            blockchain_service=mock_blockchain_service,
+            storage_service=mock_storage_service,
+            multilingual_ipfs_service=mock_multilingual_ipfs_service
+        )
+        
+        component_id = "amanita_muscaria"
+        language = "ru"
+        
+        # Mock _load_component_description_from_ipfs to return None
+        mock_multilingual_ipfs_service._load_component_description_from_ipfs.return_value = None
+        
+        # WHEN: Getting component description
+        result = await service.get_component_description(component_id, language)
+        
+        # THEN: Result is None
+        assert result is None
+        
+        # THEN: Method was called
+        mock_multilingual_ipfs_service._load_component_description_from_ipfs.assert_called_once_with(
+            component_id, language
+        )
+    
+    async def test_get_component_description_returns_none_when_component_not_found(
+        self,
+        mock_blockchain_service,
+        mock_storage_service,
+        mock_multilingual_ipfs_service
+    ):
+        """Test that get_component_description returns None when component not found"""
+        service = ComponentService(
+            blockchain_service=mock_blockchain_service,
+            storage_service=mock_storage_service,
+            multilingual_ipfs_service=mock_multilingual_ipfs_service
+        )
+        
+        component_id = "non_existent_component"
+        language = "ru"
+        
+        # WHEN: Getting component description for non-existent component
+        result = await service.get_component_description(component_id, language)
+        
+        # THEN: Result is None (component not found)
+        assert result is None
+        
+        # THEN: MultilingualIPFSService NOT called (component check failed first)
+        mock_multilingual_ipfs_service._load_component_description_from_ipfs.assert_not_called()
+    
+    async def test_get_component_description_uses_correct_classname_format(
+        self,
+        mock_blockchain_service,
+        mock_storage_service,
+        mock_multilingual_ipfs_service
+    ):
+        """Test that get_component_description uses correct className format with biounit_id"""
+        service = ComponentService(
+            blockchain_service=mock_blockchain_service,
+            storage_service=mock_storage_service,
+            multilingual_ipfs_service=mock_multilingual_ipfs_service
+        )
+        
+        component_id = "amanita_muscaria"
+        language = "ru"
+        expected_fields = {
+            "generic_description": "Test description"
+        }
+        
+        # Mock _load_component_description_from_ipfs
+        mock_multilingual_ipfs_service._load_component_description_from_ipfs.return_value = expected_fields
+        
+        # WHEN: Getting component description
+        result = await service.get_component_description(component_id, language)
+        
+        # THEN: Method called with component_id (not className)
+        # _load_component_description_from_ipfs internally forms className = "ComponentDescription.{component_id}"
+        mock_multilingual_ipfs_service._load_component_description_from_ipfs.assert_called_once_with(
+            component_id,  # ✅ component_id передается напрямую
+            language
+        )
+        
+        # THEN: Result is valid
+        assert result is not None
+        assert result.generic_description == "Test description"
+

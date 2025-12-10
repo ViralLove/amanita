@@ -2,8 +2,7 @@
 Unit tests for ProductAssembler.
 
 Tests:
-- _detect_product_format(): SINGLE/MULTI detection
-- _enrich_single_component(): ComponentService integration
+- _enrich_components(): ComponentService integration (unified method)
 """
 
 import pytest
@@ -24,207 +23,8 @@ class MockComponentService:
 
 
 @pytest.mark.unit
-class TestProductAssemblerDetectFormat:
-    """Test _detect_product_format() method"""
-    
-    @pytest.fixture
-    def assembler(self):
-        """Create ProductAssembler with mock ComponentService"""
-        mock_component_service = MockComponentService()
-        return ProductAssembler(component_service=mock_component_service)
-    
-    def test_detect_single_format(self, assembler):
-        """Test detection of SINGLE format (component_id at root)"""
-        metadata = {
-            "business_id": "product_001",
-            "title": "Amanita Muscaria",
-            "component_id": "amanita_muscaria",
-            "proportion": "100g",
-            "categories": ["mushrooms"],
-            "forms": ["dried"],
-            "species": ["Amanita muscaria"]
-        }
-        
-        format_type = assembler._detect_product_format(metadata)
-        
-        assert format_type == ProductAssembler.FORMAT_SINGLE
-    
-    def test_detect_single_format_empty_component_id(self, assembler):
-        """Test that empty component_id raises ValueError"""
-        metadata = {
-            "business_id": "product_001",
-            "component_id": "",  # Empty string
-            "categories": ["mushrooms"]
-        }
-        
-        with pytest.raises(ValueError, match="Неподдерживаемый формат"):
-            assembler._detect_product_format(metadata)
-    
-    def test_detect_multi_format(self, assembler):
-        """Test detection of NEW_MULTI format (organic_components array)"""
-        metadata = {
-            "business_id": "product_002",
-            "title": "Blend Product",
-            "organic_components": [
-                {
-                    "component_id": "amanita_muscaria",
-                    "proportion": "50g"
-                },
-                {
-                    "component_id": "psilocybe_cubensis",
-                    "proportion": "30g"
-                }
-            ],
-            "categories": ["mushrooms", "blends"],
-            "forms": ["dried"],
-            "species": ["Amanita muscaria", "Psilocybe cubensis"]
-        }
-        
-        format_type = assembler._detect_product_format(metadata)
-        
-        assert format_type == ProductAssembler.FORMAT_MULTI
-    
-    def test_detect_multi_format_single_component(self, assembler):
-        """Test NEW_MULTI format with single component in array"""
-        metadata = {
-            "business_id": "product_003",
-            "title": "Single Component in Array",
-            "organic_components": [
-                {
-                    "component_id": "blue_lotus",
-                    "proportion": "100g"
-                }
-            ],
-            "categories": ["flowers"],
-            "forms": ["dried"]
-        }
-        
-        format_type = assembler._detect_product_format(metadata)
-        
-        assert format_type == ProductAssembler.FORMAT_MULTI
-    
-    def test_reject_empty_organic_components_array(self, assembler):
-        """Test that empty organic_components array raises ValueError"""
-        metadata = {
-            "business_id": "product_006",
-            "title": "Empty Components",
-            "organic_components": [],  # Empty array
-            "categories": ["mushrooms"]
-        }
-        
-        with pytest.raises(ValueError, match="Пустой массив organic_components|Empty organic_components"):
-            assembler._detect_product_format(metadata)
-    
-    def test_reject_organic_components_without_component_id(self, assembler):
-        """Test that organic_components without component_id raises ValueError"""
-        metadata = {
-            "business_id": "product_007",
-            "title": "Missing Component ID",
-            "organic_components": [
-                {
-                    "proportion": "100g"  # No component_id!
-                }
-            ],
-            "categories": ["mushrooms"]
-        }
-        
-        with pytest.raises(ValueError, match="не содержат component_id|does not contain component_id"):
-            assembler._detect_product_format(metadata)
-    
-    def test_reject_unknown_format_no_component_id_no_organic_components(self, assembler):
-        """Test that metadata without component_id or organic_components raises ValueError"""
-        metadata = {
-            "business_id": "product_008",
-            "title": "Unknown Format",
-            "categories": ["mushrooms"]
-            # No component_id, no organic_components
-        }
-        
-        with pytest.raises(ValueError, match="Неподдерживаемый формат|Unsupported product format"):
-            assembler._detect_product_format(metadata)
-    
-    def test_reject_unknown_format_only_business_id(self, assembler):
-        """Test that minimal metadata raises ValueError"""
-        metadata = {
-            "business_id": "product_009"
-            # Minimal metadata, no component info
-        }
-        
-        with pytest.raises(ValueError, match="Неподдерживаемый формат|Unsupported product format"):
-            assembler._detect_product_format(metadata)
-    
-    def test_detect_single_with_additional_fields(self, assembler):
-        """Test NEW_SINGLE format with many additional fields"""
-        metadata = {
-            "business_id": "product_010",
-            "title": "Rich Metadata Product",
-            "component_id": "amanita_muscaria",
-            "proportion": "100g",
-            "categories": ["mushrooms"],
-            "forms": ["dried", "powder"],
-            "species": ["Amanita muscaria"],
-            "cover_image_url": "QmImage123",
-            "description": "Some description",
-            "price": 100,
-            "currency": "USD"
-        }
-        
-        format_type = assembler._detect_product_format(metadata)
-        
-        assert format_type == ProductAssembler.FORMAT_SINGLE
-    
-    def test_detect_multi_with_additional_fields(self, assembler):
-        """Test NEW_MULTI format with many additional fields"""
-        metadata = {
-            "business_id": "product_011",
-            "title": "Rich Multi-Component Product",
-            "organic_components": [
-                {
-                    "component_id": "amanita_muscaria",
-                    "proportion": "50g",
-                    "extraction_method": "dried"
-                },
-                {
-                    "component_id": "psilocybe_cubensis",
-                    "proportion": "30g",
-                    "purity": "99%"
-                }
-            ],
-            "categories": ["mushrooms", "blends"],
-            "forms": ["dried"],
-            "species": ["Amanita muscaria", "Psilocybe cubensis"],
-            "cover_image_url": "QmBlendImage"
-        }
-        
-        format_type = assembler._detect_product_format(metadata)
-        
-        assert format_type == ProductAssembler.FORMAT_MULTI
-    
-    def test_reject_component_id_not_string(self, assembler):
-        """Test that non-string component_id raises ValueError"""
-        metadata = {
-            "business_id": "product_012",
-            "component_id": 12345,  # Not a string
-            "categories": ["mushrooms"]
-        }
-        
-        with pytest.raises(ValueError, match="Неподдерживаемый формат|Unsupported product format"):
-            assembler._detect_product_format(metadata)
-    
-    def test_reject_organic_components_not_list(self, assembler):
-        """Test that organic_components not being a list raises ValueError"""
-        metadata = {
-            "business_id": "product_013",
-            "organic_components": "not_a_list",  # Should be a list
-            "categories": ["mushrooms"]
-        }
-        
-        with pytest.raises(ValueError, match="Неподдерживаемый формат|Unsupported product format"):
-            assembler._detect_product_format(metadata)
-
-@pytest.mark.unit
-class TestProductAssemblerEnrichSingle:
-    """Test _enrich_single_component() method"""
+class TestProductAssemblerEnrichComponents:
+    """Test _enrich_components() method (unified for all products)"""
     
     @pytest.fixture
     def mock_component_service(self):
@@ -248,18 +48,22 @@ class TestProductAssemblerEnrichSingle:
         return ProductAssembler(component_service=mock_component_service)
     
     @pytest.mark.asyncio
-    async def test_enrich_single_component_success(self, assembler):
-        """Test successful enrichment of SINGLE product"""
+    async def test_enrich_components_single_component_success(self, assembler):
+        """Test successful enrichment of product with single component"""
         metadata = {
             "business_id": "test_product",
-            "component_id": "amanita_muscaria",
-            "proportion": "100g",
-            "title": "Test Product"
+            "title": "Test Product",
+            "organic_components": [
+                {
+                    "component_id": "amanita_muscaria",
+                    "proportion": "100g"
+                }
+            ]
         }
         
-        enriched = await assembler._enrich_single_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
-        # Check organic_components added
+        # Check organic_components enriched
         assert "organic_components" in enriched
         assert isinstance(enriched["organic_components"], list)
         assert len(enriched["organic_components"]) == 1
@@ -273,45 +77,54 @@ class TestProductAssemblerEnrichSingle:
         assert "features" in component
     
     @pytest.mark.asyncio
-    async def test_enrich_single_component_default_proportion(self, assembler):
-        """Test enrichment with default proportion"""
+    async def test_enrich_components_missing_proportion(self, assembler):
+        """Test ValueError when proportion missing"""
         metadata = {
             "business_id": "test_product",
-            "component_id": "amanita_muscaria",
-            "title": "Test Product"
-            # No proportion → should default to "100g"
+            "organic_components": [
+                {
+                    "component_id": "amanita_muscaria"
+                    # No proportion
+                }
+            ]
         }
         
-        enriched = await assembler._enrich_single_component(metadata)
-        
-        component = enriched["organic_components"][0]
-        assert component["proportion"] == "100g"
+        with pytest.raises(ValueError, match="Отсутствует proportion|Missing proportion"):
+            await assembler._enrich_components(metadata, "ru")
     
     @pytest.mark.asyncio
-    async def test_enrich_single_component_not_found(self, assembler):
+    async def test_enrich_components_component_not_found(self, assembler):
         """Test ValueError when component not found in registry"""
         metadata = {
             "business_id": "test_product",
-            "component_id": "non_existent_component",
-            "proportion": "50g"
+            "organic_components": [
+                {
+                    "component_id": "non_existent_component",
+                    "proportion": "50g"
+                }
+            ]
         }
         
         with pytest.raises(ValueError, match="не найден|not found"):
-            await assembler._enrich_single_component(metadata)
+            await assembler._enrich_components(metadata, "ru")
     
     @pytest.mark.asyncio
-    async def test_enrich_single_component_preserves_metadata(self, assembler):
+    async def test_enrich_components_preserves_metadata(self, assembler):
         """Test that original metadata is preserved"""
         metadata = {
             "business_id": "test_product",
-            "component_id": "amanita_muscaria",
-            "proportion": "100g",
             "title": "Test Product",
             "categories": ["mushrooms"],
-            "extra_field": "extra_value"
+            "extra_field": "extra_value",
+            "organic_components": [
+                {
+                    "component_id": "amanita_muscaria",
+                    "proportion": "100g"
+                }
+            ]
         }
         
-        enriched = await assembler._enrich_single_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         # Check original fields preserved
         assert enriched["business_id"] == "test_product"
@@ -319,13 +132,13 @@ class TestProductAssemblerEnrichSingle:
         assert enriched["categories"] == ["mushrooms"]
         assert enriched["extra_field"] == "extra_value"
         
-        # Check new field added
-        assert "organic_components" in enriched
+        # Check components enriched
+        assert len(enriched["organic_components"]) == 1
 
 
 @pytest.mark.unit
-class TestProductAssemblerEnrichMulti:
-    """Test _enrich_multi_component() method"""
+class TestProductAssemblerEnrichComponentsMulti:
+    """Test _enrich_components() method with multiple components"""
     
     @pytest.fixture
     def mock_component_service(self):
@@ -362,8 +175,8 @@ class TestProductAssemblerEnrichMulti:
         return ProductAssembler(component_service=mock_component_service)
     
     @pytest.mark.asyncio
-    async def test_enrich_multi_component_success(self, assembler):
-        """Test successful enrichment of MULTI product"""
+    async def test_enrich_components_multi_success(self, assembler):
+        """Test successful enrichment of product with multiple components"""
         metadata = {
             "business_id": "blend_product",
             "title": "Relaxation Blend",
@@ -373,7 +186,7 @@ class TestProductAssemblerEnrichMulti:
             ]
         }
         
-        enriched = await assembler._enrich_multi_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         # Check organic_components enriched
         assert "organic_components" in enriched
@@ -395,7 +208,7 @@ class TestProductAssemblerEnrichMulti:
         assert comp2["scientific_title"] == "Hericium erinaceus"
     
     @pytest.mark.asyncio
-    async def test_enrich_multi_component_three_components(self, assembler):
+    async def test_enrich_components_three_components(self, assembler):
         """Test enrichment with three components"""
         metadata = {
             "business_id": "triple_blend",
@@ -406,7 +219,7 @@ class TestProductAssemblerEnrichMulti:
             ]
         }
         
-        enriched = await assembler._enrich_multi_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         assert len(enriched["organic_components"]) == 3
         assert enriched["organic_components"][0]["component_id"] == "amanita_muscaria"
@@ -414,7 +227,7 @@ class TestProductAssemblerEnrichMulti:
         assert enriched["organic_components"][2]["component_id"] == "passionflower"
     
     @pytest.mark.asyncio
-    async def test_enrich_multi_component_not_found(self, assembler):
+    async def test_enrich_components_not_found(self, assembler):
         """Test ValueError when component not found in registry"""
         metadata = {
             "business_id": "invalid_blend",
@@ -425,10 +238,10 @@ class TestProductAssemblerEnrichMulti:
         }
         
         with pytest.raises(ValueError, match="не найден|not found"):
-            await assembler._enrich_multi_component(metadata)
+            await assembler._enrich_components(metadata, "ru")
     
     @pytest.mark.asyncio
-    async def test_enrich_multi_component_missing_component_id(self, assembler):
+    async def test_enrich_components_missing_component_id(self, assembler):
         """Test ValueError when component_id missing"""
         metadata = {
             "business_id": "invalid_blend",
@@ -438,10 +251,10 @@ class TestProductAssemblerEnrichMulti:
         }
         
         with pytest.raises(ValueError, match="Отсутствует component_id|Missing component_id"):
-            await assembler._enrich_multi_component(metadata)
+            await assembler._enrich_components(metadata, "ru")
     
     @pytest.mark.asyncio
-    async def test_enrich_multi_component_missing_proportion(self, assembler):
+    async def test_enrich_components_missing_proportion(self, assembler):
         """Test ValueError when proportion missing"""
         metadata = {
             "business_id": "invalid_blend",
@@ -451,10 +264,32 @@ class TestProductAssemblerEnrichMulti:
         }
         
         with pytest.raises(ValueError, match="Отсутствует proportion|Missing proportion"):
-            await assembler._enrich_multi_component(metadata)
+            await assembler._enrich_components(metadata, "ru")
     
     @pytest.mark.asyncio
-    async def test_enrich_multi_component_preserves_metadata(self, assembler):
+    async def test_enrich_components_empty_array(self, assembler):
+        """Test ValueError when organic_components is empty"""
+        metadata = {
+            "business_id": "invalid_product",
+            "organic_components": []  # Empty array
+        }
+        
+        with pytest.raises(ValueError, match="не может быть пустым|cannot be empty"):
+            await assembler._enrich_components(metadata, "ru")
+    
+    @pytest.mark.asyncio
+    async def test_enrich_components_missing_organic_components(self, assembler):
+        """Test ValueError when organic_components missing"""
+        metadata = {
+            "business_id": "invalid_product"
+            # No organic_components
+        }
+        
+        with pytest.raises(ValueError, match="Отсутствует обязательное поле|Missing required field"):
+            await assembler._enrich_components(metadata, "ru")
+    
+    @pytest.mark.asyncio
+    async def test_enrich_components_preserves_metadata(self, assembler):
         """Test that original metadata is preserved"""
         metadata = {
             "business_id": "blend_product",
@@ -467,7 +302,7 @@ class TestProductAssemblerEnrichMulti:
             ]
         }
         
-        enriched = await assembler._enrich_multi_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         # Check original fields preserved
         assert enriched["business_id"] == "blend_product"
@@ -477,3 +312,195 @@ class TestProductAssemblerEnrichMulti:
         
         # Check components enriched
         assert len(enriched["organic_components"]) == 2
+
+
+@pytest.mark.unit
+class TestProductAssemblerExtractBlockchainData:
+    """Test _extract_blockchain_data() method with new structure (5 elements)"""
+    
+    @pytest.fixture
+    def assembler(self):
+        """Create ProductAssembler with mock ComponentService"""
+        mock_component_service = MockComponentService()
+        return ProductAssembler(component_service=mock_component_service)
+    
+    def test_extract_blockchain_data_success(self, assembler):
+        """Test successful extraction with new structure (5 elements)"""
+        blockchain_data = (
+            123,                              # [0] id
+            "0x1234567890abcdef",            # [1] seller
+            ["amanita_muscaria", "lions_mane"],  # [2] componentIds
+            "QmMetadataCID123",              # [3] metadataCID
+            True                              # [4] active
+        )
+        
+        result = assembler._extract_blockchain_data(blockchain_data)
+        
+        assert result is not None
+        product_id, seller, component_ids, ipfs_cid, is_active = result
+        
+        assert product_id == 123
+        assert seller == "0x1234567890abcdef"
+        assert component_ids == ["amanita_muscaria", "lions_mane"]
+        assert ipfs_cid == "QmMetadataCID123"
+        assert is_active is True
+    
+    def test_extract_blockchain_data_single_component(self, assembler):
+        """Test extraction with single component in componentIds"""
+        blockchain_data = (
+            456,
+            "0xabcdef1234567890",
+            ["blue_lotus"],  # Single component
+            "QmSingleCID",
+            False
+        )
+        
+        result = assembler._extract_blockchain_data(blockchain_data)
+        
+        assert result is not None
+        product_id, seller, component_ids, ipfs_cid, is_active = result
+        
+        assert component_ids == ["blue_lotus"]
+        assert is_active is False
+    
+    def test_extract_blockchain_data_empty_component_ids(self, assembler):
+        """Test extraction with empty componentIds list"""
+        blockchain_data = (
+            789,
+            "0x9876543210fedcba",
+            [],  # Empty list
+            "QmEmptyCID",
+            True
+        )
+        
+        result = assembler._extract_blockchain_data(blockchain_data)
+        
+        assert result is not None
+        _, _, component_ids, _, _ = result
+        assert component_ids == []
+    
+    def test_extract_blockchain_data_insufficient_elements(self, assembler):
+        """Test that insufficient elements returns None"""
+        blockchain_data = (123, "0x123", "QmCID")  # Only 3 elements
+        
+        result = assembler._extract_blockchain_data(blockchain_data)
+        
+        assert result is None
+    
+    def test_extract_blockchain_data_invalid_component_ids_type(self, assembler):
+        """Test that non-list componentIds returns None"""
+        blockchain_data = (
+            123,
+            "0x123",
+            "not_a_list",  # Should be a list
+            "QmCID",
+            True
+        )
+        
+        result = assembler._extract_blockchain_data(blockchain_data)
+        
+        assert result is None
+
+
+@pytest.mark.unit
+class TestProductAssemblerValidateComponentIds:
+    """Test _validate_component_ids_match() method"""
+    
+    @pytest.fixture
+    def assembler(self):
+        """Create ProductAssembler with mock ComponentService"""
+        mock_component_service = MockComponentService()
+        return ProductAssembler(component_service=mock_component_service)
+    
+    def test_validate_component_ids_match_success(self, assembler):
+        """Test successful validation when componentIds match"""
+        component_ids = ["amanita_muscaria", "lions_mane"]
+        metadata = {
+            "business_id": "test_product",
+            "organic_components": [
+                {"component_id": "amanita_muscaria", "proportion": "50g"},
+                {"component_id": "lions_mane", "proportion": "50g"}
+            ]
+        }
+        
+        result = assembler._validate_component_ids_match(component_ids, metadata)
+        
+        assert result is True
+    
+    def test_validate_component_ids_match_different_order(self, assembler):
+        """Test validation when order differs but sets match"""
+        component_ids = ["lions_mane", "amanita_muscaria"]  # Different order
+        metadata = {
+            "organic_components": [
+                {"component_id": "amanita_muscaria", "proportion": "50g"},
+                {"component_id": "lions_mane", "proportion": "50g"}
+            ]
+        }
+        
+        result = assembler._validate_component_ids_match(component_ids, metadata)
+        
+        assert result is True  # Order doesn't matter
+    
+    def test_validate_component_ids_match_mismatch(self, assembler):
+        """Test validation fails when componentIds don't match"""
+        component_ids = ["amanita_muscaria", "lions_mane"]
+        metadata = {
+            "organic_components": [
+                {"component_id": "amanita_muscaria", "proportion": "50g"},
+                {"component_id": "blue_lotus", "proportion": "50g"}  # Different
+            ]
+        }
+        
+        result = assembler._validate_component_ids_match(component_ids, metadata)
+        
+        assert result is False
+    
+    def test_validate_component_ids_match_missing_in_metadata(self, assembler):
+        """Test validation fails when metadata has fewer components"""
+        component_ids = ["amanita_muscaria", "lions_mane", "blue_lotus"]
+        metadata = {
+            "organic_components": [
+                {"component_id": "amanita_muscaria", "proportion": "50g"}
+            ]
+        }
+        
+        result = assembler._validate_component_ids_match(component_ids, metadata)
+        
+        assert result is False
+    
+    def test_validate_component_ids_match_extra_in_metadata(self, assembler):
+        """Test validation fails when metadata has extra components"""
+        component_ids = ["amanita_muscaria"]
+        metadata = {
+            "organic_components": [
+                {"component_id": "amanita_muscaria", "proportion": "50g"},
+                {"component_id": "lions_mane", "proportion": "50g"}  # Extra
+            ]
+        }
+        
+        result = assembler._validate_component_ids_match(component_ids, metadata)
+        
+        assert result is False
+    
+    def test_validate_component_ids_match_missing_organic_components(self, assembler):
+        """Test validation fails when organic_components missing"""
+        component_ids = ["amanita_muscaria"]
+        metadata = {
+            "business_id": "test_product"
+            # No organic_components
+        }
+        
+        result = assembler._validate_component_ids_match(component_ids, metadata)
+        
+        assert result is False
+    
+    def test_validate_component_ids_match_empty_arrays(self, assembler):
+        """Test validation with empty arrays"""
+        component_ids = []
+        metadata = {
+            "organic_components": []
+        }
+        
+        result = assembler._validate_component_ids_match(component_ids, metadata)
+        
+        assert result is True  # Both empty, so they match

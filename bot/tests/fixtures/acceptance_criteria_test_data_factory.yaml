@@ -1,0 +1,33 @@
+acceptance_criteria:
+  - id: AC-001
+    description: TestDataFactory.create_valid_product() создает валидный продукт
+    conditions:
+      - Все обязательные поля присутствуют: business_id, title, cover_image_url, species, organic_components, forms
+      - forms всегда массив (даже для одного элемента)
+      - organic_components всегда массив
+      - Нет legacy полей (description_cid в компонентах, form единственное число)
+      - Поддерживает переопределения через **overrides
+    validation:
+      - Продукт проходит валидацию через ProductValidator
+      - Можно создать Product.from_dict() без ошибок
+  
+  - id: AC-002
+    description: TestDataFactory.create_invalid_product() создает невалидный продукт
+    conditions:
+      - Удаляет указанное поле из валидного продукта
+      - Поддерживает переопределения через **overrides
+      - Возвращает продукт без указанного поля
+    validation:
+      - Продукт НЕ проходит валидацию через ProductValidator
+      - Error code: MISSING_REQUIRED_FIELD
+  
+  - id: AC-003
+    description: TestDataFactory.create_product_with_empty_field() создает продукт с пустым полем
+    conditions:
+      - Для массивов (organic_components, forms) устанавливает []
+      - Для строк устанавливает ""
+      - Поддерживает переопределения через **overrides
+    validation:
+      - Продукт НЕ проходит валидацию через ProductValidator
+      - Error code зависит от типа поля (EMPTY_TITLE, EMPTY_ORGANIC_COMPONENTS, etc.)
+

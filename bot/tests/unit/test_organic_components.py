@@ -78,13 +78,21 @@ class TestGetComponent:
         assert isinstance(result, tuple)
         assert len(result) == 6
         
-        # Validate fields (Component struct)
-        assert result[0] == 1                                           # id
-        assert result[1] == "amanita_muscaria"                         # businessId
-        assert result[2] == "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"  # creator
-        assert result[3] == "ar://xyz123abc456def789"                  # rootMetadataCID
-        assert result[4] is True                                        # active
-        assert result[5] == 1730000000                                  # createdAt
+        # Validate fields (Component struct - реальная структура из контракта)
+        assert result[0] == 1                                           # blockchain_id
+        assert result[1] == "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"  # creator
+        assert result[2] == 1730000000                                  # created_at
+        assert result[3] == 1730000000                                  # last_updated
+        assert result[4] == 0                                           # status (ACTIVE=0)
+        assert result[5] is True                                        # is_shared
+        
+        # businessId получается отдельно через mapping
+        business_id = mock_blockchain_service.get_component_business_id(result[0])
+        assert business_id == "amanita_muscaria"
+        
+        # rootMetadataCID получается отдельно через mapping
+        cid = mock_blockchain_service.get_component_root_metadata("amanita_muscaria")
+        assert cid == "ar://xyz123abc456def789"
     
     def test_returns_none_for_nonexistent_component(self, mock_blockchain_service):
         """Should return None for unknown component"""
@@ -96,11 +104,11 @@ class TestGetComponent:
     
     def test_cid_format_is_valid(self, mock_blockchain_service):
         """Should return CID in Arweave format (ar://...)"""
-        # WHEN: Get component
-        result = mock_blockchain_service.get_component("amanita_muscaria")
+        # WHEN: Get CID through separate mapping (not from Component struct)
+        cid = mock_blockchain_service.get_component_root_metadata("amanita_muscaria")
         
-        # THEN: CID field is valid Arweave format
-        cid = result[3]
+        # THEN: CID is valid Arweave format
+        assert cid is not None
         assert cid.startswith("ar://")
         assert len(cid) > 10  # Arweave TX IDs are 43 chars + prefix
 
@@ -185,7 +193,13 @@ class TestGetAllComponents:
         assert len(result) == 2
         
         # Validate both components present
-        business_ids = [comp[1] for comp in result]
+        # businessId получается через componentBusinessIds mapping
+        business_ids = []
+        for comp in result:
+            blockchain_id = comp[0]
+            business_id = mock_blockchain_service.get_component_business_id(blockchain_id)
+            business_ids.append(business_id)
+        
         assert "amanita_muscaria" in business_ids
         assert "blue_lotus" in business_ids
     
@@ -194,16 +208,16 @@ class TestGetAllComponents:
         # WHEN: Get all components
         result = mock_blockchain_service.get_all_components()
         
-        # THEN: Each component has valid structure
+        # THEN: Each component has valid structure (реальная структура из контракта)
         for component in result:
             assert isinstance(component, tuple)
             assert len(component) == 6
-            assert isinstance(component[0], int)        # id
-            assert isinstance(component[1], str)        # businessId
-            assert isinstance(component[2], str)        # creator
-            assert component[3].startswith("ar://")     # rootMetadataCID
-            assert isinstance(component[4], bool)       # active
-            assert isinstance(component[5], int)        # createdAt
+            assert isinstance(component[0], int)        # blockchain_id
+            assert isinstance(component[1], str)        # creator (address)
+            assert isinstance(component[2], int)        # created_at
+            assert isinstance(component[3], int)        # last_updated
+            assert isinstance(component[4], int)        # status
+            assert isinstance(component[5], bool)       # is_shared
     
     def test_returns_empty_list_when_no_components(self, mock_blockchain_service):
         """Should return empty list if totalComponents = 0"""
@@ -281,7 +295,11 @@ class TestIntegrationScenarios:
         
         # THEN: Should have valid data
         assert component is not None
-        assert component[1] == component_id
+        
+        # Проверяем, что businessId совпадает через отдельный mapping
+        blockchain_id = component[0]
+        business_id = mock_blockchain_service.get_component_business_id(blockchain_id)
+        assert business_id == component_id
     
     def test_fetch_cid_for_arweave_retrieval(self, mock_blockchain_service):
         """Scenario: Get CID to fetch metadata from Arweave"""
@@ -306,8 +324,13 @@ class TestIntegrationScenarios:
         
         # WHEN: Fetch CID for each
         for component in all_components:
-            business_id = component[1]
-            cid = mock_blockchain_service.get_component_root_metadata_cid(business_id)
+            # businessId получается через componentBusinessIds mapping
+            blockchain_id = component[0]
+            business_id = mock_blockchain_service.get_component_business_id(blockchain_id)
+            assert business_id is not None
+            
+            # CID получается через getComponentRootMetadata mapping
+            cid = mock_blockchain_service.get_component_root_metadata(business_id)
             
             # THEN: Each has valid CID
             assert cid is not None

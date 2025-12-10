@@ -68,6 +68,7 @@ INTEGRATION_STORAGE = os.getenv("INTEGRATION_STORAGE", "mock")
 
 # ================== ТЕСТ ФИКСТУРЫ INTEGRATION_STORAGE_CONFIG =====================
 
+@pytest.mark.integration
 def test_integration_storage_config_fixture():
     """Тест логики выбора storage типа для интеграционных тестов AccountService"""
     logger.info("🧪 Тестируем логику выбора storage типа для AccountService")
@@ -81,11 +82,6 @@ def test_integration_storage_config_fixture():
         logger.info("🔧 Тестируем mock режим для AccountService")
         description = "Тестовый режим: Mock IPFS/Arweave (быстро, экономично, без реальных API вызовов)"
         storage_type = "mock"
-        
-    elif current_storage.lower() == "pinata":
-        logger.info("🔧 Тестируем Pinata режим для AccountService")
-        description = "Реальный Pinata IPFS (медленно, тратит бюджет)"
-        storage_type = "pinata"
         
     elif current_storage.lower() == "arweave":
         logger.info("🔧 Тестируем Arweave режим для AccountService")

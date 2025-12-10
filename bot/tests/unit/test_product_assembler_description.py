@@ -2,10 +2,9 @@
 Unit tests for ProductAssembler ComponentDescription enrichment.
 
 Tests:
-- _enrich_single_component(): ComponentDescription fetch for SINGLE products
-- _enrich_multi_component(): ComponentDescription fetch for MULTI products
+- _enrich_components(): ComponentDescription fetch for all products (unified method)
 
-Focus: Async logic, graceful degradation, error handling
+Focus: Async logic, graceful degradation, error handling, language parameter
 """
 
 import pytest
@@ -38,7 +37,7 @@ class MockComponentService:
 
 @pytest.mark.unit
 class TestProductAssemblerDescriptionSingle:
-    """Test ComponentDescription fetch for SINGLE products"""
+    """Test ComponentDescription fetch for products with single component"""
     
     @pytest.fixture
     def mock_component_service(self):
@@ -84,22 +83,26 @@ class TestProductAssemblerDescriptionSingle:
     # ==================================================================================
     
     @pytest.mark.asyncio
-    async def test_enrich_single_with_description_success(self, assembler):
+    async def test_enrich_components_with_description_success(self, assembler):
         """
-        Test successful ComponentDescription fetch for SINGLE product.
+        Test successful ComponentDescription fetch for product with single component.
         
-        GIVEN: SINGLE product metadata + component with description
-        WHEN: _enrich_single_component() called
+        GIVEN: Product metadata with single component + component with description
+        WHEN: _enrich_components() called with language
         THEN: Component dict includes 'description' field with all sections
         """
         metadata = {
             "business_id": "test_product",
-            "component_id": "amanita_muscaria",
-            "proportion": "100g",
-            "title": "Test Product"
+            "title": "Test Product",
+            "organic_components": [
+                {
+                    "component_id": "amanita_muscaria",
+                    "proportion": "100g"
+                }
+            ]
         }
         
-        enriched = await assembler._enrich_single_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         # Check organic_components added
         assert "organic_components" in enriched
@@ -128,21 +131,25 @@ class TestProductAssemblerDescriptionSingle:
         assert "микродозинг" in desc["warnings"]
     
     @pytest.mark.asyncio
-    async def test_enrich_single_preserves_component_data_with_description(self, assembler):
+    async def test_enrich_components_preserves_component_data_with_description(self, assembler):
         """
         Test that component data is preserved when description added.
         
-        GIVEN: SINGLE product with description
-        WHEN: _enrich_single_component() called
+        GIVEN: Product with single component and description
+        WHEN: _enrich_components() called with language
         THEN: Original component data preserved + description added
         """
         metadata = {
             "business_id": "test_product",
-            "component_id": "amanita_muscaria",
-            "proportion": "50g"
+            "organic_components": [
+                {
+                    "component_id": "amanita_muscaria",
+                    "proportion": "50g"
+                }
+            ]
         }
         
-        enriched = await assembler._enrich_single_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         component = enriched["organic_components"][0]
         
@@ -161,12 +168,12 @@ class TestProductAssemblerDescriptionSingle:
     # ==================================================================================
     
     @pytest.mark.asyncio
-    async def test_enrich_single_description_not_found(self, assembler):
+    async def test_enrich_components_description_not_found(self, assembler):
         """
         Test graceful degradation when ComponentDescription not found.
         
         GIVEN: Component exists, but no description for requested language
-        WHEN: _enrich_single_component() called
+        WHEN: _enrich_components() called with language
         THEN: Product still enriched, description gracefully skipped (no error)
         """
         # Setup: component exists, but remove description
@@ -174,12 +181,16 @@ class TestProductAssemblerDescriptionSingle:
         
         metadata = {
             "business_id": "test_product",
-            "component_id": "amanita_muscaria",
-            "proportion": "100g"
+            "organic_components": [
+                {
+                    "component_id": "amanita_muscaria",
+                    "proportion": "100g"
+                }
+            ]
         }
         
         # Should NOT raise exception
-        enriched = await assembler._enrich_single_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         # Component enriched successfully
         assert "organic_components" in enriched
@@ -193,12 +204,12 @@ class TestProductAssemblerDescriptionSingle:
         assert "description" not in component, "Description должен быть пропущен при отсутствии"
     
     @pytest.mark.asyncio
-    async def test_enrich_single_description_fetch_error(self, assembler):
+    async def test_enrich_components_description_fetch_error(self, assembler):
         """
         Test graceful degradation when description fetch raises exception.
         
         GIVEN: get_component_description raises exception
-        WHEN: _enrich_single_component() called
+        WHEN: _enrich_components() called with language
         THEN: Product still enriched, description gracefully skipped
         """
         # Setup: make get_component_description raise exception
@@ -209,12 +220,16 @@ class TestProductAssemblerDescriptionSingle:
         
         metadata = {
             "business_id": "test_product",
-            "component_id": "amanita_muscaria",
-            "proportion": "100g"
+            "organic_components": [
+                {
+                    "component_id": "amanita_muscaria",
+                    "proportion": "100g"
+                }
+            ]
         }
         
         # Should NOT propagate exception
-        enriched = await assembler._enrich_single_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         # Product enriched successfully
         assert "organic_components" in enriched
@@ -227,7 +242,7 @@ class TestProductAssemblerDescriptionSingle:
 
 @pytest.mark.unit
 class TestProductAssemblerDescriptionMulti:
-    """Test ComponentDescription fetch for MULTI products"""
+    """Test ComponentDescription fetch for products with multiple components"""
     
     @pytest.fixture
     def mock_component_service(self):
@@ -281,12 +296,12 @@ class TestProductAssemblerDescriptionMulti:
     # ==================================================================================
     
     @pytest.mark.asyncio
-    async def test_enrich_multi_with_descriptions_all_found(self, assembler):
+    async def test_enrich_components_with_descriptions_all_found(self, assembler):
         """
-        Test successful ComponentDescription fetch for all components in MULTI product.
+        Test successful ComponentDescription fetch for all components in product.
         
-        GIVEN: MULTI product with 2 components, both have descriptions
-        WHEN: _enrich_multi_component() called
+        GIVEN: Product with 2 components, both have descriptions
+        WHEN: _enrich_components() called with language
         THEN: Both components include 'description' field
         """
         metadata = {
@@ -298,7 +313,7 @@ class TestProductAssemblerDescriptionMulti:
             ]
         }
         
-        enriched = await assembler._enrich_multi_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         # Check both components enriched
         assert len(enriched["organic_components"]) == 2
@@ -314,12 +329,12 @@ class TestProductAssemblerDescriptionMulti:
         assert "Ежовик" in comp2["description"]["generic_description"]
     
     @pytest.mark.asyncio
-    async def test_enrich_multi_with_descriptions_three_components(self, assembler):
+    async def test_enrich_components_with_descriptions_three_components(self, assembler):
         """
-        Test ComponentDescription fetch for 3-component MULTI product.
+        Test ComponentDescription fetch for 3-component product.
         
-        GIVEN: MULTI product with 3 components
-        WHEN: _enrich_multi_component() called
+        GIVEN: Product with 3 components
+        WHEN: _enrich_components() called with language
         THEN: All 3 components include descriptions
         """
         metadata = {
@@ -331,7 +346,7 @@ class TestProductAssemblerDescriptionMulti:
             ]
         }
         
-        enriched = await assembler._enrich_multi_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         # Check all 3 components have descriptions
         assert len(enriched["organic_components"]) == 3
@@ -346,12 +361,12 @@ class TestProductAssemblerDescriptionMulti:
     # ==================================================================================
     
     @pytest.mark.asyncio
-    async def test_enrich_multi_partial_descriptions(self, assembler):
+    async def test_enrich_components_partial_descriptions(self, assembler):
         """
         Test partial success when some descriptions not found.
         
-        GIVEN: MULTI product with 2 components, only 1 has description
-        WHEN: _enrich_multi_component() called
+        GIVEN: Product with 2 components, only 1 has description
+        WHEN: _enrich_components() called with language
         THEN: Component with description enriched, other gracefully skipped
         """
         # Remove description for lions_mane
@@ -365,7 +380,7 @@ class TestProductAssemblerDescriptionMulti:
             ]
         }
         
-        enriched = await assembler._enrich_multi_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         # Check both components enriched
         assert len(enriched["organic_components"]) == 2
@@ -383,12 +398,12 @@ class TestProductAssemblerDescriptionMulti:
         assert comp2["scientific_title"] == "Hericium erinaceus"
     
     @pytest.mark.asyncio
-    async def test_enrich_multi_all_descriptions_not_found(self, assembler):
+    async def test_enrich_components_all_descriptions_not_found(self, assembler):
         """
         Test when NO descriptions available for any component.
         
-        GIVEN: MULTI product, no descriptions available
-        WHEN: _enrich_multi_component() called
+        GIVEN: Product with multiple components, no descriptions available
+        WHEN: _enrich_components() called with language
         THEN: Product still enriched, all descriptions gracefully skipped
         """
         # Clear all descriptions
@@ -402,7 +417,7 @@ class TestProductAssemblerDescriptionMulti:
             ]
         }
         
-        enriched = await assembler._enrich_multi_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         # Both components enriched without descriptions
         assert len(enriched["organic_components"]) == 2
@@ -413,12 +428,12 @@ class TestProductAssemblerDescriptionMulti:
             assert "scientific_title" in comp
     
     @pytest.mark.asyncio
-    async def test_enrich_multi_description_fetch_errors(self, assembler):
+    async def test_enrich_components_description_fetch_errors(self, assembler):
         """
         Test graceful degradation when description fetch raises exceptions.
         
         GIVEN: get_component_description raises exception for all components
-        WHEN: _enrich_multi_component() called
+        WHEN: _enrich_components() called with language
         THEN: Product still enriched, descriptions gracefully skipped
         """
         # Make get_component_description raise exception
@@ -436,7 +451,7 @@ class TestProductAssemblerDescriptionMulti:
         }
         
         # Should NOT propagate exception
-        enriched = await assembler._enrich_multi_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         # Product enriched successfully
         assert len(enriched["organic_components"]) == 2
@@ -476,17 +491,21 @@ class TestProductAssemblerDescriptionEdgeCases:
         Test when get_component_description returns None (valid case).
         
         GIVEN: get_component_description returns None (not found)
-        WHEN: _enrich_single_component() called
+        WHEN: _enrich_components() called with language
         THEN: Description gracefully skipped, no error
         """
         # get_component_description returns None by default (not in descriptions dict)
         metadata = {
             "business_id": "test",
-            "component_id": "test_component",
-            "proportion": "100g"
+            "organic_components": [
+                {
+                    "component_id": "test_component",
+                    "proportion": "100g"
+                }
+            ]
         }
         
-        enriched = await assembler._enrich_single_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         component = enriched["organic_components"][0]
         assert "description" not in component
@@ -498,7 +517,7 @@ class TestProductAssemblerDescriptionEdgeCases:
         Test handling of empty description (edge case).
         
         GIVEN: get_component_description returns empty-ish description
-        WHEN: _enrich_single_component() called
+        WHEN: _enrich_components() called with language
         THEN: Description added (even if minimal)
         """
         # Add minimal description
@@ -508,11 +527,15 @@ class TestProductAssemblerDescriptionEdgeCases:
         
         metadata = {
             "business_id": "test",
-            "component_id": "test_component",
-            "proportion": "100g"
+            "organic_components": [
+                {
+                    "component_id": "test_component",
+                    "proportion": "100g"
+                }
+            ]
         }
         
-        enriched = await assembler._enrich_single_component(metadata)
+        enriched = await assembler._enrich_components(metadata, "ru")
         
         component = enriched["organic_components"][0]
         

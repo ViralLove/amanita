@@ -25,6 +25,7 @@ class MockProduct:
     organic_components: List[MockOrganicComponent]
 
 
+@pytest.mark.unit
 class TestProductTypeDetection:
     """Tests для _detect_product_type() method в РЕАЛЬНОМ ProductFormatterService"""
     

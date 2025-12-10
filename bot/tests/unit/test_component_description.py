@@ -55,7 +55,10 @@ def real_arweave_data_ru():
     - Quotes ("текст")
     - Long text (~700 characters)
     """
-    file_path = Path("data/components/amanita_muscaria/complex_fields/amanita_muscaria.ComponentDescription.ru.json")
+    # ✅ ИСПРАВЛЕНО: Используем паттерн из E2E тестов для единообразия
+    # bot/tests/unit/test_component_description.py -> parents[3] -> корень проекта
+    project_root = Path(__file__).resolve().parents[3]
+    file_path = project_root / "data/components/amanita_muscaria/complex_fields/amanita_muscaria.ComponentDescription.ru.json"
     
     if file_path.exists():
         with open(file_path, "r", encoding="utf-8") as f:
@@ -351,7 +354,10 @@ class TestComponentDescriptionFromDict:
         
         Tests with English production data if available.
         """
-        file_path = Path("data/components/amanita_muscaria/complex_fields/amanita_muscaria.ComponentDescription.en.json")
+        # ✅ ИСПРАВЛЕНО: Используем паттерн из E2E тестов для определения корня проекта
+        # bot/tests/unit/test_component_description.py -> parents[3] -> корень проекта
+        project_root = Path(__file__).resolve().parents[3]
+        file_path = project_root / "data/components/amanita_muscaria/complex_fields/amanita_muscaria.ComponentDescription.en.json"
         
         if not file_path.exists():
             pytest.skip("English Arweave data not found")

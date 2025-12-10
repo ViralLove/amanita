@@ -1,0 +1,34 @@
+acceptance_criteria:
+  - id: AC-001
+    description: mock_registry_service использует TestServiceFactory
+    conditions:
+      - Фикстура использует TestServiceFactory.create_product_registry_service()
+      - Все зависимости передаются явно через параметры фабрики
+      - Зависимости берутся из существующих фикстур (mock_blockchain_service, mock_ipfs_storage, mock_validation_service, mock_account_service)
+    validation:
+      - Фикстура создает ProductRegistryService через TestServiceFactory
+      - Все зависимости переданы явно
+      - Нет создания реальных сервисов
+  
+  - id: AC-002
+    description: Обратная совместимость сохранена
+    conditions:
+      - Существующие тесты работают без изменений
+      - Интерфейс фикстуры не изменился
+      - Поведение фикстуры идентично предыдущей версии
+    validation:
+      - Тесты, использующие mock_registry_service, проходят без изменений
+      - Фикстура возвращает ProductRegistryService с теми же методами
+  
+  - id: AC-003
+    description: Явная передача всех зависимостей
+    conditions:
+      - blockchain_service передается явно
+      - storage_service передается явно
+      - validation_service передается явно
+      - account_service передается явно
+      - component_service или assembler передаются явно (через TestServiceFactory)
+    validation:
+      - Все зависимости переданы в TestServiceFactory.create_product_registry_service()
+      - Нет создания зависимостей внутри ProductRegistryService
+

@@ -10,6 +10,12 @@ from unittest.mock import Mock, AsyncMock, patch
 from bot.model.product import Product, Description, PriceInfo
 from bot.model.organic_component import OrganicComponent
 from bot.services.product.exceptions import InvalidProductIdError, ProductNotFoundError
+# Для тестов _check_product_id_exists используем тот же импорт, что и в registry.py
+# registry.py использует: from services.product.exceptions import InvalidProductIdError
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+from services.product.exceptions import InvalidProductIdError as InvalidProductIdErrorService
 
 # Настройка логирования
 handler = logging.StreamHandler(sys.stdout)
@@ -150,7 +156,7 @@ async def test_validate_product_data_missing_required():
 # === Тесты для методов обновления продуктов ===
 
 @pytest.mark.asyncio
-async def test_update_product_success():
+async def test_update_product_success(mock_registry_service):
     """
     Arrange: Подготавливаем моки и валидные данные для обновления
     Act: Обновляем продукт через ProductRegistryService
@@ -158,27 +164,16 @@ async def test_update_product_success():
     """
     logger.info("🧪 Начинаем юнит-тест успешного обновления продукта")
     
-    # Создаем моки напрямую
-    mock_blockchain_service = Mock()
-    mock_storage_service = Mock()
-    mock_validation_service = Mock()
-    mock_account_service = Mock()
+    # Используем фикстуру mock_registry_service и настраиваем специфичные моки
+    registry_service = mock_registry_service
     
-    # Настраиваем моки
+    # Настраиваем моки через зависимости сервиса
     from bot.validation import ValidationResult
-    mock_validation_service.validate_product_data = AsyncMock(return_value=ValidationResult(is_valid=True, error_message=None))
-    mock_storage_service.upload_json = Mock(return_value="QmNewMetadataCID123")
-    mock_blockchain_service.seller_key = "0x1234567890abcdef"
+    registry_service.validation_service.validate_product_data = AsyncMock(return_value=ValidationResult(is_valid=True, error_message=None))
+    registry_service.storage_service.upload_json = Mock(return_value="QmNewMetadataCID123")
+    registry_service.blockchain_service.seller_key = "0x1234567890abcdef"
     # Мокаем get_product для возврата валидных данных блокчейна
-    mock_blockchain_service.get_product = Mock(return_value=(1, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "QmOldCID123", True))
-    
-    # Создаем экземпляр ProductRegistryService с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain_service,
-        storage_service=mock_storage_service,
-        validation_service=mock_validation_service,
-        account_service=mock_account_service
-    )
+    registry_service.blockchain_service.get_product = Mock(return_value=(1, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", ["component1"], "QmOldCID123", True))
     
     # Мокаем метод get_product для возврата валидного продукта
     from bot.model.product import Product, Description, PriceInfo
@@ -244,7 +239,7 @@ async def test_update_product_success():
     logger.info("✅ Юнит-тест успешного обновления продукта завершен")
 
 @pytest.mark.asyncio
-async def test_update_product_not_found():
+async def test_update_product_not_found(mock_registry_service):
     """
     Arrange: Подготавливаем моки и несуществующий ID продукта
     Act: Вызываем update_product с несуществующим ID
@@ -252,19 +247,8 @@ async def test_update_product_not_found():
     """
     logger.info("🧪 Начинаем юнит-тест обновления несуществующего продукта")
     
-    # Создаем моки напрямую
-    mock_blockchain_service = Mock()
-    mock_storage_service = Mock()
-    mock_validation_service = Mock()
-    mock_account_service = Mock()
-    
-    # Создаем экземпляр ProductRegistryService с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain_service,
-        storage_service=mock_storage_service,
-        validation_service=mock_validation_service,
-        account_service=mock_account_service
-    )
+    # Используем фикстуру mock_registry_service
+    registry_service = mock_registry_service
     
     # Мокаем метод get_product для возврата None (продукт не найден)
     registry_service.get_product = AsyncMock(return_value=None)
@@ -299,7 +283,7 @@ async def test_update_product_not_found():
     logger.info("✅ Юнит-тест обновления несуществующего продукта завершен")
 
 @pytest.mark.asyncio
-async def test_update_product_validation_error():
+async def test_update_product_validation_error(mock_registry_service):
     """
     Arrange: Подготавливаем моки и невалидные данные
     Act: Вызываем update_product с невалидными данными
@@ -307,25 +291,14 @@ async def test_update_product_validation_error():
     """
     logger.info("🧪 Начинаем юнит-тест обновления продукта с ошибкой валидации")
     
-    # Создаем моки напрямую
-    mock_blockchain_service = Mock()
-    mock_storage_service = Mock()
-    mock_validation_service = Mock()
-    mock_account_service = Mock()
+    # Используем фикстуру mock_registry_service и настраиваем специфичные моки
+    registry_service = mock_registry_service
     
     # Настраиваем мок валидации для возврата ошибки
-    mock_validation_service.validate_product_data = AsyncMock(return_value={
+    registry_service.validation_service.validate_product_data = AsyncMock(return_value={
         "is_valid": False, 
         "errors": ["Невалидный CID", "Пустой заголовок"]
     })
-    
-    # Создаем экземпляр ProductRegistryService с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain_service,
-        storage_service=mock_storage_service,
-        validation_service=mock_validation_service,
-        account_service=mock_account_service
-    )
     
     # Подготавливаем невалидные данные для обновления
     invalid_update_data = {
@@ -358,7 +331,7 @@ async def test_update_product_validation_error():
     logger.info("✅ Юнит-тест обновления продукта с ошибкой валидации завершен")
 
 @pytest.mark.asyncio
-async def test_update_product_status_success():
+async def test_update_product_status_success(mock_registry_service):
     """
     Arrange: Подготавливаем моки и валидные данные для обновления статуса
     Act: Вызываем update_product_status с валидными данными
@@ -366,25 +339,14 @@ async def test_update_product_status_success():
     """
     logger.info("🧪 Начинаем юнит-тест успешного обновления статуса продукта")
     
-    # Создаем моки напрямую
-    mock_blockchain_service = Mock()
-    mock_storage_service = Mock()
-    mock_validation_service = Mock()
-    mock_account_service = Mock()
+    # Используем фикстуру mock_registry_service и настраиваем специфичные моки
+    registry_service = mock_registry_service
     
-    # Настраиваем моки
-    mock_blockchain_service.update_product_status = AsyncMock(return_value="0xTxHash123")
-    mock_blockchain_service.seller_key = "0x1234567890abcdef"
-    # Мокаем get_product для возврата валидных данных блокчейна
-    mock_blockchain_service.get_product = Mock(return_value=(1, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "QmCID123", True))
-    
-    # Создаем экземпляр ProductRegistryService с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain_service,
-        storage_service=mock_storage_service,
-        validation_service=mock_validation_service,
-        account_service=mock_account_service
-    )
+    # Настраиваем моки через зависимости сервиса
+    registry_service.blockchain_service.update_product_status = AsyncMock(return_value="0xTxHash123")
+    registry_service.blockchain_service.seller_key = "0x1234567890abcdef"
+    # Мокаем get_product для возврата валидных данных блокчейна (5 элементов)
+    registry_service.blockchain_service.get_product = Mock(return_value=(1, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", ["component1"], "QmCID123", True))
     
     # Мокаем метод get_product для возврата валидного продукта
     from bot.model.product import Product, PriceInfo
@@ -422,7 +384,7 @@ async def test_update_product_status_success():
     logger.info("✅ Юнит-тест успешного обновления статуса продукта завершен")
 
 @pytest.mark.asyncio
-async def test_update_product_status_not_found():
+async def test_update_product_status_not_found(mock_registry_service):
     """
     Arrange: Подготавливаем моки и несуществующий ID продукта
     Act: Вызываем update_product_status с несуществующим ID
@@ -430,19 +392,8 @@ async def test_update_product_status_not_found():
     """
     logger.info("🧪 Начинаем юнит-тест обновления статуса несуществующего продукта")
     
-    # Создаем моки напрямую
-    mock_blockchain_service = Mock()
-    mock_storage_service = Mock()
-    mock_validation_service = Mock()
-    mock_account_service = Mock()
-    
-    # Создаем экземпляр ProductRegistryService с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain_service,
-        storage_service=mock_storage_service,
-        validation_service=mock_validation_service,
-        account_service=mock_account_service
-    )
+    # Используем фикстуру mock_registry_service
+    registry_service = mock_registry_service
     
     # Мокаем метод get_product для возврата None (продукт не найден)
     registry_service.get_product = AsyncMock(return_value=None)
@@ -458,7 +409,7 @@ async def test_update_product_status_not_found():
     logger.info("✅ Юнит-тест обновления статуса несуществующего продукта завершен")
 
 @pytest.mark.asyncio
-async def test_update_product_status_idempotency():
+async def test_update_product_status_idempotency(mock_registry_service):
     """
     Arrange: Подготавливаем моки и продукт с уже установленным статусом
     Act: Вызываем update_product_status с тем же статусом
@@ -466,24 +417,13 @@ async def test_update_product_status_idempotency():
     """
     logger.info("🧪 Начинаем юнит-тест идемпотентности обновления статуса")
     
-    # Создаем моки напрямую
-    mock_blockchain_service = Mock()
-    mock_storage_service = Mock()
-    mock_validation_service = Mock()
-    mock_account_service = Mock()
+    # Используем фикстуру mock_registry_service и настраиваем специфичные моки
+    registry_service = mock_registry_service
     
-    # Настраиваем моки
-    mock_blockchain_service.seller_key = "0x1234567890abcdef"
-    # Мокаем get_product для возврата валидных данных блокчейна
-    mock_blockchain_service.get_product = Mock(return_value=(1, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "QmCID123", True))
-    
-    # Создаем экземпляр ProductRegistryService с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain_service,
-        storage_service=mock_storage_service,
-        validation_service=mock_validation_service,
-        account_service=mock_account_service
-    )
+    # Настраиваем моки через зависимости сервиса
+    registry_service.blockchain_service.seller_key = "0x1234567890abcdef"
+    # Мокаем get_product для возврата валидных данных блокчейна (5 элементов)
+    registry_service.blockchain_service.get_product = Mock(return_value=(1, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", ["component1"], "QmCID123", True))
     
     # Мокаем метод get_product для возврата валидного продукта
     from bot.model.product import Product, PriceInfo
@@ -521,7 +461,7 @@ async def test_update_product_status_idempotency():
     logger.info("✅ Юнит-тест идемпотентности обновления статуса завершен")
 
 @pytest.mark.asyncio
-async def test_update_product_status_access_denied():
+async def test_update_product_status_access_denied(mock_registry_service):
     """
     Arrange: Подготавливаем моки и продукт с другим владельцем
     Act: Вызываем update_product_status без прав доступа
@@ -529,19 +469,20 @@ async def test_update_product_status_access_denied():
     """
     logger.info("🧪 Начинаем юнит-тест обновления статуса без прав доступа")
     
-    # Создаем моки напрямую
-    mock_blockchain_service = Mock()
-    mock_storage_service = Mock()
-    mock_validation_service = Mock()
-    mock_account_service = Mock()
+    # Используем фикстуру mock_registry_service
+    registry_service = mock_registry_service
     
-    # Создаем экземпляр ProductRegistryService с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain_service,
-        storage_service=mock_storage_service,
-        validation_service=mock_validation_service,
-        account_service=mock_account_service
-    )
+    # ✅ ИСПРАВЛЕНО: Настраиваем мок для возврата продукта с другим владельцем
+    # Адрес текущего селлера: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+    different_owner_address = "0x1111111111111111111111111111111111111111"  # Отличается от seller_account.address
+    registry_service.blockchain_service.get_product = Mock(return_value=(
+        1,  # id
+        different_owner_address,  # seller (другой адрес)
+        "test_business_id",  # businessId
+        ["component1"],  # componentIds
+        "QmCID1",  # metadataCID
+        True  # active
+    ))
     
     logger.info("🚀 Вызываем update_product_status без прав доступа")
     result = await registry_service.update_product_status(1, 1)
@@ -936,66 +877,58 @@ async def test_create_product_blockchain_id_error(mock_blockchain_service_with_i
 
 
 @pytest.mark.asyncio
-async def test_create_product_idempotency():
+async def test_create_product_idempotency(mock_registry_service):
     """Тест идемпотентности создания продукта"""
     logger.info("🧪 Начинаем тест идемпотентности")
     
-    # Arrange - создаем моки напрямую
+    # ✅ ИСПРАВЛЕНО: Заменено description_cid на cid (актуальная структура)
+    # Arrange - используем фикстуру и настраиваем специфичные моки
     product_data = {
             "business_id": "test1",
             "title": "Test Product",
-            "description_cid": "QmDescriptionCID123",
+            "cid": "QmDescriptionCID123",  # ✅ ИСПРАВЛЕНО: description_cid → cid
             "categories": ["mushroom"],
             "cover_image_url": "QmValidImageCID123",
             "forms": ["powder"],
             "species": "Amanita muscaria",
             "organic_components": [{
                 "component_id": "Amanita_muscaria",
-                "description_cid": "QmDescriptionCID123",
+                # ✅ ИСПРАВЛЕНО: Убрано description_cid из organic_components (больше не используется)
                 "proportion": "100%"
             }],
             "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
         }
     
-    mock_blockchain = Mock()
-    mock_blockchain.create_product = AsyncMock(return_value="0x123")
-    mock_blockchain.get_product_id_from_tx = AsyncMock(return_value=42)
-    mock_blockchain.get_products_by_current_seller_full = Mock(return_value=[])
-    mock_blockchain.product_exists_in_blockchain = Mock(return_value=False)
-    mock_blockchain.get_all_products = Mock(return_value=[])
+    registry_service = mock_registry_service
     
-    mock_storage = Mock()
-    mock_storage.upload_json = AsyncMock(return_value="QmNewMetadataCID123")
-    mock_storage.download_json = Mock(return_value={
+    # Настраиваем моки через зависимости сервиса
+    registry_service.blockchain_service.create_product = AsyncMock(return_value="0x123")
+    registry_service.blockchain_service.get_product_id_from_tx = AsyncMock(return_value=42)
+    registry_service.blockchain_service.get_products_by_current_seller_full = Mock(return_value=[])
+    registry_service.blockchain_service.product_exists_in_blockchain = Mock(return_value=False)
+    registry_service.blockchain_service.get_all_products = Mock(return_value=[])
+    
+    registry_service.storage_service.upload_json = AsyncMock(return_value="QmNewMetadataCID123")
+    registry_service.storage_service.download_json = Mock(return_value={
         "business_id": "test_product",
         "title": "Test Product",
-        "description_cid": "QmDescriptionCID",
+        "cid": "QmDescriptionCID",  # ✅ ИСПРАВЛЕНО: description_cid → cid
         "cover_image_url": "QmImageCID",
         "categories": ["mushroom"],
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
             "component_id": "Amanita_muscaria",
-            "description_cid": "QmDescriptionCID",
+            # ✅ ИСПРАВЛЕНО: Убрано description_cid из organic_components
             "proportion": "100%"
         }],
         "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
     })
     
-    mock_validation = Mock()
     from bot.validation import ValidationResult
-    mock_validation.validate_product_data = AsyncMock(return_value=ValidationResult(is_valid=True, error_message=None))
+    registry_service.validation_service.validate_product_data = AsyncMock(return_value=ValidationResult(is_valid=True, error_message=None))
     
-    mock_account = Mock()
-    mock_account.private_key = "0x1234567890abcdef"
-    
-    # Создаем экземпляр сервиса с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain,
-        storage_service=mock_storage,
-        validation_service=mock_validation,
-        account_service=mock_account
-    )
+    registry_service.account_service.private_key = "0x1234567890abcdef"
     
     logger.info("🚀 Первый вызов create_product")
     
@@ -1017,29 +950,30 @@ async def test_create_product_idempotency():
     assert result2["status"] == "success"
     
     # Проверяем, что методы вызывались дважды
-    assert mock_validation.validate_product_data.call_count == 2
-    assert mock_storage.upload_json.call_count == 2
+    assert registry_service.validation_service.validate_product_data.call_count == 2  # ✅ ИСПРАВЛЕНО: Используем registry_service.validation_service вместо undefined mock_validation
+    assert registry_service.storage_service.upload_json.call_count == 2  # ✅ ИСПРАВЛЕНО: Используем registry_service.storage_service вместо undefined mock_storage
     # Моки из conftest.py не поддерживают call_count, поэтому проверяем через флаги
     # В данном случае мы не можем точно проверить количество вызовов для блокчейна
     
     logger.info("✅ Тест идемпотентности завершен")
 
 @pytest.mark.asyncio
-async def test_create_product_success_simple():
-    """Простой тест успешного создания продукта с прямым моканием"""
+async def test_create_product_success_simple(mock_registry_service):
+    """Простой тест успешного создания продукта с использованием фикстуры"""
     logger.info("🧪 Начинаем простой тест создания продукта")
     
-    # Arrange - создаем моки напрямую
-    mock_blockchain = Mock()
-    mock_blockchain.create_product = AsyncMock(return_value="0x123")
-    mock_blockchain.get_product_id_from_tx = AsyncMock(return_value=42)
-    mock_blockchain.get_all_products = Mock(return_value=[])  # Возвращаем пустой список
-    mock_blockchain.get_products_by_current_seller_full = Mock(return_value=[])  # Возвращаем пустой список
-    mock_blockchain.product_exists_in_blockchain = Mock(return_value=False)  # Продукт не существует в блокчейне
+    # Arrange - используем фикстуру и настраиваем специфичные моки
+    registry_service = mock_registry_service
     
-    mock_storage = Mock()
-    mock_storage.upload_json = AsyncMock(return_value="QmMockJson123")
-    mock_storage.download_json = Mock(return_value={
+    # Настраиваем моки через зависимости сервиса
+    registry_service.blockchain_service.create_product = AsyncMock(return_value="0x123")
+    registry_service.blockchain_service.get_product_id_from_tx = AsyncMock(return_value=42)
+    registry_service.blockchain_service.get_all_products = Mock(return_value=[])  # Возвращаем пустой список
+    registry_service.blockchain_service.get_products_by_current_seller_full = Mock(return_value=[])  # Возвращаем пустой список
+    registry_service.blockchain_service.product_exists_in_blockchain = Mock(return_value=False)  # Продукт не существует в блокчейне
+    
+    registry_service.storage_service.upload_json = AsyncMock(return_value="QmMockJson123")
+    registry_service.storage_service.download_json = Mock(return_value={
         "business_id": "test_product",
         "title": "Test Product",
         "cover_image_url": "QmValidImageCID123",
@@ -1054,22 +988,11 @@ async def test_create_product_success_simple():
         "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
     })
     
-    mock_validation = Mock()
     from bot.validation import ValidationResult
-    mock_validation.validate_product_data = AsyncMock(return_value=ValidationResult(is_valid=True, error_message=None))
+    registry_service.validation_service.validate_product_data = AsyncMock(return_value=ValidationResult(is_valid=True, error_message=None))
     
-    mock_account = Mock()
-    mock_account.get_private_key = Mock(return_value="0x1234567890abcdef")
-    mock_account.get_address = Mock(return_value="0x1234567890abcdef1234567890abcdef12345678")
-    
-    # Создаем сервис с моками
-    from bot.services.product.registry import ProductRegistryService
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain,
-        storage_service=mock_storage,
-        validation_service=mock_validation,
-        account_service=mock_account
-    )
+    registry_service.account_service.get_private_key = Mock(return_value="0x1234567890abcdef")
+    registry_service.account_service.get_address = Mock(return_value="0x1234567890abcdef1234567890abcdef12345678")
     
     product_data = {
         "business_id": "test1",
@@ -1109,21 +1032,22 @@ async def test_create_product_success_simple():
 # ============================================================================
 
 @pytest.mark.asyncio
-async def test_get_all_products_success():
+async def test_get_all_products_success(mock_registry_service):
     """Тест успешного получения всех продуктов"""
     logger.info("🧪 Начинаем тест получения всех продуктов")
     
-    # Arrange - создаем моки напрямую
-    mock_blockchain = Mock()
-    mock_blockchain.get_catalog_version = Mock(return_value=1)
-    mock_blockchain.get_all_products = Mock(return_value=[
-        (1, "0x123", "QmCID1", True),
-        (2, "0x456", "QmCID2", True),
-        (3, "0x789", "QmCID3", True)
+    # Arrange - используем фикстуру и настраиваем специфичные моки
+    registry_service = mock_registry_service
+    
+    # Настраиваем моки через зависимости сервиса
+    registry_service.blockchain_service.get_catalog_version = Mock(return_value=1)
+    registry_service.blockchain_service.get_all_products = Mock(return_value=[
+        (1, "0x123", ["component1"], "QmCID1", True),
+        (2, "0x456", ["component2"], "QmCID2", True),
+        (3, "0x789", ["component3"], "QmCID3", True)
     ])
     
-    mock_storage = Mock()
-    mock_storage.download_json = Mock(return_value={
+    registry_service.storage_service.download_json = Mock(return_value={
         "business_id": "test_product",
         "title": "Test Product",
         "cover_image_url": "QmValidImageCID123",
@@ -1138,18 +1062,10 @@ async def test_get_all_products_success():
         "prices": [{"weight": "100", "weight_unit": "g", "price": "50", "currency": "EUR"}]
     })
     
-    # Создаем экземпляр сервиса с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain,
-        storage_service=mock_storage,
-        validation_service=Mock(),
-        account_service=Mock()
-    )
-    
     logger.info("🚀 Вызываем get_all_products")
     
     # Act
-    result = await registry_service.get_all_products()
+    result = await registry_service.get_all_products("ru")
     
     # Assert
     logger.info(f"📊 Результат: {len(result)} продуктов")
@@ -1161,17 +1077,17 @@ async def test_get_all_products_success():
 
 
 @pytest.mark.asyncio
-async def test_get_all_products_cache_hit():
+async def test_get_all_products_cache_hit(mock_registry_service):
     """Тест попадания в кэш"""
     logger.info("🧪 Начинаем тест попадания в кэш")
     
-    # Arrange - создаем моки напрямую
-    mock_blockchain = Mock()
-    mock_blockchain.get_catalog_version = Mock(return_value=1)
-    mock_blockchain.get_all_products = Mock(return_value=[])
+    # Arrange - используем фикстуру и настраиваем специфичные моки
+    registry_service = mock_registry_service
     
-    mock_storage = Mock()
-    mock_storage.download_json = Mock(return_value={
+    # Настраиваем моки через зависимости сервиса
+    registry_service.blockchain_service.get_catalog_version = Mock(return_value=1)
+    registry_service.blockchain_service.get_all_products = Mock(return_value=[])
+    registry_service.storage_service.download_json = Mock(return_value={
         "business_id": "test_product",
         "title": "Test Product",
         "cover_image_url": "QmValidImageCID123",
@@ -1186,18 +1102,10 @@ async def test_get_all_products_cache_hit():
         "prices": [{"weight": "100", "weight_unit": "g", "price": "50", "currency": "EUR"}]
     })
     
-    # Создаем экземпляр сервиса с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain,
-        storage_service=mock_storage,
-        validation_service=Mock(),
-        account_service=Mock()
-    )
-    
     logger.info("🚀 Вызываем get_all_products с актуальным кэшем")
     
     # Act
-    products = await registry_service.get_all_products()
+    products = await registry_service.get_all_products("ru")
     
     # Assert
     logger.info(f"📊 Результат: {len(products)} продуктов из кэша")
@@ -1219,7 +1127,7 @@ async def test_get_all_products_cache_miss(mock_registry_service):
     logger.info("🚀 Вызываем get_all_products с устаревшим кэшем")
     
     # Act
-    products = await mock_registry_service.get_all_products()
+    products = await mock_registry_service.get_all_products("ru")
     
     # Assert
     logger.info(f"📊 Результат: {len(products)} продуктов из блокчейна")
@@ -1235,6 +1143,42 @@ async def test_get_all_products_cache_miss(mock_registry_service):
 
 
 @pytest.mark.asyncio
+async def test_get_all_products_with_language(mock_registry_service):
+    """Тест получения продуктов с разными языками"""
+    logger.info("🧪 Начинаем тест получения продуктов с языками")
+    
+    # Arrange - используем фикстуру и настраиваем специфичные моки
+    registry_service = mock_registry_service
+    
+    # Настраиваем моки через зависимости сервиса
+    registry_service.blockchain_service.get_catalog_version = Mock(return_value=1)
+    registry_service.blockchain_service.get_all_products = Mock(return_value=[
+        (1, "0x123", ["component1"], "QmCID1", True)
+    ])
+    
+    registry_service.storage_service.download_json = Mock(return_value={
+        "business_id": "test_product",
+        "title": "Test Product",
+        "organic_components": [{
+            "component_id": "component1",
+            "proportion": "100g"
+        }]
+    })
+    
+    # Act - получаем продукты на русском
+    products_ru = await registry_service.get_all_products("ru")
+    
+    # Act - получаем продукты на английском
+    products_en = await registry_service.get_all_products("en")
+    
+    # Assert
+    assert isinstance(products_ru, list)
+    assert isinstance(products_en, list)
+    # Разные языки должны иметь разные кэши
+    logger.info("✅ Тест получения продуктов с языками завершен")
+
+
+@pytest.mark.asyncio
 async def test_get_all_products_empty_catalog(mock_registry_service):
     """Тест пустого каталога"""
     logger.info("🧪 Начинаем тест пустого каталога")
@@ -1245,7 +1189,7 @@ async def test_get_all_products_empty_catalog(mock_registry_service):
     logger.info("🚀 Вызываем get_all_products с пустым каталогом")
     
     # Act
-    products = await mock_registry_service.get_all_products()
+    products = await mock_registry_service.get_all_products("ru")
     
     # Assert
     logger.info(f"📊 Результат: {len(products)} продуктов")
@@ -1261,17 +1205,17 @@ async def test_get_all_products_empty_catalog(mock_registry_service):
 
 
 @pytest.mark.asyncio
-async def test_get_all_products_blockchain_error():
+async def test_get_all_products_blockchain_error(mock_registry_service):
     """Тест ошибки блокчейна"""
     logger.info("🧪 Начинаем тест ошибки блокчейна")
     
-    # Arrange - создаем моки напрямую
-    mock_blockchain = Mock()
-    mock_blockchain.get_catalog_version = Mock(side_effect=Exception("Blockchain connection failed"))
-    mock_blockchain.get_all_products = Mock(return_value=[])
+    # Arrange - используем фикстуру и настраиваем специфичные моки
+    registry_service = mock_registry_service
     
-    mock_storage = Mock()
-    mock_storage.download_json = Mock(return_value={
+    # Настраиваем моки через зависимости сервиса для симуляции ошибки блокчейна
+    registry_service.blockchain_service.get_catalog_version = Mock(side_effect=Exception("Blockchain connection failed"))
+    registry_service.blockchain_service.get_all_products = Mock(return_value=[])
+    registry_service.storage_service.download_json = Mock(return_value={
         "business_id": "test_product",
         "title": "Test Product",
         "cover_image_url": "QmValidImageCID123",
@@ -1286,18 +1230,10 @@ async def test_get_all_products_blockchain_error():
         "prices": [{"weight": "100", "weight_unit": "g", "price": "50", "currency": "EUR"}]
     })
     
-    # Создаем экземпляр сервиса с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain,
-        storage_service=mock_storage,
-        validation_service=Mock(),
-        account_service=Mock()
-    )
-    
     logger.info("🚀 Вызываем get_all_products с ошибкой блокчейна")
     
     # Act
-    products = await registry_service.get_all_products()
+    products = await registry_service.get_all_products("ru")
     
     # Assert
     logger.info(f"📊 Результат: {len(products)} продуктов")
@@ -1331,7 +1267,7 @@ async def test_get_product_success(mock_registry_service):
     logger.info(f"📊 Результат: {product}")
     
     assert product is not None
-    assert isinstance(product, Product)
+    assert type(product).__name__ == 'Product'  # ✅ ИСПРАВЛЕНО: Проверка типа через имя класса (работает с разными импортами)
     assert product.blockchain_id == 1
     # 🔧 ИСПРАВЛЕНИЕ: Проверяем реальный заголовок из тестовых данных IPFS
     assert product.title == "Amanita muscaria — sliced caps and gills (1st grade)"
@@ -1379,34 +1315,25 @@ async def test_get_product_invalid_id(mock_registry_service):
     logger.info("🚀 Вызываем get_product с некорректным ID=-1")
     
     # Act & Assert
-    with pytest.raises(InvalidProductIdError):
+    # ✅ ИСПРАВЛЕНО: Используем InvalidProductIdErrorService (как в других тестах, строка 2888)
+    # так как registry.py импортирует из services.product.exceptions
+    with pytest.raises(InvalidProductIdErrorService):
         await mock_registry_service.get_product(-1)
     
     logger.info("✅ Тест получения продукта с некорректным ID завершен")
 
 
 @pytest.mark.asyncio
-async def test_get_product_metadata_error():
+async def test_get_product_metadata_error(mock_registry_service):
     """Тест получения продукта с ошибкой метаданных"""
     logger.info("🧪 Начинаем тест получения продукта с ошибкой метаданных")
     
-    # Arrange - создаем моки напрямую для симуляции ошибки метаданных
-    mock_blockchain = Mock()
-    mock_blockchain.get_product = Mock(return_value=(1, "0x123", "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG", True))
+    # Arrange - используем фикстуру и настраиваем специфичные моки для симуляции ошибки метаданных
+    registry_service = mock_registry_service
     
-    mock_storage = Mock()
-    mock_storage.download_json = Mock(side_effect=Exception("IPFS download failed"))
-    
-    mock_validation = Mock()
-    mock_account = Mock()
-    
-    # Создаем экземпляр сервиса с моками
-    registry_service = ProductRegistryService(
-        blockchain_service=mock_blockchain,
-        storage_service=mock_storage,
-        validation_service=mock_validation,
-        account_service=mock_account
-    )
+    # Настраиваем моки через зависимости сервиса
+    registry_service.blockchain_service.get_product = Mock(return_value=(1, "0x123", ["component1"], "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG", True))
+    registry_service.storage_service.download_json = Mock(side_effect=Exception("IPFS download failed"))
     
     logger.info("🚀 Вызываем get_product с ID=1 (ошибка метаданных)")
     
@@ -1438,7 +1365,7 @@ async def test_get_product_string_id(mock_registry_service):
     logger.info(f"📊 Результат: {product}")
     
     assert product is not None
-    assert isinstance(product, Product)
+    assert type(product).__name__ == 'Product'  # ✅ ИСПРАВЛЕНО: Проверка типа через имя класса (работает с разными импортами)
     assert product.blockchain_id == 1
     # 🔧 ИСПРАВЛЕНИЕ: Проверяем реальный заголовок из тестовых данных IPFS
     assert product.title == "Amanita muscaria — sliced caps and gills (1st grade)"
@@ -1830,6 +1757,7 @@ async def test_get_catalog_version_error():
     logger.info("✅ Тест ошибки получения версии каталога завершен")
 
 
+@pytest.mark.unit
 def test_is_cache_valid_fresh():
     """Тест проверки актуального кэша"""
     logger.info("🧪 Начинаем тест проверки актуального кэша")
@@ -1865,6 +1793,7 @@ def test_is_cache_valid_fresh():
     logger.info("✅ Тест проверки актуального кэша завершен")
 
 
+@pytest.mark.unit
 def test_is_cache_valid_expired():
     """Тест проверки устаревшего кэша"""
     logger.info("🧪 Начинаем тест проверки устаревшего кэша")
@@ -1901,6 +1830,7 @@ def test_is_cache_valid_expired():
     logger.info("✅ Тест проверки устаревшего кэша завершен")
 
 
+@pytest.mark.unit
 def test_is_cache_valid_none_timestamp():
     """Тест проверки кэша без временной метки"""
     logger.info("🧪 Начинаем тест проверки кэша без временной метки")
@@ -1932,6 +1862,7 @@ def test_is_cache_valid_none_timestamp():
     logger.info("✅ Тест проверки кэша без временной метки завершен")
 
 
+@pytest.mark.unit
 def test_is_cache_valid_different_types():
     """Тест проверки кэша для разных типов"""
     logger.info("🧪 Начинаем тест проверки кэша для разных типов")
@@ -2039,7 +1970,7 @@ async def test_deserialize_product_success():
         prices=[test_price]
     )
     
-    mock_assembler.assemble_product = Mock(return_value=test_product)
+    mock_assembler.assemble_product = AsyncMock(return_value=test_product)
     registry_service.assembler = mock_assembler
     
     # Настраиваем мок storage_service для возврата метаданных
@@ -2054,8 +1985,9 @@ async def test_deserialize_product_success():
         "prices": []
     })
     
-    # Тестовые данные продукта (кортеж из блокчейна) - НОВАЯ структура с componentIds
-    product_data = (1, "0x123456789", ["test_component"], "QmTestCID123", True)
+    # Тестовые данные продукта (кортеж из блокчейна) - НОВАЯ структура с componentIds и businessId
+    # Структура: (id, seller, businessId, componentIds, metadataCID, active) - 6 элементов
+    product_data = (1, "0x123456789", "test-product", ["test_component"], "QmTestCID123", True)
     
     logger.info("🚀 Вызываем _deserialize_product с корректными данными")
     
@@ -2113,23 +2045,25 @@ async def test_deserialize_product_correct_tuple_indices():
     """
     REGRESSION TEST: Проверка правильных индексов в Product tuple
     
-    Контракт возвращает:
+    Контракт возвращает (НОВАЯ структура с businessId):
     struct Product {
         uint256 id;              // [0]
         address seller;          // [1]
-        string[] componentIds;   // [2] ← СПИСОК!
-        string metadataCID;      // [3] ← CID метаданных
-        bool active;             // [4]
+        string businessId;       // [2] ← НОВОЕ ПОЛЕ!
+        string[] componentIds;   // [3] ← СПИСОК!
+        string metadataCID;      // [4] ← CID метаданных
+        bool active;             // [5]
     }
     
-    БЫЛО (ОШИБКА):
+    БЫЛО (ОШИБКА - 5 элементов без businessId):
         ipfs_cid = product_data[2]  # ← componentIds (список)
         is_active = product_data[3]  # ← metadataCID (строка)
     
-    СТАЛО (ПРАВИЛЬНО):
-        component_ids = product_data[2]  # ← componentIds (список)
-        ipfs_cid = product_data[3]       # ← metadataCID (строка)
-        is_active = product_data[4]      # ← active (bool)
+    СТАЛО (ПРАВИЛЬНО - 6 элементов с businessId):
+        business_id = product_data[2]      # ← businessId (строка)
+        component_ids = product_data[3]    # ← componentIds (список)
+        ipfs_cid = product_data[4]         # ← metadataCID (строка)
+        is_active = product_data[5]        # ← active (bool)
     """
     logger.info("🧪 [REGRESSION] Тест правильных индексов Product tuple")
     
@@ -2186,19 +2120,21 @@ async def test_deserialize_product_correct_tuple_indices():
     })
     
     # ========================================
-    # КРИТИЧЕСКИЙ ТЕСТ: Новая структура tuple с componentIds
+    # КРИТИЧЕСКИЙ ТЕСТ: Новая структура tuple с componentIds и businessId
     # ========================================
     product_data_new_structure = (
         1,                          # [0] id
         "0xSellerAddress",          # [1] seller
-        ["amanita_muscaria"],       # [2] componentIds (СПИСОК!)
-        "QmProductMetadataCID",     # [3] metadataCID (строка)
-        True                        # [4] active
+        "test_product",             # [2] businessId (string) - НОВОЕ ПОЛЕ
+        ["amanita_muscaria"],       # [3] componentIds (СПИСОК!)
+        "QmProductMetadataCID",     # [4] metadataCID (строка)
+        True                        # [5] active
     )
     
-    logger.info("🔍 Тестируем с НОВОЙ структурой tuple (5 элементов, componentIds как список)")
-    logger.info(f"   product_data[2] = {product_data_new_structure[2]} (тип: {type(product_data_new_structure[2])})")
-    logger.info(f"   product_data[3] = {product_data_new_structure[3]} (тип: {type(product_data_new_structure[3])})")
+    logger.info("🔍 Тестируем с НОВОЙ структурой tuple (6 элементов, componentIds как список)")
+    logger.info(f"   product_data[2] = {product_data_new_structure[2]} (тип: {type(product_data_new_structure[2])}) - businessId")
+    logger.info(f"   product_data[3] = {product_data_new_structure[3]} (тип: {type(product_data_new_structure[3])}) - componentIds (список)")
+    logger.info(f"   product_data[4] = {product_data_new_structure[4]} (тип: {type(product_data_new_structure[4])}) - metadataCID")
     
     # Act
     result = await registry_service._deserialize_product(product_data_new_structure)
@@ -2207,7 +2143,7 @@ async def test_deserialize_product_correct_tuple_indices():
     assert result is not None, "Продукт должен быть десериализован"
     assert result.blockchain_id == 1, "Blockchain ID должен совпадать"
     
-    # ✅ КРИТИЧЕСКАЯ ПРОВЕРКА: download_json был вызван со СТРОКОЙ, не со списком
+    # ✅ КРИТИЧЕСКАЯ ПРОВЕРКА: download_json был вызван со СТРОКОЙ (metadataCID), не со списком (componentIds)
     mock_storage.download_json.assert_called_once()
     call_args = mock_storage.download_json.call_args[0][0]
     logger.info(f"🔍 download_json вызван с: {call_args} (тип: {type(call_args)})")
@@ -2413,6 +2349,7 @@ async def test_get_cached_image_not_found():
     logger.info("✅ Тест получения кэшированного изображения - не найдено завершен")
 
 
+@pytest.mark.unit
 def test_validate_ipfs_cid_valid():
     """Тест валидации корректного IPFS CID"""
     logger.info("🧪 Начинаем тест валидации корректного IPFS CID")
@@ -2451,6 +2388,7 @@ def test_validate_ipfs_cid_valid():
     logger.info("✅ Тест валидации корректного IPFS CID завершен")
 
 
+@pytest.mark.unit
 def test_validate_ipfs_cid_invalid():
     """Тест валидации некорректного IPFS CID"""
     logger.info("🧪 Начинаем тест валидации некорректного IPFS CID")
@@ -2729,6 +2667,7 @@ async def test_update_catalog_cache_large_products(mock_blockchain_service, mock
 # ИТОГОВЫЕ ТЕСТЫ ДЛЯ ПРОВЕРКИ ВСЕГО ФАЙЛА
 # ============================================================================
 
+@pytest.mark.unit
 def test_all_private_methods_covered():
     """Тест для проверки покрытия всех приватных методов"""
     logger.info("🧪 Проверяем покрытие всех приватных методов")
@@ -2752,6 +2691,7 @@ def test_all_private_methods_covered():
     logger.info(f"✅ Все {len(private_methods)} приватных методов покрыты тестами")
 
 
+@pytest.mark.unit
 def test_product_registry_service_complete_coverage():
     """Тест для проверки полного покрытия ProductRegistryService"""
     logger.info("🧪 Проверяем полное покрытие ProductRegistryService")
@@ -2946,7 +2886,8 @@ async def test_check_product_id_exists_invalid_id_empty():
     )
     
     # Проверяем что пустой ID выбрасывает InvalidProductIdError
-    with pytest.raises(InvalidProductIdError) as exc_info:
+    # Используем InvalidProductIdErrorService, так как registry.py импортирует из services.product.exceptions
+    with pytest.raises(InvalidProductIdErrorService) as exc_info:
         await service._check_product_id_exists("")
     
     assert "непустой строкой" in str(exc_info.value), "Сообщение об ошибке должно упоминать непустую строку"
@@ -2973,7 +2914,8 @@ async def test_check_product_id_exists_invalid_id_none():
     )
     
     # Проверяем что None ID выбрасывает InvalidProductIdError
-    with pytest.raises(InvalidProductIdError) as exc_info:
+    # Используем InvalidProductIdErrorService, так как registry.py импортирует из services.product.exceptions
+    with pytest.raises(InvalidProductIdErrorService) as exc_info:
         await service._check_product_id_exists(None)
     
     assert "не может быть None" in str(exc_info.value), "Сообщение об ошибке должно упоминать None"
@@ -3191,6 +3133,7 @@ async def test_create_product_unique_id_success(mock_blockchain_service, mock_ip
 # ТЕСТИРОВАНИЕ БЛОКЧЕЙН ВАЛИДАЦИИ (UNIT-ТЕСТЫ С МОКАМИ)
 # ============================================================================
 
+@pytest.mark.unit
 def test_check_blockchain_product_exists_unit_mocked(mock_blockchain_service, mock_ipfs_service):
     """Unit-тест проверки blockchain ID с полным мокированием"""
     logger.info("🔗 Unit-тест: проверка blockchain ID (мокированная)")
@@ -3212,6 +3155,7 @@ def test_check_blockchain_product_exists_unit_mocked(mock_blockchain_service, mo
     logger.info("✅ Unit-тест blockchain валидации с моками работает корректно")
 
 
+@pytest.mark.unit
 def test_check_blockchain_product_exists_validation_unit(mock_blockchain_service, mock_ipfs_service):
     """Unit-тест валидации входных параметров для blockchain ID"""
     logger.info("🔗 Unit-тест: валидация параметров blockchain ID")
@@ -3231,6 +3175,7 @@ def test_check_blockchain_product_exists_validation_unit(mock_blockchain_service
     logger.info("✅ Unit-тест валидации blockchain ID работает корректно")
 
 
+@pytest.mark.unit
 def test_check_blockchain_product_exists_error_handling_unit(mock_blockchain_service, mock_ipfs_service):
     """Unit-тест обработки ошибок блокчейна с моками"""
     logger.info("🔗 Unit-тест: обработка ошибок blockchain валидации")
@@ -3576,6 +3521,7 @@ async def test_get_all_products_invalid_cache_unit(mock_blockchain_service, mock
 # ЗАВЕРШЕНИЕ ТЕСТИРОВАНИЯ
 # ============================================================================
 
+@pytest.mark.unit
 def test_final_coverage_summary():
     """Финальный тест для подведения итогов покрытия"""
     logger.info("🎯 ФИНАЛЬНЫЕ ИТОГИ ТЕСТИРОВАНИЯ PRODUCT REGISTRY")

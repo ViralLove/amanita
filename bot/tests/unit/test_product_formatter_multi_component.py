@@ -23,6 +23,7 @@ class MockProduct:
         self.organic_components = organic_components
 
 
+@pytest.mark.unit
 class TestMultiComponentFormatting:
     """Tests для форматирования мультикомпонентных продуктов"""
     

@@ -1,0 +1,38 @@
+acceptance_criteria:
+  - id: AC-001
+    description: TestServiceFactory.create_product_registry_service() создает ProductRegistryService с замокированными зависимостями
+    conditions:
+      - Метод возвращает экземпляр ProductRegistryService
+      - Все зависимости (blockchain_service, storage_service, validation_service, account_service, assembler) замокированы
+      - ProductRegistryService не создает реальные сервисы (нет подключений к Web3)
+      - Метод поддерживает переопределение зависимостей через параметры
+    validation:
+      - ProductRegistryService создается без ошибок
+      - Нет попыток подключения к Web3
+      - Все зависимости доступны как моки
+  
+  - id: AC-002
+    description: TestServiceFactory создает моки для всех зависимостей ProductRegistryService
+    conditions:
+      - Создается mock_blockchain_service
+      - Создается mock_storage_service
+      - Создается mock_validation_service
+      - Создается mock_account_service
+      - Создается mock_component_service
+      - Создается mock_assembler с mock_component_service
+    validation:
+      - Все моки создаются без ошибок
+      - Моки имеют базовую функциональность для тестов
+  
+  - id: AC-003
+    description: TestServiceFactory поддерживает переопределение зависимостей
+    conditions:
+      - Метод принимает опциональные параметры для переопределения зависимостей
+      - Переопределенные зависимости используются вместо созданных моков
+      - Метод работает как с переопределенными, так и с дефолтными зависимостями
+    validation:
+      - Можно передать кастомный blockchain_service
+      - Можно передать кастомный storage_service
+      - Можно передать кастомный assembler
+      - Все переопределения работают корректно
+

@@ -49,6 +49,7 @@ class MockProduct:
     dosage_instructions: Optional[List] = None
 
 
+@pytest.mark.integration
 class TestProductTypeDetectionIntegration:
     """
     Integration tests для type detection в formatting flow.

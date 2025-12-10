@@ -17,6 +17,7 @@ class MockOrganicComponent:
         self.forms = forms or []
 
 
+@pytest.mark.unit
 class TestSingleComponentFormatting:
     """Tests для форматирования монокомпонентных продуктов"""
     
