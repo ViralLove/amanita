@@ -58,14 +58,14 @@ Each seller is a **seller node** with their own e-commerce solution deployed thr
 2. **Create your wallet** in the WebApp (guided, secure, non-custodial).
 3. **Explore the ecosystem**:
    - Browse products, make your first purchase, invite friends, or connect your WooCommerce store.
-4. **Need help?** Use the in-bot Help button or see the [documentation](docs/doc-master.md).
+4. **Need help?** Use the in-bot Help button or see the [documentation](docs/concept/doc-master.md).
 
 ## 📚 Documentation
-- [Manifest & Mission](docs/manifest.md)
-- [Architecture & Components](docs/architecture-overview.md)
-- [Network Economy](docs/Network-Economy.md) — tokenomics and social mining mechanics
-- [API & Integrations](docs/webapi-overview.md)
-- [Smart Contracts](docs/contracts-overview.md)
+- [Manifest & Mission](docs/concept/manifest.md)
+- [Architecture & Components](docs/tech/architecture-overview.md)
+- [Network Economy](docs/concept/Network-Economy.md) — tokenomics and social mining mechanics
+- [API & Integrations](docs/tech/webapi-overview.md)
+- [Smart Contracts](docs/tech/contracts-overview.md)
 
 ### Bot Documentation
 - [Bot Quick Start](bot/docs/QUICK-START.md) — quick start guide for Telegram bot
