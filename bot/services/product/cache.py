@@ -56,13 +56,14 @@ class ProductCacheService:
             self._initialized = True
             self.logger.info(f"ProductCacheService initialization completed")
     
-    def _validate_cached_data(self, data: Any, data_type: str) -> ValidationResult:
+    def _validate_cached_data(self, data: Any, data_type: str, cid: Optional[str] = None) -> ValidationResult:
         """
         Валидирует кэшированные данные через ValidationFactory.
         
         Args:
             data: Данные для валидации
             data_type: Тип данных ('catalog', 'product', 'description', 'image')
+            cid: CID для валидации (обязателен для 'description' и 'image')
             
         Returns:
             ValidationResult: Результат валидации
@@ -83,13 +84,52 @@ class ProductCacheService:
                 validator = ValidationFactory.get_product_validator()
                 return validator.validate(data)
             elif data_type == 'description':
-                # Валидируем CID описания
-                validator = ValidationFactory.get_cid_validator()
-                return validator.validate(data)
+                # Валидируем структуру Description и CID
+                # Используем строковое сравнение для совместимости с импортами из разных мест
+                type_name = type(data).__name__
+                module_name = type(data).__module__
+                
+                # Проверяем что данные - это объект Description (по имени класса и модулю)
+                if type_name != 'Description' or 'product' not in module_name:
+                    return ValidationResult.failure(
+                        f"Ожидался объект Description, получен {type_name} из {module_name}",
+                        field_name="description_type",
+                        error_code="INVALID_DESCRIPTION_TYPE"
+                    )
+                
+                # Проверяем CID если передан (используем storage_service из self для поддержки моков)
+                if cid:
+                    if not self.storage_service.validate_ipfs_cid(cid):
+                        return ValidationResult.failure(
+                            f"Невалидный CID: {cid}",
+                            field_name="cid",
+                            field_value=cid,
+                            error_code="INVALID_CID"
+                        )
+                
+                return ValidationResult.success()
             elif data_type == 'image':
-                # Валидируем CID изображения
-                validator = ValidationFactory.get_cid_validator()
-                return validator.validate(data)
+                # Валидируем URL изображения и CID
+                
+                # Проверяем что данные - это строка (URL)
+                if not isinstance(data, str):
+                    return ValidationResult.failure(
+                        f"Ожидалась строка URL, получен {type(data).__name__}",
+                        field_name="image_type",
+                        error_code="INVALID_IMAGE_TYPE"
+                    )
+                
+                # Проверяем CID если передан (используем storage_service из self для поддержки моков)
+                if cid:
+                    if not self.storage_service.validate_ipfs_cid(cid):
+                        return ValidationResult.failure(
+                            f"Невалидный CID: {cid}",
+                            field_name="cid",
+                            field_value=cid,
+                            error_code="INVALID_CID"
+                        )
+                
+                return ValidationResult.success()
             else:
                 return ValidationResult.failure(
                     f"Неизвестный тип данных для валидации: {data_type}",
@@ -143,8 +183,8 @@ class ProductCacheService:
                 value, timestamp = cached_data
                 
                 if self._is_cache_valid(timestamp, cache_type):
-                    # Валидируем кэшированные данные
-                    validation_result = self._validate_cached_data(value, cache_type)
+                    # Валидируем кэшированные данные (передаем key как CID для description и image)
+                    validation_result = self._validate_cached_data(value, cache_type, cid=key if cache_type in ['description', 'image'] else None)
                     if validation_result.is_valid:
                         self.logger.info(f"[ProductCacheService] ✅ Кэш валиден и данные прошли валидацию: key='{key}', cache_type='{cache_type}'")
                         return value

@@ -30,27 +30,28 @@ class ProductService:
         self.formatter_service = formatter_service
         self.logger = logging.getLogger(__name__)
     
-    async def get_product_by_id(self, product_id: str) -> Optional[Any]:
+    async def get_product_by_id(self, product_id: str, language: str = "ru") -> Optional[Any]:
         """
         Получает продукт по ID
         
         Args:
             product_id: ID продукта для поиска
+            language: Язык для загрузки ComponentDescription (по умолчанию "ru")
             
         Returns:
             Optional[Any]: Найденный продукт или None
         """
         try:
-            self.logger.info(f"[ProductService] Поиск продукта по ID: {product_id}")
+            self.logger.info(f"[ProductService] Поиск продукта по ID: {product_id} (language={language})")
             
-            # Получаем все продукты и ищем по ID
+            # Получаем все продукты с учетом языка и ищем по ID
             # TODO: Добавить метод get_product_by_id в ProductRegistryService
-            products = await product_registry_service.get_all_products()
+            products = await product_registry_service.get_all_products(language)
             
             for product in products:
                 if (getattr(product, 'id', None) == product_id or 
                     getattr(product, 'business_id', None) == product_id):
-                    self.logger.info(f"[ProductService] Продукт найден: {product.title}")
+                    self.logger.info(f"[ProductService] Продукт найден: {product.title} (language={language})")
                     return product
             
             self.logger.error(f"[ProductService] Продукт с ID {product_id} не найден")

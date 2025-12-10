@@ -30,27 +30,30 @@ class CatalogService:
         self.formatter_service = formatter_service
         self.logger = logging.getLogger(__name__)
     
-    async def get_catalog_with_progress(self) -> List[Any]:
+    async def get_catalog_with_progress(self, language: str = "ru") -> List[Any]:
         """
         Получает каталог продуктов с отображением прогресса
+        
+        Args:
+            language: Язык для загрузки ComponentDescription (по умолчанию "ru")
         
         Returns:
             List[Any]: Список продуктов из каталога
         """
         try:
-            self.logger.info("[CatalogService] Запрос каталога товаров")
+            self.logger.info(f"[CatalogService] Запрос каталога товаров (language={language})")
             self.logger.info(f"[CatalogService] product_registry_service: {product_registry_service}")
             
-            # Получаем каталог через сервис (с кэшированием)
-            self.logger.info("[CatalogService] Вызываем product_registry_service.get_all_products()")
-            products = await product_registry_service.get_all_products()
+            # Получаем каталог через сервис (с кэшированием) с учетом языка
+            self.logger.info(f"[CatalogService] Вызываем product_registry_service.get_all_products(language={language})")
+            products = await product_registry_service.get_all_products(language)
             self.logger.info(f"[CatalogService] Получен ответ от product_registry_service: {type(products)}")
             
             if not products:
                 self.logger.info("[CatalogService] Каталог пуст")
                 return []
             
-            self.logger.info(f"[CatalogService] Найдено {len(products)} продуктов")
+            self.logger.info(f"[CatalogService] Найдено {len(products)} продуктов (language={language})")
             self.logger.info(f"[CatalogService] Тип первого продукта: {type(products[0]) if products else 'N/A'}")
             return products
             

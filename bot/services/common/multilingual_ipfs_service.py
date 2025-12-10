@@ -46,12 +46,13 @@ class MultilingualIPFSService:
     - Поддержку множественных языков
     
     АРХИТЕКТУРА ДАННЫХ:
-    - Simple fields (per-component): используются для per-component данных через get_component_translations(biounit_id, language)
-      Формат ключа в блокчейне: "component.{biounit_id}.*.{language}"
-      Пример: "component.amanita_muscaria.*.ru" → CID с переводами для amanita_muscaria
+    - Complex fields (per-component): используются для per-component данных через get_component_translations(biounit_id, language)
+      Формат ключа в блокчейне: "ComponentDescription.{biounit_id}.{language}"
+      Пример: "ComponentDescription.amanita_muscaria.ru" → CID с переводами для amanita_muscaria
+      Соответствует scripts слою, который записывает с className = "ComponentDescription.{biounit_id}"
     
     - Complex fields (глобальные шаблоны): предназначены для глобальных шаблонов через get_component_description_template(language)
-      Формат ключа в блокчейне: "{className}.{language}"
+      Формат ключа в блокчейне: "ComponentDescription.{language}" (БЕЗ biounit_id)
       Пример: "ComponentDescription.ru" → CID с глобальным шаблоном (НЕ используется в production)
     """
     
@@ -166,11 +167,13 @@ class MultilingualIPFSService:
     
     def get_component_translations(self, component_id: str, language: str) -> Optional[Dict[str, Any]]:
         """
-        Получает переводы компонента из IPFS через simple fields (per-component данные).
+        Получает переводы компонента из IPFS через complex fields (per-component данные).
         
-        ПРИМЕЧАНИЕ: Этот метод использует SIMPLE FIELDS для per-component данных.
+        ПРИМЕЧАНИЕ: Этот метод использует COMPLEX FIELDS для per-component данных.
         component_id = biounit_id (строка, например "amanita_muscaria").
-        Данные загружаются через блокчейн маппинг: simpleFieldCIDs["component.{biounit_id}.*.{language}"]
+        Данные загружаются через блокчейн маппинг: complexFieldCIDs["ComponentDescription.{biounit_id}.{language}"]
+        
+        Формат соответствует scripts слою, который записывает данные с className = "ComponentDescription.{biounit_id}".
         
         Для глобальных шаблонов (если понадобятся) используйте get_component_description_template().
         
@@ -179,7 +182,7 @@ class MultilingualIPFSService:
             language: Язык перевода (например, "ru")
             
         Returns:
-            Dict[str, Any] или None: Переводы компонента (per-component данные через simple fields)
+            Dict[str, Any] или None: Переводы компонента (fields из ComponentDescription complex field)
         """
         try:
             self.stats['ipfs_requests'] += 1
@@ -202,13 +205,15 @@ class MultilingualIPFSService:
                 self._save_to_local_cache_only(cache_key, cached_data, 'component')
                 return cached_data
             
-            # Загружаем из IPFS
-            component_data = self._load_from_ipfs(component_id, language, 'component')
+            # Загружаем из IPFS через complex fields (соответствует scripts слою)
+            # Используем _load_component_description_from_ipfs() который формирует
+            # className = "ComponentDescription.{component_id}" для соответствия scripts слою
+            component_data = self._load_component_description_from_ipfs(component_id, language)
             if component_data:
                 self.stats['ipfs_hits'] += 1
                 # Сохраняем в кэш
                 self._save_to_cache(cache_key, component_data, 'component')
-                self.logger.debug(f"[MultilingualIPFSService] Загружен из IPFS компонент {component_id} на языке {language}")
+                self.logger.debug(f"[MultilingualIPFSService] Загружен из IPFS компонент {component_id} на языке {language} через complex fields")
                 return component_data
             
             # Используем fallback
@@ -559,18 +564,18 @@ class MultilingualIPFSService:
     
     def _get_complex_field_cid(self, className: str, language: str) -> Optional[str]:
         """
-        Получает CID для complex field (глобальный шаблон) через блокчейн контракт.
+        Получает CID для complex field через блокчейн контракт.
         
-        ПРИМЕЧАНИЕ: Complex fields предназначены для глобальных шаблонов (например, ComponentDescription.ru).
-        Per-component данные хранятся как simple fields через get_component_translations(biounit_id, language).
-        В production complex fields не используются для per-component данных.
+        ПРИМЕЧАНИЕ: Complex fields используются для:
+        - Per-component данных: className = "ComponentDescription.{biounit_id}" (используется в production)
+        - Глобальных шаблонов: className = "ComponentDescription" (НЕ используется в production)
         
         Args:
-            className: Имя класса (например, "ComponentDescription")
+            className: Имя класса (например, "ComponentDescription" или "ComponentDescription.amanita_muscaria")
             language: Язык (например, "ru")
             
         Returns:
-            str или None: CID для complex field (глобального шаблона)
+            str или None: CID для complex field
         """
         if not self.blockchain_service:
             self.logger.debug("[MultilingualIPFSService] BlockchainService недоступен для complex field")
@@ -595,18 +600,18 @@ class MultilingualIPFSService:
     
     def _load_complex_field_from_ipfs(self, className: str, language: str) -> Optional[Dict[str, Any]]:
         """
-        Загружает complex field (глобальный шаблон) из IPFS через блокчейн маппинг.
+        Загружает complex field из IPFS через блокчейн маппинг.
         
-        ПРИМЕЧАНИЕ: Complex fields предназначены для глобальных шаблонов (например, ComponentDescription.ru).
-        Per-component данные хранятся как simple fields через get_component_translations(biounit_id, language).
-        В production complex fields не используются для per-component данных.
+        ПРИМЕЧАНИЕ: Complex fields используются для:
+        - Per-component данных: className = "ComponentDescription.{biounit_id}" (используется в production)
+        - Глобальных шаблонов: className = "ComponentDescription" (НЕ используется в production)
         
         Args:
-            className: Имя класса (например, "ComponentDescription")
+            className: Имя класса (например, "ComponentDescription" или "ComponentDescription.amanita_muscaria")
             language: Язык (например, "ru")
             
         Returns:
-            Dict[str, Any] или None: JSON с полями complex field (глобального шаблона)
+            Dict[str, Any] или None: JSON с полями complex field (структура: {label, type, fields})
         """
         try:
             if not self.ipfs_factory:
@@ -672,13 +677,61 @@ class MultilingualIPFSService:
             self.logger.error(f"[MultilingualIPFSService] Ошибка загрузки complex field {className}.{language}: {e}")
             return None
     
+    def _load_component_description_from_ipfs(self, component_id: str, language: str) -> Optional[Dict[str, Any]]:
+        """
+        Загружает ComponentDescription для конкретного компонента из IPFS через блокчейн маппинг (complex field).
+        
+        Использует формат className с biounit_id для соответствия scripts слою:
+        - Scripts записывает: "ComponentDescription.{biounit_id}.{lang}"
+        - Этот метод читает: "ComponentDescription.{component_id}.{lang}"
+        
+        Args:
+            component_id: ID биологической единицы (biounit_id, например "amanita_muscaria")
+            language: Язык (например, "ru")
+            
+        Returns:
+            Dict[str, Any] или None: JSON с полями ComponentDescription (fields) для компонента
+        """
+        try:
+            # Формируем className с biounit_id (соответствует scripts слою)
+            className = f"ComponentDescription.{component_id}"
+            
+            # Проверяем кэш с правильным ключом (включает component_id)
+            cache_key = f"complex_{className}_{language}"
+            cached_data = self._get_from_cache(cache_key, 'component')
+            if isinstance(cached_data, dict):
+                # Если данные в кэше, извлекаем fields
+                fields = cached_data.get('fields')
+                if isinstance(fields, dict):
+                    self.stats['cache_hits'] += 1
+                    self.logger.debug(f"[MultilingualIPFSService] Кэш hit для ComponentDescription {component_id} (lang: {language})")
+                    return fields
+            
+            # Загружаем complex field через существующий метод
+            complex_data = self._load_complex_field_from_ipfs(className, language)
+            if not complex_data:
+                self.logger.warning(f"[MultilingualIPFSService] Не удалось загрузить ComponentDescription для {component_id} (lang: {language})")
+                return None
+            
+            # Возвращаем только fields из complex data
+            fields = complex_data.get('fields')
+            if not isinstance(fields, dict):
+                self.logger.warning(f"[MultilingualIPFSService] Поле 'fields' не является словарем для ComponentDescription.{component_id}.{language}")
+                return None
+            
+            self.logger.info(f"[MultilingualIPFSService] Успешно загружен ComponentDescription для {component_id} (lang: {language})")
+            return fields
+        except Exception as e:
+            self.logger.error(f"[MultilingualIPFSService] Ошибка получения ComponentDescription для {component_id} (lang: {language}): {e}")
+            return None
+    
     def get_component_description_template(self, language: str) -> Optional[Dict[str, Any]]:
         """
         Получает глобальный шаблон ComponentDescription из IPFS через блокчейн маппинг (complex field).
         
         ПРИМЕЧАНИЕ: Этот метод предназначен для загрузки ГЛОБАЛЬНЫХ ШАБЛОНОВ ComponentDescription.
         Per-component данные НЕ загружаются через этот метод!
-        Для per-component данных используйте get_component_translations(biounit_id, language).
+        Для per-component данных используйте _load_component_description_from_ipfs(component_id, language).
         
         В production глобальные шаблоны НЕ используются - каждый компонент имеет свое описание.
         Этот метод зарезервирован для будущего использования, если понадобятся глобальные шаблоны.

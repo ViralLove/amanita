@@ -48,7 +48,7 @@ class ProductRegistryService:
         'image': timedelta(hours=12)
     }
 
-    def __init__(self, blockchain_service: Optional[BlockchainService] = None, storage_service: Optional[ProductStorageService] = None, validation_service: Optional[ProductValidationService] = None, account_service: Optional['AccountService'] = None, assembler: Optional[ProductAssembler] = None):
+    def __init__(self, blockchain_service: Optional[BlockchainService] = None, storage_service: Optional[ProductStorageService] = None, validation_service: Optional[ProductValidationService] = None, account_service: Optional['AccountService'] = None, assembler: Optional[ProductAssembler] = None, component_service: Optional['ComponentService'] = None):
         """
         Инициализирует сервис реестра продуктов.
         
@@ -58,6 +58,7 @@ class ProductRegistryService:
             validation_service: Сервис для валидации продуктов
             account_service: Сервис для работы с аккаунтами (если None, создается автоматически)
             assembler: Сервис для сборки продуктов (если None, создается автоматически)
+            component_service: Сервис для работы с компонентами (если None и assembler не передан, создается автоматически)
         """
         # Инициализируем logger
         self.logger = logging.getLogger(__name__)
@@ -79,10 +80,18 @@ class ProductRegistryService:
         
         # Инициализируем ProductAssembler (clean break: требует ComponentService)
         if assembler is None:
-            from services.product.component_service import ComponentService
-            self.assembler = ProductAssembler(component_service=ComponentService())
+            # Если передан component_service, используем его для создания ProductAssembler
+            if component_service is None:
+                from services.product.component_service import ComponentService
+                component_service = ComponentService()
+                self.logger.info("ComponentService создан автоматически для ProductAssembler")
+            else:
+                self.logger.info(f"Использован переданный ComponentService ({type(component_service).__name__})")
+            
+            self.assembler = ProductAssembler(component_service=component_service)
         else:
             self.assembler = assembler
+            self.logger.info(f"Использован переданный ProductAssembler ({type(assembler).__name__})")
         
         # Инициализируем AccountService
         if account_service is None:
@@ -290,11 +299,18 @@ class ProductRegistryService:
         "field_3": "active"
     }
     
-    async def get_all_products(self) -> List[Product]:
-        """Получает все продукты с кэшированием"""
-
-        self.logger.info(f"[ProductRegistry] get_all_products id(self)={id(self)}")
-        self.logger.info(f"[ProductRegistry] 🚀 Начинаем получение всех продуктов")
+    async def get_all_products(self, language: str = "ru") -> List[Product]:
+        """
+        Получает все продукты с кэшированием.
+        
+        Args:
+            language: Язык для загрузки ComponentDescription (по умолчанию "ru")
+        
+        Returns:
+            List[Product]: Список продуктов каталога
+        """
+        self.logger.info(f"[ProductRegistry] get_all_products id(self)={id(self)}, language={language}")
+        self.logger.info(f"[ProductRegistry] 🚀 Начинаем получение всех продуктов (language={language})")
         self.logger.info(f"[ProductRegistry] blockchain_service: {self.blockchain_service}")
         self.logger.info(f"[ProductRegistry] cache_service: {self.cache_service}")
 
@@ -304,26 +320,44 @@ class ProductRegistryService:
             catalog_version = self.blockchain_service.get_catalog_version()
             self.logger.info(f"[ProductRegistry] ✅ Текущая версия каталога: {catalog_version}")
             
-            # Проверяем кэш
-            self.logger.info(f"[ProductRegistry] 🔍 Проверяем кэш каталога...")
-            cached_catalog = self.cache_service.get_cached_item("catalog", "catalog")
+            # Кэш по ключу (catalog_version, language)
+            cache_key = f"catalog:{catalog_version}:{language}"
+            self.logger.info(f"[ProductRegistry] 🔍 Проверяем кэш каталога с ключом: {cache_key}")
+            cached_catalog = self.cache_service.get_cached_item(cache_key, "catalog")
             self.logger.info(f"[ProductRegistry] cached_catalog: {cached_catalog}")
             
             if cached_catalog:
                 products_in_cache = cached_catalog.get('products', [])
-                self.logger.info(f"[ProductRegistry] 📦 Найден кэш каталога: version={cached_catalog.get('version')}, products_count={len(products_in_cache)}")
+                cached_version = cached_catalog.get('version')
+                cached_lang = cached_catalog.get('language')
+                self.logger.info(
+                    f"[ProductRegistry] 📦 Найден кэш каталога: "
+                    f"version={cached_version}, language={cached_lang}, products_count={len(products_in_cache)}"
+                )
 
-                # Если версия совпадает и кэш не пустой — используем его
-                if cached_catalog.get("version") == catalog_version and len(products_in_cache) > 0:
-                    self.logger.info(f"[ProductRegistry] ✅ Возвращаем кэшированный каталог (версия {catalog_version})")
+                # Если версия и язык совпадают и кэш не пустой — используем его
+                if (cached_version == catalog_version and 
+                    cached_lang == language and 
+                    len(products_in_cache) > 0):
+                    self.logger.info(
+                        f"[ProductRegistry] ✅ Возвращаем кэшированный каталог "
+                        f"(version={catalog_version}, language={language})"
+                    )
                     return products_in_cache
-                elif cached_catalog.get("version") == catalog_version and len(products_in_cache) == 0:
-                    # Версия совпадает, но кэш пуст — принудительно обновим из блокчейна
-                    self.logger.info(f"[ProductRegistry] ⚠️ Кэш пуст при актуальной версии ({catalog_version}), обновляем из блокчейна")
+                elif cached_version == catalog_version and cached_lang == language and len(products_in_cache) == 0:
+                    # Версия и язык совпадают, но кэш пуст — принудительно обновим из блокчейна
+                    self.logger.info(
+                        f"[ProductRegistry] ⚠️ Кэш пуст при актуальной версии и языке "
+                        f"({catalog_version}, {language}), обновляем из блокчейна"
+                    )
                 else:
-                    self.logger.info(f"[ProductRegistry] ❌ Кэш устарел: cached_version={cached_catalog.get('version')}, current_version={catalog_version}")
+                    self.logger.info(
+                        f"[ProductRegistry] ❌ Кэш устарел или для другого языка: "
+                        f"cached_version={cached_version}, cached_lang={cached_lang}, "
+                        f"current_version={catalog_version}, current_lang={language}"
+                    )
             else:
-                self.logger.info(f"[ProductRegistry] 📭 Кэш каталога пуст")
+                self.logger.info(f"[ProductRegistry] 📭 Кэш каталога пуст для ключа: {cache_key}")
             
             # Получаем продукты из блокчейна
             self.logger.info(f"[ProductRegistry] 🔗 Загружаем продукты из блокчейна...")
@@ -336,14 +370,27 @@ class ProductRegistryService:
             
             # Обрабатываем каждый продукт через унифицированный метод
             products = []
-            self.logger.info(f"[ProductRegistry] 🔄 Начинаем обработку {len(products_data)} продуктов из блокчейна")
+            self.logger.info(f"[ProductRegistry] 🔄 Начинаем обработку {len(products_data)} продуктов из блокчейна (language={language})")
             self.logger.info(f"[ProductRegistry] 📋 Products data: {products_data}")
             
             for i, product_data in enumerate(products_data):
                 try:
                     self.logger.info(f"[ProductRegistry] 🔍 Обрабатываем продукт {i+1}/{len(products_data)}: {product_data}")
-                    # Используем унифицированный метод десериализации
-                    product = await self._deserialize_product(product_data)
+                    
+                    # ✅ ФИЛЬТРАЦИЯ ПО СЕЛЛЕРУ: Проверяем, что продукт принадлежит текущему селлеру
+                    if len(product_data) >= 2:
+                        product_seller_address = product_data[1]  # seller address из блокчейна
+                        current_seller_address = self.seller_account.address
+                        
+                        if product_seller_address.lower() != current_seller_address.lower():
+                            self.logger.debug(
+                                f"[ProductRegistry] ⏭️ Пропускаем продукт {product_data[0]}: "
+                                f"принадлежит другому селлеру ({product_seller_address} != {current_seller_address})"
+                            )
+                            continue  # Пропускаем продукты других селлеров
+                    
+                    # Используем унифицированный метод десериализации с языком
+                    product = await self._deserialize_product(product_data, language)
                     if product:
                         products.append(product)
                         self.logger.info(f"[ProductRegistry] ✅ Продукт {i+1} успешно обработан: ID={product.id if hasattr(product, 'id') else 'N/A'}")
@@ -354,15 +401,27 @@ class ProductRegistryService:
                     self.logger.error(f"[ProductRegistry] ❌ Error processing product {i+1}: {e}")
                     continue
             
-            # Обновляем кэш
-            self.logger.info(f"[ProductRegistry] 💾 Сохраняем каталог в кэш: version={catalog_version}, products_count={len(products)}")
-            self.cache_service.set_cached_item("catalog", {
+            # ✅ Статистика фильтрации: логируем результаты фильтрации по селлеру
+            self.logger.info(
+                f"[ProductRegistry] 📊 Статистика фильтрации: "
+                f"получено из блокчейна={len(products_data)}, "
+                f"отфильтровано по селлеру={len(products_data) - len(products)}, "
+                f"возвращено продуктов селлера={len(products)}"
+            )
+            
+            # Обновляем кэш с ключом (catalog_version, language)
+            self.logger.info(
+                f"[ProductRegistry] 💾 Сохраняем каталог в кэш: "
+                f"version={catalog_version}, language={language}, products_count={len(products)}"
+            )
+            self.cache_service.set_cached_item(cache_key, {
                 "version": catalog_version,
+                "language": language,
                 "products": products
             }, "catalog")
-            self.logger.info(f"[ProductRegistry] ✅ Каталог успешно сохранен в кэш")
+            self.logger.info(f"[ProductRegistry] ✅ Каталог успешно сохранен в кэш с ключом: {cache_key}")
             
-            self.logger.info(f"[ProductRegistry] 🎉 ФИНАЛЬНЫЙ РЕЗУЛЬТАТ: возвращаем {len(products)} продуктов")
+            self.logger.info(f"[ProductRegistry] 🎉 ФИНАЛЬНЫЙ РЕЗУЛЬТАТ: возвращаем {len(products)} продуктов (language={language})")
             return products
             
         except Exception as e:
@@ -372,12 +431,13 @@ class ProductRegistryService:
             self.logger.error(traceback.format_exc())
             return []
 
-    async def get_product(self, product_id: Union[str, int]) -> Product:
+    async def get_product(self, product_id: Union[str, int], language: str = "ru") -> Product:
         """
         Получает продукт по ID.
         
         Args:
             product_id: ID продукта (строка или число)
+            language: Язык для загрузки ComponentDescription (по умолчанию "ru")
             
         Returns:
             Product: Данные продукта
@@ -407,8 +467,8 @@ class ProductRegistryService:
                 self.logger.warning(f"[ProductRegistry] Продукт {product_id} не найден в блокчейне (None)")
                 return None
             
-            # Десериализуем продукт
-            product = await self._deserialize_product(product_data)
+            # Десериализуем продукт с языком
+            product = await self._deserialize_product(product_data, language)
             if not product:
                 self.logger.warning(f"[ProductRegistry] Не удалось десериализовать продукт {product_id}")
                 return None
@@ -942,29 +1002,42 @@ class ProductRegistryService:
             self.logger.error(f"[ProductRegistry] Ошибка деактивации продукта {product_id}: {e}")
             return False
 
-    async def _deserialize_product(self, product_data: tuple) -> Optional[Product]:
+    async def _deserialize_product(self, product_data: tuple, language: str = "ru") -> Optional[Product]:
         """
         Десериализует продукт из кортежа блокчейна и метаданных IPFS.
         Использует ProductAssembler для централизованной сборки продукта.
         
         Args:
-            product_data: tuple (id, seller, ipfsCID, active)
+            product_data: tuple (id, seller, businessId, componentIds, metadataCID, active) - 6 элементов
+            language: Язык для загрузки ComponentDescription (по умолчанию "ru")
+        
         Returns:
             Product или None
         """
         try:
-            self.logger.info(f"[ProductRegistry] 🔍 Начинаем десериализацию продукта: {product_data}")
+            self.logger.info(f"[ProductRegistry] 🔍 Начинаем десериализацию продукта: {product_data}, language={language}")
             
-            if not hasattr(product_data, '__getitem__') or len(product_data) < 4:
-                self.logger.error(f"[ProductRegistry] ❌ Некорректная структура product_data: {product_data}")
+            # ✅ ИСПРАВЛЕНО: Проверка на 6 элементов (новая структура с businessId)
+            if not hasattr(product_data, '__getitem__') or len(product_data) < 6:
+                self.logger.error(
+                    f"[ProductRegistry] ❌ Некорректная структура product_data: ожидается 6 элементов "
+                    f"(id, seller, businessId, componentIds, metadataCID, active), "
+                    f"получено {len(product_data) if hasattr(product_data, '__len__') else 'N/A'}: {product_data}"
+                )
                 return None
 
-            product_id = product_data[0]  # Блокчейн ID
-            component_ids = product_data[2]  # componentIds (список)
-            ipfs_cid = product_data[3]  # metadataCID (строка)
-            is_active = bool(product_data[4])  # active (bool)
+            # ✅ ИСПРАВЛЕНО: Извлекаем все 6 элементов из новой структуры
+            product_id = product_data[0]           # [0] id (uint256)
+            seller_address = product_data[1]       # [1] seller (address)
+            business_id = product_data[2]          # [2] businessId (string) - извлекаем для логирования
+            component_ids = product_data[3]        # [3] componentIds (string[]) ← ИСПРАВЛЕНО
+            ipfs_cid = product_data[4]             # [4] metadataCID (string) ← ИСПРАВЛЕНО
+            is_active = bool(product_data[5])      # [5] active (bool) ← ИСПРАВЛЕНО
 
-            self.logger.info(f"[ProductRegistry] 📋 Извлечены данные: ID={product_id}, CID={ipfs_cid}, Active={is_active}")
+            self.logger.info(
+                f"[ProductRegistry] 📋 Извлечены данные: ID={product_id}, businessId={business_id}, "
+                f"componentIds={component_ids}, CID={ipfs_cid}, Active={is_active}"
+            )
             self.logger.info(f"[ProductRegistry] 🔗 Загружаем метаданные из IPFS: {ipfs_cid}")
             
             # 🔧 ИСПРАВЛЕНИЕ: download_json теперь синхронный метод
@@ -975,11 +1048,15 @@ class ProductRegistryService:
 
             self.logger.info(f"[ProductRegistry] ✅ Метаданные загружены: {type(metadata)}, keys={list(metadata.keys()) if isinstance(metadata, dict) else 'N/A'}")
 
-            # Используем ProductAssembler для централизованной сборки продукта
-            self.logger.info(f"[ProductRegistry] 🔧 Вызываем ProductAssembler.assemble_product...")
-            product = await self.assembler.assemble_product(product_data, metadata)
+            # ✅ ИСПРАВЛЕНО: Передаем в assembler только 5 элементов (assembler ожидает без businessId)
+            # business_id берется из метаданных в assembler, поэтому не передаем его из блокчейна
+            assembler_blockchain_data = (product_id, seller_address, component_ids, ipfs_cid, is_active)
+            
+            # Используем ProductAssembler для централизованной сборки продукта с языком
+            self.logger.info(f"[ProductRegistry] 🔧 Вызываем ProductAssembler.assemble_product (language={language})...")
+            product = await self.assembler.assemble_product(assembler_blockchain_data, metadata, language)
             if product:
-                self.logger.info(f"[ProductRegistry] ✅ Продукт {product_id} успешно собран через ProductAssembler")
+                self.logger.info(f"[ProductRegistry] ✅ Продукт {product_id} успешно собран через ProductAssembler (language={language})")
             else:
                 self.logger.error(f"[ProductRegistry] ❌ Не удалось собрать продукт {product_id} через ProductAssembler")
             

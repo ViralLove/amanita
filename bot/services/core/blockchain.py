@@ -440,6 +440,180 @@ class BlockchainService:
         except Exception as e:
             logger.error(f"[BlockchainService] Ошибка валидации инвайт-кода: {e}")
             return {"success": False, "reason": str(e)}
+    
+    def validate_activator_invite_pair(self, activator_address: str, invite_code: str) -> dict:
+        """
+        Валидирует связь между активатором и инвайтом перед активацией.
+        
+        Проверяет:
+        1. Инвайт существует
+        2. inviteMinter[tokenId] == activator (синхронизация)
+        3. Инвайт не использован
+        4. Инвайт не истек
+        5. Активатор имеет capacity (circle < 12)
+        
+        Args:
+            activator_address: Адрес активатора (например, seller address)
+            invite_code: Код инвайта для проверки
+            
+        Returns:
+            dict: {
+                'valid': bool,
+                'reason': str (если не valid),
+                'token_id': int (если найден),
+                'minter': str (если найден),
+                'is_used': bool,
+                'expired': bool,
+                'activator_capacity': int (если valid),
+                'circle_size': int (если valid),
+                'expected_activator': str (если не синхронизирован)
+            }
+        """
+        logger.info(f"[BlockchainService] Валидация пары активатор-инвайт: activator={activator_address[:10]}..., invite={invite_code}")
+        
+        try:
+            contract = self.get_contract("SpiralEngine")
+            if not contract:
+                return {
+                    'valid': False,
+                    'reason': 'contract_not_found',
+                    'token_id': None,
+                    'minter': None
+                }
+            
+            # 1. Проверка существования инвайта
+            exists = self._call_contract_read_function(
+                "SpiralEngine", "inviteCodeExists", False, invite_code
+            )
+            if not exists:
+                logger.warning(f"[BlockchainService] Инвайт {invite_code} не найден")
+                return {
+                    'valid': False,
+                    'reason': 'invite_not_found',
+                    'token_id': None,
+                    'minter': None
+                }
+            
+            # 2. Получение token_id
+            token_id = self._call_contract_read_function(
+                "SpiralEngine", "inviteCodeToTokenId", 0, invite_code
+            )
+            if not token_id:
+                logger.warning(f"[BlockchainService] Не удалось получить token_id для инвайта {invite_code}")
+                return {
+                    'valid': False,
+                    'reason': 'invalid_token_id',
+                    'token_id': None,
+                    'minter': None
+                }
+            
+            # 3. Проверка минтера (критично для синхронизации)
+            minter = self._call_contract_read_function(
+                "SpiralEngine", "inviteMinter", None, token_id
+            )
+            if not minter:
+                logger.warning(f"[BlockchainService] Не удалось получить минтера для token_id {token_id}")
+                return {
+                    'valid': False,
+                    'reason': 'minter_not_found',
+                    'token_id': token_id,
+                    'minter': None
+                }
+            
+            # Normalize addresses for comparison
+            if minter.lower() != activator_address.lower():
+                logger.warning(
+                    f"[BlockchainService] Рассинхронизация: инвайт {invite_code} создан {minter[:10]}..., "
+                    f"а активирует {activator_address[:10]}..."
+                )
+                return {
+                    'valid': False,
+                    'reason': 'invite_not_from_activator',
+                    'token_id': token_id,
+                    'minter': minter,
+                    'expected_activator': activator_address
+                }
+            
+            # 4. Проверка использования
+            is_used = self._call_contract_read_function(
+                "SpiralEngine", "isInviteUsed", False, token_id
+            )
+            if is_used:
+                logger.warning(f"[BlockchainService] Инвайт {invite_code} уже использован")
+                return {
+                    'valid': False,
+                    'reason': 'invite_already_used',
+                    'token_id': token_id,
+                    'minter': minter,
+                    'is_used': True
+                }
+            
+            # 5. Проверка срока действия
+            expiry = self._call_contract_read_function(
+                "SpiralEngine", "inviteExpiry", 0, token_id
+            )
+            current_time = self.web3.eth.get_block('latest').timestamp
+            expired = expiry > 0 and expiry <= current_time
+            if expired:
+                logger.warning(
+                    f"[BlockchainService] Инвайт {invite_code} истек: expiry={expiry}, current={current_time}"
+                )
+                return {
+                    'valid': False,
+                    'reason': 'invite_expired',
+                    'token_id': token_id,
+                    'minter': minter,
+                    'expired': True,
+                    'expiry': expiry,
+                    'current_time': current_time
+                }
+            
+            # 6. Проверка capacity активатора
+            circle = self._call_contract_read_function(
+                "SpiralEngine", "getCircleMembers", [], activator_address
+            )
+            if circle is None:
+                circle = []
+            
+            capacity = 12 - len(circle)
+            if capacity <= 0:
+                logger.warning(
+                    f"[BlockchainService] Активатор {activator_address[:10]}... заполнен: "
+                    f"circle_size={len(circle)}/12, capacity={capacity}"
+                )
+                return {
+                    'valid': False,
+                    'reason': 'activator_circle_full',
+                    'token_id': token_id,
+                    'minter': minter,
+                    'capacity': capacity,
+                    'circle_size': len(circle)
+                }
+            
+            # Все проверки пройдены
+            logger.info(
+                f"[BlockchainService] ✅ Пара валидна: activator={activator_address[:10]}..., "
+                f"invite={invite_code}, capacity={capacity}/12"
+            )
+            return {
+                'valid': True,
+                'reason': None,
+                'token_id': token_id,
+                'minter': minter,
+                'is_used': False,
+                'expired': False,
+                'activator_capacity': capacity,
+                'circle_size': len(circle)
+            }
+            
+        except Exception as e:
+            logger.error(f"[BlockchainService] Ошибка валидации пары активатор-инвайт: {e}")
+            return {
+                'valid': False,
+                'reason': f'validation_error: {str(e)}',
+                'token_id': None,
+                'minter': None
+            }
 
     async def activate_invite(self, invite_code: str, user_address: str, new_invite_codes: List[str] = None, expiry: int = 0, private_key: str = None) -> dict:
         """Активация инвайта через SpiralEngine"""
@@ -917,12 +1091,27 @@ class BlockchainService:
         """
         Получает компонент по business ID из OrganicComponentRegistry
         
+        Contract function: getComponentByBusinessId(string businessId)
+        
         Args:
             component_id: Business ID компонента (например, "amanita_muscaria")
             
         Returns:
-            dict: Данные компонента (id, businessId, creator, rootMetadataCID, active, createdAt)
+            tuple | None: Component struct из контракта (6 полей):
+                - [0] blockchain_id (int): числовой ID в блокчейне
+                - [1] creator (str): адрес создателя
+                - [2] created_at (int): timestamp создания
+                - [3] last_updated (int): timestamp последнего обновления
+                - [4] status (int): статус (ACTIVE=0, PENDING=1, ARCHIVED=2)
+                - [5] is_shared (bool): доступен ли для общего использования
+            
             None: Если компонент не найден или произошла ошибка
+        
+        Note:
+            businessId и rootMetadataCID НЕ входят в Component struct.
+            Они хранятся в отдельных mappings и получаются через:
+            - get_component_business_id(blockchain_id) для businessId
+            - get_component_root_metadata(business_id) для rootMetadataCID
         """
         try:
             component = self._call_contract_read_function(
@@ -1051,46 +1240,41 @@ class BlockchainService:
 
     def get_component_root_metadata_cid(self, component_id: str) -> Optional[str]:
         """
-        Получает CID корневых метаданных компонента из Arweave
+        Получает rootMetadataCID компонента из отдельного mapping в контракте.
+        
+        Contract function: getComponentRootMetadata(string businessId)
+        
+        НЕ извлекает из Component struct, а использует отдельный mapping в контракте.
+        Это alias для get_component_root_metadata() для обратной совместимости.
         
         Args:
-            component_id: Business ID компонента
+            component_id: Business ID компонента (например, "amanita_muscaria")
             
         Returns:
-            str: Arweave transaction ID (CID) метаданных
+            str | None: IPFS/Arweave CID (например, "ar://xyz123abc456def789")
             None: Если компонент не найден или произошла ошибка
         """
-        try:
-            # Сначала получаем полные данные компонента
-            component = self.get_component(component_id)
-            if not component:
-                logger.warning(f"Cannot get CID: component '{component_id}' not found")
-                return None
-            
-            # Извлекаем rootMetadataCID из структуры Component
-            # Component structure: (id, businessId, creator, rootMetadataCID, active, createdAt)
-            if isinstance(component, (list, tuple)) and len(component) >= 4:
-                cid = component[3]  # rootMetadataCID is 4th field (index 3)
-                logger.info(f"Component '{component_id}' root metadata CID: {cid}")
-                return cid
-            elif isinstance(component, dict):
-                cid = component.get('rootMetadataCID')
-                logger.info(f"Component '{component_id}' root metadata CID: {cid}")
-                return cid
-            else:
-                logger.error(f"Unexpected component structure for '{component_id}': {type(component)}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error getting component CID '{component_id}': {e}")
-            return None
+        # ✅ ПРАВИЛЬНО: использует отдельный метод для получения CID через mapping
+        return self.get_component_root_metadata(component_id)
 
-    def get_all_components(self) -> List[dict]:
+    def get_all_components(self) -> List[tuple]:
         """
         Получает все компоненты из OrganicComponentRegistry
         
         Returns:
-            List[dict]: Список всех компонентов
+            List[tuple]: Список Component struct из контракта (каждый tuple содержит 6 полей):
+                - [0] blockchain_id (int): числовой ID в блокчейне
+                - [1] creator (str): адрес создателя
+                - [2] created_at (int): timestamp создания
+                - [3] last_updated (int): timestamp последнего обновления
+                - [4] status (int): статус (ACTIVE=0, PENDING=1, ARCHIVED=2)
+                - [5] is_shared (bool): доступен ли для общего использования
+        
+        Note:
+            businessId и rootMetadataCID НЕ входят в Component struct.
+            Они получаются через:
+            - get_component_business_id(blockchain_id) для businessId
+            - get_component_root_metadata(business_id) для rootMetadataCID
         """
         try:
             # Получаем общее количество компонентов

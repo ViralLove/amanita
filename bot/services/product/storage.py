@@ -33,10 +33,26 @@ class ProductStorageService:
         self.logger.info(f"[ProductStorageService] Тип коммуникации: {self.communication_type}")
     
     def validate_ipfs_cid(self, cid: str) -> bool:
-        """Проверяет валидность IPFS CID"""
+        """
+        Проверяет валидность CID (IPFS или Arweave transaction ID).
+        
+        Поддерживает:
+        - IPFS CID v0 (Qm..., 46 символов)
+        - IPFS CID v1 (bafy..., >46 символов)
+        - Arweave transaction ID (43 символа, base64url: A-Za-z0-9_-)
+        """
         if not cid:
             return False
-        return bool(self.IPFS_CID_PATTERN.match(cid))
+        
+        # IPFS CID (Qm... или bafy...)
+        if self.IPFS_CID_PATTERN.match(cid):
+            return True
+        
+        # Arweave transaction ID (43 символа, base64url: A-Za-z0-9_-)
+        if len(cid) == 43 and all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-' for c in cid):
+            return True
+        
+        return False
     
     def download_json(self, cid: str) -> Optional[Dict[str, Any]]:
         """

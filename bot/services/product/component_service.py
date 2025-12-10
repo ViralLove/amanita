@@ -78,7 +78,8 @@ class ComponentService:
     def __init__(
         self,
         blockchain_service: Optional[BlockchainService] = None,
-        storage_service: Optional[ProductStorageService] = None
+        storage_service: Optional[ProductStorageService] = None,
+        multilingual_ipfs_service: Optional[Any] = None
     ):
         """
         Инициализирует ComponentService с зависимостями.
@@ -88,6 +89,8 @@ class ComponentService:
                               Если None, создается новый экземпляр BlockchainService.
             storage_service: Сервис для работы с хранилищем (Arweave/IPFS).
                            Если None, создается ProductStorageService с Arweave провайдером.
+            multilingual_ipfs_service: Сервис для работы с мультиязычными данными в IPFS.
+                                     Если None, создается новый экземпляр MultilingualIPFSService.
         
         Примечания:
         - Dependency injection позволяет передавать mock-объекты для тестирования
@@ -112,6 +115,28 @@ class ComponentService:
         else:
             self.storage_service = storage_service
             logger.info(f"ComponentService: использован переданный StorageService ({type(storage_service).__name__})")
+        
+        # Инициализация MultilingualIPFSService (для чтения complex fields из блокчейна)
+        if multilingual_ipfs_service is None:
+            # Ленивый импорт для избежания циклических зависимостей
+            from services.common.multilingual_ipfs_service import MultilingualIPFSService
+            from services.common.translation_cache_service import TranslationCacheService
+            from services.common.fallback_localization_service import FallbackLocalizationService
+            
+            ipfs_factory = IPFSFactory()
+            cache_service = TranslationCacheService(cache_dir="cache/translations", default_ttl=3600)
+            fallback_service = FallbackLocalizationService(default_language='ru')
+            
+            self.multilingual_ipfs_service = MultilingualIPFSService(
+                ipfs_factory=ipfs_factory,
+                cache_service=cache_service,
+                fallback_service=fallback_service,
+                blockchain_service=self.blockchain_service
+            )
+            logger.info("ComponentService: создан MultilingualIPFSService")
+        else:
+            self.multilingual_ipfs_service = multilingual_ipfs_service
+            logger.info(f"ComponentService: использован переданный MultilingualIPFSService ({type(multilingual_ipfs_service).__name__})")
         
         # Инициализация кэша
         self._cache: Dict[str, Dict[str, Any]] = {}
@@ -443,32 +468,24 @@ class ComponentService:
             
             logger.info(f"🌍 Fetching description for '{component_id}' in language '{language}'")
             
-            # Step 2: Load description via LocalizationService (blockchain path for complex fields)
+            # Step 2: Load description via MultilingualIPFSService (blockchain path for complex fields)
+            # Используем новый метод _load_component_description_from_ipfs() который формирует
+            # className с biounit_id для соответствия scripts слою
             description_data = None
             try:
-                # Ленивый импорт для избежания циклической зависимости
-                from dependencies import get_localization_service
-                localization_service = get_localization_service(lang=language)
+                # Загружаем ComponentDescription напрямую из блокчейна через MultilingualIPFSService
+                # Метод формирует className = "ComponentDescription.{component_id}" для соответствия scripts слою
+                description_data = self.multilingual_ipfs_service._load_component_description_from_ipfs(
+                    component_id,
+                    language
+                )
                 
-                # Собираем все поля описания через LocalizationService
-                fields_to_fetch = ['generic_description', 'effects', 'shamanic', 'warnings']
-                description_data = {}
-                
-                for field in fields_to_fetch:
-                    key = f'component.{component_id}.{field}'
-                    value = localization_service.t(key, default='')
-                    # Если значение не пустое и не равно ключу (не fallback placeholder)
-                    if value and value != key:
-                        description_data[field] = value
-                
-                # Проверяем, что получены данные (хотя бы generic_description обязателен)
-                if description_data and 'generic_description' in description_data:
-                    logger.info(f"✅ ComponentDescription loaded via LocalizationService (blockchain path) for '{component_id}' (lang: {language})")
+                if description_data:
+                    logger.info(f"✅ ComponentDescription loaded via MultilingualIPFSService (blockchain path) for '{component_id}' (lang: {language})")
                 else:
-                    description_data = None
-                    logger.warning(f"⚠️ LocalizationService не вернул данные для '{component_id}' (lang: {language})")
+                    logger.warning(f"⚠️ MultilingualIPFSService не вернул данные для '{component_id}' (lang: {language})")
             except Exception as e:
-                logger.error(f"❌ Error using LocalizationService for '{component_id}' (lang: {language}): {e}")
+                logger.error(f"❌ Error using MultilingualIPFSService for '{component_id}' (lang: {language}): {e}")
                 description_data = None
             
             # Step 3: No description available

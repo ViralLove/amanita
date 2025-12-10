@@ -6,7 +6,7 @@ ProductRegistryService и ProductMetadataService, предоставляя ед�
 интерфейс для создания объектов Product.
 """
 
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 import logging
 import json
 from model.product import Product
@@ -24,41 +24,6 @@ class ProductAssembler:
     - Создание объектов Product с правильными данными
     - Обработка ошибок и логирование процесса
     """
-    
-    # ==================================================================================
-    # ФОРМАТЫ МЕТАДАННЫХ ПРОДУКТОВ
-    # ==================================================================================
-    # 
-    # Все продукты используют централизованный OrganicComponentRegistry.
-    # Два формата метаданных:
-    #
-    # 1. SINGLE — Чистый компонент (component_id на корневом уровне)
-    #    Пример: Blue Lotus Tincture
-    #    {
-    #      "business_id": "blue_lotus_tincture",
-    #      "component_id": "blue_lotus",        ← КЛЮЧ: component_id здесь
-    #      "proportion": "100%",
-    #      "form": "tincture"
-    #    }
-    #    → Продукт = один компонент из реестра в определенной форме
-    #
-    # 2. MULTI — Смесь компонентов (organic_components массив)
-    #    Пример: Relaxation Blend
-    #    {
-    #      "business_id": "relaxation_blend",
-    #      "organic_components": [             ← КЛЮЧ: массив компонентов
-    #        {"component_id": "amanita_muscaria", "proportion": "50g"},
-    #        {"component_id": "lions_mane", "proportion": "30g"}
-    #      ]
-    #    }
-    #    → Продукт = смесь компонентов из реестра
-    #
-    # Любой другой формат → ValueError с объяснением требований
-    #
-    # ==================================================================================
-    
-    FORMAT_SINGLE = 'SINGLE'  # component_id на корневом уровне
-    FORMAT_MULTI = 'MULTI'    # organic_components массив с component_id
     
     def __init__(self, component_service, validation_service=None):
         """
@@ -79,22 +44,28 @@ class ProductAssembler:
         
         self.logger.info("✅ ProductAssembler initialized with ComponentService (clean break)")
     
-    async def assemble_product(self, blockchain_data: Tuple, metadata: Dict[str, Any]) -> Optional[Product]:
+    async def assemble_product(self, blockchain_data: Tuple, metadata: Dict[str, Any], language: str = "ru") -> Optional[Product]:
         """
         Собирает продукт из данных блокчейна и IPFS метаданных.
         
         Args:
-            blockchain_data: Кортеж с данными блокчейна (id, seller, ipfsCID, active)
-            metadata: Словарь с метаданными продукта из IPFS
+            blockchain_data: Кортеж с данными блокчейна (id, seller, componentIds, metadataCID, active)
+                - [0] id: blockchain_id продукта
+                - [1] seller: адрес продавца
+                - [2] componentIds: список component_id из OrganicComponentRegistry
+                - [3] metadataCID: IPFS CID метаданных
+                - [4] active: статус активности
+            metadata: Словарь с метаданными продукта из IPFS (с organic_components массивом)
+            language: Язык для загрузки ComponentDescription (по умолчанию "ru")
             
         Returns:
             Product: Собранный объект продукта или None при ошибке
             
         Raises:
-            ValueError: При некорректных данных блокчейна
+            ValueError: При некорректных данных блокчейна или метаданных
         """
         try:
-            self.logger.info(f"🔍 Начинаем сборку продукта: blockchain_data={blockchain_data}")
+            self.logger.info(f"🔍 Начинаем сборку продукта: blockchain_data={blockchain_data}, language={language}")
             
             # Шаг 1: Валидация и извлечение данных блокчейна
             blockchain_info = self._extract_blockchain_data(blockchain_data)
@@ -102,8 +73,12 @@ class ProductAssembler:
                 self.logger.error("❌ Не удалось извлечь данные блокчейна")
                 return None
             
-            product_id, ipfs_cid, is_active = blockchain_info
-            self.logger.info(f"✅ Данные блокчейна извлечены: blockchain_id={product_id}, CID={ipfs_cid}, Active={is_active}")
+            product_id, seller, component_ids, ipfs_cid, is_active = blockchain_info
+            self.logger.info(
+                f"✅ Данные блокчейна извлечены: "
+                f"blockchain_id={product_id}, seller={seller}, "
+                f"componentIds={len(component_ids)} items, CID={ipfs_cid}, Active={is_active}"
+            )
             
             # Шаг 2: Валидация базовых метаданных через ValidationFactory
             validation_result = self._validate_metadata(metadata)
@@ -113,15 +88,22 @@ class ProductAssembler:
             
             self.logger.info("✅ Базовые метаданные успешно валидированы")
             
-            # Шаг 3: Создание объекта Product из метаданных (с обогащением)
-            product = await self._create_product_from_metadata(metadata)
+            # Шаг 3: Валидация соответствия componentIds из blockchain и organic_components из metadata
+            if not self._validate_component_ids_match(component_ids, metadata):
+                self.logger.warning(
+                    "⚠️ Несоответствие componentIds между blockchain и metadata "
+                    "(продолжаем сборку, но это может указывать на проблему)"
+                )
+            
+            # Шаг 4: Создание объекта Product из метаданных (с обогащением)
+            product = await self._create_product_from_metadata(metadata, language)
             if not product:
                 self.logger.error("❌ Не удалось создать продукт из метаданных")
                 return None
             
             self.logger.info("✅ Объект Product создан из метаданных")
             
-            # Шаг 4: Установка блокчейн-данных
+            # Шаг 5: Установка блокчейн-данных
             self._set_blockchain_data(product, product_id, ipfs_cid, is_active)
             
             self.logger.info(f"🎉 Продукт {product.business_id} (blockchain_id={product_id}) успешно собран")
@@ -131,39 +113,64 @@ class ProductAssembler:
             self.logger.error(f"�� Критическая ошибка при сборке продукта: {e}")
             return None
     
-    def _extract_blockchain_data(self, blockchain_data: Tuple) -> Optional[Tuple[int, str, bool]]:
+    def _extract_blockchain_data(self, blockchain_data: Tuple) -> Optional[Tuple[int, str, List[str], str, bool]]:
         """
-        Извлекает и валидирует данные из кортежа блокчейна.
+        Извлекает и валидирует данные из кортежа блокчейна (новая структура с componentIds).
         
         Args:
-            blockchain_data: Кортеж (id, seller, ipfsCID, active)
+            blockchain_data: Кортеж (id, seller, componentIds, metadataCID, active)
             
         Returns:
-            Tuple[int, str, bool]: (product_id, ipfs_cid, is_active) или None при ошибке
+            Tuple[int, str, List[str], str, bool]: 
+            (product_id, seller, component_ids, ipfs_cid, is_active) или None при ошибке
+        
+        Структура:
+            - [0] id (blockchain_id)
+            - [1] seller
+            - [2] componentIds (список)
+            - [3] metadataCID
+            - [4] active
         """
         try:
-            if not hasattr(blockchain_data, '__getitem__') or len(blockchain_data) < 4:
-                self.logger.error(f"Некорректная структура blockchain_data: {blockchain_data}")
+            if not hasattr(blockchain_data, '__getitem__') or len(blockchain_data) < 5:
+                self.logger.error(
+                    f"Некорректная структура blockchain_data: ожидается 5 элементов, "
+                    f"получено {len(blockchain_data) if hasattr(blockchain_data, '__len__') else 'N/A'}. "
+                    f"Данные: {blockchain_data}"
+                )
                 return None
             
-            product_id = blockchain_data[0]  # blockchain_id продукта
-            seller = blockchain_data[1]      # Адрес продавца
-            ipfs_cid = blockchain_data[2]    # IPFS CID
-            is_active = bool(blockchain_data[3])  # Статус активности
+            product_id = blockchain_data[0]      # blockchain_id продукта
+            seller = blockchain_data[1]          # Адрес продавца
+            component_ids = blockchain_data[2]   # componentIds (список)
+            ipfs_cid = blockchain_data[3]        # metadataCID
+            is_active = bool(blockchain_data[4]) # Статус активности
             
             # Валидация извлеченных данных
             if not isinstance(product_id, (int, str)) or not product_id:
                 self.logger.error(f"Некорректный blockchain_id: {product_id}")
                 return None
             
-            if not ipfs_cid or not isinstance(ipfs_cid, str):
-                self.logger.error(f"Некорректный ipfs_cid: {ipfs_cid}")
+            if not isinstance(component_ids, list):
+                self.logger.error(f"Некорректный componentIds: ожидается список, получен {type(component_ids)}")
                 return None
             
-            return product_id, ipfs_cid, is_active
+            if not ipfs_cid or not isinstance(ipfs_cid, str):
+                self.logger.error(f"Некорректный metadataCID: {ipfs_cid}")
+                return None
+            
+            self.logger.info(
+                f"✅ Извлечены данные блокчейна: "
+                f"id={product_id}, seller={seller}, componentIds={len(component_ids)} items, "
+                f"CID={ipfs_cid}, active={is_active}"
+            )
+            
+            return product_id, seller, component_ids, ipfs_cid, is_active
             
         except Exception as e:
             self.logger.error(f"Ошибка извлечения данных блокчейна: {e}")
+            import traceback
+            self.logger.error(f"Stack trace: {traceback.format_exc()}")
             return None
     
     def _validate_metadata(self, metadata: Dict[str, Any]) -> bool:
@@ -199,262 +206,133 @@ class ProductAssembler:
             self.logger.error(f"Ошибка валидации метаданных: {e}")
             return False
     
-    def _detect_product_format(self, metadata: Dict[str, Any]) -> str:
+    def _validate_component_ids_match(
+        self, 
+        component_ids: List[str], 
+        metadata: Dict[str, Any]
+    ) -> bool:
         """
-        Определяет формат продукта (SINGLE или MULTI).
-        
-        АЛГОРИТМ:
-        =========
-        
-        1. Проверка SINGLE формата:
-           - Ищем 'component_id' на корневом уровне метаданных
-           - Если найден → продукт = чистый компонент из реестра
-           - Пример: {"business_id": "...", "component_id": "blue_lotus", "proportion": "100%"}
-        
-        2. Проверка MULTI формата:
-           - Ищем 'organic_components' массив в метаданных
-           - Проверяем первый элемент на наличие 'component_id'
-           - Если найден → продукт = смесь компонентов из реестра
-           - Пример: {"business_id": "...", "organic_components": [{"component_id": "...", "proportion": "..."}]}
-        
-        3. Неподдерживаемый формат:
-           - Нет ни 'component_id', ни 'organic_components' → ОШИБКА
-           - Метаданные не соответствуют требованиям
-        
-        ТАБЛИЦА:
-        ========
-        | Признак                          | Формат  | Действие      |
-        |----------------------------------|---------|---------------|
-        | component_id на корневом уровне  | SINGLE  | ✅ Обработать |
-        | organic_components + component_id| MULTI   | ✅ Обработать |
-        | Другое                           | Invalid | ❌ ValueError |
+        Валидирует соответствие componentIds из blockchain и organic_components из metadata.
         
         Args:
-            metadata: Метаданные продукта из IPFS/Arweave
-            
+            component_ids: Список component_id из blockchain (Product.componentIds[])
+            metadata: Метаданные продукта с organic_components массивом
+        
         Returns:
-            str: 'SINGLE' или 'MULTI'
-            
-        Raises:
-            ValueError: Если формат не поддерживается
+            bool: True если соответствуют, False если нет
+        
+        Логика:
+            - Извлекает component_id из каждого элемента organic_components
+            - Сравнивает множества (set) для игнорирования порядка
+            - Логирует предупреждение при несоответствии (не блокирует сборку)
         """
         try:
-            # ──────────────────────────────────────────────────────────────────────
-            # ШАГ 1: Проверка SINGLE формата
-            # ──────────────────────────────────────────────────────────────────────
-            # component_id на корневом уровне метаданных
-            # Пример: {"business_id": "blue_lotus_tincture", "component_id": "blue_lotus"}
+            # Извлекаем component_id из метаданных
+            if 'organic_components' not in metadata:
+                self.logger.warning(
+                    "⚠️ Валидация componentIds: отсутствует поле 'organic_components' в metadata"
+                )
+                return False
             
-            if 'component_id' in metadata and isinstance(metadata['component_id'], str):
-                component_id = metadata['component_id']
-                if component_id and component_id.strip():
-                    self.logger.info(f"📍 Формат: SINGLE (component_id='{component_id}')")
-                    return self.FORMAT_SINGLE
+            if not isinstance(metadata['organic_components'], list):
+                self.logger.warning(
+                    "⚠️ Валидация componentIds: 'organic_components' должен быть списком"
+                )
+                return False
             
-            # ──────────────────────────────────────────────────────────────────────
-            # ШАГ 2: Проверка MULTI формата
-            # ──────────────────────────────────────────────────────────────────────
-            # organic_components массив с component_id в элементах
-            # Пример: [{"component_id": "...", "proportion": "..."}]
-            
-            if 'organic_components' in metadata and isinstance(metadata['organic_components'], list):
-                components = metadata['organic_components']
-                
-                # Массив не может быть пустым
-                if len(components) == 0:
-                    raise ValueError(
-                        "Пустой массив organic_components. "
-                        "Продукт должен содержать хотя бы один компонент."
-                    )
-                
-                # Проверяем первый компонент
-                first_comp = components[0]
-                
-                # Должен содержать component_id
-                if 'component_id' in first_comp:
-                    component_id = first_comp['component_id']
-                    if isinstance(component_id, str) and component_id.strip():
-                        self.logger.info(
-                            f"📍 Формат: MULTI ({len(components)} компонентов)"
+            metadata_component_ids = []
+            for i, comp in enumerate(metadata['organic_components']):
+                if isinstance(comp, dict):
+                    comp_id = comp.get('component_id')
+                    if comp_id:
+                        metadata_component_ids.append(str(comp_id))
+                    else:
+                        self.logger.warning(
+                            f"⚠️ Валидация componentIds: компонент {i} не содержит 'component_id'"
                         )
-                        return self.FORMAT_MULTI
-                
-                # organic_components есть, но нет component_id
-                raise ValueError(
-                    "Компоненты в organic_components не содержат component_id. "
-                    f"Требуется поле component_id в каждом элементе.\n"
-                    f"Первый компонент: {first_comp}"
-                )
-            
-            # ──────────────────────────────────────────────────────────────────────
-            # ШАГ 3: Неподдерживаемый формат
-            # ──────────────────────────────────────────────────────────────────────
-            raise ValueError(
-                f"Неподдерживаемый формат продукта. "
-                f"\n\n"
-                f"Требуется:\n"
-                f"  - либо 'component_id' на корневом уровне (SINGLE)\n"
-                f"  - либо 'organic_components' массив с component_id (MULTI)\n"
-                f"\n"
-                f"Найденные ключи: {list(metadata.keys())}"
-            )
-            
-        except ValueError:
-            # Пробрасываем ValueError как есть (это ожидаемые ошибки)
-            raise
-        except Exception as e:
-            # Логируем неожиданные ошибки
-            self.logger.error(f"Ошибка определения формата продукта: {e}")
-            raise ValueError(f"Ошибка определения формата продукта: {e}")
-    
-    async def _enrich_single_component(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обогащает SINGLE продукт данными из реестра компонентов.
-        
-        Формат SINGLE:
-            {
-              "component_id": "amanita_muscaria",
-              "proportion": "100g",
-              ...
-            }
-        
-        Процесс:
-            1. Получить component_id из метаданных
-            2. Загрузить полные данные компонента из реестра через ComponentService
-            3. Создать product component с proportion через OrganicComponent.for_product()
-            4. Добавить organic_components массив в метаданные
-            5. Вернуть обогащенные метаданные
-        
-        Args:
-            metadata: Метаданные продукта с component_id на корневом уровне
-        
-        Returns:
-            Dict: Обогащенные метаданные с organic_components массивом
-        
-        Raises:
-            ValueError: Если компонент не найден в реестре
-        """
-        try:
-            component_id = metadata.get('component_id')
-            proportion = metadata.get('proportion', '100g')
-            
-            self.logger.info(f"🔍 Обогащаем SINGLE продукт: component_id='{component_id}', proportion='{proportion}'")
-            
-            # ──────────────────────────────────────────────────────────────────────
-            # ШАГ 1: Получить полные данные компонента из реестра
-            # ──────────────────────────────────────────────────────────────────────
-            self.logger.info(f"   Загружаем компонент из реестра через ComponentService...")
-            
-            registry_component = self.component_service.get_component_full(component_id)
-            
-            if not registry_component:
-                raise ValueError(
-                    f"Компонент '{component_id}' не найден в OrganicComponentRegistry. "
-                    f"Убедитесь что компонент зарегистрирован в реестре."
-                )
-            
-            self.logger.info(f"   ✅ Компонент загружен: {registry_component.scientific_title}")
-            self.logger.info(f"      Forms: {registry_component.forms}")
-            self.logger.info(f"      Features: {len(registry_component.features.get('common', []))} общих")
-            
-            # ──────────────────────────────────────────────────────────────────────
-            # ШАГ 2: Создать product component с proportion
-            # ──────────────────────────────────────────────────────────────────────
-            from model.organic_component import OrganicComponent
-            
-            product_component = OrganicComponent.for_product(
-                registry_component=registry_component,
-                proportion=proportion
-            )
-            
-            self.logger.info(f"   ✅ Product component создан:")
-            self.logger.info(f"      component_id: {product_component.component_id}")
-            self.logger.info(f"      proportion: {product_component.proportion}")
-            self.logger.info(f"      scientific_title: {product_component.scientific_title}")
-            
-            # ──────────────────────────────────────────────────────────────────────
-            # ШАГ 3: Добавить organic_components массив в метаданные
-            # ──────────────────────────────────────────────────────────────────────
-            enriched_metadata = metadata.copy()
-            component_dict = product_component.to_dict()
-            
-            # ──────────────────────────────────────────────────────────────────────
-            # 🆕 ШАГ 4: Fetch ComponentDescription (Task 9.1)
-            # ──────────────────────────────────────────────────────────────────────
-            try:
-                # Определяем язык (по умолчанию "ru" если не передан)
-                # TODO: В будущем получать язык из контекста (loc.language)
-                language = "ru"  # Default для первой реализации
-                
-                self.logger.info(f"   🌍 Fetching ComponentDescription for '{component_id}' (lang: {language})")
-                description = await self.component_service.get_component_description(
-                    component_id,
-                    language
-                )
-                
-                if description:
-                    component_dict['description'] = description.to_dict()
-                    self.logger.info(f"   ✅ ComponentDescription добавлен (generic: {len(description.generic_description)} chars)")
                 else:
-                    self.logger.warning(f"   ⚠️ ComponentDescription не найден (graceful skip)")
-                    
-            except Exception as e:
-                # Graceful degradation: description опциональное поле
-                self.logger.warning(f"   ⚠️ Error fetching description (graceful skip): {e}")
+                    self.logger.warning(
+                        f"⚠️ Валидация componentIds: компонент {i} не является словарем"
+                    )
             
-            enriched_metadata['organic_components'] = [component_dict]
+            # Нормализуем component_ids из blockchain (все в строки)
+            blockchain_component_ids = [str(cid) for cid in component_ids]
             
-            self.logger.info(f"✅ SINGLE продукт обогащен:")
-            self.logger.info(f"   Добавлен organic_components массив с 1 компонентом")
-            self.logger.info(f"   Component: {component_id} ({proportion})")
-            self.logger.info(f"   Description: {'✅ Added' if 'description' in component_dict else '⚠️ Not available'}")
+            # Сравниваем множества (игнорируем порядок)
+            blockchain_set = set(blockchain_component_ids)
+            metadata_set = set(metadata_component_ids)
             
-            return enriched_metadata
+            if blockchain_set != metadata_set:
+                self.logger.warning(
+                    f"⚠️ Несоответствие componentIds:\n"
+                    f"   Blockchain: {blockchain_component_ids}\n"
+                    f"   Metadata:   {metadata_component_ids}\n"
+                    f"   Blockchain set: {blockchain_set}\n"
+                    f"   Metadata set:   {metadata_set}"
+                )
+                return False
             
-        except ValueError:
-            # Пробрасываем ValueError (компонент не найден)
-            raise
+            self.logger.info(
+                f"✅ Валидация componentIds: соответствие подтверждено "
+                f"({len(blockchain_component_ids)} компонентов)"
+            )
+            return True
+            
         except Exception as e:
-            self.logger.error(f"❌ Ошибка обогащения SINGLE продукта: {e}")
+            self.logger.error(f"Ошибка валидации соответствия componentIds: {e}")
             import traceback
-            self.logger.error(f"   Stack trace: {traceback.format_exc()}")
-            raise ValueError(f"Ошибка обогащения SINGLE продукта: {e}")
+            self.logger.error(f"Stack trace: {traceback.format_exc()}")
+            return False
     
-    async def _enrich_multi_component(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+    async def _enrich_components(self, metadata: Dict[str, Any], language: str) -> Dict[str, Any]:
         """
-        Обогащает MULTI продукт данными из реестра компонентов.
+        Обогащает метаданные продукта данными из реестра компонентов.
         
-        Формат MULTI:
-            {
-              "organic_components": [
-                {"component_id": "amanita_muscaria", "proportion": "50g"},
-                {"component_id": "lions_mane", "proportion": "30g"}
-              ]
-            }
+        Работает с organic_components массивом (всегда массив, даже для 1 компонента).
+        Не зависит от количества компонентов.
         
         Процесс:
             Для каждого компонента в массиве:
             1. Получить component_id и proportion
             2. Загрузить полные данные компонента из реестра через ComponentService
             3. Создать product component с proportion через OrganicComponent.for_product()
-            4. Заменить минимальную ссылку на полный объект компонента
-            5. Вернуть обогащенные метаданные
+            4. Загрузить ComponentDescription с указанным языком
+            5. Добавить обогащенный компонент в массив
         
         Args:
-            metadata: Метаданные продукта с organic_components (ссылки на реестр)
+            metadata: Метаданные продукта с organic_components массивом
+            language: Язык для загрузки ComponentDescription
         
         Returns:
             Dict: Обогащенные метаданные с полными данными всех компонентов
         
         Raises:
-            ValueError: Если любой компонент не найден в реестре
+            ValueError: Если компонент не найден в реестре или отсутствуют обязательные поля
         """
         try:
             enriched_metadata = metadata.copy()
             enriched_components = []
             
+            # Валидация наличия organic_components
+            if 'organic_components' not in metadata:
+                raise ValueError(
+                    "Отсутствует обязательное поле 'organic_components'. "
+                    "Метаданные должны содержать массив компонентов."
+                )
+            
+            if not isinstance(metadata['organic_components'], list):
+                raise ValueError(
+                    f"organic_components должен быть массивом, получен: {type(metadata['organic_components'])}"
+                )
+            
             components_count = len(metadata['organic_components'])
-            self.logger.info(f"🔍 Обогащаем MULTI продукт: {components_count} компонентов")
+            if components_count == 0:
+                raise ValueError(
+                    "organic_components не может быть пустым. "
+                    "Продукт должен содержать хотя бы один компонент."
+                )
+            
+            self.logger.info(f"🔍 Обогащаем продукт: {components_count} компонент(ов) (lang: {language})")
             
             # ──────────────────────────────────────────────────────────────────────
             # Итерация по каждому компоненту в массиве
@@ -503,13 +381,10 @@ class ProductAssembler:
                 component_dict = product_component.to_dict()
                 
                 # ──────────────────────────────────────────────────────────────────
-                # 🆕 ШАГ 3: Fetch ComponentDescription (Task 9.2)
+                # ШАГ 3: Fetch ComponentDescription с указанным языком
                 # ──────────────────────────────────────────────────────────────────
                 try:
-                    # TODO: В будущем получать язык из контекста (loc.language)
-                    language = "ru"  # Default для первой реализации
-                    
-                    self.logger.info(f"      🌍 Fetching description for '{component_id}' (lang: {language})")
+                    self.logger.info(f"      🌍 Fetching ComponentDescription for '{component_id}' (lang: {language})")
                     description = await self.component_service.get_component_description(
                         component_id,
                         language
@@ -517,9 +392,9 @@ class ProductAssembler:
                     
                     if description:
                         component_dict['description'] = description.to_dict()
-                        self.logger.info(f"      ✅ ComponentDescription added (generic: {len(description.generic_description)} chars)")
+                        self.logger.info(f"      ✅ ComponentDescription добавлен (generic: {len(description.generic_description)} chars)")
                     else:
-                        self.logger.warning(f"      ⚠️ ComponentDescription not found (graceful skip)")
+                        self.logger.warning(f"      ⚠️ ComponentDescription не найден (graceful skip)")
                         
                 except Exception as e:
                     # Graceful degradation: description опциональное поле
@@ -530,12 +405,12 @@ class ProductAssembler:
                 self.logger.info(f"      ✅ Обогащен: {component_id} ({proportion}) [desc: {'✅' if 'description' in component_dict else '⚠️'}]")
             
             # ──────────────────────────────────────────────────────────────────────
-            # ШАГ 3: Заменить массив компонентов на обогащенные данные
+            # ШАГ 4: Заменить массив компонентов на обогащенные данные
             # ──────────────────────────────────────────────────────────────────────
             enriched_metadata['organic_components'] = enriched_components
             
-            self.logger.info(f"✅ MULTI продукт обогащен:")
-            self.logger.info(f"   Все {len(enriched_components)} компонента загружены из реестра")
+            self.logger.info(f"✅ Продукт обогащен:")
+            self.logger.info(f"   Все {len(enriched_components)} компонент(ов) загружены из реестра")
             for i, comp in enumerate(enriched_components):
                 self.logger.info(f"   [{i+1}] {comp['component_id']} ({comp['proportion']})")
             
@@ -545,65 +420,48 @@ class ProductAssembler:
             # Пробрасываем ValueError (компонент не найден или отсутствуют обязательные поля)
             raise
         except Exception as e:
-            self.logger.error(f"❌ Ошибка обогащения MULTI продукта: {e}")
+            self.logger.error(f"❌ Ошибка обогащения продукта: {e}")
             import traceback
             self.logger.error(f"   Stack trace: {traceback.format_exc()}")
-            raise ValueError(f"Ошибка обогащения MULTI продукта: {e}")
+            raise ValueError(f"Ошибка обогащения продукта: {e}")
     
-    async def _create_product_from_metadata(self, metadata: Dict[str, Any]) -> Optional[Product]:
+    async def _create_product_from_metadata(self, metadata: Dict[str, Any], language: str) -> Optional[Product]:
         """
         Создает объект Product из метаданных с обогащением через ComponentService.
         
-        Только SINGLE и MULTI форматы поддерживаются.
+        Все продукты используют единый формат с organic_components массивом.
         
         Процесс:
-            1. Определить формат продукта (_detect_product_format)
-            2. Обогатить данными из реестра:
-               - SINGLE → _enrich_single_component()
-               - MULTI  → _enrich_multi_component()
-            3. Валидировать обогащенные метаданные
-            4. Создать Product объект через Product.from_dict()
+            1. Обогатить метаданные данными из реестра через _enrich_components()
+            2. Валидировать обогащенные метаданные
+            3. Создать Product объект через Product.from_dict()
         
         Args:
-            metadata: Метаданные продукта из Arweave
-            
+            metadata: Метаданные продукта из Arweave (с organic_components массивом)
+            language: Язык для загрузки ComponentDescription
+        
         Returns:
             Product: Созданный объект продукта или None при ошибке
         """
         try:
             business_id = metadata.get('business_id', 'N/A')
-            self.logger.info(f"🔍 Создание Product из метаданных: business_id='{business_id}'")
+            self.logger.info(f"🔍 Создание Product из метаданных: business_id='{business_id}', language='{language}'")
             self.logger.info(f"📋 Структура метаданных: {list(metadata.keys())}")
             
             # ──────────────────────────────────────────────────────────────────────
-            # ШАГ 1: Определить формат продукта
+            # ШАГ 1: Обогатить метаданные данными из реестра компонентов
             # ──────────────────────────────────────────────────────────────────────
-            product_format = self._detect_product_format(metadata)
-            self.logger.info(f"📍 Определен формат: {product_format}")
+            self.logger.info("🔧 Обогащаем продукт через ComponentService...")
+            enriched_metadata = await self._enrich_components(metadata, language)
             
             # ──────────────────────────────────────────────────────────────────────
-            # ШАГ 2: Обогатить метаданные данными из реестра компонентов
-            # ──────────────────────────────────────────────────────────────────────
-            if product_format == self.FORMAT_SINGLE:
-                self.logger.info("🔧 Обогащаем SINGLE продукт через ComponentService...")
-                enriched_metadata = await self._enrich_single_component(metadata)
-                
-            elif product_format == self.FORMAT_MULTI:
-                self.logger.info("🔧 Обогащаем MULTI продукт через ComponentService...")
-                enriched_metadata = await self._enrich_multi_component(metadata)
-                
-            else:
-                # Никогда не должно произойти (_detect_product_format поднимает ValueError)
-                raise ValueError(f"Неподдерживаемый формат: {product_format}")
-            
-            # ──────────────────────────────────────────────────────────────────────
-            # ШАГ 3: Валидация обогащенных метаданных
+            # ШАГ 2: Валидация обогащенных метаданных
             # ──────────────────────────────────────────────────────────────────────
             self.logger.info("🔍 Валидация обогащенных метаданных...")
             self._validate_product_metadata(enriched_metadata)
             
             # ──────────────────────────────────────────────────────────────────────
-            # ШАГ 4: Создание Product объекта
+            # ШАГ 3: Создание Product объекта
             # ──────────────────────────────────────────────────────────────────────
             self.logger.info("🏗️ Создание Product объекта через Product.from_dict()...")
             product = Product.from_dict(enriched_metadata)
