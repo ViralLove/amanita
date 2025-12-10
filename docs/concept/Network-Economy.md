@@ -26,18 +26,18 @@ This document describes the network economy principles of the AMANITA ecosystem,
 
 ## Three-Tier Token System
 
-### 1. $AMANITA - Utility Token (ERC-20)
-**Purpose:** Internal ecosystem currency for seller rewards and sales stimulation
+### 1. $LOVECOIN - Utility Token (ERC-20)
+**Purpose:** Utility token for social mining in Loveconomy
 
 **Key Characteristics:**
-- **Initial Supply:** 888,888,888 AMANITA (fixed supply)
+- **Initial Supply:** 888,888,888 LOVECOIN (initial supply) + additional emission
 - **Mining Mechanism:** Through LoveEmissionEngine based on superlikes
 - **Usage:** Seller rewards, discounts, internal ecosystem payments
-- **Transfer Restrictions:** Only from users to sellers (inter-user transfers prohibited)
-- **Burn Mechanism:** Burned on first payment to prevent speculation
+- **Claim Mechanism:** Claimable immediately after accumulation via `claimLOVECOIN()`
+- **Contract:** `Lovecoin.sol`
 
 **Economic Model:**
-- **Emission Rate:** 1 AMANITA per superlike in LoveDoPostNFT
+- **Emission Rate:** 1 LOVECOIN per superlike in LoveDoPostNFT
 - **Distribution:** Direct to sellers based on social proof
 - **Value Creation:** Through real social interactions and reputation building
 
@@ -45,31 +45,37 @@ This document describes the network economy principles of the AMANITA ecosystem,
 **Purpose:** Governance and collective decision-making for ecosystem development
 
 **Key Characteristics:**
-- **Mining Mechanism:** Same as $AMANITA but with reputation threshold
+- **Contract:** `AmanitaGovToken.sol` (symbol: AGOV in contract, used as LGOV in LoveEmissionEngine)
+- **Mining Mechanism:** Same as $LOVECOIN but with reputation threshold
 - **Activation Threshold:** 8 LoveDo posts required for activation
-- **Governance Features:** ERC20Votes with delegation and snapshot voting
+- **Governance Features:** ERC20Votes + ERC20Permit with delegation and snapshot voting
 - **Usage:** DAO governance, collective resource management, coalition formation
+- **One-time Activation:** Can be activated only once after reputation threshold
 
 **Reputation System:**
-- **Pending AGOV:** Accumulated but not yet activated
-- **Active AGOV:** Available for governance after reputation threshold
+- **Pending LGOV:** Accumulated but not yet activated
+- **Active LGOV:** Available for governance after reputation threshold
 - **LoveDo Count:** Number of posts directed at seller (reputation metric)
 
-### 3. InviteNFT - Social Capital (ERC-721)
+### 3. InviteNFT - Social Capital (ERC-721, Soulbound)
 **Purpose:** Access control, trust system, and social capital representation
 
+**⚠️ IMPORTANT:** `InviteNFT.sol` does NOT exist — all invite functionality is implemented in `SpiralEngine.sol`!
+
 **Key Characteristics:**
+- **Contract:** `SpiralEngine.sol` (UUPS upgradeable)
 - **Limited Supply:** 12 invites per activated user
 - **Unique Codes:** Each invite has a unique string identifier
 - **One-time Use:** Each invite can only be used once
-- **Transferable:** Can be transferred between users
+- **Soulbound:** Transfers are restricted (all transfer functions reverted)
 - **Expiry System:** Optional expiration dates for time-limited invites
+- **Integration:** Delegates SBT functionality to `SoulIdentity` contract
 
 **Social Capital Mechanics:**
 - **Access Control:** Invite required for ecosystem participation
-- **Trust Building:** Inviter responsible for invitee behavior
-- **Network Growth:** Organic expansion through trusted connections
-- **Reputation Tracking:** Full history of invite transfers and usage
+- **Trust Building:** Activator responsible for activated user behavior
+- **Network Growth:** Organic expansion through trusted connections (spiral hierarchy)
+- **Reputation Tracking:** Full history of invite usage and organic trust communities
 
 ## Social Mining System
 
@@ -79,24 +85,24 @@ This document describes the network economy principles of the AMANITA ecosystem,
 **Mining Process:**
 1. **LoveDo Post Creation:** User creates a post praising a seller (max 8 posts per month)
 2. **Superlike Mechanism:** Seller can give superlikes to posts about them (max 8 superlikes per month)
-3. **Emission Trigger:** Each superlike triggers token emission (1 AMANITA + 1 AGOV pending)
+3. **Emission Trigger:** Each superlike triggers token emission (1 LOVECOIN + 1 LGOV pending)
 4. **Distribution:** Tokens distributed to the praised seller (sellerTo in LoveDo post)
 
 **Key Constraints:**
 - **Monthly Limits:** 8 posts per user, 8 superlikes per seller per month
-- **Social Validation:** Only users from the same inviter group can superlike posts
-- **Reputation Threshold:** AGOV activation requires 8 LoveDo posts directed at seller
+- **Social Validation:** Only users from the same inviter group (organic trust community) can superlike posts
+- **Reputation Threshold:** LGOV activation requires 8 LoveDo posts directed at seller
 - **One-time Superlikes:** Each seller can superlike a post only once
 
 **Token Distribution:**
-- **$AMANITA:** Immediately claimable utility tokens (1 per superlike)
-- **$AGOV:** Governance tokens that require reputation threshold (8 LoveDo posts)
-- **Accumulation:** Tokens accumulate in amanitaAccrued and agovAccrued mappings
+- **$LOVECOIN:** Immediately claimable utility tokens (1 per superlike) via `claimLOVECOIN()`
+- **$LGOV:** Governance tokens that require reputation threshold (8 LoveDo posts) via `claimLGOV()`
+- **Accumulation:** Tokens accumulate in `loveAccrued` and `lgovAccrued` mappings
 
 **Example Scenarios:**
-- **Seller1** receives 5 LoveDo posts → gets 5 superlikes → accumulates 5 $AMANITA + 5 $AGOV pending
-- **Seller2** receives 10 LoveDo posts → gets 8 superlikes → can claim 8 $AMANITA + activate 8 $AGOV (≥8 posts threshold)
-- **User A** creates LoveDo post for Seller3 → Seller3 superlikes → Seller3 receives 1 $AMANITA + 1 $AGOV pending
+- **Seller1** receives 5 LoveDo posts → gets 5 superlikes → accumulates 5 $LOVECOIN + 5 $LGOV pending
+- **Seller2** receives 10 LoveDo posts → gets 8 superlikes → can claim 8 $LOVECOIN + activate 8 $LGOV (≥8 posts threshold)
+- **User A** creates LoveDo post for Seller3 → Seller3 superlikes → Seller3 receives 1 $LOVECOIN + 1 $LGOV pending
 
 ### LoveDoPostNFT - Social Proof System
 **Purpose:** Decentralized reputation and social proof mechanism
@@ -119,8 +125,8 @@ This document describes the network economy principles of the AMANITA ecosystem,
 **Key Rule:** Sellers can only use tokens within their earned budget
 
 **Examples:**
-- **Seller1** mined 88 $AMANITA → can only give discounts up to 88 euros
-- **Seller2** mined 44 $AMANITA → limited to discounts of 44 euros
+- **Seller1** mined 88 $LOVECOIN → can only give discounts up to 88 euros
+- **Seller2** mined 44 $LOVECOIN → limited to discounts of 44 euros
 - **No Overdraft:** Cannot spend more than earned
 
 ### Direct User Priority
@@ -157,7 +163,7 @@ This document describes the network economy principles of the AMANITA ecosystem,
 ### Multi-Level Activity
 **Network Example:**
 ```
-Seller1 (88 $AMANITA)
+Seller1 (88 $LOVECOIN)
 ├── User A (invited User B)
 │   ├── User B (made purchase) → User A received tokens
 │   └── User C (invited User D)
@@ -178,14 +184,14 @@ Seller1 (88 $AMANITA)
 **Traditional vs Web3 Trust:**
 - **Traditional:** Centralized authority (banks, platforms)
 - **Web3:** Decentralized trust through social proof and reputation
-- **AMANITA Implementation:** InviteNFT + LoveDoPostNFT create trust networks
+- **AMANITA Implementation:** SpiralEngine + LoveDoPostNFT create trust networks
 
 ### Post-Barter Economy
 **Economic Evolution:**
 - **Barter:** Direct goods exchange
 - **Money:** Centralized currency systems
 - **Post-Barter:** Social capital + utility tokens + governance
-- **AMANITA Model:** Combines social proof with economic incentives
+- **AMANITA Model:** Combines social proof with economic incentives through LOVECOIN and LGOV
 
 ### Social Capital Monetization
 **Innovation:** Converting social interactions into economic value
@@ -250,39 +256,49 @@ Seller1 (88 $AMANITA)
 ### LoveEmissionEngine
 **Core Functions:**
 - `emitForSuperlike(uint256 tokenId, address liker)`: Triggers token emission on superlike (EMITTER_ROLE only)
-- `claimAMANITA()`: Allows sellers to claim accumulated utility tokens (reentrancy protected)
-- `claimAGOV()`: Activates governance tokens after reputation threshold (8 LoveDo posts required)
-- `getReputationProgress(address seller)`: Returns (pending AGOV, active AGOV, loveDoCount)
+- `claimLOVECOIN()`: Allows sellers to claim accumulated utility tokens (reentrancy protected)
+- `claimLGOV()`: Activates governance tokens after reputation threshold (8 LoveDo posts required)
+- `getReputationProgress(address seller)`: Returns (pending LGOV, active LGOV, loveDoCount)
 
 **Key Mappings:**
-- `amanitaAccrued[address]`: Accumulated AMANITA tokens per seller
-- `agovAccrued[address]`: Accumulated AGOV tokens per seller
-- `agovClaimed[address]`: Whether AGOV has been claimed (one-time activation)
+- `loveAccrued[address]`: Accumulated LOVECOIN tokens per seller
+- `lgovAccrued[address]`: Accumulated LGOV tokens per seller
+- `lgovClaimed[address]`: Whether LGOV has been claimed (one-time activation)
 
-### InviteNFT
+**Token Integration:**
+- Uses `Lovecoin.sol` for utility tokens ($LOVECOIN)
+- Uses `AmanitaGovToken.sol` for governance tokens (as $LGOV)
+
+### SpiralEngine (Invite System)
+**⚠️ IMPORTANT:** `InviteNFT.sol` does NOT exist — all invite functionality is in `SpiralEngine.sol`!
+
 **Key Features:**
-- Unique invite codes with one-time use (soulbound NFTs)
-- Full history tracking of all transfers and usage
+- Unique invite codes with one-time use (soulbound NFTs, IERC5192)
+- Full history tracking of all usage and organic trust communities
 - Expiry system for time-limited invites (optional)
 - Integration with LoveEmissionEngine for access control
+- Spiral hierarchy with 12-granular circles (max 12 activated users per activator)
 
 **Core Functions:**
-- `activateAndMintInvites()`: Activates invite and mints exactly 12 new invites
-- `mintInvites()`: Batch mint invites for sellers (SELLER_ROLE only)
-- `validateInviteCode()`: Validates invite code and user eligibility
-- `isUserActivated()`: Checks if user has activated an invite
+- `mintInvite(string inviteCode, uint256 expiry)`: Creates one invite for distribution
+- `activateUser(string inviteCode, address user, string[] newInviteCodes, uint256 expiry)`: Activates user and mints exactly 12 new invites
+- `grantSellerRole(address user)`: Grants SELLER_ROLE to activated user
+- `isUserActivated(address user)`: Checks if user has activated an invite
+- `getCircleMembers(address activator)`: Returns members of organic trust community
 
 **Key Mappings:**
 - `inviteCodeToTokenId[string]`: Maps invite code to NFT tokenId
 - `isInviteUsed[uint256]`: Tracks if invite has been used
 - `usedInviteByUser[address]`: Maps user to their used invite
 - `inviteExpiry[uint256]`: Optional expiry timestamps
+- `userActivator[address]`: Who activated the user
+- `activatedBy[address]`: Array of users activated by this address (max 12)
 
 ### LoveDoPostNFT
 **Social Proof System:**
 - Monthly limits to prevent spam (8 posts/user, 8 superlikes/seller)
 - Superlike mechanism for reputation building
-- Integration with InviteNFT for access control
+- Integration with SpiralEngine for access control
 - Full transparency of social interactions
 
 **Core Functions:**
@@ -366,9 +382,10 @@ This model ensures **fair and sustainable development** of a decentralized ecosy
 
 ### Smart Contract Addresses
 - **LoveEmissionEngine:** Core token emission logic
-- **AmanitaToken:** Utility token (888,888,888 supply)
-- **AmanitaGovToken:** Governance token with voting (ERC20Votes)
-- **InviteNFT:** Social capital and access control (soulbound NFTs)
+- **Lovecoin:** Utility token (888,888,888 initial supply + emission)
+- **AmanitaGovToken:** Governance token with voting (ERC20Votes + ERC20Permit, used as LGOV)
+- **SpiralEngine:** Social capital and access control (soulbound NFTs, invite system)
+- **AmanitaToken:** Legacy token (exists but not used in active emission system)
 - **LoveDoPostNFT:** Social proof and reputation
 - **ProductRegistry:** Decentralized product catalog
 - **AmanitaRegistry:** Central contract registry
@@ -376,12 +393,13 @@ This model ensures **fair and sustainable development** of a decentralized ecosy
 - **AmanitaPaymentRouter:** Payment processing with stablecoins
 
 ### Economic Parameters
-- **Emission Rate:** 1 AMANITA per superlike (EMISSION_RATE = 1 ether)
-- **Reputation Threshold:** 8 LoveDo posts for AGOV activation (LOVE_DO_THRESHOLD = 8)
+- **Emission Rate:** 1 LOVECOIN per superlike (EMISSION_RATE = 1 ether)
+- **LGOV Emission Rate:** 1 LGOV per superlike (pending until reputation threshold)
+- **Reputation Threshold:** 8 LoveDo posts for LGOV activation (LOVE_DO_THRESHOLD = 8)
 - **Monthly Limits:** 8 posts per user, 8 superlikes per seller (MAX_MONTHLY_POSTS_PER_USER = 8, MAX_SUPERLIKES_PER_MONTH = 8)
 - **Invite Limit:** 12 invites per activated user (exactly 12 in activateAndMintInvites)
 - **Seller Mentions:** 8 mentions per seller (MAX_MENTIONS_PER_SELLER = 8)
-- **Token Supply:** 888,888,888 AMANITA (INITIAL_SUPPLY)
+- **Token Supply:** 888,888,888 LOVECOIN (INITIAL_SUPPLY) + additional emission
 
 ### Integration Points
 - **WordPress Plugin:** WooCommerce integration

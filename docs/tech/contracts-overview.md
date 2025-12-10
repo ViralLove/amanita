@@ -17,64 +17,78 @@ This document provides a comprehensive overview of the Amanita ecosystem smart c
 
 **Key Functions:**
 - `emitForSuperlike(uint256 tokenId, address liker)` - Triggers token emission on superlike
-- `claimAMANITA()` - Allows sellers to claim accumulated utility tokens
-- `claimAGOV()` - Activates governance tokens after reputation threshold
+- `claimLOVECOIN()` - Allows sellers to claim accumulated utility tokens ($LOVECOIN)
+- `claimLGOV()` - Activates governance tokens after reputation threshold
 - `getReputationProgress(address seller)` - Returns reputation status
 
 **Security Features:**
 - Access control via EMITTER_ROLE
-- Reentrancy protection in claimAMANITA()
-- Social validation for superlikes
-- One-time AGOV activation
+- Reentrancy protection in claimLOVECOIN()
+- Social validation for superlikes through invite graph
+- One-time LGOV activation
 
 **Key Mappings:**
 ```solidity
-mapping(address => uint256) public amanitaAccrued;  // Accumulated AMANITA
-mapping(address => uint256) public agovAccrued;     // Accumulated AGOV
-mapping(address => bool) public agovClaimed;        // AGOV activation status
+mapping(address => uint256) public loveAccrued;      // Accumulated LOVECOIN
+mapping(address => uint256) public lgovAccrued;     // Accumulated LGOV
+mapping(address => bool) public lgovClaimed;         // LGOV activation status
 ```
 
-#### **AmanitaToken.sol**
-**Purpose:** Utility token for internal ecosystem payments
+**Token Integration:**
+- Uses `Lovecoin.sol` for utility tokens ($LOVECOIN)
+- Uses `AmanitaGovToken.sol` for governance tokens (as $LGOV)
+- Integrated with `LoveDoPostNFT.sol` and `SpiralEngine.sol`
+
+#### **Lovecoin.sol**
+**Purpose:** Utility token for social mining in Loveconomy
 
 **Characteristics:**
-- **Supply:** 888,888,888 AMANITA (INITIAL_SUPPLY)
+- **Supply:** 888,888,888 LOVECOIN (INITIAL_SUPPLY) + additional emission
 - **Standard:** ERC-20 with AccessControl
 - **Minting:** Controlled by MINTER_ROLE
 - **Burning:** Controlled by MINTER_ROLE
+- **Usage:** Social mining through superlikes in LoveDo posts
 
 **Key Functions:**
 - `mint(address to, uint256 amount)` - Mint new tokens
 - `burn(address from, uint256 amount)` - Burn tokens
 
+**Note:** `AmanitaToken.sol` exists in codebase but is not actively used in `LoveEmissionEngine`. The active token system uses `Lovecoin` for utility tokens.
+
 #### **AmanitaGovToken.sol**
 **Purpose:** Governance token with voting capabilities
 
 **Characteristics:**
-- **Standard:** ERC20Votes with delegation
+- **Symbol:** AGOV (in contract), used as LGOV in LoveEmissionEngine
+- **Standard:** ERC20Votes + ERC20Permit with delegation
 - **Governance:** Snapshot voting support
-- **Activation:** Requires reputation threshold
+- **Activation:** Requires reputation threshold (8 LoveDo posts)
 - **Minting:** Controlled by MINTER_ROLE
 
 **Key Features:**
 - Delegation support for voting
 - Permit functionality for gasless approvals
 - Integration with OpenZeppelin governance
+- One-time activation after reputation threshold
 
-#### **InviteNFT.sol**
-**Purpose:** Access control and social capital management
+#### **SpiralEngine.sol** (UUPS upgradeable)
+**Purpose:** Access control, social capital management, and spiral hierarchy
+
+**⚠️ IMPORTANT:** `InviteNFT.sol` does NOT exist — all invite functionality is implemented in `SpiralEngine.sol`!
 
 **Characteristics:**
-- **Standard:** ERC-721 (Soulbound)
+- **Standard:** ERC-721 (Soulbound) with IERC5192
 - **Supply:** 12 invites per activated user
-- **Transfer:** Restricted (soulbound behavior)
+- **Transfer:** Restricted (soulbound behavior - all transfer functions reverted)
 - **Expiry:** Optional time-limited invites
+- **Integration:** Delegates SBT functionality to `SoulIdentity` contract
 
 **Key Functions:**
-- `activateAndMintInvites()` - Activates invite and mints 12 new invites
-- `mintInvites()` - Batch mint invites for sellers
-- `validateInviteCode()` - Validates invite code and user eligibility
-- `isUserActivated()` - Checks if user has activated an invite
+- `mintInvite(string inviteCode, uint256 expiry)` - Creates one invite for distribution
+- `activateUser(string inviteCode, address user, string[] newInviteCodes, uint256 expiry)` - Activates user and mints 12 new invites
+- `grantSellerRole(address user)` - Grants SELLER_ROLE to activated user
+- `getCircleMembers(address activator)` - Returns members of organic trust community
+- `isUserActivated(address user)` - Checks if user has activated an invite
 
 **Key Mappings:**
 ```solidity
@@ -82,6 +96,8 @@ mapping(string => uint256) public inviteCodeToTokenId;  // Code to NFT mapping
 mapping(uint256 => bool) public isInviteUsed;           // Usage tracking
 mapping(address => uint256) public usedInviteByUser;    // User activation
 mapping(uint256 => uint256) public inviteExpiry;        // Expiry timestamps
+mapping(address => address) public userActivator;        // Who activated user
+mapping(address => address[]) public activatedBy;        // Whom user activated (max 12)
 ```
 
 #### **LoveDoPostNFT.sol**
@@ -198,16 +214,19 @@ struct Order {
 1. User creates LoveDo post → LoveDoPostNFT.mintLoveDoPost()
 2. Seller gives superlike → LoveDoPostNFT.addSuperlike()
 3. Emission triggered → LoveEmissionEngine.emitForSuperlike()
-4. Tokens accumulated → amanitaAccrued[seller] += EMISSION_RATE
-5. Seller claims tokens → LoveEmissionEngine.claimAMANITA()
+4. Tokens accumulated → loveAccrued[seller] += EMISSION_RATE (LOVECOIN)
+5. Tokens accumulated → lgovAccrued[seller] += EMISSION_RATE (LGOV pending)
+6. Seller claims utility tokens → LoveEmissionEngine.claimLOVECOIN()
+7. Seller activates governance → LoveEmissionEngine.claimLGOV() (if ≥8 LoveDo posts)
 ```
 
 ### Access Control Flow
 ```
-1. User receives invite code → InviteNFT validation
-2. User activates invite → InviteNFT.activateAndMintInvites()
-3. User gains access → InviteNFT.isUserActivated() returns true
-4. User can participate → All ecosystem functions available
+1. User receives invite code → SpiralEngine validation
+2. Activator calls activateUser() → SpiralEngine.activateUser()
+3. User gains access → SpiralEngine.isUserActivated() returns true
+4. 12 new invites minted → SpiralEngine creates invites for activated user
+5. User can participate → All ecosystem functions available
 ```
 
 ### Product Management Flow
@@ -261,9 +280,10 @@ struct Order {
 ## Economic Parameters
 
 ### Token Economics
-- **AMANITA Supply:** 888,888,888 (INITIAL_SUPPLY)
-- **Emission Rate:** 1 AMANITA per superlike (EMISSION_RATE = 1 ether)
-- **AGOV Threshold:** 8 LoveDo posts (LOVE_DO_THRESHOLD = 8)
+- **LOVECOIN Supply:** 888,888,888 (INITIAL_SUPPLY) + additional emission
+- **Emission Rate:** 1 LOVECOIN per superlike (EMISSION_RATE = 1 ether)
+- **LGOV Emission Rate:** 1 LGOV per superlike (pending until reputation threshold)
+- **LGOV Threshold:** 8 LoveDo posts (LOVE_DO_THRESHOLD = 8)
 
 ### Activity Limits
 - **Monthly Posts:** 8 per user (MAX_MONTHLY_POSTS_PER_USER)
@@ -310,9 +330,9 @@ struct Order {
 ## Monitoring and Analytics
 
 ### Key Metrics
-- **Token Emission:** AMANITA and AGOV distribution
+- **Token Emission:** LOVECOIN and LGOV distribution
 - **Social Activity:** LoveDo posts and superlikes
-- **Network Growth:** Invite activations
+- **Network Growth:** Invite activations through SpiralEngine
 - **Product Activity:** Catalog updates
 
 ### Events Tracking

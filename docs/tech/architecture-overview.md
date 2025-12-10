@@ -17,7 +17,7 @@ Amanita is a decentralized ecosystem that bridges traditional e-commerce with bl
 ### 🏗️ **Core Infrastructure Layer**
 
 #### **Blockchain Network (Polygon)**
-- **Smart Contracts**: InviteNFT, ProductRegistry, LoveDoPostNFT, LoveEmissionEngine, AmanitaToken and more
+- **Smart Contracts**: SpiralEngine, ProductRegistry, LoveDoPostNFT, LoveEmissionEngine, Lovecoin, AmanitaGovToken and more
 - **Purpose**: Trust, reputation, product registry, social mining, shared loyalty systems
 - **Key Features**: Low-cost transactions, fast confirmation, Ethereum compatibility
 
@@ -78,10 +78,11 @@ Amanita is a decentralized ecosystem that bridges traditional e-commerce with bl
 
 ### 📦 **Smart Contract Ecosystem**
 
-#### **InviteNFT (ERC-721)**
-- **Purpose**: Access control and trust system
-- **Features**: Unique invite codes, one-time use, inviter tracking
-- **Integration**: Telegram bot validation, user onboarding
+#### **SpiralEngine (ERC-721, Soulbound)**
+- **Purpose**: Access control, trust system, and spiral hierarchy
+- **Features**: Unique invite codes, one-time use, inviter tracking, 12 invites per activated user
+- **Integration**: Telegram bot validation, user onboarding, organic trust communities
+- **⚠️ Note**: `InviteNFT.sol` does NOT exist — all invite functionality is in `SpiralEngine.sol`
 - **Details**: See [Network Economy](Network-Economy.md) for invite system mechanics and social capital model
 
 #### **ProductRegistry**
@@ -91,45 +92,44 @@ Amanita is a decentralized ecosystem that bridges traditional e-commerce with bl
 
 #### **LoveEmissionEngine**
 - **Purpose**: Social mining and token distribution
-- **Features**: $LOVE token rewards, reputation building, community engagement
+- **Features**: $LOVECOIN token rewards, $LGOV governance tokens, reputation building, community engagement
 - **Integration**: Telegram bot, user activities, cross-seller cooperation
+- **Token Integration**: Uses `Lovecoin.sol` for utility tokens, `AmanitaGovToken.sol` for governance
 - **Details**: See [Network Economy](Network-Economy.md) for social mining mechanics and economic model
 
-#### **AmanitaToken (ERC-20)**
-- **Purpose**: Non-transferable loyalty token for sales stimulation
+#### **Lovecoin (ERC-20)**
+- **Purpose**: Utility token for social mining in Loveconomy
 - **Features**: 
-  - Mined through loyalty programs and burned on first payment
-  - Payment only from users to sellers (inter-user transfers prohibited)
-  - Stimulates sales and cross-selling within the ecosystem
-  - Internal ecosystem currency for seller rewards
+  - Initial supply: 888,888,888 LOVECOIN
+  - Mined through superlikes in LoveDo posts
+  - Claimable immediately after accumulation
+  - Social emission based on LoveDoPostNFT activities
 - **Integration**: LoveEmissionEngine, seller rewards, user benefits
 - **Details**: See [Network Economy](Network-Economy.md) for comprehensive tokenomics
 
-#### **LoveToken (ERC-20)**
-- **Purpose**: Universal P2P token across all themed ecosystems
-- **Features**:
-  - Social emission based on LoveDoPostNFT activities
-  - Issued but never burned (permanent supply)
-  - Universal across all themed ecosystems (Amanita is first example - folk medicine)
-  - P2P transfers between any roles allowed
-  - Used alongside InviteNFT in all ecosystems
-- **Integration**: Cross-ecosystem compatibility, universal reputation system
-
-#### **LoveGovToken (ERC-20)**
+#### **AmanitaGovToken (ERC-20Votes)**
 - **Purpose**: Governance token for collective action and OpenGov
 - **Features**:
-  - Triggered by $LOVE mining activities
+  - Symbol: AGOV (in contract), used as LGOV in LoveEmissionEngine
+  - Triggered by social mining activities (superlikes)
+  - Activation requires 8+ LoveDo posts (reputation threshold)
+  - One-time activation after reputation threshold
   - Enables coalition formation for large-scale projects
   - Supports collective property acquisition, facility rentals, and other capital-intensive tasks
   - Part of OpenGov system for decentralized decision-making
 - **Integration**: Coalition governance, collective resource management
+
+#### **AmanitaToken (ERC-20)**
+- **Purpose**: Legacy token (exists in codebase but not actively used in LoveEmissionEngine)
+- **Status**: Present in contracts but not integrated into active token emission system
+- **Note**: Active token system uses `Lovecoin` for utility and `AmanitaGovToken` for governance
 
 ### 🌐 **Themed Ecosystem Architecture**
 
 #### **Ecosystem Organization**
 - **Thematic Focus**: Each ecosystem specializes in specific industries or themes
 - **Amanita Example**: First ecosystem focused on natural remmidies (biohacking)
-- **Cross-Ecosystem**: $LOVE and InviteNFT work across all themed ecosystems
+- **Cross-Ecosystem**: $LOVECOIN and SpiralEngine invites work across all themed ecosystems
 - **Shared Infrastructure**: Common blockchain and storage infrastructure
 
 #### **Ecosystem Benefits**
@@ -159,9 +159,10 @@ Amanita is a decentralized ecosystem that bridges traditional e-commerce with bl
 
 ### **User Onboarding Flow**
 1. User receives invite code (link or manual entry)
-2. Telegram bot validates code through InviteNFT contract
-3. User creates wallet via WebApp
-4. User gains access to ecosystem features
+2. Telegram bot validates code through SpiralEngine contract
+3. Activator calls activateUser() to activate user and mint 12 new invites
+4. User creates wallet via WebApp
+5. User gains access to ecosystem features
 
 *For detailed economic flows and token distribution, see [Network Economy](Network-Economy.md)*
 
@@ -211,7 +212,7 @@ Amanita is a decentralized ecosystem that bridges traditional e-commerce with bl
 ### **Network Growth**
 - **Seller Node Expansion**: New sellers can join without infrastructure changes
 - **Cross-Seller Discovery**: Products automatically available across network
-- **Token Economics**: Incentivized growth through $AMANITA rewards
+- **Token Economics**: Incentivized growth through $LOVECOIN and $LGOV rewards
 
 *For detailed economic model and growth mechanics, see [Network Economy](Network-Economy.md)*
 
