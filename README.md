@@ -11,14 +11,14 @@ To create an open, ethical, and scalable platform for fair trade and cooperation
 - **WebApp Wallet** — a non-custodial wallet for managing assets and invites
 - **WordPress Plugin** — a bridge between WooCommerce and the Amanita ecosystem
 - **Python Backend/API** — services for catalog, orders, users, and blockchain integration
-- **Smart Contracts (Solidity, Polygon)** — InviteNFT, AmanitaToken, OrderNFT, ReviewNFT, AmanitaSale
+- **Smart Contracts (Solidity, Polygon)** — SpiralEngine (invite system), ProductRegistry, OrganicComponentRegistry, Lovecoin (utility token), AmanitaGovToken (governance), LoveEmissionEngine, LoveDoPostNFT, AmanitaInternational (localization), SoulIdentity (SBT)
 - **Supabase Edge Functions** — ArWeave integration for data storage
 
 ## 🔑 Key Components
-- **Invite NFT** — invitation and trust system (ERC-721)
-- **AMANITA Coin** — non-transferable loyalty token (ERC-20)
-- **Order NFT** — on-chain purchase receipts
-- **Review NFT** — reviews and reputation
+- **SpiralEngine** — invitation and trust system (ERC-721, Soulbound)
+- **$LOVECOIN** — utility token for social mining (ERC-20)
+- **$LGOV** — governance token with reputation threshold (ERC-20Votes)
+- **InviteNFT (SpiralEngine)** — Soulbound invitation tokens, 12 per activated user
 - **API** — secure HMAC REST API for integrations
 - **WebApp** — wallet and user interface
 - **WordPress Plugin** — catalog and order sync with WooCommerce
@@ -39,7 +39,7 @@ Each seller is a **seller node** with their own e-commerce solution deployed thr
 3. **Invite code entry**:
    - If the bot is launched via a link with an invite code, it is auto-filled.
    - Otherwise, the user is prompted to enter or paste an invite code manually.
-   - The code is validated on-chain (InviteNFT smart contract).
+   - The code is validated on-chain (SpiralEngine contract).
 4. **Wallet creation** — after successful invite validation, the user creates a non-custodial wallet via the integrated WebApp (Telegram WebApp API).
 5. **Access to main menu** — the user can now browse the product catalog, manage their cart, view order history, invite friends, and contact support.
 6. **Help is always available** — at every step, a "Help" button provides FAQ or direct support.
@@ -61,12 +61,18 @@ Each seller is a **seller node** with their own e-commerce solution deployed thr
 4. **Need help?** Use the in-bot Help button or see the [documentation](docs/doc-master.md).
 
 ## 📚 Documentation
-- [AI-Navigator.md](AI-Navigator.md) — working diary and decision history
 - [Manifest & Mission](docs/manifest.md)
 - [Architecture & Components](docs/architecture-overview.md)
 - [Network Economy](docs/Network-Economy.md) — tokenomics and social mining mechanics
 - [API & Integrations](docs/webapi-overview.md)
 - [Smart Contracts](docs/contracts-overview.md)
+
+### Bot Documentation
+- [Bot Quick Start](bot/docs/QUICK-START.md) — quick start guide for Telegram bot
+- [Bot Architecture](bot/docs/tech/telegram/Technical%20Architecture.md) — Telegram bot technical architecture
+- [Services Architecture](bot/docs/tech/service/Services%20Architecture.md) — services and dependency injection
+- [API Documentation](bot/docs/tech/api/api.md) — FastAPI REST API reference
+- [Testing Guide](bot/docs/tests/overview.md) — testing strategy and guide
 
 ## 💬 Contacts & Support
 - Telegram: [@zeya888](https://t.me/zeya888)

@@ -63,7 +63,7 @@
 def call_contract_function(self, contract_name: str, function_name: str, *args, **kwargs) -> Any
 async def transact_contract_function(self, contract_name: str, function_name: str, private_key: str, *args, **kwargs) -> Optional[str]
 
-# Специализированные методы для InviteNFT
+# Специализированные методы для SpiralEngine (invite system)
 def validate_invite_code(self, invite_code: str) -> dict
 def get_token_id_by_invite_code(self, invite_code: str) -> int
 def get_user_invites(self, user_address: str) -> list
