@@ -1,11 +1,11 @@
 # Network Economy - AMANITA Ecosystem
 
 ## Overview
-This document describes the network economy principles of the AMANITA ecosystem, based on social mining, financial responsibility of participants, and selective invite distribution. The ecosystem implements a three-tier token system with social capital mechanisms.
+This document describes the network economy principles of the AMANITA ecosystem, based on social mining, financial responsibility of participants, and selective invite distribution. The ecosystem implements a multi-token system with social capital mechanisms: $LOVECOIN (social mining), $LGOV (governance), $AMANITA (decentralized seller emission), and SpiralEngine (invite system).
 
 **Related Documentation:**
 - **[README.md](../README.md)** — Project overview and getting started guide
-- **[Architecture Overview](architecture-overview.md)** — System architecture and component interactions
+- **[Architecture Overview](../tech/architecture-overview.md)** — System architecture and component interactions
 
 **Context:** This document provides the economic foundation for the Amanita ecosystem, detailing how social interactions create value through blockchain-based reputation systems. It complements the technical architecture by explaining the "why" behind the smart contract design decisions.
 
@@ -24,7 +24,7 @@ This document describes the network economy principles of the AMANITA ecosystem,
 - ✅ **Invites as limited resource** and value
 - ✅ **Transparency** of all economic processes
 
-## Three-Tier Token System
+## Token System
 
 ### 1. $LOVECOIN - Utility Token (ERC-20)
 **Purpose:** Utility token for social mining in Loveconomy
@@ -51,16 +51,34 @@ This document describes the network economy principles of the AMANITA ecosystem,
 - **Governance Features:** ERC20Votes + ERC20Permit with delegation and snapshot voting
 - **Usage:** DAO governance, collective resource management, coalition formation
 - **One-time Activation:** Can be activated only once after reputation threshold
+- **Issuance:** Based on $LOVECOIN accumulation
 
 **Reputation System:**
 - **Pending LGOV:** Accumulated but not yet activated
 - **Active LGOV:** Available for governance after reputation threshold
 - **LoveDo Count:** Number of posts directed at seller (reputation metric)
 
-### 3. InviteNFT - Social Capital (ERC-721, Soulbound)
-**Purpose:** Access control, trust system, and social capital representation
+### 3. $AMANITA - Decentralized Seller Emission Token (ERC-20)
+**Purpose:** Loyalty tokens for decentralized emission by sellers based on sold values
 
-**⚠️ IMPORTANT:** `InviteNFT.sol` does NOT exist — all invite functionality is implemented in `SpiralEngine.sol`!
+**Key Characteristics:**
+- **Contract:** `AmanitaToken.sol` (symbol: AMANITA)
+- **Initial Supply:** 888,888,888 AMANITA (INITIAL_SUPPLY)
+- **Emission Mechanism:** Decentralized emission by sellers based on their sold values
+- **Burn Mechanism:** Tokens are burned on redemption
+- **Usage:** Seller loyalty programs, rewards to audience, cross-seller cooperation
+- **Control:** MINTER_ROLE for minting, MINTER_ROLE for burning
+
+**Economic Model:**
+- **Decentralized Emission:** Each seller can emit tokens based on their sales
+- **Value-Based:** Emission tied to actual sold values
+- **Burn on Redemption:** Tokens are burned when redeemed, maintaining economic balance
+- **Seller Autonomy:** Each seller controls their own emission within ecosystem rules
+
+**Note:** This is a separate token system from $LOVECOIN (social P2P dynamics) and $LGOV (governance). $AMANITA focuses on seller-to-audience loyalty programs.
+
+### 4. SpiralEngine - Social Capital (ERC-721, Soulbound, Invite System)
+**Purpose:** Access control, trust system, and social capital representation through spiral hierarchy
 
 **Key Characteristics:**
 - **Contract:** `SpiralEngine.sol` (UUPS upgradeable)
@@ -381,11 +399,11 @@ This model ensures **fair and sustainable development** of a decentralized ecosy
 ## Technical Implementation Notes
 
 ### Smart Contract Addresses
-- **LoveEmissionEngine:** Core token emission logic
-- **Lovecoin:** Utility token (888,888,888 initial supply + emission)
+- **LoveEmissionEngine:** Core token emission logic for $LOVECOIN and $LGOV
+- **Lovecoin:** Utility token for social mining (888,888,888 initial supply + emission)
 - **AmanitaGovToken:** Governance token with voting (ERC20Votes + ERC20Permit, used as LGOV)
+- **AmanitaToken:** Decentralized seller emission token (888,888,888 initial supply, burned on redemption)
 - **SpiralEngine:** Social capital and access control (soulbound NFTs, invite system)
-- **AmanitaToken:** Legacy token (exists but not used in active emission system)
 - **LoveDoPostNFT:** Social proof and reputation
 - **ProductRegistry:** Decentralized product catalog
 - **AmanitaRegistry:** Central contract registry
@@ -399,7 +417,9 @@ This model ensures **fair and sustainable development** of a decentralized ecosy
 - **Monthly Limits:** 8 posts per user, 8 superlikes per seller (MAX_MONTHLY_POSTS_PER_USER = 8, MAX_SUPERLIKES_PER_MONTH = 8)
 - **Invite Limit:** 12 invites per activated user (exactly 12 in activateAndMintInvites)
 - **Seller Mentions:** 8 mentions per seller (MAX_MENTIONS_PER_SELLER = 8)
-- **Token Supply:** 888,888,888 LOVECOIN (INITIAL_SUPPLY) + additional emission
+- **Token Supply:** 
+  - 888,888,888 LOVECOIN (INITIAL_SUPPLY) + additional emission
+  - 888,888,888 AMANITA (INITIAL_SUPPLY) + decentralized seller emission (burned on redemption)
 
 ### Integration Points
 - **WordPress Plugin:** WooCommerce integration
@@ -414,7 +434,7 @@ This model ensures **fair and sustainable development** of a decentralized ecosy
 **For comprehensive understanding of the Amanita ecosystem:**
 
 - **[README.md](../README.md)** — Project overview, mission, and getting started
-- **[Architecture Overview](architecture-overview.md)** — Technical architecture and system components
+- **[Architecture Overview](../tech/architecture-overview.md)** — Technical architecture and system components
 
 **This document focuses on:**
 - Economic model and tokenomics
