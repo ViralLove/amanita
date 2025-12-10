@@ -950,7 +950,8 @@ class TestProductFullDeserializationFlow:
         # Assemble product (uses real ProductAssembler)
         product = await real_product_assembler.assemble_product(
             blockchain_data,
-            metadata
+            metadata,
+            language="ru"
         )
         
         # STAGE 1: Assembly validation

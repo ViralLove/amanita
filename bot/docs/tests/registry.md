@@ -437,7 +437,7 @@ fi
 
 ### 🎯 Текущий статус
 
-**Файл**: `bot/tests/test_product_registry_integration.py`
+**Файл**: `bot/tests/integration/test_product_registry_integration.py`
 **Статус**: ❌ **Требует рефакторинга для соответствия Mock стратегии**
 
 #### 🔍 Анализ текущих проблем:

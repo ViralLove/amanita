@@ -219,89 +219,133 @@ class TestMultilingualIPFSService(unittest.TestCase):
 
     # ===== Components symmetry tests =====
     def test_component_fetches_json_by_cid_from_amanita(self):
-        """Component: базовый путь контракт → IPFS → кэш"""
+        """Component: базовый путь контракт → IPFS → кэш (через complex fields)"""
         component_id = "comp-001"
         language = "en"
-        expected_payload = {"desc": {"en": "Reishi"}}
+        className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
+        expected_cid = "QmComponentCID123"
+        expected_complex_data = {
+            "label": "ComponentDescription",
+            "type": "complex",
+            "fields": {
+                "generic_description": "Reishi description",
+                "effects": "Reishi effects"
+            }
+        }
+        expected_fields = expected_complex_data["fields"]
         cache_key = f"component_{component_id}_{language}"
+        
+        # Настраиваем mocks для complex fields
+        complex_field_fn = MagicMock()
+        complex_field_fn.call.return_value = expected_cid
+        self.amanita_contract.functions.getComplexFieldCID.return_value = complex_field_fn
         self.cache_service.get.return_value = None
-        self.ipfs_service.download_json.return_value = expected_payload
+        self.ipfs_service.download_json.return_value = expected_complex_data
 
         result = self.service.get_component_translations(component_id, language)
 
-        # контракт, IPFS вызваны
+        # контракт, IPFS вызваны (через complex fields)
         self.blockchain_service.get_contract.assert_called_with("AmanitaInternational")
-        self.ipfs_service.download_json.assert_called_once()
-        # запись в кэш с TTL компонента
-        self.cache_service.set.assert_called_with(cache_key, expected_payload, 'ipfs', self.service.cache_ttl['component'])
+        self.amanita_contract.functions.getComplexFieldCID.assert_called_once_with(className, language)
+        self.ipfs_service.download_json.assert_called_once_with(expected_cid)
+        # запись в кэш с TTL компонента (fields из complex data)
+        self.cache_service.set.assert_called_with(cache_key, expected_fields, 'ipfs', self.service.cache_ttl['component'])
         self.assertIsInstance(result, dict)
-        self.assertEqual(result, expected_payload)
+        self.assertEqual(result, expected_fields)
 
     def test_component_caches_ipfs_payload_per_entity_language(self):
-        """Component: TTL/инвалидация и повторная загрузка"""
+        """Component: TTL/инвалидация и повторная загрузка (через complex fields)"""
         component_id = "comp-002"
         language = "en"
-        payload_first = {"desc": {"en": "Cordyceps"}}
-        payload_second = {"desc": {"en": "Cordyceps (fresh)"}}
+        className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
+        fields_first = {"generic_description": "Cordyceps description", "effects": "Cordyceps effects"}
+        fields_second = {"generic_description": "Cordyceps (fresh) description", "effects": "Cordyceps (fresh) effects"}
+        complex_data_first = {
+            "label": "ComponentDescription",
+            "type": "complex",
+            "fields": fields_first
+        }
+        complex_data_second = {
+            "label": "ComponentDescription",
+            "type": "complex",
+            "fields": fields_second
+        }
         cache_key = f"component_{component_id}_{language}"
+        
+        # Настраиваем mocks для complex fields
+        complex_field_fn = MagicMock()
+        complex_field_fn.call.return_value = "QmCID123"
+        self.amanita_contract.functions.getComplexFieldCID.return_value = complex_field_fn
         self.cache_service.get.return_value = None
-        self.ipfs_service.download_json.return_value = payload_first
+        self.ipfs_service.download_json.return_value = complex_data_first
         self.service.cache_ttl["component"] = 1
 
         first = self.service.get_component_translations(component_id, language)
-        self.assertEqual(first, payload_first)
+        self.assertEqual(first, fields_first)
         self.assertEqual(self.ipfs_service.download_json.call_count, 1)
 
         # external fast-path: очищаем локальный кэш и возвращаем из external
         self.ipfs_service.download_json.reset_mock()
         if cache_key in self.service.ipfs_cache:
             del self.service.ipfs_cache[cache_key]
-        self.cache_service.get.return_value = payload_first
+        self.cache_service.get.return_value = fields_first
         second = self.service.get_component_translations(component_id, language)
-        self.assertEqual(second, payload_first)
+        self.assertEqual(second, fields_first)
         self.ipfs_service.download_json.assert_not_called()
 
         # истечение TTL и повторная загрузка
         self.assertIn(cache_key, self.service.ipfs_cache)
         self.service.ipfs_cache[cache_key].timestamp = 0
-        self.cache_service.get.return_value = None
-        self.ipfs_service.download_json.return_value = payload_second
+        # Также очищаем кэш для complex field
+        complex_cache_key = f"complex_{className}_{language}"
+        if complex_cache_key in self.service.ipfs_cache:
+            self.service.ipfs_cache[complex_cache_key].timestamp = 0
+        self.cache_service.get.return_value = None  # Нет в external кэше
+        self.ipfs_service.download_json.return_value = complex_data_second
         third = self.service.get_component_translations(component_id, language)
-        self.assertEqual(third, payload_second)
+        self.assertEqual(third, fields_second)
         self.ipfs_service.download_json.assert_called_once()
 
     def test_component_external_cache_fast_path(self):
-        """Component: external cache → немедленный возврат без IPFS"""
+        """Component: external cache → немедленный возврат без IPFS (через complex fields)"""
         component_id = "comp-003"
         language = "ru"
-        cached_payload = {"desc": {"ru": "Рейши"}}
-        self.cache_service.get.return_value = cached_payload
+        cached_fields = {"generic_description": "Рейши описание", "effects": "Рейши эффекты"}
+        self.cache_service.get.return_value = cached_fields
 
         result = self.service.get_component_translations(component_id, language)
 
         self.cache_service.get.assert_called_once()
         self.ipfs_service.download_json.assert_not_called()
-        self.assertEqual(result, cached_payload)
+        self.assertEqual(result, cached_fields)
         # локальный кэш восстановлен
         cache_key = f"component_{component_id}_{language}"
         self.assertIn(cache_key, self.service.ipfs_cache)
 
     def test_component_fallback_used_when_ipfs_none_and_external_miss(self):
-        """Component: external miss → IPFS None → fallback dict"""
+        """Component: external miss → IPFS None → fallback dict (через complex fields)"""
         component_id = "comp-004"
         language = "en"
-        fallback_payload = {"desc": {"en": "Fallback Component"}}
+        className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
+        fallback_fields = {"generic_description": "Fallback Component description", "effects": "Fallback effects"}
+        
+        # Настраиваем mocks для complex fields (возвращает None)
+        complex_field_fn = MagicMock()
+        complex_field_fn.call.return_value = ""  # Пустой CID
+        self.amanita_contract.functions.getComplexFieldCID.return_value = complex_field_fn
         self.cache_service.get.return_value = None
-        self.ipfs_service.download_json.return_value = None
-        self.fallback_service.get_translation_with_fallback.return_value = fallback_payload
+        # _load_component_description_from_ipfs вернет None, поэтому будет использован fallback
+        self.service._load_component_description_from_ipfs = MagicMock(return_value=None)
+        self.fallback_service.get_translation_with_fallback.return_value = fallback_fields
 
         result = self.service.get_component_translations(component_id, language)
 
         self.cache_service.get.assert_called()
-        self.ipfs_service.download_json.assert_called_once()
+        # Проверяем, что был вызов getComplexFieldCID (через _load_component_description_from_ipfs)
+        self.amanita_contract.functions.getComplexFieldCID.assert_called_once_with(className, language)
         self.fallback_service.get_translation_with_fallback.assert_called_once()
         self.assertIsInstance(result, dict)
-        self.assertEqual(result, fallback_payload)
+        self.assertEqual(result, fallback_fields)
 
     def test_product_local_expired_but_external_valid_uses_external_without_ipfs(self):
         """Product: истёкший локальный TTL при актуальном external → external-hit, без IPFS"""
@@ -730,6 +774,196 @@ class TestMultilingualIPFSService(unittest.TestCase):
         
         # THEN: Возвращается None
         self.assertIsNone(result)
+
+    # ===== Per-component complex fields tests (with biounit_id) =====
+    
+    def test_load_component_description_from_ipfs_success(self):
+        """Тест: успешная загрузка per-component описания через complex fields с biounit_id"""
+        # GIVEN: Настроенный сервис для per-component данных
+        component_id = "amanita_muscaria"
+        language = "ru"
+        className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
+        expected_cid = "QmComponentDescriptionCID123"
+        expected_complex_data = {
+            "label": "ComponentDescription",
+            "type": "complex",
+            "fields": {
+                "generic_description": "Описание компонента amanita_muscaria",
+                "effects": "Эффекты",
+                "shamanic": "Шаманское использование",
+                "warnings": "Предупреждения"
+            }
+        }
+        expected_fields = expected_complex_data["fields"]
+        
+        # Настраиваем mocks для _load_complex_field_from_ipfs
+        complex_field_fn = MagicMock()
+        complex_field_fn.call.return_value = expected_cid
+        self.amanita_contract.functions.getComplexFieldCID.return_value = complex_field_fn
+        self.cache_service.get.return_value = None  # Нет в кэше
+        self.ipfs_service.download_json.return_value = expected_complex_data
+        
+        # WHEN: Загружаем per-component описание
+        result = self.service._load_component_description_from_ipfs(component_id, language)
+        
+        # THEN: Метод вызывал _load_complex_field_from_ipfs с правильным className (с biounit_id)
+        # Проверяем, что был вызов через внутренний метод _load_complex_field_from_ipfs
+        # с className = "ComponentDescription.amanita_muscaria"
+        self.amanita_contract.functions.getComplexFieldCID.assert_called_once_with(className, language)
+        
+        # THEN: Загрузил JSON из IPFS
+        self.ipfs_service.download_json.assert_called_once_with(expected_cid)
+        
+        # THEN: Возвращены только fields из complex data
+        self.assertEqual(result, expected_fields)
+        self.assertIn("generic_description", result)
+        self.assertEqual(result["generic_description"], "Описание компонента amanita_muscaria")
+
+    def test_load_component_description_from_ipfs_uses_cache(self):
+        """Тест: _load_component_description_from_ipfs использует кэш"""
+        # GIVEN: Данные уже в кэше
+        component_id = "amanita_muscaria"
+        language = "ru"
+        className = f"ComponentDescription.{component_id}"
+        cache_key = f"complex_{className}_{language}"
+        cached_complex_data = {
+            "label": "ComponentDescription",
+            "type": "complex",
+            "fields": {"generic_description": "Cached description"}
+        }
+        cached_fields = cached_complex_data["fields"]
+        
+        self.cache_service.get.return_value = cached_complex_data
+        
+        # WHEN: Загружаем per-component описание
+        result = self.service._load_component_description_from_ipfs(component_id, language)
+        
+        # THEN: Возвращены fields из кэша
+        self.assertEqual(result, cached_fields)
+        
+        # THEN: IPFS не вызывался
+        self.ipfs_service.download_json.assert_not_called()
+        
+        # THEN: Блокчейн не вызывался
+        self.amanita_contract.functions.getComplexFieldCID.assert_not_called()
+
+    def test_load_component_description_from_ipfs_validates_structure(self):
+        """Тест: _load_component_description_from_ipfs валидирует структуру JSON"""
+        # GIVEN: Неправильная структура JSON (без поля fields)
+        component_id = "amanita_muscaria"
+        language = "ru"
+        className = f"ComponentDescription.{component_id}"
+        invalid_complex_data = {
+            "label": "ComponentDescription",
+            "type": "complex"
+            # Отсутствует поле "fields"
+        }
+        
+        complex_field_fn = MagicMock()
+        complex_field_fn.call.return_value = "QmCID"
+        self.amanita_contract.functions.getComplexFieldCID.return_value = complex_field_fn
+        self.cache_service.get.return_value = None
+        self.ipfs_service.download_json.return_value = invalid_complex_data
+        
+        # WHEN: Загружаем per-component описание
+        result = self.service._load_component_description_from_ipfs(component_id, language)
+        
+        # THEN: Возвращается None (валидация не прошла)
+        self.assertIsNone(result)
+
+    def test_load_component_description_from_ipfs_returns_none_when_no_data(self):
+        """Тест: _load_component_description_from_ipfs возвращает None при отсутствии данных"""
+        # GIVEN: _load_complex_field_from_ipfs возвращает None
+        component_id = "amanita_muscaria"
+        language = "ru"
+        
+        # Mock _load_complex_field_from_ipfs для возврата None
+        self.service._load_complex_field_from_ipfs = MagicMock(return_value=None)
+        
+        # WHEN: Загружаем per-component описание
+        result = self.service._load_component_description_from_ipfs(component_id, language)
+        
+        # THEN: Возвращается None
+        self.assertIsNone(result)
+
+    def test_get_component_translations_uses_complex_fields(self):
+        """Тест: get_component_translations() использует complex fields через _load_component_description_from_ipfs"""
+        # GIVEN: Настроенный сервис для per-component данных
+        component_id = "amanita_muscaria"
+        language = "ru"
+        className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
+        expected_cid = "QmTranslationsCID"
+        expected_fields = {
+            "generic_description": "Test description",
+            "effects": "Test effects",
+            "shamanic": "Test shamanic",
+            "warnings": "Test warnings"
+        }
+        expected_complex_data = {
+            "label": "ComponentDescription",
+            "type": "complex",
+            "fields": expected_fields
+        }
+        cache_key = f"component_{component_id}_{language}"
+        
+        # Настраиваем mocks
+        complex_field_fn = MagicMock()
+        complex_field_fn.call.return_value = expected_cid
+        self.amanita_contract.functions.getComplexFieldCID.return_value = complex_field_fn
+        self.cache_service.get.return_value = None  # Нет в кэше
+        self.ipfs_service.download_json.return_value = expected_complex_data
+        
+        # WHEN: Получаем переводы компонента
+        result = self.service.get_component_translations(component_id, language)
+        
+        # THEN: Метод использовал complex fields (через _load_component_description_from_ipfs)
+        # Проверяем, что был вызов getComplexFieldCID с правильным className (с biounit_id)
+        self.amanita_contract.functions.getComplexFieldCID.assert_called_once_with(className, language)
+        
+        # THEN: Загрузил JSON из IPFS
+        self.ipfs_service.download_json.assert_called_once_with(expected_cid)
+        
+        # THEN: Сохранил в кэш (вызывается дважды: для complex data и для fields)
+        expected_ttl = self.service.cache_ttl['component']
+        # Проверяем последний вызов (для fields)
+        self.assertGreaterEqual(self.cache_service.set.call_count, 1)
+        # Проверяем, что был вызов с fields
+        calls = self.cache_service.set.call_args_list
+        fields_call_found = any(
+            call[0][0] == cache_key and call[0][1] == expected_fields 
+            for call in calls
+        )
+        self.assertTrue(fields_call_found, f"Expected call with cache_key={cache_key} and fields, got calls: {calls}")
+        
+        # THEN: Возвращены fields из complex data
+        self.assertEqual(result, expected_fields)
+        self.assertIn("generic_description", result)
+        self.assertEqual(result["generic_description"], "Test description")
+
+    def test_get_component_translations_uses_cache_for_complex_fields(self):
+        """Тест: get_component_translations() использует кэш для complex fields"""
+        # GIVEN: Данные уже в кэше
+        component_id = "amanita_muscaria"
+        language = "ru"
+        cache_key = f"component_{component_id}_{language}"
+        cached_fields = {
+            "generic_description": "Cached description",
+            "effects": "Cached effects"
+        }
+        
+        self.cache_service.get.return_value = cached_fields
+        
+        # WHEN: Получаем переводы компонента
+        result = self.service.get_component_translations(component_id, language)
+        
+        # THEN: Возвращены данные из кэша
+        self.assertEqual(result, cached_fields)
+        
+        # THEN: IPFS не вызывался
+        self.ipfs_service.download_json.assert_not_called()
+        
+        # THEN: Блокчейн не вызывался
+        self.amanita_contract.functions.getComplexFieldCID.assert_not_called()
 
 
 if __name__ == "__main__":

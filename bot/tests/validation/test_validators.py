@@ -18,6 +18,7 @@ from bot.validation import (
     ProductValidator,
     ValidationResult
 )
+from tests.fixtures.test_data_factory import TestDataFactory
 
 
 class TestCIDValidator:
@@ -274,19 +275,8 @@ class TestProductValidator:
     
     def test_valid_product(self):
         """Тест валидного продукта."""
-        valid_product = {
-            "business_id": "test_product_1",
-            "title": "Test Product",
-            "cover_image_url": "Qm123456789",
-            "species": "Amanita muscaria",
-            "organic_components": [
-                {
-                    "component_id": "amanita_muscaria",
-                    "description_cid": "Qm123456789",
-                    "proportion": "100%"
-                }
-            ]
-        }
+        # Используем TestDataFactory для создания валидного продукта в едином формате
+        valid_product = TestDataFactory.create_valid_product()
 
         result = self.validator.validate(valid_product)
         assert result.is_valid, "Продукт должен быть валидным"
@@ -315,39 +305,21 @@ class TestProductValidator:
 
     def test_invalid_product_id(self):
         """Тест невалидного business_id продукта."""
-        invalid_product = {
-            "business_id": "",  # пустой business_id
-            "title": "Test Product",
-            "cover_image_url": "Qm123456789",
-            "species": "Amanita muscaria",
-            "organic_components": [
-                {
-                    "component_id": "amanita_muscaria",
-                    "description_cid": "Qm123456789",
-                    "proportion": "100%"
-                }
-            ]
-        }
+        # Используем TestDataFactory для создания продукта с пустым business_id
+        # Валидатор проверяет: если business_id пустая строка → MISSING_BUSINESS_ID
+        # (проверка на строке 345: if not business_id)
+        invalid_product = TestDataFactory.create_product_with_empty_field("business_id")
 
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
+        # Пустая строка business_id возвращает MISSING_BUSINESS_ID
         assert result.error_code == "MISSING_BUSINESS_ID"
 
     def test_empty_title(self):
         """Тест пустого заголовка."""
-        invalid_product = {
-            "business_id": "test_product_1",
-            "title": "",  # пустой заголовок
-            "cover_image_url": "Qm123456789",
-            "species": "Amanita muscaria",
-            "organic_components": [
-                {
-                    "component_id": "amanita_muscaria",
-                    "description_cid": "Qm123456789",
-                    "proportion": "100%"
-                }
-            ]
-        }
+        # Используем TestDataFactory для создания продукта с пустым title
+        # Важно: forms должен присутствовать, чтобы валидатор дошел до проверки title
+        invalid_product = TestDataFactory.create_product_with_empty_field("title")
 
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
@@ -355,13 +327,9 @@ class TestProductValidator:
 
     def test_empty_organic_components(self):
         """Тест пустых органических компонентов."""
-        invalid_product = {
-            "business_id": "test_product_1",
-            "title": "Test Product",
-            "cover_image_url": "Qm123456789",
-            "species": "Amanita muscaria",
-            "organic_components": []  # пустой список
-        }
+        # Используем TestDataFactory для создания продукта с пустым массивом organic_components
+        # Важно: forms должен присутствовать, чтобы валидатор дошел до проверки organic_components
+        invalid_product = TestDataFactory.create_product_with_empty_field("organic_components")
 
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
@@ -369,19 +337,18 @@ class TestProductValidator:
 
     def test_invalid_component(self):
         """Тест невалидного компонента."""
-        invalid_product = {
-            "business_id": "test_product_1",
-            "title": "Test Product",
-            "cover_image_url": "Qm123456789",
-            "species": "Amanita muscaria",
-            "organic_components": [
+        # Используем TestDataFactory для создания продукта с пустым component_id
+        # Важно: forms должен присутствовать, чтобы валидатор дошел до проверки компонентов
+        # Удаляем description_cid (legacy поле)
+        invalid_product = TestDataFactory.create_valid_product(
+            organic_components=[
                 {
                     "component_id": "",  # пустой component_id
-                    "description_cid": "Qm123456789",
                     "proportion": "100%"
+                    # ✅ НЕТ description_cid (legacy поле удалено)
                 }
             ]
-        }
+        )
 
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
@@ -389,45 +356,29 @@ class TestProductValidator:
 
     def test_invalid_cover_image(self):
         """Тест невалидного изображения."""
-        invalid_product = {
-            "business_id": "test_product_1",
-            "title": "Test Product",
-            "cover_image_url": "invalid_cid",  # невалидный CID
-            "species": "Amanita muscaria",
-            "organic_components": [
-                {
-                    "component_id": "amanita_muscaria",
-                    "description_cid": "Qm123456789",
-                    "proportion": "100%"
-                }
-            ]
-        }
+        # Используем TestDataFactory для создания продукта с невалидным cover_image_url
+        # Удаляем description_cid (legacy поле)
+        invalid_product = TestDataFactory.create_valid_product(
+            cover_image_url="invalid_cid"  # невалидный CID
+        )
 
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
         assert result.field_name == "cover_image_url"
+        # CID валидатор возвращает INVALID_CID_PREFIX для CID, не начинающегося с 'Qm'
+        assert result.error_code in ["INVALID_CID_PREFIX", "INVALID_CID_FORMAT"]
 
     def test_invalid_price(self):
         """Тест невалидной цены."""
-        invalid_product = {
-            "business_id": "test_product_1",
-            "title": "Test Product",
-            "cover_image_url": "Qm123456789",
-            "species": "Amanita muscaria",
-            "organic_components": [
-                {
-                    "component_id": "amanita_muscaria",
-                    "description_cid": "Qm123456789",
-                    "proportion": "100%"
-                }
-            ],
-            "prices": [
-                {
-                    "price": -10,  # невалидная цена
-                    "currency": "EUR"
-                }
-            ]
-        }
+        # Используем TestDataFactory для создания валидного продукта
+        # Затем переопределяем prices с невалидной ценой
+        invalid_product = TestDataFactory.create_valid_product()
+        invalid_product["prices"] = [
+            {
+                "price": -10,  # невалидная цена (отрицательная)
+                "currency": "EUR"
+            }
+        ]
 
         result = self.validator.validate(invalid_product)
         assert not result.is_valid

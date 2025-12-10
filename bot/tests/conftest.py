@@ -256,21 +256,24 @@ def mock_blockchain_service(monkeypatch):
         def get_catalog_version(self):
             return 1
 
-        # Возвращает список из 9 фиктивных продуктов (структура ProductRegistry.Product)
+        # ✅ ИСПРАВЛЕНО: Возвращает список продуктов с 6-элементной структурой (новая версия контракта)
         def get_all_products(self):
             """
-            Возвращает список из 9 фиктивных продуктов (структура ProductRegistry.Product)
-            Убрали жестко закодированный продукт с ID 42 для динамического тестирования
+            Возвращает список продуктов (структура ProductRegistry.Product - 6 элементов)
+            Структура: (id, seller, businessId, componentIds, metadataCID, active)
+            ✅ ИСПРАВЛЕНО: Используем адрес текущего селлера для прохождения фильтрации по seller
             """
+            # ✅ ИСПРАВЛЕНО: Используем адрес текущего селлера (как в get_product) для прохождения фильтрации
+            seller_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
             return [
-                (1, "0x0000000000000000000000000000000000000001", "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG", False),
-                (2, "0x0000000000000000000000000000000000000002", "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1", False),
-                (3, "0x0000000000000000000000000000000000000003", "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B", False),
-                (4, "0x0000000000000000000000000000000000000004", "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz", False),
-                (5, "0x0000000000000000000000000000000000000005", "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy", False),
-                (6, "0x0000000000000000000000000000000000000006", "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd", False),
-                (7, "0x0000000000000000000000000000000000000007", "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa", False),
-                (8, "0x0000000000000000000000000000000000000008", "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S", False)
+                (1, seller_address, "amanita1", ["amanita_muscaria"], "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG", False),
+                (2, seller_address, "blue_lotus_tincture", ["blue_lotus"], "QmbTBHeByJwUP9JyTo2GcHzj1YwzVww6zXrEDFt3zgdwQ1", False),
+                (3, seller_address, "product_3", ["amanita_muscaria"], "QmUPHsHyuDHKyVbduvqoooAYShFCSfYgcnEioxNNqgZK2B", False),
+                (4, seller_address, "product_4", ["blue_lotus"], "Qmat1agJkdYK5uX8YZoJvQnQ3zzqSaavmzUEhpEfQHD4gz", False),
+                (5, seller_address, "product_5", ["amanita_muscaria"], "Qmbkp4owyjyjRuYGd7b1KfVjo5bBvCutgYdCi7qKd3ZPoy", False),
+                (6, seller_address, "product_6", ["blue_lotus"], "QmWwjNvD8HX6WB2TLsxiEhciMJCHRfiZBw9G2wgfqKyPbd", False),
+                (7, seller_address, "product_7", ["amanita_muscaria"], "QmbGrAqeugUxZZxWojavu4rbHdk5XNmSsSv92UV8FKjyHa", False),
+                (8, seller_address, "product_8", ["blue_lotus"], "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S", False)
                 # Убрали продукт с ID 42 - теперь он создается динамически в тестах
             ]
         
@@ -302,17 +305,37 @@ def mock_blockchain_service(monkeypatch):
             logger.info(f"   - product_statuses: {self.product_statuses}")
             logger.info(f"   - status для ID {product_id_int}: {status}")
             
+            # ✅ ИСПРАВЛЕНО: Возвращаем 6-элементный tuple (новая структура контракта)
+            # Структура: (id, seller, businessId, componentIds, metadataCID, active)
+            
             # Проверяем, существует ли продукт с таким ID
             if product_id_int in self.product_cids:
                 # Продукт был создан через create_product, возвращаем сохраненный CID
                 cid = self.product_cids[product_id_int]
-                logger.info(f"🔍 [MockBlockchainService] Получен продукт: ID={product_id_int}, CID={cid}, Status={status}")
-                return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", cid, status)
+                # Получаем business_id и componentIds из хранилища продуктов (если доступно)
+                business_id = f"product_{product_id_int}"  # Дефолтное значение
+                component_ids = ["amanita_muscaria"]  # Дефолтное значение
+                
+                # Если есть доступ к storage_service, пытаемся получить реальные данные
+                if hasattr(self, 'storage_service') and self.storage_service and cid:
+                    try:
+                        metadata = self.storage_service.download_json(cid)
+                        if metadata and isinstance(metadata, dict):
+                            business_id = metadata.get('business_id', business_id)
+                            # componentIds обычно берется из метаданных или используется дефолт
+                            if 'organic_components' in metadata:
+                                component_ids = [comp.get('component_id', 'amanita_muscaria') for comp in metadata.get('organic_components', [])]
+                                if not component_ids:
+                                    component_ids = ["amanita_muscaria"]
+                    except Exception as e:
+                        logger.warning(f"⚠️ [MockBlockchainService] Не удалось получить metadata для CID {cid}: {e}")
+                
+                logger.info(f"🔍 [MockBlockchainService] Получен продукт: ID={product_id_int}, businessId={business_id}, CID={cid}, Status={status}")
+                return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", business_id, component_ids, cid, status)
             else:
-                # 🔧 ИСПРАВЛЕНИЕ: Если продукт не найден в product_cids, 
-                # возвращаем None для CID
+                # Если продукт не найден в product_cids, возвращаем None для CID
                 logger.info(f"🔍 [MockBlockchainService] Продукт {product_id_int} не найден в product_cids, но статус: {status}")
-                return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", None, status)
+                return (product_id_int, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", f"product_{product_id_int}", [], None, status)
 
         # Имитация создания продукта в блокчейне. Сохраняет CID для синхронизации с MockIPFSStorage.
         async def create_product(self, ipfs_cid):
@@ -952,6 +975,117 @@ def mock_validation_service():
             return ValidationResult.success()
     
     return MockProductValidationService()
+
+
+@pytest.fixture(scope="function")
+def mock_localization_service():
+    """
+    Фикстура для создания мока LocalizationService.
+    
+    Используется в unit тестах для изоляции от реальных зависимостей.
+    Следует паттерну существующих фикстур (mock_blockchain_service, mock_storage_service).
+    
+    Returns:
+        MagicMock: Мок LocalizationService с базовой функциональностью для тестов.
+    """
+    from unittest.mock import MagicMock
+    from bot.services.common.localization_service import LocalizationService
+    
+    mock_service = MagicMock(spec=LocalizationService)
+    
+    # Базовые методы для локализации
+    mock_service.t = MagicMock(return_value="Mock Translation")
+    mock_service.get_translation = MagicMock(return_value="Mock Translation")
+    mock_service.get = MagicMock(return_value="Mock Value")
+    mock_service.get_localized_text = MagicMock(return_value="Mock Localized Text")
+    
+    # Методы для работы с языками
+    mock_service.lang = "ru"
+    mock_service.get_language = MagicMock(return_value="ru")
+    mock_service.set_language = MagicMock()
+    mock_service.switch_language = MagicMock()
+    
+    # Атрибуты для дочерних сервисов (используются в LocalizationService)
+    mock_service.product_localization = MagicMock()
+    mock_service.component_localization = MagicMock()
+    
+    return mock_service
+
+
+@pytest.fixture(scope="function")
+def mock_service_factory(mock_blockchain_service):
+    """
+    Фикстура для создания мока ServiceFactory.
+    
+    Использует существующую фикстуру mock_blockchain_service для изоляции.
+    Следует паттерну существующих фикстур (mock_blockchain_service, mock_storage_service).
+    
+    Args:
+        mock_blockchain_service: Существующая фикстура для мока BlockchainService
+    
+    Returns:
+        MockServiceFactory: Мок ServiceFactory с использованием mock_blockchain_service
+    
+    Note:
+        Эта фикстура опциональна. Альтернативный подход - мокировать
+        dependencies.get_localization_service() напрямую в тестах.
+    """
+    from unittest.mock import MagicMock
+    from bot.services.common.localization_service import LocalizationService
+    from bot.services.common.multilingual_ipfs_service import MultilingualIPFSService
+    from bot.services.common.translation_cache_service import TranslationCacheService
+    from bot.services.common.fallback_localization_service import FallbackLocalizationService
+    from bot.services.core.ipfs_factory import IPFSFactory
+    
+    class MockServiceFactory:
+        """
+        Мок ServiceFactory для unit тестов.
+        
+        Использует mock_blockchain_service вместо реального BlockchainService.
+        """
+        
+        def __init__(self, blockchain_service):
+            """Инициализация с моком BlockchainService"""
+            self.blockchain = blockchain_service
+        
+        def create_localization_service(self, lang: str = 'ru'):
+            """
+            Создает LocalizationService с моками вместо реальных зависимостей.
+            
+            Args:
+                lang: Язык локализации (по умолчанию 'ru')
+            
+            Returns:
+                MagicMock: Мок LocalizationService с базовой функциональностью
+            """
+            # Создаем моки для зависимостей
+            cache_service = MagicMock(spec=TranslationCacheService)
+            fallback_service = MagicMock(spec=FallbackLocalizationService)
+            ipfs_factory = MagicMock(spec=IPFSFactory)
+            
+            # Создаем мок MultilingualIPFSService
+            ipfs_service = MagicMock(spec=MultilingualIPFSService)
+            ipfs_service.blockchain_service = self.blockchain
+            
+            # Создаем мок LocalizationService (используем mock_localization_service паттерн)
+            localization_service = MagicMock(spec=LocalizationService)
+            localization_service.lang = lang
+            localization_service.t = MagicMock(return_value="Mock Translation")
+            localization_service.get_translation = MagicMock(return_value="Mock Translation")
+            localization_service.get = MagicMock(return_value="Mock Value")
+            localization_service.get_localized_text = MagicMock(return_value="Mock Localized Text")
+            localization_service.get_language = MagicMock(return_value=lang)
+            localization_service.set_language = MagicMock()
+            localization_service.switch_language = MagicMock()
+            localization_service.cache_service = cache_service
+            localization_service.fallback_service = fallback_service
+            localization_service.ipfs_service = ipfs_service
+            localization_service.product_localization = MagicMock()
+            localization_service.component_localization = MagicMock()
+            
+            return localization_service
+    
+    return MockServiceFactory(mock_blockchain_service)
 
 
 @pytest.fixture(scope="function")
@@ -1856,11 +1990,12 @@ def mock_ipfs_storage():
         async def download_json_async(self, cid):
             return self.download_json(cid)
         
-        # Асинхронная версия download_json для совместимости с ProductStorageService
-        async def download_json(self, cid):
+        # ✅ ИСПРАВЛЕНО: download_json должен быть синхронным для ProductStorageService
+        # (ProductStorageService.download_json() вызывает синхронный метод)
+        def download_json(self, cid):
             return self.download_json_sync(cid)
         
-        # Переименовываем старый метод для ясности
+        # Переименовываем старый метод для ясности (используется внутри)
         def download_json_sync(self, cid):
             if self.should_fail_download:
                 return None
@@ -1900,21 +2035,82 @@ def mock_ipfs_storage():
 
 @pytest.fixture(scope="function")
 def mock_registry_service(mock_blockchain_service, mock_ipfs_storage, mock_validation_service, mock_account_service):
-    """Полностью замоканный ProductRegistryService для unit-тестов"""
-    from bot.services.product.registry import ProductRegistryService
-    from unittest.mock import Mock, AsyncMock
-    from bot.model.product import Product
-    from bot.model.product import PriceInfo
+    """
+    Полностью замоканный ProductRegistryService для unit-тестов.
     
-    # Создаем сервис
-    service = ProductRegistryService(
+    Использует TestServiceFactory для создания сервиса с правильно замокированными зависимостями.
+    Все зависимости передаются явно, предотвращая создание реальных сервисов.
+    
+    ✅ ИСПРАВЛЕНО: Используем реальный ProductAssembler с моком ComponentService
+    для правильной сборки продуктов из метаданных.
+    """
+    from bot.tests.fixtures.service_factory import TestServiceFactory
+    from unittest.mock import Mock, AsyncMock
+    from bot.services.product.assembler import ProductAssembler
+    # ✅ ИСПРАВЛЕНО: Используем правильный импорт ComponentService (как в assembler)
+    # Проверяем через sys.path для работы с относительными импортами
+    import sys
+    import os
+    # Добавляем bot в path для корректного импорта
+    bot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'bot')
+    if bot_path not in sys.path:
+        sys.path.insert(0, bot_path)
+    
+    try:
+        from services.product.component_service import ComponentService
+    except ImportError:
+        # Fallback на bot.services если первый не работает
+        from bot.services.product.component_service import ComponentService
+    
+    # ✅ ИСПРАВЛЕНО: Создаем реальный ProductAssembler с моком ComponentService
+    # Это позволяет реально собирать продукты из метаданных, но без реальных обращений к компонентам
+    mock_component_service = Mock(spec=ComponentService)
+    mock_component_service.get_component_description = AsyncMock(return_value=None)  # Мокируем получение описаний
+    
+    # ✅ ИСПРАВЛЕНО: Настройка get_component_full для возврата реального OrganicComponent
+    # По аналогии с test_product_assembler.py (MockComponentService возвращает реальные объекты)
+    def mock_get_component_full(component_id: str):
+        """
+        Возвращает реальный OrganicComponent для тестов.
+        
+        Args:
+            component_id: ID компонента (например, "amanita_muscaria")
+        
+        Returns:
+            OrganicComponent: Реальный объект компонента для тестирования
+        """
+        if not component_id:
+            return None
+        
+        # Создаем реальный объект OrganicComponent (как в test_product_assembler.py, строки 35-40)
+        return OrganicComponent(
+            component_id=component_id,
+            blockchain_id=1,
+            creator="0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            active=True,
+            created_at=None,
+            scientific_title=f"Test {component_id}",
+            forms=[],
+            features={},  # features должен быть dict, не list
+            localizations={}
+        )
+    
+    mock_component_service.get_component_full = Mock(side_effect=mock_get_component_full)
+    
+    real_assembler = ProductAssembler(component_service=mock_component_service, validation_service=mock_validation_service)
+    
+    # Создаем сервис через TestServiceFactory с явной передачей всех зависимостей
+    # Передаем реальный assembler вместо мока
+    service = TestServiceFactory.create_product_registry_service(
         blockchain_service=mock_blockchain_service,
         storage_service=mock_ipfs_storage,
         validation_service=mock_validation_service,
-        account_service=mock_account_service
+        account_service=mock_account_service,
+        assembler=real_assembler  # ✅ Используем реальный assembler
     )
     
     # Мокаем cache_service чтобы избежать реальных обращений к IPFS
+    # (сохраняем для обратной совместимости с существующими тестами)
     mock_cache_service = Mock()
     mock_cache_service.get_description_by_cid.return_value = None
     mock_cache_service.get_image_url_by_cid.return_value = "https://mocked.ipfs/test.jpg"
@@ -1924,10 +2120,12 @@ def mock_registry_service(mock_blockchain_service, mock_ipfs_storage, mock_valid
     service.cache_service = mock_cache_service
     
     # Мокаем metadata_service чтобы избежать реальных обращений к IPFS
+    # (сохраняем для обратной совместимости с существующими тестами)
     mock_metadata_service = Mock()
     mock_metadata_service.process_metadata.return_value = None
     service.metadata_service = mock_metadata_service
     
+    logger.debug("✅ mock_registry_service создан через TestServiceFactory")
     return service
 
 
@@ -2860,16 +3058,12 @@ def mock_product_registry_service_with_failing_validation(mock_blockchain_servic
 def integration_storage_config():
     """Конфигурация storage для интеграционных тестов с детальным логированием для DevOps"""
     # 🔍 Детальное логирование переменных окружения для DevOps мониторинга
-    storage_type = os.getenv("INTEGRATION_STORAGE", "mock").lower()
+    storage_type = os.getenv("INTEGRATION_STORAGE", "arweave").lower()
     print(f"🔍 [DEVOPS] INTEGRATION_STORAGE={storage_type}")
     
     # 📊 Логирование доступности API ключей для диагностики
-    pinata_api_key = os.getenv("PINATA_API_KEY")
-    pinata_secret_key = os.getenv("PINATA_SECRET_KEY")
     arweave_private_key = os.getenv("ARWEAVE_PRIVATE_KEY")
     
-    print(f"🔍 [DEVOPS] PINATA_API_KEY: {'✅ Установлен' if pinata_api_key else '❌ Не установлен'}")
-    print(f"🔍 [DEVOPS] PINATA_SECRET_KEY: {'✅ Установлен' if pinata_secret_key else '❌ Не установлен'}")
     print("🔍 [DEVOPS] ARWEAVE_PRIVATE_KEY: ********")
     
     configs = {
@@ -2881,16 +3075,6 @@ def integration_storage_config():
                 "performance": "fast",
                 "cost": "free",
                 "api_calls": "none"
-            }
-        },
-        "pinata": {
-            "service": _get_real_pinata_storage(),
-            "description": "Реальный Pinata IPFS (медленно, тратит бюджет)",
-            "devops_info": {
-                "type": "real",
-                "performance": "slow",
-                "cost": "budget",
-                "api_calls": "pinata_api"
             }
         },
         "arweave": {
@@ -2928,25 +3112,6 @@ def _create_mock_storage():
     return mock_storage
 
 
-def _get_real_pinata_storage():
-    """Получение реального Pinata storage (с проверкой переменных окружения)"""
-    try:
-        from bot.services.core.storage.pinata import SecurePinataUploader
-        pinata_api_key = os.getenv("PINATA_API_KEY")
-        pinata_secret_key = os.getenv("PINATA_SECRET_KEY")
-        
-        if not pinata_api_key or not pinata_secret_key:
-            print("⚠️ [DEVOPS] PINATA_API_KEY или PINATA_SECRET_KEY не установлены, используем mock (fallback)")
-            return _create_mock_storage()
-        
-        print("✅ [DEVOPS] Используется реальный Pinata IPFS (API ключи валидны)")
-        return SecurePinataUploader()
-        
-    except Exception as e:
-        print(f"❌ [DEVOPS] Ошибка инициализации Pinata: {e}, используем mock (fallback)")
-        return _create_mock_storage()
-
-
 def _get_real_arweave_storage():
     """Получение реального Arweave storage (с проверкой переменных окружения)"""
     try:
@@ -2970,6 +3135,8 @@ def integration_registry_service_real_blockchain(integration_storage_config):
     """Интеграционный сервис с реальным блокчейном и настраиваемым storage"""
     from bot.dependencies import get_product_registry_service
     from bot.services.core.blockchain import BlockchainService
+    from bot.services.product.validation import ProductValidationService
+    from bot.services.core.account import AccountService
     
     # ✅ Блокчейн ВСЕГДА реальный в интеграционных тестах
     try:
@@ -2986,12 +3153,89 @@ def integration_registry_service_real_blockchain(integration_storage_config):
     registry_service = get_product_registry_service(
         blockchain_service=blockchain_service,      # ✅ ВСЕГДА реальный
         storage_service=storage_service,            # 🔧 Настраиваемый
-        validation_service=mock_validation_service(),
-        account_service=mock_account_service()
+        validation_service=ProductValidationService(),  # ✅ Реальный сервис
+        account_service=AccountService(blockchain_service)  # ✅ Реальный сервис
     )
     
     logger.info("✅ IntegrationRegistryService создан с реальным блокчейном")
     return registry_service
+
+
+@pytest.fixture(scope="function")
+def integration_registry_service_real_full():
+    """
+    Интеграционный сервис с ПОЛНОСТЬЮ реальными сервисами.
+    
+    Использует:
+    - ✅ Реальный BlockchainService (Hardhat node)
+    - ✅ Реальный ArWeaveUploader, обернутый в ProductStorageService (real Arweave)
+    - ✅ Реальный ProductValidationService
+    - ✅ Реальный AccountService
+    - ✅ Реальный ProductAssembler и ComponentService
+    
+    Требует:
+    - SELLER_PRIVATE_KEY в .env
+    - ARWEAVE_PRIVATE_KEY в .env
+    - Запущенный Hardhat node
+    
+    Эта фикстура предназначена для интеграционных тестов с реальными данными селлера.
+    """
+    from bot.dependencies import get_product_registry_service
+    from bot.services.core.blockchain import BlockchainService
+    from bot.services.product.validation import ProductValidationService
+    from bot.services.core.account import AccountService
+    from bot.services.core.storage.ar_weave import ArWeaveUploader
+    from bot.services.product.storage import ProductStorageService
+    import os
+    
+    # Проверка обязательных переменных окружения
+    seller_private_key = os.getenv("SELLER_PRIVATE_KEY")
+    arweave_private_key = os.getenv("ARWEAVE_PRIVATE_KEY")
+    
+    if not seller_private_key:
+        pytest.skip("⚠️ SELLER_PRIVATE_KEY не установлен в .env (требуется для интеграционных тестов)")
+    
+    if not arweave_private_key:
+        pytest.skip("⚠️ ARWEAVE_PRIVATE_KEY не установлен в .env (требуется для интеграционных тестов)")
+    
+    try:
+        # ✅ Реальный блокчейн
+        blockchain_service = BlockchainService()
+        if not blockchain_service.web3.is_connected():
+            pytest.skip("⚠️ Hardhat node недоступен (проверьте, что node запущен на localhost:8545)")
+        
+        logger.info("✅ BlockchainService инициализирован (реальный блокчейн)")
+        
+        # ✅ Реальный Arweave storage, обернутый в ProductStorageService
+        arweave_provider = ArWeaveUploader()
+        storage_service = ProductStorageService(storage_provider=arweave_provider)
+        logger.info("✅ ArWeaveUploader обернут в ProductStorageService (реальный Arweave)")
+        
+        # ✅ Реальный validation service
+        validation_service = ProductValidationService()
+        logger.info("✅ ProductValidationService инициализирован (реальный сервис)")
+        
+        # ✅ Реальный account service
+        account_service = AccountService(blockchain_service)
+        logger.info("✅ AccountService инициализирован (реальный сервис)")
+        
+        # Создаем ProductRegistryService через DI с полностью реальными сервисами
+        registry_service = get_product_registry_service(
+            blockchain_service=blockchain_service,      # ✅ Реальный
+            storage_service=storage_service,            # ✅ Реальный (ArWeaveUploader в ProductStorageService)
+            validation_service=validation_service,      # ✅ Реальный
+            account_service=account_service             # ✅ Реальный
+            # assembler создается автоматически с реальными зависимостями
+        )
+        
+        logger.info("✅ ProductRegistryService создан с ПОЛНОСТЬЮ реальными сервисами")
+        logger.info("🚀 Готов к интеграционному тестированию с реальными данными")
+        
+        return registry_service
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка инициализации реальных сервисов: {e}")
+        pytest.skip(f"Ошибка инициализации: {e}")
 
 
 @pytest.fixture(scope="function")
@@ -3009,6 +3253,82 @@ def seller_account():
     except Exception as e:
         logger.error(f"❌ Ошибка создания аккаунта продавца: {e}")
         pytest.skip(f"Ошибка создания аккаунта: {e}")
+
+
+@pytest.fixture(scope="function")
+def seller_address(request):
+    """
+    Фикстура для получения адреса селлера как строки.
+    
+    Источники адреса (в порядке приоритета):
+    1. SELLER_ADDRESS env var (если установлен)
+    2. seller_account.address (если seller_account доступен через SELLER_PRIVATE_KEY)
+    3. Создание Account из SELLER_PRIVATE_KEY напрямую (если доступен)
+    4. Hardcoded fallback для localhost: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+    
+    Returns:
+        str: Ethereum адрес селлера (lowercase, нормализованный)
+    
+    Использование:
+        def test_example(seller_address):
+            assert seller_address.startswith("0x")
+            assert seller_address == "0x70997970c51812dc3a010c7d01b50e0d17dc79c8"
+    """
+    import os
+    
+    # Получаем оба источника для проверки соответствия (если доступны)
+    seller_address_env = os.getenv("SELLER_ADDRESS")
+    seller_account_obj = None
+    account_address_from_fixture = None
+    
+    # Попытка получить seller_account fixture для проверки соответствия
+    try:
+        seller_account_obj = request.getfixturevalue('seller_account')
+        if seller_account_obj and hasattr(seller_account_obj, 'address'):
+            account_address_from_fixture = seller_account_obj.address.lower() if seller_account_obj.address else None
+    except (pytest.FixtureLookupError, Exception) as e:
+        # Фикстура seller_account недоступна - это нормально, продолжаем
+        logger.debug(f"ℹ️ seller_account fixture недоступна для проверки соответствия: {e}")
+    
+    # Проверка соответствия адресов (если оба источника доступны)
+    if seller_address_env and account_address_from_fixture:
+        seller_address_normalized = seller_address_env.lower()
+        if seller_address_normalized != account_address_from_fixture:
+            logger.warning(
+                f"⚠️ Несоответствие адресов: "
+                f"SELLER_ADDRESS={seller_address_env} != seller_account.address={account_address_from_fixture}. "
+                f"Используется SELLER_ADDRESS (приоритет 1)."
+            )
+    
+    # Приоритет 1: SELLER_ADDRESS env var
+    if seller_address_env:
+        normalized = seller_address_env.lower()
+        logger.info(f"✅ Seller address from SELLER_ADDRESS env: {normalized}")
+        return normalized
+    
+    # Приоритет 2: seller_account.address (если seller_account доступен)
+    if seller_account_obj and account_address_from_fixture:
+        logger.info(f"✅ Seller address from seller_account fixture: {account_address_from_fixture}")
+        return account_address_from_fixture
+    
+    # Приоритет 3: Создание Account из SELLER_PRIVATE_KEY напрямую
+    seller_private_key = os.getenv("SELLER_PRIVATE_KEY")
+    if seller_private_key:
+        try:
+            from eth_account import Account
+            account = Account.from_key(seller_private_key)
+            if account and hasattr(account, 'address'):
+                normalized = account.address.lower()
+                logger.info(f"✅ Seller address from SELLER_PRIVATE_KEY: {normalized}")
+                return normalized
+        except Exception as e:
+            logger.warning(f"⚠️ Не удалось создать Account из SELLER_PRIVATE_KEY: {e}")
+    
+    # Приоритет 4: Hardcoded fallback для localhost
+    fallback_address = "0x70997970c51812dc3a010c7d01b50e0d17dc79c8"
+    logger.info(f"⚠️ Seller address using hardcoded fallback (localhost): {fallback_address}")
+    logger.warning("💡 Рекомендуется установить SELLER_ADDRESS в .env для явности")
+    return fallback_address
 
 
 @pytest.fixture(scope="function")

@@ -2,11 +2,11 @@
 Мок-данные для тестирования онбординга
 """
 
-# Валидные инвайт-коды для тестирования
+# Валидные инвайт-коды для тестирования (формат: AMANITA-XXXX-XXXX)
 VALID_INVITE_CODES = [
-    "TEST12345678",  # Для теста успешной активации
-    "USED12345678",  # Для теста уже использованного кода
-    "FAKE12345678",  # Для теста несуществующего кода
+    "AMANITA-TEST-1234",  # Для теста успешной активации
+    "AMANITA-USED-5678",  # Для теста уже использованного кода
+    "AMANITA-FAKE-9012",  # Для теста несуществующего кода
 ]
 
 # Невалидные инвайт-коды для тестирования
@@ -17,9 +17,9 @@ INVALID_INVITE_CODES = [
     "12345678901 ",  # Содержит пробел
 ]
 
-# Мок-ответы от смарт-контракта
+# Мок-ответы от смарт-контракта (формат кодов: AMANITA-XXXX-XXXX)
 MOCK_CONTRACT_RESPONSES = {
-    "TEST12345678": {
+    "AMANITA-TEST-1234": {
         "success": True,
         "message": "Инвайт-код успешно активирован",
         "data": {
@@ -29,23 +29,23 @@ MOCK_CONTRACT_RESPONSES = {
             "expiry": 0
         }
     },
-    "USED12345678": {
+    "AMANITA-USED-5678": {
         "success": False,
         "message": "Инвайт-код уже использован",
         "error": "already_used"
     },
-    "FAKE12345678": {
+    "AMANITA-FAKE-9012": {
         "success": False,
         "message": "Инвайт-код не найден",
         "error": "not_found"
     }
 }
 
-# Тестовые сценарии
+# Тестовые сценарии (формат кодов: AMANITA-XXXX-XXXX для валидных)
 TEST_SCENARIOS = {
     "successful_activation": {
-        "code": "TEST12345678",
-        "expected_response": MOCK_CONTRACT_RESPONSES["TEST12345678"],
+        "code": "AMANITA-TEST-1234",
+        "expected_response": MOCK_CONTRACT_RESPONSES["AMANITA-TEST-1234"],
         "description": "Успешная активация валидного кода"
     },
     "invalid_format": {
@@ -58,13 +58,13 @@ TEST_SCENARIOS = {
         "description": "Попытка активации кода неверного формата"
     },
     "already_used": {
-        "code": "USED12345678",
-        "expected_response": MOCK_CONTRACT_RESPONSES["USED12345678"],
+        "code": "AMANITA-USED-5678",
+        "expected_response": MOCK_CONTRACT_RESPONSES["AMANITA-USED-5678"],
         "description": "Попытка активации уже использованного кода"
     },
     "not_found": {
-        "code": "FAKE12345678",
-        "expected_response": MOCK_CONTRACT_RESPONSES["FAKE12345678"],
+        "code": "AMANITA-FAKE-9012",
+        "expected_response": MOCK_CONTRACT_RESPONSES["AMANITA-FAKE-9012"],
         "description": "Попытка активации несуществующего кода"
     }
 } 

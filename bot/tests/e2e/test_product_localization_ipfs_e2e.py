@@ -66,6 +66,24 @@ class TestProductLocalizationIPFSE2E:
         logger.info("E2E TEST: Product Localization via IPFS/CID")
         logger.info("="*80)
         
+        # Импорт EnvironmentValidator для проверки окружения
+        from bot.tests.fixtures.env_validator import EnvironmentValidator
+        
+        # Проверка окружения: если не stub режим, проверяем Hardhat node
+        is_valid, error_message = EnvironmentValidator.validate_e2e_environment()
+        if not is_valid:
+            pytest.skip(f"⚠️ {error_message}")
+        
+        use_stubs = EnvironmentValidator.should_use_stubs()
+        if use_stubs:
+            logger.info("✅ E2E_USE_STUBS=true: stub режим активирован, Hardhat node не требуется")
+        else:
+            node_available, node_message = EnvironmentValidator.validate_hardhat_node()
+            if node_available:
+                logger.info(f"✅ Hardhat node доступен: {node_message}")
+            else:
+                pytest.skip(f"⚠️ Hardhat node недоступен: {node_message}. Установите E2E_USE_STUBS=true для stub режима.")
+        
         # Импорт функций из conftest (доступны как модуль через pytest)
         from tests.e2e.conftest import (
             create_product_ipfs_payload,
@@ -95,11 +113,11 @@ class TestProductLocalizationIPFSE2E:
         # 1.1: Профиль local активирован
         assert os.getenv("ENVIRONMENT") == "local", "Environment should be 'local'"
         assert os.getenv("ENABLE_CACHING") == "true", "Caching should be enabled"
-        assert os.getenv("E2E_USE_STUBS") == "true", "E2E_USE_STUBS should be 'true' for stub mode"
+        # E2E_USE_STUBS может быть true или false (проверено выше через EnvironmentValidator)
         logger.info("✅ 1.1: Local profile activated")
         logger.info(f"   ENVIRONMENT: {os.getenv('ENVIRONMENT')}")
         logger.info(f"   ENABLE_CACHING: {os.getenv('ENABLE_CACHING')}")
-        logger.info(f"   E2E_USE_STUBS: {os.getenv('E2E_USE_STUBS')}")
+        logger.info(f"   E2E_USE_STUBS: {os.getenv('E2E_USE_STUBS')} ({'stub mode' if use_stubs else 'real mode'})")
         
         # 1.2: TranslationCacheService инициализирован
         assert e2e_translation_cache_service is not None, "TranslationCacheService should be initialized"
@@ -121,7 +139,6 @@ class TestProductLocalizationIPFSE2E:
         assert ipfs_service is not None, "IPFS service should be available"
         
         # Проверка, что это stub (если E2E_USE_STUBS=true)
-        use_stubs = os.getenv("E2E_USE_STUBS") == "true"
         if use_stubs:
             assert hasattr(ipfs_service, 'download_calls'), "IPFS stub should have download_calls counter"
             assert hasattr(ipfs_service, 'upload_calls'), "IPFS stub should have upload_calls counter"

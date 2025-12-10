@@ -21,6 +21,9 @@ from typing import Dict, Any, Optional, Tuple
 # Import harness
 from .harness import E2EHarness
 
+# Import EnvironmentValidator for unified environment checks
+from bot.tests.fixtures.env_validator import EnvironmentValidator
+
 # Services imported lazily in fixtures to avoid singleton initialization issues
 
 logger = logging.getLogger(__name__)
@@ -106,39 +109,55 @@ async def e2e_harness():
     Scope: session (one instance for all E2E tests)
     
     Validates:
-    - Hardhat node running
+    - Environment requirements via EnvironmentValidator
+    - Hardhat node running (if not stub mode)
     - Contracts deployed
     - Prerequisites met
     
     Raises:
         pytest.skip: If prerequisites not met
     """
+    # Unified environment validation via EnvironmentValidator
+    is_valid, error_message = EnvironmentValidator.validate_e2e_environment()
+    
+    if not is_valid:
+        pytest.skip(f"⚠️ E2E environment validation failed: {error_message}\n"
+                   f"   See: bot/docs/QUICK-START.md for setup instructions")
+    
+    use_stubs = EnvironmentValidator.should_use_stubs()
+    
     harness = E2EHarness()
     
     try:
-        # Connect to node
-        await harness.connect_to_node()
-        
-        # Validate prerequisites
-        prerequisites = await harness.validate_prerequisites()
-        
-        # Check all prerequisites
-        if not all(prerequisites.values()):
-            failed = [k for k, v in prerequisites.items() if not v]
-            pytest.skip(f"⚠️ E2E prerequisites not met: {failed}\n"
-                       f"   See: bot/docs/QUICK-START.md for setup instructions")
-        
-        logger.info(f"✅ E2E Harness ready")
-        
-        yield harness
+        # If stub mode, skip node connection but still provide harness for compatibility
+        if use_stubs:
+            logger.info("✅ E2E Harness ready (stub mode - node connection skipped)")
+            yield harness
+        else:
+            # Connect to node (only if not stub mode)
+            await harness.connect_to_node()
+            
+            # Validate prerequisites
+            prerequisites = await harness.validate_prerequisites()
+            
+            # Check all prerequisites
+            if not all(prerequisites.values()):
+                failed = [k for k, v in prerequisites.items() if not v]
+                pytest.skip(f"⚠️ E2E prerequisites not met: {failed}\n"
+                           f"   See: bot/docs/QUICK-START.md for setup instructions")
+            
+            logger.info(f"✅ E2E Harness ready")
+            
+            yield harness
         
     except ConnectionError as e:
         pytest.skip(f"⚠️ Hardhat node not running: {e}\n"
                    f"   Run: npx hardhat node")
     
     finally:
-        # Cleanup
-        await harness.cleanup()
+        # Cleanup (only if connected)
+        if not use_stubs:
+            await harness.cleanup()
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -791,6 +810,10 @@ def create_minimal_product_metadata(product_id: str, component_ids: list, metada
             }
         ]
     
+    # Обязательное поле forms (массив)
+    if "forms" not in metadata:
+        metadata["forms"] = ["powder"]  # Значение по умолчанию
+    
     # Опциональные поля
     if categories:
         metadata["categories"] = categories
@@ -890,7 +913,7 @@ async def deserialize_product_from_metadata(
         
         # Шаг 4: Десериализуем через ProductAssembler
         logger.info(f"[deserialize_product_from_metadata] Calling ProductAssembler.assemble_product")
-        product = await product_assembler.assemble_product(blockchain_data, product_metadata)
+        product = await product_assembler.assemble_product(blockchain_data, product_metadata, language="ru")
         
         if product:
             logger.info(f"[deserialize_product_from_metadata] ✅ Product deserialized successfully: {product.business_id}")
