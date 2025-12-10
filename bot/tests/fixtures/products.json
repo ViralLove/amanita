@@ -1,14 +1,12 @@
 {
     "valid_products": [
         {
-            "id": "amanita1",
             "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Amanita muscaria — sliced caps and gills (1st grade)",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "100%"
+                    "proportion": "100%",
+                    "component_id": "amanita_muscaria"
                 }
             ],
             "categories": [
@@ -34,14 +32,12 @@
             "business_id": "amanita1"
         },
         {
-            "id": "blue_lotus_tincture",
             "cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
             "title": "Blue Lotus — Tinctura",
             "organic_components": [
                 {
-                    "biounit_id": "blue_lotus",
-                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
-                    "proportion": "100%"
+                    "proportion": "100%",
+                    "component_id": "blue_lotus"
                 }
             ],
             "categories": [
@@ -67,14 +63,12 @@
             "business_id": "blue_lotus_tincture"
         },
         {
-            "id": "amanita_multiple_forms",
             "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Amanita muscaria — Multiple Forms",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "100%"
+                    "proportion": "100%",
+                    "component_id": "amanita_muscaria"
                 }
             ],
             "categories": [
@@ -105,14 +99,12 @@
             "business_id": "amanita_multiple_forms"
         },
         {
-            "id": "sleep_formula_1",
             "cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
             "title": "Формула глубокого сна",
             "organic_components": [
                 {
-                    "biounit_id": "blue_lotus",
-                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
-                    "proportion": "50%"
+                    "proportion": "50%",
+                    "component_id": "blue_lotus"
                 }
             ],
             "categories": [
@@ -136,19 +128,16 @@
             "business_id": "sleep_formula_1"
         },
         {
-            "id": "focus_enhancer_1",
             "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Усилитель концентрации",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "70%"
+                    "proportion": "70%",
+                    "component_id": "amanita_muscaria"
                 },
                 {
-                    "biounit_id": "blue_lotus",
-                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
-                    "proportion": "30%"
+                    "proportion": "30%",
+                    "component_id": "blue_lotus"
                 }
             ],
             "categories": [
@@ -173,19 +162,16 @@
             "business_id": "focus_enhancer_1"
         },
         {
-            "id": "premium_blend_1",
             "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Премиум смесь для медитации",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "60%"
+                    "proportion": "60%",
+                    "component_id": "amanita_muscaria"
                 },
                 {
-                    "biounit_id": "blue_lotus",
-                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
-                    "proportion": "40%"
+                    "proportion": "40%",
+                    "component_id": "blue_lotus"
                 }
             ],
             "categories": [
@@ -217,14 +203,12 @@
             "business_id": "premium_blend_1"
         },
         {
-            "id": "stress_relief_1",
             "cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
             "title": "Антистресс формула",
             "organic_components": [
                 {
-                    "biounit_id": "blue_lotus",
-                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
-                    "proportion": "100%"
+                    "proportion": "100%",
+                    "component_id": "blue_lotus"
                 }
             ],
             "categories": [
@@ -248,19 +232,16 @@
             "business_id": "stress_relief_1"
         },
         {
-            "id": "energy_boost_1",
             "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Энергетический бустер",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "80%"
+                    "proportion": "80%",
+                    "component_id": "amanita_muscaria"
                 },
                 {
-                    "biounit_id": "blue_lotus",
-                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
-                    "proportion": "20%"
+                    "proportion": "20%",
+                    "component_id": "blue_lotus"
                 }
             ],
             "categories": [
@@ -285,19 +266,16 @@
             "business_id": "energy_boost_1"
         },
         {
-            "id": "wellness_complex_1",
             "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Комплексное оздоровление",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "50%"
+                    "proportion": "50%",
+                    "component_id": "amanita_muscaria"
                 },
                 {
-                    "biounit_id": "blue_lotus",
-                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
-                    "proportion": "50%"
+                    "proportion": "50%",
+                    "component_id": "blue_lotus"
                 }
             ],
             "categories": [
@@ -378,9 +356,8 @@
             "title": "Test Product",
             "organic_components": [
                 {
-                    "biounit_id": "test_component",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "100%"
+                    "proportion": "100%",
+                    "component_id": "test_component"
                 }
             ],
             "categories": [
@@ -407,9 +384,8 @@
             "title": "Test Product",
             "organic_components": [
                 {
-                    "biounit_id": "test_component",
-                    "description_cid": "invalid_cid",
-                    "proportion": "100%"
+                    "proportion": "100%",
+                    "component_id": "test_component"
                 }
             ],
             "categories": [
@@ -436,9 +412,8 @@
             "title": "Test Product",
             "organic_components": [
                 {
-                    "biounit_id": "test_component",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "100%"
+                    "proportion": "100%",
+                    "component_id": "test_component"
                 }
             ],
             "categories": [
@@ -465,9 +440,8 @@
             "title": "Test Product Invalid Proportion",
             "organic_components": [
                 {
-                    "biounit_id": "test_component",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "invalid_proportion"
+                    "proportion": "invalid_proportion",
+                    "component_id": "test_component"
                 }
             ],
             "categories": [
@@ -494,14 +468,12 @@
             "title": "Test Product Invalid Proportion Sum",
             "organic_components": [
                 {
-                    "biounit_id": "test_component_1",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "60%"
+                    "proportion": "60%",
+                    "component_id": "test_component_1"
                 },
                 {
-                    "biounit_id": "test_component_2",
-                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
-                    "proportion": "50%"
+                    "proportion": "50%",
+                    "component_id": "test_component_2"
                 }
             ],
             "categories": [
@@ -528,14 +500,12 @@
             "title": "Test Product Duplicate Biounit ID",
             "organic_components": [
                 {
-                    "biounit_id": "duplicate_id",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "50%"
+                    "proportion": "50%",
+                    "component_id": "duplicate_id"
                 },
                 {
-                    "biounit_id": "duplicate_id",
-                    "description_cid": "QmdmJFdMQXRpp3qNRTLYqsR1kFLYhTSRA8YMfd5JvNi85S",
-                    "proportion": "50%"
+                    "proportion": "50%",
+                    "component_id": "duplicate_id"
                 }
             ],
             "categories": [
@@ -559,14 +529,12 @@
     ],
     "test_scenarios": {
         "create_product_success": {
-            "id": "AMANITA1",
             "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Amanita muscaria — sliced caps and gills (1st grade)",
             "organic_components": [
                 {
-                    "biounit_id": "amanita_muscaria",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "100%"
+                    "proportion": "100%",
+                    "component_id": "amanita_muscaria"
                 }
             ],
             "categories": [
@@ -588,17 +556,16 @@
                     "price": "80",
                     "currency": "EUR"
                 }
-            ]
+            ],
+            "business_id": "AMANITA1"
         },
         "update_product_success": {
-            "id": "test_product_8",
             "cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "title": "Updated Product Title",
             "organic_components": [
                 {
-                    "biounit_id": "test_component_8",
-                    "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
-                    "proportion": "100%"
+                    "proportion": "100%",
+                    "component_id": "test_component_8"
                 }
             ],
             "categories": [
@@ -618,7 +585,8 @@
                     "price": "120",
                     "currency": "EUR"
                 }
-            ]
+            ],
+            "business_id": "test_product_8"
         },
         "update_product_status": {
             "product_id": 8,
