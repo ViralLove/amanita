@@ -1,6 +1,8 @@
 {
   "name": "hardhat-project",
   "scripts": {
+    "compile": "hardhat compile",
+    "compile:bot": "hardhat compile && bash scripts/sync_artifacts_to_bot.sh",
     "deploy:registry": "hardhat run scripts/deploy_full.js 0",
     "deploy:all": "hardhat run scripts/deploy_full.js 1",
     "deploy:contracts": "hardhat run scripts/deploy_full.js 2",

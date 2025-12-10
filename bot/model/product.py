@@ -560,45 +560,40 @@ class Product:
             if field not in data:
                 raise ValueError(f"Отсутствует обязательное поле '{field}'")
 
-        # Обратная совместимость: поддержка старого формата с description
-        if 'organic_components' in data:
-            # Новый формат с компонентами
-            logger.info(f"🔬 Используем новый формат с organic_components")
-            organic_components_data = data['organic_components']
-            if not isinstance(organic_components_data, list):
-                raise ValueError("organic_components должен быть списком")
-            
-            logger.info(f"🏗️ Создаем {len(organic_components_data)} OrganicComponent объектов...")
-            organic_components = []
-            for i, comp in enumerate(organic_components_data):
-                logger.info(f"  Создаем компонент {i+1}: {comp}")
-                try:
-                    component = OrganicComponent.from_dict(comp)
-                    organic_components.append(component)
-                    logger.info(f"  ✅ Компонент {i+1} создан успешно")
-                except Exception as e:
-                    logger.error(f"  ❌ Ошибка создания компонента {i+1}: {e}")
-                    raise
-        elif 'description' in data and 'description_cid' in data:
-            # Старый формат: создаем один компонент из description
-            logger.info(f"🔬 Используем старый формат с description")
-            organic_components = [OrganicComponent(
-                component_id=data.get('species', 'unknown'),
-                description_cid=data['description_cid'],
-                proportion='100%'
-            )]
-        else:
-            raise ValueError("Должны быть указаны либо organic_components, либо description + description_cid")
+        # Единый формат: требуется organic_components массив
+        if 'organic_components' not in data:
+            raise ValueError("Отсутствует обязательное поле 'organic_components'")
+        
+        organic_components_data = data['organic_components']
+        if not isinstance(organic_components_data, list):
+            raise ValueError("'organic_components' должен быть массивом")
+        
+        if len(organic_components_data) == 0:
+            raise ValueError("'organic_components' не может быть пустым массивом")
+        
+        logger.info(f"🔬 Используем единый формат с organic_components")
+        logger.info(f"🏗️ Создаем {len(organic_components_data)} OrganicComponent объектов...")
+        organic_components = []
+        for i, comp in enumerate(organic_components_data):
+            logger.info(f"  Создаем компонент {i+1}: {comp}")
+            try:
+                component = OrganicComponent.from_dict(comp)
+                organic_components.append(component)
+                logger.info(f"  ✅ Компонент {i+1} создан успешно")
+            except Exception as e:
+                logger.error(f"  ❌ Ошибка создания компонента {i+1}: {e}")
+                raise
 
         # Создаем объекты PriceInfo
         prices = [PriceInfo.from_dict(p) for p in data.get('prices', [])]
 
-        # Обратная совместимость: поддержка поля 'form' (единственное число)
-        if 'forms' in data:
-            forms_value = data.get('forms', [])
-        else:
-            single_form = data.get('form')
-            forms_value = [single_form] if single_form else []
+        # Единый формат: требуется forms массив
+        if 'forms' not in data:
+            raise ValueError("Отсутствует обязательное поле 'forms'")
+        
+        forms_value = data.get('forms', [])
+        if not isinstance(forms_value, list):
+            raise ValueError("'forms' должен быть массивом")
 
         return cls(
             business_id=data['business_id'],

@@ -79,10 +79,10 @@ class CatalogHandler(BaseCatalogHandler, ErrorHandlerMixin, LocalizationMixin, P
                 catalog_service = get_catalog_service()
                 self.logger.info(f"[{self.__class__.__name__}] Сервис каталога получен: {catalog_service is not None}")
                 
-                # Получаем каталог через сервис
-                self.logger.info(f"[{self.__class__.__name__}] Запрашиваем каталог через сервис для user_id {callback.from_user.id}")
-                products = await catalog_service.get_catalog_with_progress()
-                self.logger.info(f"[{self.__class__.__name__}] Каталог получен для user_id {callback.from_user.id}: {len(products) if products else 0} продуктов")
+                # Получаем каталог через сервис с учетом языка пользователя
+                self.logger.info(f"[{self.__class__.__name__}] Запрашиваем каталог через сервис для user_id {callback.from_user.id} (language={loc.language})")
+                products = await catalog_service.get_catalog_with_progress(loc.language)
+                self.logger.info(f"[{self.__class__.__name__}] Каталог получен для user_id {callback.from_user.id}: {len(products) if products else 0} продуктов (language={loc.language})")
                 
                 if not products:
                     # Каталог пуст

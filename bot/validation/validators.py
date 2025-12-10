@@ -330,7 +330,7 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
             )
         
         # Проверяем обязательные поля
-        required_fields = ['business_id', 'title', 'cover_image_url', 'species', 'organic_components']
+        required_fields = ['business_id', 'title', 'cover_image_url', 'species', 'organic_components', 'forms']
         for field in required_fields:
             if field not in value:
                 return ValidationResult.failure(
@@ -409,11 +409,29 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
                 error_code="EMPTY_ORGANIC_COMPONENTS"
             )
         
+        if not isinstance(organic_components, list):
+            return ValidationResult.failure(
+                "'organic_components' должен быть массивом",
+                field_name="organic_components",
+                field_value=organic_components,
+                error_code="INVALID_ORGANIC_COMPONENTS_TYPE"
+            )
+        
         # Валидируем каждый компонент
         for i, component in enumerate(organic_components):
             component_result = self._validate_component(component, i)
             if not component_result.is_valid:
                 return component_result
+        
+        # Валидируем forms массив
+        forms = value.get('forms', [])
+        if not isinstance(forms, list):
+            return ValidationResult.failure(
+                "'forms' должен быть массивом",
+                field_name="forms",
+                field_value=forms,
+                error_code="INVALID_FORMS_TYPE"
+            )
         
         # Валидируем изображение (cover_image_url или cover_image для обратной совместимости)
         cover_image_url = value.get('cover_image_url') or value.get('cover_image')
@@ -451,8 +469,8 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
                 error_code="INVALID_COMPONENT_TYPE"
             )
         
-        # Проверяем обязательные поля компонента
-        required_component_fields = ['component_id', 'description_cid', 'proportion']
+        # Проверяем обязательные поля компонента (без description_cid - legacy поле)
+        required_component_fields = ['component_id', 'proportion']
         for field in required_component_fields:
             if field not in component:
                 return ValidationResult.failure(
@@ -471,13 +489,6 @@ class ProductValidator(ValidationRule[Dict[str, Any]]):
                 field_value=component_id,
                 error_code="EMPTY_BIOUNIT_ID"
             )
-        
-        # Валидируем description_cid
-        description_cid = component.get('description_cid')
-        cid_result = self.cid_validator.validate(description_cid)
-        if not cid_result.is_valid:
-            cid_result.field_name = f"organic_components[{index}].description_cid"
-            return cid_result
         
         # Валидируем proportion
         proportion = component.get('proportion')

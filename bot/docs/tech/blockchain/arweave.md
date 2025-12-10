@@ -17,38 +17,45 @@ ArWeave - это децентрализованная сеть для посто
 
 ### **Основные компоненты:**
 
-#### **1. ArWeaveUploader**
-- **Назначение:** Основной класс для работы с ArWeave
-- **Функциональность:** Загрузка и скачивание файлов
-- **Аутентификация:** Через приватный ключ (JSON файл)
+#### **1. ArWeaveUploader (Python Bot)**
+- **Назначение:** Класс для работы с ArWeave **только на чтение**
+- **Функциональность:** Только скачивание файлов (чтение данных)
+- **Аутентификация:** Не требуется для чтения (публичные данные)
 
 #### **2. Поддерживаемые операции:**
-- `upload_text()` - загрузка текстовых данных (JSON) ⚠️ Требует SDK
-- `upload_file()` - загрузка файлов с автоматическим определением MIME типа ⚠️ Требует SDK
 - `download_json()` - скачивание JSON данных ✅ Работает
 - `download_file()` - скачивание файлов ✅ Работает
+- `get_public_url()` - формирование публичного URL ✅ Работает
+
+#### **3. Загрузка данных (Node.js)**
+- **Загрузка выполняется через:** `scripts/lib/services/ArweaveManager.js`
+- **Тип:** Node.js сервис с прямым использованием Arweave SDK
+- **Назначение:** Загрузка продуктов, компонентов и метаданных в Arweave
+- **Аутентификация:** Через приватный ключ ArWeave (RSA JSON)
+
+**⚠️ Важно:** Python бот **не выполняет загрузку** в Arweave. Все операции загрузки выполняются через Node.js скрипты в директории `scripts/`.
 
 ---
 
 ## 🔧 **ТЕКУЩЕЕ СОСТОЯНИЕ**
 
-### **✅ РАБОТАЕТ (80%):**
+### **✅ РАБОТАЕТ (100% чтения):**
 - **Скачивание данных** - `download_json()` и `download_file()`
 - **Обработка CID** - поддержка префиксов `ar://`
 - **Логирование** - детальное логирование операций
 - **Обработка ошибок** - try-catch с traceback
-- **Валидация ключей** - проверка RSA формата
-- **Start Transformation кванты** - тестирование информационных квантов
+- **Валидация идентификаторов** - проверка формата transaction ID
+- **HTTP запросы** - прямое чтение с `arweave.net` gateway
 
-### **❌ НЕ РАБОТАЕТ (20%):**
-- **Загрузка данных** - `upload_text()` и `upload_file()` возвращают ошибки
-- **ArWeave SDK** - не установлен, HTTP API не поддерживает загрузку
-- **Аутентификация** - кошелек не инициализируется для загрузки
+### **✅ ЗАГРУЗКА (Node.js):**
+- **Загрузка через Node.js:** `scripts/lib/services/ArweaveManager.js`
+- **Использует Arweave SDK:** Прямая интеграция с Arweave сетью
+- **Поддержка операций:** Загрузка текста, JSON, файлов
 
-### **🔧 ПРОБЛЕМЫ:**
-1. **HTTP API ограничения:** Простой HTTP API не поддерживает загрузку транзакций
-2. **SDK отсутствует:** ArWeave SDK не установлен
-3. **Загрузка:** Все методы загрузки возвращают ошибки 400 Bad Request
+### **⚠️ УСТАРЕВШЕЕ (Python):**
+- **Методы `upload_text()` и `upload_file()`:** Устарели, не используются
+- **Edge Function интеграция:** Больше не используется
+- **Supabase Edge Function:** Не требуется для работы с Arweave
 
 ---
 
@@ -56,14 +63,13 @@ ArWeave - это децентрализованная сеть для посто
 
 ```
 bot/services/core/storage/
-├── ar_weave.py          # Основной класс ArWeaveUploader
+├── ar_weave.py          # ArWeaveUploader (только чтение)
 └── __init__.py          # Инициализация модуля
 
-bot/tests/
-├── test_arweave.py      # Тесты ArWeave функциональности
-└── fixtures/            # Тестовые данные
+scripts/lib/services/
+└── ArweaveManager.js    # Загрузка в Arweave (Node.js)
 
-bot/docs/
+bot/docs/tech/blockchain/
 ├── arweave.md           # Документация (этот файл)
 └── arweave-TDD.md       # TDD план и результаты
 ```
@@ -97,16 +103,13 @@ ARWEAVE_PRIVATE_KEY=arweave-wallet.json
 
 ## 🚀 **ИСПОЛЬЗОВАНИЕ**
 
-### **Инициализация:**
+### **Чтение данных (Python Bot):**
 ```python
 from bot.services.core.storage.ar_weave import ArWeaveUploader
 
-# Создание экземпляра
+# Создание экземпляра (ключ не требуется для чтения)
 uploader = ArWeaveUploader()
-```
 
-### **Скачивание данных:**
-```python
 # Скачивание JSON
 data = uploader.download_json("arweave_transaction_id")
 print(data)
@@ -115,32 +118,33 @@ print(data)
 file_content = uploader.download_file("arweave_transaction_id")
 with open("downloaded_file.txt", "wb") as f:
     f.write(file_content)
+
+# Получение публичного URL
+url = uploader.get_public_url("arweave_transaction_id")
+print(url)  # https://arweave.net/{transaction_id}
+
+# Поддержка префикса ar://
+data = uploader.download_json("ar://arweave_transaction_id")
 ```
 
-### **Загрузка данных (требует SDK):**
-```python
-# Загрузка текста (возвращает ошибку без SDK)
-tx_id = uploader.upload_text('{"test": "data"}')
-print(tx_id)  # "arweave_upload_error"
+### **Загрузка данных (Node.js Scripts):**
+```javascript
+// scripts/lib/services/ArweaveManager.js
+const ArweaveManager = require('./lib/services/ArweaveManager');
 
-# Загрузка файла (возвращает ошибку без SDK)
-tx_id = uploader.upload_file("/path/to/file.txt")
-print(tx_id)  # "arweave_file_upload_error"
-```
+// Инициализация
+const arweaveManager = new ArweaveManager(config);
+await arweaveManager.initialize();
 
-### **Start Transformation кванты:**
-```python
-# Тестирование информационных квантов
-TRANSFORMATION = "88888888"
+// Загрузка JSON
+const result = await arweaveManager.uploadJSON(data, {
+    tags: { 'Content-Type': 'application/json' }
+});
 
-# Минимальная загрузка
-minimal_content = {
-    "transformation_id": TRANSFORMATION,
-    "type": "start_transformation",
-    "timestamp": "2024-01-01T00:00:00Z",
-    "data": "minimal_test_data"
-}
-tx_id = uploader.upload_text(str(minimal_content))
+// Загрузка файла
+const result = await arweaveManager.uploadFile(filePath, {
+    tags: { 'Content-Type': 'image/jpeg' }
+});
 ```
 
 ---
@@ -170,25 +174,24 @@ tx_id = uploader.upload_text(str(minimal_content))
 
 ---
 
-## 🚨 **ИЗВЕСТНЫЕ ПРОБЛЕМЫ**
+## 🚨 **ИЗВЕСТНЫЕ ОГРАНИЧЕНИЯ**
 
-### **1. ArWeave SDK:**
-- **Проблема:** SDK не установлен
-- **Симптомы:** HTTP API возвращает 400 Bad Request при загрузке
-- **Решение:** Установить ArWeave SDK
-- **Приоритет:** КРИТИЧЕСКИЙ
+### **1. Python Bot - только чтение:**
+- **Ограничение:** Python бот использует Arweave только для чтения
+- **Причина:** Загрузка требует Arweave SDK, который реализован в Node.js
+- **Решение:** Загрузка выполняется через `scripts/lib/services/ArweaveManager.js`
+- **Статус:** ✅ По дизайну
 
-### **2. HTTP API ограничения:**
-- **Проблема:** Простой HTTP API не поддерживает загрузку транзакций
-- **Симптомы:** 400 Bad Request при попытке загрузки
-- **Решение:** Использовать ArWeave SDK для загрузки
-- **Приоритет:** ВЫСОКИЙ
+### **2. HTTP API для чтения:**
+- **Ограничение:** Используется только HTTP GET для чтения
+- **Преимущество:** Не требует SDK, простое чтение с gateway
+- **Решение:** Прямые HTTP запросы к `arweave.net`
+- **Статус:** ✅ Работает
 
-### **3. Кошелек для загрузки:**
-- **Проблема:** Кошелек не инициализируется для загрузки
-- **Симптомы:** `self.wallet = None`
-- **Решение:** Установить SDK и инициализировать кошелек
-- **Приоритет:** СРЕДНИЙ
+### **3. Устаревшие методы загрузки:**
+- **Проблема:** Методы `upload_text()` и `upload_file()` в Python устарели
+- **Решение:** Использовать Node.js `ArweaveManager` для загрузки
+- **Статус:** ⚠️ Методы помечены как устаревшие
 
 ---
 
@@ -208,46 +211,29 @@ tx_id = uploader.upload_text(str(minimal_content))
 
 ## 🧪 **ТЕСТИРОВАНИЕ**
 
-### **Статистика тестов:**
-- **Всего тестов:** 10
-- **Успешно:** 8 (80%)
-- **Провалено:** 2 (20%)
+### **Python Bot тесты:**
+- **Тесты удалены:** `test_arweave.py` больше не используется
+- **Причина:** Тесты были связаны с устаревшей Edge Function интеграцией
+- **Текущее состояние:** Arweave используется только для чтения, тестирование через интеграционные тесты других сервисов
 
-### **Работающие тесты:**
-- ✅ `test_arweave_initialization`
-- ✅ `test_error_handling_invalid_cid`
-- ✅ `test_download_real_data`
-- ✅ `test_start_transformation_minimal_upload`
-- ✅ `test_start_transformation_json_upload`
-- ✅ `test_start_transformation_text_upload`
-- ✅ `test_start_transformation_metadata_upload`
-- ✅ `test_start_transformation_validation`
-
-### **Проваленные тесты:**
-- ❌ `test_upload_and_download_text` (HTTP API 400)
-- ❌ `test_download_with_ar_prefix` (зависит от загрузки)
+### **Node.js загрузка:**
+- **Тесты:** `scripts/tests/unit/services/ArweaveManager.test.js`
+- **Интеграция:** E2E тесты проверяют загрузку через Action 444 (компоненты)
 
 ---
 
 ## 🔮 **ПЛАН РАЗВИТИЯ**
 
-### **Краткосрочные цели:**
-1. **Установить ArWeave SDK** - критически важно
-2. **Восстановить загрузку данных** - использовать SDK
-3. **Активировать все тесты** - полное покрытие
-4. **Интегрировать с ProductRegistry** - замена Pinata
+### **Текущее состояние:**
+- ✅ Python бот использует Arweave для чтения (100% работает)
+- ✅ Node.js скрипты используют Arweave для загрузки (ArweaveManager)
+- ✅ Разделение ответственности: чтение (Python) / загрузка (Node.js)
 
-### **Среднесрочные цели:**
-1. **Добавить кэширование** - оптимизация скачивания
-2. **Реализовать batch загрузку** - производительность
-3. **Добавить метрики** - мониторинг
-4. **Оптимизировать производительность** - скорость
-
-### **Долгосрочные цели:**
-1. **Полная замена Pinata** - миграция
-2. **Интеграция с другими сервисами** - экосистема
-3. **Мониторинг и алерты** - надежность
-4. **Автоматическое резервное копирование** - безопасность
+### **Возможные улучшения:**
+1. **Кэширование для чтения** - оптимизация повторных запросов
+2. **Batch операции чтения** - производительность при множественных запросах
+3. **Метрики и мониторинг** - отслеживание использования Arweave
+4. **Обработка ошибок сети** - retry механизмы для чтения
 
 ---
 
@@ -302,12 +288,9 @@ tx_id = uploader.upload_text(str(minimal_content))
 - Храните резервную копию ключа в офлайн-хранилище
 
 ### **6. Проверка работоспособности**
-- После настройки переменных окружения запустите тесты:
-  ```bash
-  pytest tests/test_arweave.py -v
-  ```
-- Если тесты на скачивание проходят — интеграция работает
-- Для загрузки потребуется установить ArWeave SDK
+- **Python Bot (чтение):** Интеграция работает автоматически, ключ не требуется для чтения
+- **Node.js (загрузка):** Проверка через Action 444 (загрузка компонентов в Arweave)
+- Тесты Arweave удалены, так как функциональность проверяется через интеграционные тесты других сервисов
 
 ---
 
@@ -331,8 +314,8 @@ A: Проверьте путь в .env и права доступа к файл�
 **Q: Как восстановить доступ к кошельку?**
 A: Только по приватному ключу (JSON-файлу). Без него восстановление невозможно!
 
-**Q: Почему загрузка не работает?**
-A: Требуется установить ArWeave SDK. HTTP API не поддерживает прямую загрузку.
+**Q: Почему Python бот не загружает в Arweave?**
+A: По дизайну. Python бот использует Arweave только для чтения. Загрузка выполняется через Node.js скрипты (`scripts/lib/services/ArweaveManager.js`).
 
 **Q: Сколько стоит загрузка в ArWeave?**
 A: Примерно $0.50 за MB единоразово. Для тестов достаточно 0.05-0.1 AR. 

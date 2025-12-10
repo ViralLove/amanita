@@ -4,14 +4,13 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters.command import Command
 from services.common.localization import Localization
 from model.user_settings import UserSettings
-from services.core.blockchain import BlockchainService
+from services.product.registry_singleton import product_registry_service
 import logging
 
 router = Router()
 logger = logging.getLogger(__name__)
 
 user_settings = UserSettings()
-blockchain = BlockchainService()
 
 # Кнопки меню продавца
 def get_seller_menu_keyboard(loc):
@@ -39,8 +38,8 @@ async def handle_seller_products_list(callback: types.CallbackQuery, state: FSMC
     lang = user_settings.get_language(user_id)
     loc = Localization(lang)
 
-    # Заглушка: загружаем список товаров из блокчейна (пример)
-    products = blockchain.get_all_products()
+    # Загружаем список товаров через ProductRegistryService с учетом языка
+    products = await product_registry_service.get_all_products(loc.language)
 
     if not products:
         await callback.message.answer(loc.t("seller_menu.no_products"))

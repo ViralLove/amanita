@@ -59,6 +59,15 @@ module.exports = {
         }
       }
     },
+    // Ganache локальная сеть (Amanita application)
+    ganache: {
+      url: "http://127.0.0.1:7545",
+      chainId: 5777, // Chain ID из Ganache (eth_chainId возвращает 0x539 = 1337)
+      gasPrice: "auto",
+      // Используем ключи из .env (DEPLOYER_PRIVATE_KEY и SELLER_PRIVATE_KEY)
+      accounts: DEPLOYER_PRIVATE_KEY ? [`0x${DEPLOYER_PRIVATE_KEY.replace(/^0x/, '')}`] : undefined,
+      timeout: 60000
+    },
     // Тестовая сеть для upgrade scenarios
     upgradeTest: {
       url: "http://localhost:8546",

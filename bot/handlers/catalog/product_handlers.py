@@ -66,7 +66,7 @@ async def show_product_details(callback: CallbackQuery):
         )
         
         # Делегируем поиск продукта в сервис
-        product = await product_service.get_product_by_id(product_id)
+        product = await product_service.get_product_by_id(product_id, loc.language)
         
         # Удаляем сообщение о загрузке
         await loading_message.delete()
@@ -133,7 +133,7 @@ async def handle_show_product_details(self, callback: CallbackQuery) -> None:
             product_service = get_product_service()
             
             # Получаем продукт через сервис
-            product = await product_service.get_product_by_id(product_id)
+            product = await product_service.get_product_by_id(product_id, loc.language)
             
             if not product:
                 # Продукт не найден
