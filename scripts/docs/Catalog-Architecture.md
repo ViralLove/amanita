@@ -1508,7 +1508,7 @@ DEPLOY_ACTION=555 \
 npx hardhat run scripts/deploy_full.js --network localhost
 
 # Verify component exists
-node scripts/validate_component_upload.js \
+node scripts/validators/validate_component_upload.js \
   --component amanita_muscaria \
   --network localhost
 

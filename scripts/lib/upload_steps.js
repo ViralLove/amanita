@@ -10,6 +10,7 @@
 
 const utils = require('./upload_utils');
 const stateManager = require('./state_manager');
+const contractVerification = require('./contract_verification');
 
 // ====================================================================
 // 🔹 STEP 1: UPLOAD SIMPLE FIELDS
@@ -40,10 +41,29 @@ const stateManager = require('./state_manager');
 async function uploadSimpleFields(context, state, onProgress = null) {
   console.log("\n🔹 ШАГ 1: Загрузка Simple Fields");
   
-  // Проверяем, был ли шаг уже выполнен
-  if (stateManager.isStepCompleted(state, 'simple_fields_uploaded')) {
-    console.log("✅ Шаг уже выполнен, используем сохраненные данные");
-    return state.simple_fields;
+  // ✅ CHANGE (2025-12-02): Check arweave section for steps
+  const verification = await contractVerification.verifyStepCompletion({
+    state: state.arweave,  // ← Pass arweave section instead of full state
+    stepName: 'simple_fields_uploaded',
+    contractCheckFn: () => contractVerification.checkSimpleFieldsInContract(context)
+  });
+  
+  if (verification.isComplete && verification.isConsistent) {
+    console.log("✅ Шаг уже выполнен, данные подтверждены в контракте");
+    return verification.stateData;
+  }
+  
+  if (verification.isComplete && !verification.isConsistent) {
+    console.warn(`❌ НЕСООТВЕТСТВИЕ: State file говорит "загружено", но данных нет в контракте`);
+    console.warn(`   Отсутствующие поля: ${verification.missingItems.join(', ')}`);
+    console.warn(`   💡 Вероятная причина: Node был перезапущен, blockchain state сброшен`);
+    console.warn(`   🔧 Восстанавливаем из state в контракт...`);
+    
+    // Восстанавливаем отсутствующие поля из state в контракт
+    await restoreSimpleFieldsToContract(context, state, verification.missingItems);
+    
+    // Возвращаем данные из state (они теперь в контракте)
+    return verification.stateData;
   }
   
   const simpleFieldCIDs = {};
@@ -153,10 +173,10 @@ async function uploadSimpleFields(context, state, onProgress = null) {
       onProgress({ step: 'simple_fields', substep: 'dosage', progress: 100, status: 'completed' });
     }
     
-    // Сохраняем state
-    state.simple_fields = simpleFieldCIDs;
-    stateManager.markStepCompleted(state, 'simple_fields_uploaded');
-    stateManager.saveComponentState(context.componentDir, context.network, state);
+    // ✅ CHANGE (2025-12-02): Save to arweave section
+    state.arweave.simple_fields = simpleFieldCIDs;
+    stateManager.markStepCompleted(state.arweave, 'simple_fields_uploaded');
+    stateManager.saveComponentState(context.componentDir, state);
     
     console.log("\n✅ ШАГ 1 завершен: Simple Fields загружены");
     
@@ -189,10 +209,29 @@ async function uploadSimpleFields(context, state, onProgress = null) {
 async function uploadComplexFields(context, state, onProgress = null) {
   console.log("\n🔹 ШАГ 2: Загрузка Complex Fields");
   
-  // Проверяем, был ли шаг уже выполнен
-  if (stateManager.isStepCompleted(state, 'complex_fields_uploaded')) {
-    console.log("✅ Шаг уже выполнен, используем сохраненные данные");
-    return state.complex_fields;
+  // ✅ CHANGE (2025-12-02): Check arweave section for steps
+  const verification = await contractVerification.verifyStepCompletion({
+    state: state.arweave,  // ← Pass arweave section
+    stepName: 'complex_fields_uploaded',
+    contractCheckFn: () => contractVerification.checkComplexFieldsInContract(context)
+  });
+  
+  if (verification.isComplete && verification.isConsistent) {
+    console.log("✅ Шаг уже выполнен, данные подтверждены в контракте");
+    return verification.stateData;
+  }
+  
+  if (verification.isComplete && !verification.isConsistent) {
+    console.warn(`❌ НЕСООТВЕТСТВИЕ: State file говорит "загружено", но данных нет в контракте`);
+    console.warn(`   Отсутствующие языки: ${verification.missingItems.join(', ')}`);
+    console.warn(`   💡 Вероятная причина: Node был перезапущен, blockchain state сброшен`);
+    console.warn(`   🔧 Восстанавливаем из state в контракт...`);
+    
+    // Восстанавливаем отсутствующие языки из state в контракт
+    await restoreComplexFieldsToContract(context, state, verification.missingItems);
+    
+    // Возвращаем данные из state (они теперь в контракте)
+    return verification.stateData;
   }
   
   const complexFieldCIDs = {};
@@ -212,17 +251,41 @@ async function uploadComplexFields(context, state, onProgress = null) {
       const filePath = `complex_fields/${context.biounit_id}.ComponentDescription.${lang}.json`;
       
       try {
-        // Читаем файл описания для текущего языка
-        const descData = utils.readJSON(context.componentDir, filePath);
+        // ✅ OPTIMIZATION: Если данные уже в state (при повторной загрузке в контракт),
+        // используем существующий CID из state вместо повторной загрузки в Arweave
+        let descCID;
+        let descResult;
         
-        const filename = `${context.biounit_id}_ComponentDescription_${lang}.json`;
-        const descResult = await uploadToArweave(
-          context,
-          descData,
-          filename
-        );
+        // ✅ CHANGE (2025-12-02): Check arweave.complex_fields
+        const arweaveComplexFields = state.arweave?.complex_fields || state.complex_fields || {};
         
-        const descCID = descResult.txId || descResult;
+        if (arweaveComplexFields[lang]) {
+          const existingCID = typeof arweaveComplexFields[lang] === 'string' 
+            ? arweaveComplexFields[lang] 
+            : arweaveComplexFields[lang]?.cid;
+          
+          if (existingCID) {
+            console.log(`   ♻️ Используем существующий CID из state: ${existingCID.substring(0, 20)}...`);
+            descCID = existingCID;
+            descResult = {
+              txId: existingCID,
+              url: arweaveComplexFields[lang]?.url || `https://arweave.net/${existingCID}`,
+              size: arweaveComplexFields[lang]?.size || 0
+            };
+          } else {
+            // Нет CID в state - загружаем заново в Arweave
+            const descData = utils.readJSON(context.componentDir, filePath);
+            const filename = `${context.biounit_id}_ComponentDescription_${lang}.json`;
+            descResult = await uploadToArweave(context, descData, filename);
+            descCID = descResult.txId || descResult;
+          }
+        } else {
+          // Нет данных в state - загружаем заново в Arweave
+          const descData = utils.readJSON(context.componentDir, filePath);
+          const filename = `${context.biounit_id}_ComponentDescription_${lang}.json`;
+          descResult = await uploadToArweave(context, descData, filename);
+          descCID = descResult.txId || descResult;
+        }
         
         complexFieldCIDs[lang] = {
           cid: descCID,
@@ -279,10 +342,10 @@ async function uploadComplexFields(context, state, onProgress = null) {
     
     console.log(`\n📊 Обработано языков: ${processedCount} из ${languages.length}`);
     
-    // Сохраняем state
-    state.complex_fields = complexFieldCIDs;
-    stateManager.markStepCompleted(state, 'complex_fields_uploaded');
-    stateManager.saveComponentState(context.componentDir, context.network, state);
+    // ✅ CHANGE (2025-12-02): Save to arweave section
+    state.arweave.complex_fields = complexFieldCIDs;
+    stateManager.markStepCompleted(state.arweave, 'complex_fields_uploaded');
+    stateManager.saveComponentState(context.componentDir, state);
     
     console.log("\n✅ ШАГ 2 завершен: Complex Fields загружены");
     
@@ -308,10 +371,11 @@ async function uploadComplexFields(context, state, onProgress = null) {
 async function uploadShareableData(context, state, onProgress = null) {
   console.log("\n🔹 ШАГ 3: Загрузка глобальных словарей");
   
-  // Проверяем, был ли шаг уже выполнен в state
-  if (state.shareable_data && state.shareable_data.featuresCID) {
+  // ✅ CHANGE (2025-12-02): Check arweave section
+  const arweaveShareable = state.arweave?.shareable_data || state.shareable_data;
+  if (arweaveShareable && arweaveShareable.featuresCID) {
     console.log("✅ Шаг уже выполнен (state), используем сохраненные данные");
-    return state.shareable_data;
+    return arweaveShareable;
   }
   
   // Проверяем, загружены ли shareable data в контракт
@@ -323,7 +387,7 @@ async function uploadShareableData(context, state, onProgress = null) {
       console.log(`   → Features CID: ${existingData.features_cid}`);
       console.log(`   → Forms CID: ${existingData.component_forms_cid}`);
       
-      // Сохраняем в state для будущих запусков
+      // ✅ CHANGE (2025-12-02): Save to arweave section
       const shareableData = {
         featuresCID: existingData.features_cid,
         formsCID: existingData.component_forms_cid,
@@ -331,9 +395,9 @@ async function uploadShareableData(context, state, onProgress = null) {
         formsVersion: existingData.forms_version
       };
       
-      state.shareable_data = shareableData;
-      markStepCompleted(state, 'shareable_data_uploaded');
-      saveComponentState(context.componentDir, context.network, state);
+      state.arweave.shareable_data = shareableData;
+      stateManager.markStepCompleted(state.arweave, 'shareable_data_uploaded');
+      stateManager.saveComponentState(context.componentDir, state);
       
       return shareableData;
     }
@@ -414,14 +478,10 @@ async function uploadShareableData(context, state, onProgress = null) {
     
     const shareableData = { featuresCID, formsCID };
     
-    // Сохраняем state
-    state.shareable_data = shareableData;
-    
-    // Если есть метод markStepCompleted, используем его
-    if (typeof state.steps_completed !== 'undefined') {
-      stateManager.markStepCompleted(state, 'shareable_data_uploaded');
-      stateManager.saveComponentState(context.componentDir, context.network, state);
-    }
+    // ✅ CHANGE (2025-12-02): Save to arweave section
+    state.arweave.shareable_data = shareableData;
+    stateManager.markStepCompleted(state.arweave, 'shareable_data_uploaded');
+    stateManager.saveComponentState(context.componentDir, state);
     
     console.log("\n✅ ШАГ 3 завершен: Shareable Data загружены");
     
@@ -474,20 +534,20 @@ function updateRootMetadata(context, simpleFieldCIDs, complexFieldCIDs, state) {
     fs.writeFileSync(finalRootPath, JSON.stringify(finalRootData, null, 2), 'utf8');
     console.log(`💾 Финальный файл сохранен: ${finalFileName}`);
     
-    // 4. Сохраняем в state (сохраняем существующий CID если есть)
-    const existingCID = state.root_metadata && state.root_metadata.cid;
-    state.root_metadata = {
+    // ✅ CHANGE (2025-12-02): Save to arweave section
+    const existingCID = state.arweave?.root_metadata?.cid;
+    state.arweave.root_metadata = {
       path: finalFileName,
       data: finalRootData
     };
     
     // Сохраняем CID если он уже был (для повторных запусков)
     if (existingCID) {
-      state.root_metadata.cid = existingCID;
+      state.arweave.root_metadata.cid = existingCID;
       console.log(`📌 Сохранен существующий CID: ${existingCID}`);
     }
     
-    stateManager.saveComponentState(context.componentDir, context.network, state);
+    stateManager.saveComponentState(context.componentDir, state);
     
     console.log("\n✅ ШАГ 4 завершен: Root Metadata обновлен");
     
@@ -545,10 +605,11 @@ async function uploadRootMetadata(context, rootData, state, onProgress = null) {
       onProgress({ step: 'root_metadata', progress: 100, status: 'completed', cid: rootCID });
     }
     
-    // Сохраняем CID в state
-    state.root_metadata.cid = rootCID;
-    stateManager.markStepCompleted(state, 'root_metadata_uploaded');
-    stateManager.saveComponentState(context.componentDir, context.network, state);
+    // ✅ CHANGE (2025-12-02): Save to arweave section
+    state.arweave.root_metadata.cid = rootCID;
+    state.arweave.root_metadata.uploaded_at = new Date().toISOString();
+    stateManager.markStepCompleted(state.arweave, 'root_metadata_uploaded');
+    stateManager.saveComponentState(context.componentDir, state);
     
     console.log("\n✅ ШАГ 5 завершен: Root Metadata загружен в Arweave");
     
@@ -575,22 +636,72 @@ async function uploadRootMetadata(context, rootData, state, onProgress = null) {
 async function registerComponent(context, rootCID, state, onProgress = null) {
   console.log("\n🔹 ШАГ 6: Регистрация в OrganicComponentRegistry");
   
-  // ✅ REMOVED: No longer blindly trust state file
-  // Component existence is now verified in ComponentActions.js before calling this function
-  // If this function is called, registration MUST be performed
+  // ✅ CHANGE (2025-12-02): Multi-network support with deployments
+  // Check if component already registered on current network
+  
+  if (!state.deployments) {
+    state.deployments = {};
+  }
+  
+  const networkDeployment = state.deployments[context.network];
+  
+  if (networkDeployment) {
+    console.log(`ℹ️  Deployment для ${context.network} найден в state:`);
+    console.log(`   → Blockchain ID: ${networkDeployment.blockchain_id}`);
+    console.log(`   → TX Hash: ${networkDeployment.txHash}`);
+    console.log(`   → Registered at: ${networkDeployment.registered_at}`);
+    
+    // Проверяем что компонент действительно есть в контракте
+    try {
+      const componentExists = await context.contracts.organicComponentRegistry.componentExists(context.biounit_id);
+      
+      if (componentExists) {
+        const blockchainId = await context.contracts.organicComponentRegistry.businessIdToComponentId(context.biounit_id);
+        console.log(`✅ Подтверждено в контракте: componentExists() = TRUE`);
+        console.log(`   → Blockchain ID в контракте: ${blockchainId}`);
+        console.log(`   → Пропуск регистрации`);
+        
+        // Обновляем blockchain_id если отличается
+        if (networkDeployment.blockchain_id != blockchainId.toString()) {
+          console.log(`⚠️ Blockchain ID в state (${networkDeployment.blockchain_id}) != в контракте (${blockchainId})`);
+          console.log(`   → Обновляем state`);
+          state.deployments[context.network].blockchain_id = blockchainId.toString();
+          stateManager.saveComponentState(context.componentDir, state);
+        }
+        
+        return blockchainId.toString();
+      } else {
+        console.warn(`❌ НЕСООТВЕТСТВИЕ: State говорит "зарегистрирован", но componentExists() = FALSE`);
+        console.warn(`   💡 Вероятная причина: Node был перезапущен, blockchain state сброшен`);
+        console.warn(`   🔧 Выполняем регистрацию заново с сохранённым Arweave CID...`);
+      }
+    } catch (verifyError) {
+      console.error(`❌ Ошибка проверки контракта: ${verifyError.message}`);
+      console.warn(`   🔧 Fail-safe: Регистрируем заново...`);
+    }
+  } else {
+    console.log(`ℹ️  Deployment для ${context.network} НЕ найден в state, выполняем регистрацию...`);
+  }
   
   // В dry-run режиме не регистрируем в контракте
   if (context.dryRun) {
     console.log("🔷 [DRY-RUN] Пропускаем регистрацию в контракте");
-    const mockBlockchainId = 999;
+    const mockBlockchainId = Math.floor(Math.random() * 1000);
     
-    state.contract_registration = {
-      blockchain_id: mockBlockchainId,  // ✅ Числовой ID из контракта (не biounit_id!)
+    state.deployments[context.network] = {
+      blockchain_id: mockBlockchainId,
       txHash: "DRYRUN_TX_HASH",
+      blockNumber: "N/A",
+      registered_at: new Date().toISOString(),
       dry_run: true
     };
-    stateManager.markStepCompleted(state, 'component_registered');
-    stateManager.saveComponentState(context.componentDir, context.network, state);
+    
+    // Mark step completed in arweave section
+    if (!state.arweave.steps_completed.includes('component_registered')) {
+      state.arweave.steps_completed.push('component_registered');
+    }
+    
+    stateManager.saveComponentState(context.componentDir, state);
     
     console.log(`🔷 [DRY-RUN] Mock Blockchain ID: ${mockBlockchainId}`);
     console.log("\n✅ ШАГ 6 завершен (DRY-RUN)");
@@ -681,16 +792,24 @@ async function registerComponent(context, rootCID, state, onProgress = null) {
       onProgress({ step: 'register_component', progress: 100, status: 'completed', componentId });
     }
     
-    // Сохраняем в state
-    state.contract_registration = {
-      blockchain_id: componentId,  // ✅ Числовой ID из контракта (не biounit_id!)
+    // ✅ CHANGE (2025-12-02): Save to deployments[network]
+    state.deployments[context.network] = {
+      blockchain_id: componentId.toString(),
       txHash: receipt.hash,
-      blockNumber: receipt.blockNumber
+      blockNumber: receipt.blockNumber,
+      registered_at: new Date().toISOString()
     };
-    stateManager.markStepCompleted(state, 'component_registered');
-    stateManager.saveComponentState(context.componentDir, context.network, state);
+    
+    // Mark step completed in arweave section (only once, not per network)
+    if (!state.arweave.steps_completed.includes('component_registered')) {
+      state.arweave.steps_completed.push('component_registered');
+    }
+    
+    stateManager.saveComponentState(context.componentDir, state);
     
     console.log("\n✅ ШАГ 6 завершен: Компонент зарегистрирован в контракте");
+    console.log(`   → Network: ${context.network}`);
+    console.log(`   → Blockchain ID: ${componentId}`);
     
     return componentId;
     
@@ -860,6 +979,173 @@ async function uploadToArweave(context, data, filename, options = {}) {
 }
 
 // ====================================================================
+// 🔧 RESTORATION FUNCTIONS
+// ====================================================================
+
+/**
+ * Восстановить Simple Fields из state в контракт (без повторной загрузки в Arweave)
+ * 
+ * Используется для восстановления данных после перезапуска ноды, когда state файлы
+ * содержат CIDs, но контракт был развернут заново.
+ * 
+ * @param {Object} context - Upload context
+ * @param {Object} context.contracts - Contract instances
+ * @param {Object} context.contracts.amanitaInternational - AmanitaInternational contract
+ * @param {Object} context.seller - Seller account with signer
+ * @param {string} context.biounit_id - Component biounit_id (optional, not used for simple fields)
+ * @param {boolean} context.dryRun - Dry-run mode flag
+ * @param {boolean} context.arweaveOnly - Arweave-only mode flag
+ * @param {Object} state - Component state
+ * @param {Array<string>} missingFields - Список отсутствующих полей (['title', 'dosage'])
+ * @returns {Promise<Object>} Восстановленные CIDs { title?: string, dosage?: string }
+ */
+async function restoreSimpleFieldsToContract(context, state, missingFields) {
+  if (!context || !context.contracts || !context.contracts.amanitaInternational) {
+    throw new Error('Invalid context: contracts.amanitaInternational is required');
+  }
+  if (!context.seller || !context.seller.signer) {
+    throw new Error('Invalid context: seller.signer is required');
+  }
+  if (!state) {
+    throw new Error('State object is required');
+  }
+  if (!Array.isArray(missingFields)) {
+    throw new Error('missingFields must be an array');
+  }
+  
+  // В dry-run или arweave-only режиме не сохраняем в контракт
+  if (context.dryRun || context.arweaveOnly) {
+    console.log("🔷 [DRY-RUN/ARWEAVE_ONLY] Пропускаем восстановление в контракт");
+    return {};
+  }
+  
+  const amanitaIntl = context.contracts.amanitaInternational;
+  const signer = context.seller.signer;
+  const amanitaIntlWithSigner = amanitaIntl.connect(signer);
+  const restored = {};
+  
+  // ✅ FIX (2025-12-02): Get fields from arweave section (same pattern as restoreComplexFieldsToContract)
+  const simpleFields = state.arweave?.simple_fields || state.simple_fields || {};
+  
+  for (const field of missingFields) {
+    // Определяем ключ в state и поле контракта
+    const stateKey = field === 'title' ? 'title' : 'dosage_types';
+    const stateData = simpleFields[stateKey];
+    
+    if (!stateData || !stateData.cid) {
+      console.warn(`⚠️ CID для ${field} отсутствует в state, пропускаем восстановление`);
+      continue;
+    }
+    
+    const cid = stateData.cid;
+    const fieldKey = field === 'title' 
+      ? 'ComponentDescription.title' 
+      : 'DosageInstruction.description';
+    
+    try {
+      console.log(`🔧 Восстанавливаем ${fieldKey} из state в контракт...`);
+      const tx = await amanitaIntlWithSigner.setSimpleFieldCID(fieldKey, cid);
+      await tx.wait();
+      
+      // ✅ CRITICAL FIX: Wait for nonce synchronization to prevent race conditions
+      // Same pattern as registerComponent() and DeployActions - prevents "nonce has already been used"
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      restored[field] = cid;
+      console.log(`✅ ${fieldKey} восстановлен (CID: ${cid.substring(0, 20)}...)`);
+    } catch (error) {
+      console.error(`❌ Ошибка восстановления ${fieldKey}: ${error.message}`);
+      throw error;
+    }
+  }
+  
+  return restored;
+}
+
+/**
+ * Восстановить Complex Fields из state в контракт (без повторной загрузки в Arweave)
+ * 
+ * Используется для восстановления данных после перезапуска ноды, когда state файлы
+ * содержат CIDs, но контракт был развернут заново.
+ * 
+ * @param {Object} context - Upload context
+ * @param {Object} context.contracts - Contract instances
+ * @param {Object} context.contracts.amanitaInternational - AmanitaInternational contract
+ * @param {Object} context.seller - Seller account with signer
+ * @param {string} context.biounit_id - Component biounit_id (required)
+ * @param {boolean} context.dryRun - Dry-run mode flag
+ * @param {boolean} context.arweaveOnly - Arweave-only mode flag
+ * @param {Object} state - Component state
+ * @param {Array<string>} missingLanguages - Список отсутствующих языков
+ * @returns {Promise<Object>} Восстановленные CIDs по языкам { ru?: string, en?: string, ... }
+ */
+async function restoreComplexFieldsToContract(context, state, missingLanguages) {
+  if (!context || !context.contracts || !context.contracts.amanitaInternational) {
+    throw new Error('Invalid context: contracts.amanitaInternational is required');
+  }
+  if (!context.seller || !context.seller.signer) {
+    throw new Error('Invalid context: seller.signer is required');
+  }
+  if (!context.biounit_id) {
+    throw new Error('Invalid context: biounit_id is required');
+  }
+  if (!state) {
+    throw new Error('State object is required');
+  }
+  if (!Array.isArray(missingLanguages)) {
+    throw new Error('missingLanguages must be an array');
+  }
+  
+  // В dry-run или arweave-only режиме не сохраняем в контракт
+  if (context.dryRun || context.arweaveOnly) {
+    console.log("🔷 [DRY-RUN/ARWEAVE_ONLY] Пропускаем восстановление в контракт");
+    return {};
+  }
+  
+  const amanitaIntl = context.contracts.amanitaInternational;
+  const signer = context.seller.signer;
+  const amanitaIntlWithSigner = amanitaIntl.connect(signer);
+  const className = `ComponentDescription.${context.biounit_id}`;
+  const restored = {};
+  
+  // ✅ CHANGE (2025-12-02): Get fields from arweave section
+  const complexFields = state.arweave?.complex_fields || state.complex_fields || {};
+  
+  for (const lang of missingLanguages) {
+    const stateData = complexFields[lang];
+    if (!stateData) {
+      console.warn(`⚠️ CID для ${lang} отсутствует в state, пропускаем восстановление`);
+      continue;
+    }
+    
+    // Поддерживаем как строку, так и объект с cid
+    const cid = typeof stateData === 'string' ? stateData : stateData.cid;
+    if (!cid) {
+      console.warn(`⚠️ CID для ${lang} невалиден, пропускаем восстановление`);
+      continue;
+    }
+    
+    try {
+      console.log(`🔧 Восстанавливаем ${className}.${lang} из state в контракт...`);
+      const tx = await amanitaIntlWithSigner.setComplexFieldCID(className, lang, cid);
+      await tx.wait();
+      
+      // ✅ CRITICAL FIX: Wait for nonce synchronization to prevent race conditions
+      // Same pattern as registerComponent() and DeployActions - prevents "nonce has already been used"
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      restored[lang] = cid;
+      console.log(`✅ ${className}.${lang} восстановлен (CID: ${cid.substring(0, 20)}...)`);
+    } catch (error) {
+      console.error(`❌ Ошибка восстановления ${className}.${lang}: ${error.message}`);
+      throw error;
+    }
+  }
+  
+  return restored;
+}
+
+// ====================================================================
 // 🎯 EXPORTS
 // ====================================================================
 
@@ -870,6 +1156,8 @@ module.exports = {
   updateRootMetadata,
   uploadRootMetadata,
   registerComponent,
-  uploadToArweave
+  uploadToArweave,
+  restoreSimpleFieldsToContract,
+  restoreComplexFieldsToContract
 };
 

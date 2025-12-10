@@ -23,6 +23,19 @@ const fs = require('fs');
 const path = require('path');
 const { program } = require('commander');
 
+// Same pattern as config/index.js and validate_component_upload.js
+require('dotenv').config();
+
+// ====================================================================
+// 🔧 PROJECT ROOT CONFIGURATION
+// ====================================================================
+
+/**
+ * Project root directory (scripts/validators -> scripts -> project root)
+ * Used for resolving paths to data/, lib/, and other shared resources
+ */
+const PROJECT_ROOT = path.resolve(__dirname, '../..');
+
 // ====================================================================
 // 🔧 CONFIGURATION
 // ====================================================================
@@ -51,8 +64,8 @@ function buildContext(options) {
   const sellerId = options.seller || process.env.SELLER_BUSINESS_ID || 'iveta';
   const network = options.network || 'localhost';
   
-  // Auto-resolve paths based on seller ID
-  const sellerBasePath = path.join(__dirname, '..', 'data', 'sellers', sellerId);
+  // ✅ ИСПРАВЛЕНО: Используем PROJECT_ROOT для правильного пути к data/
+  const sellerBasePath = path.join(PROJECT_ROOT, 'data', 'sellers', sellerId);
   const csvFilename = `${sellerId.charAt(0).toUpperCase() + sellerId.slice(1)}_catalog.csv`;
   const csvPath = options.csv || path.join(sellerBasePath, 'catalog', csvFilename);
   const outputDir = path.join(sellerBasePath, 'output');
@@ -564,9 +577,9 @@ async function validatePhase2_ArweaveLayer(context) {
   try {
     // Try to load AmanitaInternational contract
     const { ethers } = require('hardhat');
-    const ContractManager = require('./lib/services/ContractManager');
-    const EthersUtils = require('./lib/utils/EthersUtils');
-    const config = require('./lib/config');
+    const ContractManager = require('../lib/services/ContractManager');
+    const EthersUtils = require('../lib/utils/EthersUtils');
+    const config = require('../lib/config');
     
     const rpcUrl = context.network === 'localhost' ? 'http://127.0.0.1:8545' : config.get('network.rpcUrl');
     const provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -669,9 +682,9 @@ async function validatePhase3_ContractLayer(context) {
   try {
     // Initialize contracts (same pattern as component validator and Phase 2)
     const { ethers } = require('hardhat');
-    const ContractManager = require('./lib/services/ContractManager');
-    const EthersUtils = require('./lib/utils/EthersUtils');
-    const config = require('./lib/config');
+    const ContractManager = require('../lib/services/ContractManager');
+    const EthersUtils = require('../lib/utils/EthersUtils');
+    const config = require('../lib/config');
     
     const rpcUrl = network === 'localhost' ? 'http://127.0.0.1:8545' : config.get('network.rpcUrl');
     const provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -1168,9 +1181,9 @@ async function validatePhase5_ComponentIntegration(context) {
   try {
     // Initialize contracts
     const { ethers } = require('hardhat');
-    const ContractManager = require('./lib/services/ContractManager');
-    const EthersUtils = require('./lib/utils/EthersUtils');
-    const config = require('./lib/config');
+    const ContractManager = require('../lib/services/ContractManager');
+    const EthersUtils = require('../lib/utils/EthersUtils');
+    const config = require('../lib/config');
     
     const rpcUrl = network === 'localhost' ? 'http://127.0.0.1:8545' : config.get('network.rpcUrl');
     const provider = new ethers.JsonRpcProvider(rpcUrl);

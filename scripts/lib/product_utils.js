@@ -90,13 +90,18 @@ async function getComponentIdFromContract(biounit_id, contractManager = null) {
   // Source 2: Fallback to _upload_state file (offline scenario or contract unavailable)
   try {
     const network = process.env.NETWORK || 'localhost';
-    const statePath = path.join(__dirname, '../../data/components', biounit_id, `_upload_state_${network}.json`);
+    // ✅ CHANGE (2025-12-02): Universal state filename
+    const statePath = path.join(__dirname, '../../data/components', biounit_id, `_upload_state.json`);
     
     if (fs.existsSync(statePath)) {
       const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-      if (state.contract_registration && state.contract_registration.componentId) {
-        const idStr = state.contract_registration.componentId.toString();
-        console.log(`   → Component ID from state file: ${idStr} (fallback source)`);
+      
+      // ✅ CHANGE (2025-12-02): Support new structure (deployments per network)
+      const deployment = state.deployments?.[network] || state.contract_registration;
+      
+      if (deployment && (deployment.componentId || deployment.blockchain_id)) {
+        const idStr = (deployment.componentId || deployment.blockchain_id).toString();
+        console.log(`   → Component ID from state file: ${idStr} (fallback source, network: ${network})`);
         return idStr;
       }
     }

@@ -437,8 +437,11 @@ class CatalogActions {
       
       // 3. Clear catalog
       logger.info('Sending clearSellerCatalog transaction...');
+      // ✅ FIX (2025-12-02): Increased gas limit for O(n²) _removeFromActiveProducts algorithm
+      // Each product removal requires loop through activeProductIds array
+      // For 17 products: ~1.1-1.2M gas needed (was failing with 1M)
       const tx = await productRegistryWithSigner.clearSellerCatalog(sellerAddress, {
-        gasLimit: this.config.get('network.name') === 'polygon' ? 2000000 : 1000000
+        gasLimit: 3000000  // Sufficient for up to ~50 products
       });
       
       logger.info(`Transaction sent: ${tx.hash}`);
@@ -679,23 +682,38 @@ class CatalogActions {
     logger.info('Checking if components are loaded...');
     
     try {
-      // 1. Check state files for uploaded components
-      const stateFile = path.join(
-        __dirname,
-        '..',
-        '..',
-        '..',
-        'data',
-        `_upload_state_${network}.json`
-      );
+      // 1. Check individual component state files in data/components/
+      const COMPONENTS_DIR = path.join(__dirname, '..', '..', '..', 'data', 'components');
       
-      logger.info(`Checking state file: ${path.basename(stateFile)}`);
+      logger.info(`Checking component state files in: ${COMPONENTS_DIR}`);
       
-      if (fs.existsSync(stateFile)) {
-        const stateData = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
-        if (stateData.components && Object.keys(stateData.components).length > 0) {
-          const componentCount = Object.keys(stateData.components).length;
-          logger.success(`✓ Found ${componentCount} components in state file`);
+      if (fs.existsSync(COMPONENTS_DIR)) {
+        const componentDirs = fs.readdirSync(COMPONENTS_DIR)
+          .filter(name => fs.statSync(path.join(COMPONENTS_DIR, name)).isDirectory());
+        
+        let loadedCount = 0;
+        
+        for (const componentId of componentDirs) {
+          // ✅ CHANGE (2025-12-02): Universal state filename
+          const componentStateFile = path.join(COMPONENTS_DIR, componentId, `_upload_state.json`);
+          
+          if (fs.existsSync(componentStateFile)) {
+            try {
+              const state = JSON.parse(fs.readFileSync(componentStateFile, 'utf8'));
+              
+              // Check if component fully uploaded (arweave steps completed)
+              const arweaveSteps = state.arweave?.steps_completed || state.steps_completed || [];
+              if (arweaveSteps.includes('component_registered')) {
+                loadedCount++;
+              }
+            } catch (e) {
+              // Skip invalid state files
+            }
+          }
+        }
+        
+        if (loadedCount > 0) {
+          logger.success(`✓ Found ${loadedCount} loaded components in individual state files`);
           return true;
         }
       }

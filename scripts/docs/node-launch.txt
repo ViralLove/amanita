@@ -21,15 +21,63 @@ lsof -ti:8545
 npx hardhat node
 
 # ========================================
+# 🔋 ANVIL ONLY: FUND DEPLOYER (if using Anvil instead of Hardhat node)
+# ========================================
+
+# ⚠️ SKIP THIS SECTION IF USING HARDHAT NODE (npx hardhat node)
+# ⚠️ ONLY FOR ANVIL USERS (anvil --port 8545)
+
+# Anvil doesn't include custom deployer (0x8F6251F6...) in pre-funded accounts.
+# Auto-funding доступен в тестах, но для manual deploy нужно профинансировать вручную:
+
+# Check deployer balance:
+cast balance 0x8F6251F6332A8e8479cD371e1bdA8102d2088d99 --rpc-url http://localhost:8545
+
+# If 0 ETH → fund deployer (100 ETH):
+cast rpc anvil_setBalance \
+  0x8F6251F6332A8e8479cD371e1bdA8102d2088d99 \
+  0x56BC75E2D63100000 \
+  --rpc-url http://localhost:8545
+
+# Alternative (if foundry not installed):
+curl -X POST http://localhost:8545 \
+  -H "Content-Type: application/json" \
+  --data '{
+    "jsonrpc":"2.0",
+    "method":"anvil_setBalance",
+    "params":["0x8F6251F6332A8e8479cD371e1bdA8102d2088d99","0x56BC75E2D63100000"],
+    "id":1
+  }'
+
+# Verify funding success:
+cast balance 0x8F6251F6332A8e8479cD371e1bdA8102d2088d99 --rpc-url http://localhost:8545
+# Expected: 100.0 ETH ✅
+
+# ⚠️ NOTE: 
+# - Repeat after каждого anvil restart (unless using --dump-state)
+# - For tests: auto-funding работает automatically (в conftest.py)
+# - For manual deploy: use commands above
+
+# ✅ ONCE FUNDED, PROCEED TO PREREQUISITES SECTION BELOW
+
+# ========================================
 # ⚠️ PREREQUISITES (ОБЯЗАТЕЛЬНО!)
 # ========================================
 
 # Убедитесь что .env содержит эти переменные:
 #
+# For Hardhat Node (default):
 # DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 # DEPLOYER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 # SELLER_PRIVATE_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 # SELLER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+#
+# For Anvil (alternative):
+# - Same accounts (Anvil uses same mnemonic as Hardhat)
+# - But need to fund deployer manually (see section above)
+#
+# ⚠️ NOTE: Current .env may have different deployer (0x8F6251F6...)
+#          That's OK - just ensure it's funded before deploy!
 #
 # Без этих переменных деплой ПРОВАЛИТСЯ на Шаге 3!
 
@@ -66,7 +114,7 @@ DEPLOY_ACTION=555 DEPLOYER_INVITE=<PASTE_INVITE_1_HERE> \
 npx hardhat run scripts/deploy_full.js --network localhost
 
 # Пример (НЕ КОПИРОВАТЬ, использовать свой invite!):
-DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-F9X1-13MD npx hardhat run scripts/deploy_full.js --network localhost
+DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-LGKZ-T8O8 npx hardhat run scripts/deploy_full.js --network localhost
 
 # ✓ ОЖИДАЕТСЯ В ЛОГАХ:
 #   → Seller активирован в SpiralEngine ✅
@@ -75,15 +123,18 @@ DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-F9X1-13MD npx hardhat run scripts/depl
 #   → Компоненты регистрируются с РЕАЛЬНЫМИ Arweave CID ✅
 
 # ✓ ВАЛИДАЦИЯ КОМПОНЕНТОВ (после Action 555):
-node scripts/validate_component_upload.js --component amanita_muscaria --network localhost
+node scripts/validators/validate_component_upload.js --component amanita_muscaria --network localhost
 # Или для всех компонентов:
 for comp in data/components/*; do 
-  [ -d "$comp" ] && node scripts/validate_component_upload.js --component $(basename $comp) --network localhost
+  [ -d "$comp" ] && node scripts/validators/validate_component_upload.js --component $(basename $comp) --network localhost
 done
 
 # 5.1 🔑 КРИТИЧЕСКИЙ ШАГ: Назначение ACTIVATOR_ROLE для seller
 # ⚠️ БЕЗ ЭТОГО ШАГА ОНБОРДИНГ НЕ РАБОТАЕТ!
 DEPLOY_ACTION=9 npx hardhat run scripts/deploy_full.js --network localhost
+
+# Очищение каталога
+DEPLOY_ACTION=6 npx hardhat run scripts/deploy_full.js --network localhost
 
 # ✓ ОЖИДАЕТСЯ В ЛОГАХ:
 #   → ACTIVATOR_ROLE назначена успешно ✅
@@ -99,9 +150,9 @@ DEPLOY_ACTION=13 npx hardhat run scripts/deploy_full.js --network localhost
 DEPLOY_ACTION=444 npx hardhat run scripts/deploy_full.js --network localhost
 
 # ✓ ВАЛИДАЦИЯ КАТАЛОГА (после Action 444):
-node scripts/validate_catalog_pipeline.js --seller iveta --network localhost
+node scripts/validators/validate_catalog_pipeline.js --seller iveta --network localhost
 # Или с полной проверкой Arweave CIDs:
-node scripts/validate_catalog_pipeline.js --seller iveta --network localhost --full-arweave-check
+node scripts/validators/validate_catalog_pipeline.js --seller iveta --network localhost --full-arweave-check
 
 # 6. Полная инициализация селлера + создание каталога
 DEPLOY_ACTION=888 DEPLOYER_INVITE=<PASTE_INVITE_2_HERE> \
@@ -199,7 +250,7 @@ cat bot/flowers/deployer_invites_localhost.txt  # → 12 инвайтов
 # 3. Компоненты загружены:
 # → Проверить в логах Action 555: "Component registered: <component_id>"
 # → Валидация:
-node scripts/validate_component_upload.js --component amanita_muscaria --network localhost
+node scripts/validators/validate_component_upload.js --component amanita_muscaria --network localhost
 # Ожидается: Quality Score >= 9.0/10
 
 # 4. Каталог создан:
@@ -221,7 +272,7 @@ bash scripts/validate_full_deployment.sh
 # Или по отдельности:
 
 # Валидация компонентов (single):
-node scripts/validate_component_upload.js \
+node scripts/validators/validate_component_upload.js \
   --component amanita_muscaria \
   --network localhost \
   --seller 0x70997970C51812dc3A010C7d01b50e0d17dc79C8

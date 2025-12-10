@@ -35,12 +35,28 @@ class EthersUtils {
   getSigner(privateKey = null) {
     const key = privateKey || this.config.get('deployer.privateKey');
     if (!key) {
+      logger.error('[ERROR] No private key available!');
+      logger.error('[ERROR] Sources checked:');
+      logger.error(`  - privateKey parameter: ${privateKey ? 'provided' : 'null'}`);
+      logger.error(`  - config.deployer.privateKey: ${this.config.get('deployer.privateKey') ? 'found' : 'undefined'}`);
+      logger.error('[ERROR] Set DEPLOYER_PRIVATE_KEY in .env');
       throw new Error('No private key available. Set DEPLOYER_PRIVATE_KEY in .env');
     }
     
-    // КРИТИЧНО: Всегда создаём НОВЫЙ Wallet instance!
-    // Это гарантирует что ethers.js запросит актуальный nonce из provider
-    return new ethers.Wallet(key, this.provider);
+    // 🔍 DEBUG: Log signer creation (without exposing full key)
+    logger.debug(`[DEBUG] Creating signer with private key: ${key.substring(0, 10)}...${key.substring(key.length - 4)}`);
+    
+    try {
+      // КРИТИЧНО: Всегда создаём НОВЫЙ Wallet instance!
+      // Это гарантирует что ethers.js запросит актуальный nonce из provider
+      const wallet = new ethers.Wallet(key, this.provider);
+      logger.debug(`[DEBUG] Signer created successfully. Address: ${wallet.address}`);
+      return wallet;
+    } catch (error) {
+      logger.error(`[ERROR] Failed to create signer from private key: ${error.message}`);
+      logger.error(`[ERROR] Private key format: ${key.substring(0, 10)}...${key.substring(key.length - 4)}`);
+      throw error;
+    }
   }
 
   /**

@@ -4,6 +4,12 @@
  * This file is executed before all tests to set up the global test environment.
  */
 
+// Configure Chai plugins
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+
+chai.use(chaiAsPromised);
+
 // Suppress console output during tests (optional)
 if (process.env.SUPPRESS_LOGS === 'true') {
   global.console = {

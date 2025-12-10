@@ -18,11 +18,12 @@ const path = require('path');
 /**
  * Загрузить state компонента из файла
  * @param {string} componentDir - Директория компонента
- * @param {string} network - Название сети
+ * @param {string} network - Название сети (опционально, для совместимости)
  * @returns {Object} State объект или новый state
  */
-function loadComponentState(componentDir, network) {
-  const stateFile = path.join(componentDir, `_upload_state_${network}.json`);
+function loadComponentState(componentDir, network = null) {
+  // ✅ CHANGE (2025-12-02): Universal filename without network suffix
+  const stateFile = path.join(componentDir, `_upload_state.json`);
   
   console.log(`💾 Загрузка component state: ${path.basename(componentDir)}`);
   
@@ -31,11 +32,17 @@ function loadComponentState(componentDir, network) {
       const stateData = fs.readFileSync(stateFile, 'utf8');
       const state = JSON.parse(stateData);
       
-      console.log(`✅ State загружен`);
-      console.log(`   → Шагов завершено: ${state.steps_completed.length}`);
+      console.log(`✅ State загружен: ${path.basename(stateFile)}`);
       
-      if (state.steps_completed.length > 0) {
-        console.log(`   → Последние: ${state.steps_completed.slice(-3).join(', ')}`);
+      // ✅ Support both old (flat) and new (multi-level) structure
+      const arweaveSteps = state.arweave?.steps_completed || state.steps_completed || [];
+      const deployments = state.deployments || {};
+      
+      console.log(`   → Arweave шагов: ${arweaveSteps.length}`);
+      console.log(`   → Deployments: ${Object.keys(deployments).join(', ') || 'none'}`);
+      
+      if (arweaveSteps.length > 0) {
+        console.log(`   → Последние шаги: ${arweaveSteps.slice(-3).join(', ')}`);
       }
       
       return state;
@@ -54,33 +61,39 @@ function loadComponentState(componentDir, network) {
 /**
  * Создать новый state для компонента
  * @param {string} componentDir - Директория компонента
- * @param {string} network - Название сети
+ * @param {string} network - Название сети (опционально, не используется в структуре)
  * @returns {Object} Новый state объект
  */
-function createComponentState(componentDir, network) {
+function createComponentState(componentDir, network = null) {
   const biounit_id = path.basename(componentDir);  // ✅ biounit_id - текстовое значение из имени директории
   
+  // ✅ CHANGE (2025-12-02): Multi-network structure
   return {
     biounit_id: biounit_id,  // ✅ biounit_id - текстовое значение (например "amanita_muscaria")
-    network: network,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    steps_completed: [],
-    simple_fields: {},
-    complex_fields: {},
-    shareable_data: {},
-    root_metadata: {},
-    contract_registration: {}
+    
+    // ✅ NEW: Arweave-specific data (network-agnostic, shared across all networks)
+    arweave: {
+      steps_completed: [],
+      simple_fields: {},
+      complex_fields: {},
+      shareable_data: {},
+      root_metadata: {}
+    },
+    
+    // ✅ NEW: Per-network deployment data
+    deployments: {}
   };
 }
 
 /**
  * Сохранить state компонента в файл
  * @param {string} componentDir - Директория компонента
- * @param {string} network - Название сети
  * @param {Object} state - State объект для сохранения
+ * @param {string} network - Название сети (опционально, не используется в имени файла)
  */
-function saveComponentState(componentDir, network, state) {
+function saveComponentState(componentDir, state, network = null) {
   console.log(`💾 Сохранение component state...`);
   
   try {
@@ -93,34 +106,58 @@ function saveComponentState(componentDir, network, state) {
       fs.mkdirSync(componentDir, { recursive: true });
     }
     
-    // Сохраняем state
-    const stateFile = path.join(componentDir, `_upload_state_${network}.json`);
+    // ✅ CHANGE (2025-12-02): Universal filename without network suffix
+    const stateFile = path.join(componentDir, `_upload_state.json`);
+    
     // BigInt replacer для JSON.stringify
     const replacer = (key, value) => 
         typeof value === 'bigint' ? value.toString() : value;
     fs.writeFileSync(stateFile, JSON.stringify(state, replacer, 2), 'utf8');
     
-    console.log(`✅ State сохранен`);
-    console.log(`   → Шагов завершено: ${state.steps_completed.length}`);
+    // ✅ Проверка успешности сохранения
+    if (!fs.existsSync(stateFile)) {
+      throw new Error(`State file was not created: ${stateFile}`);
+    }
+    
+    console.log(`✅ State сохранен: ${stateFile}`);
+    
+    // ✅ Support both old and new structure for logging
+    const arweaveSteps = state.arweave?.steps_completed?.length || state.steps_completed?.length || 0;
+    const deployments = Object.keys(state.deployments || {});
+    
+    console.log(`   → Arweave шагов: ${arweaveSteps}`);
+    console.log(`   → Deployments: ${deployments.join(', ') || 'none'}`);
     
   } catch (error) {
     console.error(`❌ Ошибка сохранения state:`, error.message);
+    console.error(`   → Путь: ${componentDir}/_upload_state.json`);
     throw error;
   }
 }
 
 /**
  * Проверить, был ли шаг уже выполнен
- * @param {Object} state - State объект
+ * @param {Object} state - State объект (может быть полный state или state.arweave)
  * @param {string} stepName - Название шага
  * @returns {boolean} true если шаг уже выполнен
  */
 function isStepCompleted(state, stepName) {
-  if (!state || !state.steps_completed) {
+  if (!state) {
     return false;
   }
   
-  return state.steps_completed.includes(stepName);
+  // ✅ CHANGE (2025-12-02): Support both old and new structure
+  // New structure: state.arweave.steps_completed
+  // Old structure: state.steps_completed
+  // Also support when state.arweave is passed directly
+  
+  const stepsArray = state.steps_completed;
+  
+  if (!stepsArray || !Array.isArray(stepsArray)) {
+    return false;
+  }
+  
+  return stepsArray.includes(stepName);
 }
 
 /**
@@ -132,22 +169,26 @@ function isStepCompleted(state, stepName) {
 function needsBlockchainRegistration(componentState, verbose = false) {
   const biounit_id = componentState.biounit_id || 'unknown';
   
+  // ✅ CHANGE (2025-12-02): Support both old and new structure
+  const arweaveSteps = componentState.arweave?.steps_completed || componentState.steps_completed || [];
+  const rootCid = componentState.arweave?.root_metadata?.cid || componentState.root_metadata?.cid;
+  
   if (verbose) {
     console.log(`\n🔍 Проверка needsBlockchainRegistration для ${biounit_id}:`);
-    console.log(`   → steps_completed:`, componentState.steps_completed);
-    console.log(`   → contract_registration:`, componentState.contract_registration);
-    console.log(`   → root_metadata.cid:`, componentState.root_metadata?.cid);
+    console.log(`   → arweave.steps_completed:`, arweaveSteps);
+    console.log(`   → deployments:`, Object.keys(componentState.deployments || {}));
+    console.log(`   → root_metadata.cid:`, rootCid);
   }
   
-  // Если шаг уже выполнен - не нужно
-  if (componentState.steps_completed.includes('component_registered')) {
-    if (verbose) console.log(`   ✅ Step 6 уже выполнен - SKIP`);
+  // Если шаг уже выполнен - не нужно (проверяем arweave секцию)
+  if (arweaveSteps.includes('component_registered')) {
+    if (verbose) console.log(`   ✅ Step 6 уже выполнен в arweave - SKIP`);
     return false;
   }
   
   // Если есть root metadata CID - можно регистрировать
-  if (componentState.root_metadata && componentState.root_metadata.cid) {
-    if (verbose) console.log(`   ✅ CID есть, contract_registered НЕТ - НУЖНА РЕГИСТРАЦИЯ!`);
+  if (rootCid) {
+    if (verbose) console.log(`   ✅ CID есть, component_registered НЕТ - НУЖНА РЕГИСТРАЦИЯ!`);
     return true;
   }
   
@@ -157,10 +198,18 @@ function needsBlockchainRegistration(componentState, verbose = false) {
 
 /**
  * Отметить шаг как выполненный
- * @param {Object} state - State объект
+ * @param {Object} state - State объект (может быть полный state.arweave или весь state)
  * @param {string} stepName - Название шага
  */
 function markStepCompleted(state, stepName) {
+  if (!state) {
+    console.error(`❌ Cannot mark step "${stepName}": state is null/undefined`);
+    return;
+  }
+  
+  // ✅ CHANGE (2025-12-02): Flexible - works with any object that has steps_completed
+  // Can be called with state.arweave or full state (for backward compatibility)
+  
   // Инициализируем массив если не существует
   if (!state.steps_completed) {
     state.steps_completed = [];
@@ -182,7 +231,8 @@ function markStepCompleted(state, stepName) {
  * @returns {Object} { completed, total, percentage }
  */
 function getComponentProgress(state, totalSteps = 6) {
-  const completed = state.steps_completed?.length || 0;
+  // ✅ CHANGE (2025-12-02): Support both old and new structure
+  const completed = state.arweave?.steps_completed?.length || state.steps_completed?.length || 0;
   const percentage = Math.round((completed / totalSteps) * 100);
   
   return {

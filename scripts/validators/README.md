@@ -11,24 +11,26 @@
 
 **Phases**:
 1. **CSV/FileSystem** (15% weight) - Проверка CSV файла и product JSON
-2. **Arweave Layer** (30% weight) - Проверка CID на Arweave
+2. **Arweave Layer** (25% weight) - Проверка CID на Arweave
 3. **Contract Layer** (35% weight) - Проверка регистрации в ProductRegistry
 4. **Consistency** (20% weight) - Сопоставление данных между слоями
-5. **Components** - Проверка зависимостей компонентов
+5. **Components** (5% weight) - Проверка зависимостей компонентов
 
 **Usage**:
 ```bash
-# Full validation
+# Quick validation (sampled - first 5 products only)
 node scripts/validators/validate_catalog_pipeline.js --seller iveta --network localhost
 
-# With full Arweave check (all CIDs)
+# Full validation (recommended for production)
 node scripts/validators/validate_catalog_pipeline.js --seller iveta --network localhost --full-arweave-check
 
 # JSON output for automation
 node scripts/validators/validate_catalog_pipeline.js --seller iveta --network localhost --json
 ```
 
-**Output**: Quality Score 0-10, PASS threshold >= 8.0
+**Output**: Quality Score 0-10, PASS threshold >= 7.0
+
+**📚 Detailed Audit**: See [Catalog Upload Validation Audit](../../docs/Catalog-Upload-Validation-Audit.md) for comprehensive analysis of validation honesty, scoring system, and known limitations.
 
 ---
 

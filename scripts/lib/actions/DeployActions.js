@@ -199,6 +199,12 @@ class DeployActions {
         isUUPS: true,
         registry: contracts.magicRegistry
       });
+      await waitForNonce();
+
+      // ⏱️ CRITICAL: Wait for nonce to settle after all deployments before setup
+      logger.info('⏱️ Waiting 1000ms for nonce to settle after all contract deployments...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      logger.info('✅ Nonce settled, proceeding with system connections setup...');
 
       // Setup all system connections (делегируем в SetupActions)
       await this.setupActions.setupSystemConnections(contracts);

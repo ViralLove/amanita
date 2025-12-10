@@ -92,7 +92,13 @@ class DeployRouter {
    */
   async initializeProvider() {
     try {
-      const rpcUrl = this.config.get('network.rpcUrl') || 'http://localhost:8545';
+      // Determine RPC URL: try RPC_URL, then WEB3_PROVIDER_URI, then use Hardhat network
+      const rpcUrl = process.env.RPC_URL || process.env.WEB3_PROVIDER_URI || 'http://localhost:8545';
+      this.logger.debug(`[DEBUG] RPC URL sources:`);
+      this.logger.debug(`  - RPC_URL: ${process.env.RPC_URL || 'undefined'}`);
+      this.logger.debug(`  - WEB3_PROVIDER_URI: ${process.env.WEB3_PROVIDER_URI || 'undefined'}`);
+      this.logger.debug(`  - Selected RPC URL: ${rpcUrl}`);
+      
       this.provider = new ethers.JsonRpcProvider(rpcUrl);
       
       // Test connection
@@ -101,6 +107,10 @@ class DeployRouter {
       
       this.logger.info(`Connected to network: ${network.chainId}`);
       this.logger.info(`Current block: ${blockNumber}`);
+      this.logger.debug(`[DEBUG] Network details:`);
+      this.logger.debug(`  - Chain ID: ${network.chainId}`);
+      this.logger.debug(`  - RPC URL: ${rpcUrl}`);
+      this.logger.debug(`  - Block number: ${blockNumber}`);
     } catch (error) {
       this.logger.error('Failed to initialize Provider:', error.message);
       throw error;
@@ -185,6 +195,14 @@ async function main(action) {
  * CLI interface
  */
 if (require.main === module) {
+  // 🔍 DEBUG: Set log level from environment
+  const logLevel = process.env.LOG_LEVEL || process.env.DEBUG ? 'debug' : 'info';
+  logger.setLevel(logLevel);
+  
+  if (logLevel === 'debug') {
+    logger.debug('[DEBUG] Debug logging enabled via LOG_LEVEL=debug or DEBUG environment variable');
+  }
+  
   const action = process.env.DEPLOY_ACTION ? parseInt(process.env.DEPLOY_ACTION) : null;
   
   if (!action) {

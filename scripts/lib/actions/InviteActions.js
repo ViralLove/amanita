@@ -752,8 +752,9 @@ class InviteActions {
     // Determine filename based on userAddress and suffix
     let fileName;
     if (userAddress === 'deployer' || !suffix) {
-      // Backward compatibility: deployer_invites_{network}.txt
-      fileName = `deployer_invites_${network}.txt`;
+      // Network-agnostic: deployer_invites.txt (no network suffix)
+      // Deployer invites универсальны (можно использовать на любой сети)
+      fileName = `deployer_invites.txt`;
     } else {
       // New format: {address}_invites_{suffix}.txt
       fileName = `${userAddress}_invites_${suffix}.txt`;

@@ -102,6 +102,13 @@ class SetupActions {
   async setupSystemConnections(contracts = null) {
     logger.info("Setting up all system connections...");
     
+    // Helper: Wait for nonce update between setup operations
+    const waitForNonce = async (ms = 1000) => {
+      logger.info(`⏱️ Waiting ${ms}ms for nonce update...`);
+      await new Promise(resolve => setTimeout(resolve, ms));
+      logger.info('✅ Nonce settled, proceeding...');
+    };
+    
     try {
       // Если контракты не переданы, загружаем через MagicRegistry
       if (!contracts) {
@@ -110,12 +117,15 @@ class SetupActions {
       
       // 1. Setup SBT ecosystem connections
       await this.setupSBTEcosystem(contracts);
+      await waitForNonce();
       
       // 2. Setup OrganicComponentRegistry connections
       await this.setupOrganicComponentRegistry(contracts);
+      await waitForNonce();
       
       // 3. Setup ProductRegistry connections (depends on OrganicComponentRegistry)
       await this.setupProductRegistry(contracts);
+      await waitForNonce();
       
       // 4. Setup AmanitaInternational connections (depends on SpiralEngine)
       await this.setupAmanitaInternational(contracts);
@@ -217,6 +227,13 @@ class SetupActions {
       return;
     }
     
+    // Helper: Wait for nonce update between transactions
+    const waitForNonce = async (ms = 1000) => {
+      logger.info(`⏱️ Waiting ${ms}ms for nonce update...`);
+      await new Promise(resolve => setTimeout(resolve, ms));
+      logger.info('✅ Nonce settled, proceeding...');
+    };
+    
     try {
       const signer = this.ethersUtils.getSigner();
       
@@ -227,6 +244,7 @@ class SetupActions {
       const soulboundCoreWithSigner = soulboundCore.connect(signer);
       const tx1 = await soulboundCoreWithSigner.setMetadataContract(await soulMetadata.getAddress());
       await tx1.wait();
+      await waitForNonce();
       
       // 2. Connect SoulRecovery to SoulboundCore
       console.log("--------------------------------------------------");
@@ -234,6 +252,7 @@ class SetupActions {
       console.log("--------------------------------------------------");
       const tx2 = await soulboundCoreWithSigner.setRecoveryContract(await soulRecovery.getAddress());
       await tx2.wait();
+      await waitForNonce();
       
       // 3. Connect SoulIntegration to SoulboundCore
       console.log("--------------------------------------------------");
@@ -241,6 +260,7 @@ class SetupActions {
       console.log("--------------------------------------------------");
       const tx3 = await soulboundCoreWithSigner.setIntegrationContract(await soulIntegration.getAddress());
       await tx3.wait();
+      await waitForNonce();
       
       // 4. Connect SoulIdentity to SpiralEngine
       console.log("--------------------------------------------------");

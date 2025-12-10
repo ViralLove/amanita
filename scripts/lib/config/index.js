@@ -82,7 +82,8 @@ const config = {
   // Network
   network: {
     name: validatedEnv.NETWORK,
-    rpcUrl: validatedEnv.RPC_URL
+    // Support both RPC_URL and WEB3_PROVIDER_URI for compatibility
+    rpcUrl: validatedEnv.RPC_URL || validatedEnv.WEB3_PROVIDER_URI
   },
   
   // Arweave configuration (with comprehensive fallbacks)

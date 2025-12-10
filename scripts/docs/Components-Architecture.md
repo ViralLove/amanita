@@ -703,18 +703,18 @@ Example:
 
 ```bash
 # Single component validation
-node scripts/validate_component_upload.js \
+node scripts/validators/validate_component_upload.js \
   --component amanita_muscaria \
   --network localhost
 
 # With JSON output
-node scripts/validate_component_upload.js \
+node scripts/validators/validate_component_upload.js \
   --component blue_lotus \
   --network localhost \
   --json
 
 # Custom seller (override .env)
-node scripts/validate_component_upload.js \
+node scripts/validators/validate_component_upload.js \
   --component lions_mane \
   --network localhost \
   --seller 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
@@ -979,7 +979,7 @@ UPLOAD_SHAREABLE=true \
 npx hardhat run scripts/deploy_full.js --network localhost
 
 # 3. Validate component
-node scripts/validate_component_upload.js \
+node scripts/validators/validate_component_upload.js \
   --component amanita_muscaria \
   --network localhost
 ```
@@ -993,7 +993,7 @@ UPLOAD_SHAREABLE=false \
 npx hardhat run scripts/deploy_full.js --network localhost
 
 # Validate
-node scripts/validate_component_upload.js \
+node scripts/validators/validate_component_upload.js \
   --component blue_lotus \
   --network localhost
 ```
@@ -1007,7 +1007,7 @@ for comp in data/components/*/; do
   [[ "$component" == "component_features_presets.json" ]] && continue
   
   echo "=== Validating: $component ==="
-  node scripts/validate_component_upload.js \
+  node scripts/validators/validate_component_upload.js \
     --component "$component" \
     --network localhost \
     | grep -E "Quality Score|Action 444"
@@ -1069,7 +1069,7 @@ cat data/components/your_component/state.your_component.localhost.json
 DEPLOY_ACTION=555 npx hardhat run scripts/deploy_full.js --network localhost
 
 # Validate again
-node scripts/validate_component_upload.js --component your_component --network localhost
+node scripts/validators/validate_component_upload.js --component your_component --network localhost
 ```
 
 ### **Issue 2: CIDs Not Accessible on Arweave**
@@ -1088,7 +1088,7 @@ node scripts/validate_component_upload.js --component your_component --network l
 sleep 600
 
 # 2. Retry validation
-node scripts/validate_component_upload.js --component your_component --network localhost
+node scripts/validators/validate_component_upload.js --component your_component --network localhost
 
 # 3. If still failing, check CID manually
 curl https://arweave.net/YOUR_CID
@@ -1117,7 +1117,7 @@ cp data/components/your_component/state.your_component.localhost.json \
 rm data/components/your_component/state.your_component.localhost.json
 
 # 3. Re-run validation (will rebuild state from contract)
-node scripts/validate_component_upload.js --component your_component --network localhost
+node scripts/validators/validate_component_upload.js --component your_component --network localhost
 ```
 
 ### **Issue 4: Missing Language Files**

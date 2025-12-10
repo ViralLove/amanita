@@ -85,12 +85,40 @@ class ContractManager {
       // Legacy section separator
       logger.legacySection(contractName);
       
+      // 🔍 DEBUG: Check private key source
+      const privateKeyFromOptions = deployOptions.privateKey;
+      const privateKeyFromConfig = this.config.get('deployer.privateKey');
+      logger.debug(`[DEBUG] Private key sources for ${contractName}:`);
+      logger.debug(`  - deployOptions.privateKey: ${privateKeyFromOptions ? `${privateKeyFromOptions.substring(0, 10)}...` : 'undefined'}`);
+      logger.debug(`  - config.deployer.privateKey: ${privateKeyFromConfig ? `${privateKeyFromConfig.substring(0, 10)}...` : 'undefined'}`);
+      
       const artifact = this.loadContractArtifact(contractName);
       const signer = this.ethersUtils.getSigner(deployOptions.privateKey);
+      const deployerAddress = await signer.getAddress();
+      
+      // 🔍 DEBUG: Detailed deployer information
+      logger.debug(`[DEBUG] Deployer information for ${contractName}:`);
+      logger.debug(`  - Deployer address: ${deployerAddress}`);
+      logger.debug(`  - Private key used: ${(privateKeyFromOptions || privateKeyFromConfig || 'FALLBACK').substring(0, 10)}...`);
       
       // Get balance before deployment
-      const balanceBefore = await this.ethersUtils.provider.getBalance(await signer.getAddress());
+      const balanceBefore = await this.ethersUtils.provider.getBalance(deployerAddress);
       const balanceBeforeETH = ethers.formatEther(balanceBefore);
+      
+      // 🔍 DEBUG: Balance and network info
+      logger.debug(`[DEBUG] Balance and network check for ${contractName}:`);
+      logger.debug(`  - Deployer address: ${deployerAddress}`);
+      logger.debug(`  - Balance: ${balanceBeforeETH} ETH (${balanceBefore.toString()} wei)`);
+      const network = await this.ethersUtils.provider.getNetwork();
+      logger.debug(`  - Network Chain ID: ${network.chainId}`);
+      logger.debug(`  - Provider URL: ${this.ethersUtils.provider.connection?.url || 'unknown'}`);
+      
+      // ⚠️ WARNING: Check if balance is zero
+      if (balanceBefore === 0n) {
+        logger.error(`[ERROR] Deployer account ${deployerAddress} has ZERO balance!`);
+        logger.error(`[ERROR] Please fund the account in Ganache or check if correct private key is used.`);
+        throw new Error(`Deployer account ${deployerAddress} has insufficient funds: balance is 0 ETH`);
+      }
       
       const ContractFactory = new ethers.ContractFactory(artifact.abi, artifact.bytecode, signer);
       
@@ -499,6 +527,14 @@ class ContractManager {
         : uupsContracts.includes(contractName);
       
       const isSBTContract = sbtContracts.includes(contractName);
+
+      // Ensure privateKey is passed through options (fallback to config if not provided)
+      if (!options.privateKey) {
+        options.privateKey = this.config.get('deployer.privateKey');
+        logger.debug(`[DEBUG] deploySingleContract: Using privateKey from config.deployer.privateKey`);
+      } else {
+        logger.debug(`[DEBUG] deploySingleContract: Using privateKey from options`);
+      }
 
       // Deploy based on contract type
       let deployedContract;

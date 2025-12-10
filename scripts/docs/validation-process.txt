@@ -150,14 +150,14 @@ check();
 # ========================================
 
 # Console format (human-readable, default)
-node scripts/validate_component_upload.js --component amanita_muscaria --network localhost
+node scripts/validators/validate_component_upload.js --component amanita_muscaria --network localhost
 
 # JSON format (machine-readable, для CI/CD)
-node scripts/validate_component_upload.js --component amanita_muscaria --network localhost --json \
+node scripts/validators/validate_component_upload.js --component amanita_muscaria --network localhost --json \
   | jq '.qualityScore, .contract.action444_compatible'
 
 # Compact format (только summary)
-node scripts/validate_component_upload.js --component amanita_muscaria --network localhost \
+node scripts/validators/validate_component_upload.js --component amanita_muscaria --network localhost \
   | grep -E "Quality Score|Action 444 Compatible|Overall Status"
 
 # ========================================
@@ -259,7 +259,7 @@ while true; do
   for comp in data/components/*/; do
     component=$(basename "$comp")
     [[ "$component" == "component_features_presets.json" ]] && continue
-    score=$(node scripts/validate_component_upload.js --component "$component" --network localhost 2>&1 \
+    score=$(node scripts/validators/validate_component_upload.js --component "$component" --network localhost 2>&1 \
       | grep "Quality Score" | awk '{print $3}')
     echo "$component: $score"
   done
@@ -283,7 +283,7 @@ echo ""
 
 echo "1. Validating Components..."
 for comp in amanita_muscaria blue_lotus lions_mane; do
-  node scripts/validate_component_upload.js --component "$comp" --network localhost \
+  node scripts/validators/validate_component_upload.js --component "$comp" --network localhost \
     | grep -q "✅ PASS" && echo "  ✅ $comp" || echo "  ❌ $comp FAILED"
 done
 

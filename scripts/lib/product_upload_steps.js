@@ -435,10 +435,15 @@ async function uploadProductImages(context, productsDir, sellerId, outputDir) {
       console.log(`   → URL: ${imageMapping[productId].url}`);
       
       // Update product JSON with image CID
-      productData.images.cover_cid = imageCID;
-      productData.images.cover_url = imageMapping[productId].url;
+      // ✅ Единый формат: обновляем cover_image_url (основное поле для bot слоя)
+      productData.cover_image_url = imageCID;
+      // Также сохраняем в images для обратной совместимости (если нужно)
+      if (productData.images) {
+        productData.images.cover_cid = imageCID;
+        productData.images.cover_url = imageMapping[productId].url;
+      }
       fs.writeFileSync(productFile, JSON.stringify(productData, null, 2), 'utf8');
-      console.log(`   ✅ Product JSON обновлен с image CID`);
+      console.log(`   ✅ Product JSON обновлен с image CID (cover_image_url: ${imageCID})`);
       
       uploadedCount++;
       
@@ -860,16 +865,18 @@ async function registerProductsInContract(context, productMapping, productData) 
         continue;
       }
       
-      // Подготавливаем componentIds (component_business_id strings для контракта)
-      const componentIds = product.components.map(comp => comp.component_business_id).filter(id => id && id !== '');
+      // Подготавливаем componentIds (component_id strings для контракта)
+      // ✅ Единый формат: используем organic_components массив
+      const organicComponents = product.organic_components || product.components || [];
+      const componentIds = organicComponents.map(comp => comp.component_id || comp.component_business_id).filter(id => id && id !== '');
       const metadataCID = productMapping[productId].product_cid;
       
-      console.log(`   → Component Business IDs: [${componentIds.join(', ')}]`);
+      console.log(`   → Component IDs: [${componentIds.join(', ')}]`);
       console.log(`   → Metadata CID: ${metadataCID}`);
       
       // В dry-run режиме используем mock component IDs если реальные не найдены
       if (context.dryRun && componentIds.length === 0) {
-        const mockComponentIds = product.components.map((_, index) => `mock_component_${index + 1}`);
+        const mockComponentIds = organicComponents.map((_, index) => `mock_component_${index + 1}`);
         console.log(`   🔷 [DRY-RUN] Используем mock Component IDs: [${mockComponentIds.join(', ')}]`);
         componentIds.push(...mockComponentIds);
       }

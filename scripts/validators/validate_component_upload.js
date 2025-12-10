@@ -7,11 +7,11 @@
  * across all layers: FileSystem → Arweave → Contract → State
  * 
  * Usage:
- *   node scripts/validate_component_upload.js --component amanita_muscaria
- *   node scripts/validate_component_upload.js --component blue_lotus --network localhost
+ *   node scripts/validators/validate_component_upload.js --component amanita_muscaria
+ *   node scripts/validators/validate_component_upload.js --component blue_lotus --network localhost
  * 
  * Programmatic Use:
- *   const { validateComponent } = require('./scripts/validate_component_upload.js');
+ *   const { validateComponent } = require('./scripts/validators/validate_component_upload.js');
  *   const report = await validateComponent('amanita_muscaria', 'localhost', sellerAddress);
  * 
  * @version 1.0.0
@@ -26,7 +26,7 @@ const { program } = require('commander');
 // 🔧 CONFIGURATION
 // ====================================================================
 
-const COMPONENTS_DIR = path.join(__dirname, '../data/components');
+const COMPONENTS_DIR = path.join(__dirname, '../../data/components');
 const SUPPORTED_LANGUAGES = ['ru', 'en', 'de', 'es', 'fr', 'nl', 'et'];
 
 // ====================================================================
@@ -94,11 +94,11 @@ async function validateFileSystem(componentId, network) {
     checks.errors.push('Complex fields directory not found');
   }
   
-  // 5. Check state file
-  const stateFile = path.join(componentDir, `_upload_state_${network}.json`);
+  // ✅ CHANGE (2025-12-02): Universal state filename
+  const stateFile = path.join(componentDir, `_upload_state.json`);
   checks.state_file = fs.existsSync(stateFile);
   if (!checks.state_file) {
-    checks.errors.push(`State file not found: _upload_state_${network}.json`);
+    checks.errors.push(`State file not found: _upload_state.json`);
   }
   
   // 6. Check final metadata
@@ -128,8 +128,8 @@ async function validateArweaveLayer(componentId, network) {
     errors: []
   };
   
-  // Load state file
-  const stateFile = path.join(COMPONENTS_DIR, componentId, `_upload_state_${network}.json`);
+  // ✅ CHANGE (2025-12-02): Universal state filename
+  const stateFile = path.join(COMPONENTS_DIR, componentId, `_upload_state.json`);
   
   if (!fs.existsSync(stateFile)) {
     checks.errors.push('State file not found, cannot validate Arweave layer');
@@ -201,9 +201,12 @@ async function validateArweaveLayer(componentId, network) {
     }
   }
   
+  // ✅ CHANGE (2025-12-02): Support new structure (arweave section)
+  const complexFields = state?.arweave?.complex_fields || state?.complex_fields || {};
+  
   // 2. Check complex fields (7 languages) - support nested structure
-  if (state.complex_fields) {
-    for (const [lang, data] of Object.entries(state.complex_fields)) {
+  if (Object.keys(complexFields).length > 0) {
+    for (const [lang, data] of Object.entries(complexFields)) {
       // Nested structure: { cid: "...", url: "..." }
       const cid = typeof data === 'string' ? data : data?.cid;
       
@@ -214,8 +217,9 @@ async function validateArweaveLayer(componentId, network) {
   }
   
   // 3. Check root metadata
-  if (state.root_metadata?.cid) {
-    checks.root_metadata = await checkCID(state.root_metadata.cid, 'Root.Metadata');
+  const rootMetadata = state?.arweave?.root_metadata || state?.root_metadata;
+  if (rootMetadata?.cid) {
+    checks.root_metadata = await checkCID(rootMetadata.cid, 'Root.Metadata');
   } else {
     checks.errors.push('Root metadata CID not found in state');
   }
@@ -246,9 +250,9 @@ async function validateContractLayer(componentId, network, sellerAddress) {
   try {
     // Initialize contracts
     const { ethers } = require('hardhat');
-    const ContractManager = require('./lib/services/ContractManager');
-    const EthersUtils = require('./lib/utils/EthersUtils');
-    const config = require('./lib/config');
+    const ContractManager = require('../lib/services/ContractManager');
+    const EthersUtils = require('../lib/utils/EthersUtils');
+    const config = require('../lib/config');
     
     // ✅ Create provider first (required by EthersUtils)
     const rpcUrl = network === 'localhost' ? 'http://127.0.0.1:8545' : config.get('network.rpcUrl');
@@ -330,11 +334,12 @@ async function validateContractLayer(componentId, network, sellerAddress) {
     try {
       const contractRootCID = await organicRegistry.componentRootMetadataCIDs(blockchainId);
       
-      const stateFile = path.join(COMPONENTS_DIR, componentId, `_upload_state_${network}.json`);
+      // ✅ CHANGE (2025-12-02): Universal state filename
+      const stateFile = path.join(COMPONENTS_DIR, componentId, `_upload_state.json`);
       if (fs.existsSync(stateFile)) {
         const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
-        // Support both nested (root_metadata.cid) and flat (root_metadata.data.cid)
-        const stateRootCID = state.root_metadata?.cid || state.root_metadata?.data?.cid;
+        // ✅ CHANGE (2025-12-02): Support new structure (arweave section)
+        const stateRootCID = state.arweave?.root_metadata?.cid || state.root_metadata?.cid || state.root_cid;
         
         checks.root_cid_match = contractRootCID === stateRootCID;
         
@@ -361,12 +366,15 @@ async function validateContractLayer(componentId, network, sellerAddress) {
     };
     
     try {
-      // Load state file for CID comparison (reuse logic from root CID check)
-      const stateFile = path.join(COMPONENTS_DIR, componentId, `_upload_state_${network}.json`);
+      // ✅ CHANGE (2025-12-02): Universal state filename
+      const stateFile = path.join(COMPONENTS_DIR, componentId, `_upload_state.json`);
       let state = null;
+      let complexFieldsState = {};
       if (fs.existsSync(stateFile)) {
         try {
           state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+          // ✅ FIX (2025-12-02): Extract complexFields from correct structure (arweave section)
+          complexFieldsState = state.arweave?.complex_fields || state.complex_fields || {};
         } catch (parseError) {
           complexFieldsChecks.warnings.push(`Could not parse state file: ${parseError.message}`);
         }
@@ -392,12 +400,13 @@ async function validateContractLayer(componentId, network, sellerAddress) {
           if (cid && cid !== "" && cid !== ethers.ZeroAddress) {
             complexFieldsChecks.keys_found++;
             
+            // ✅ FIX (2025-12-02): Use complexFieldsState (extracted from Phase 3.5 local state)
             // Проверяем соответствие CID в контракте и state файле
-            if (state && state.complex_fields && state.complex_fields[lang]) {
-              // Поддерживаем как вложенную структуру (state.complex_fields[lang].cid), так и плоскую (state.complex_fields[lang] как string)
-              const stateCID = typeof state.complex_fields[lang] === 'string' 
-                ? state.complex_fields[lang] 
-                : state.complex_fields[lang]?.cid;
+            if (complexFieldsState && complexFieldsState[lang]) {
+              // Поддерживаем как вложенную структуру (complexFieldsState[lang].cid), так и плоскую (complexFieldsState[lang] как string)
+              const stateCID = typeof complexFieldsState[lang] === 'string' 
+                ? complexFieldsState[lang] 
+                : complexFieldsState[lang]?.cid;
               
               if (stateCID && cid === stateCID) {
                 complexFieldsChecks.cids_match_state++;
@@ -475,7 +484,8 @@ async function validateStateConsistency(componentId, network) {
     errors: []
   };
   
-  const stateFile = path.join(COMPONENTS_DIR, componentId, `_upload_state_${network}.json`);
+  // ✅ CHANGE (2025-12-02): Universal state filename
+  const stateFile = path.join(COMPONENTS_DIR, componentId, `_upload_state.json`);
   
   if (!fs.existsSync(stateFile)) {
     checks.errors.push('State file not found');
@@ -492,43 +502,54 @@ async function validateStateConsistency(componentId, network) {
     return checks;
   }
   
-  // 1. Format validation (support both componentId and component_id)
-  const stateComponentId = state.componentId || state.component_id;
-  checks.format_valid = stateComponentId === componentId && state.network === network;
+  // ✅ CHANGE (2025-12-02): Support new structure
+  const stateComponentId = state.biounit_id || state.componentId || state.component_id;
+  checks.format_valid = stateComponentId === componentId;
   if (!checks.format_valid) {
-    checks.errors.push(`State format invalid: componentId=${stateComponentId}, network=${state.network}`);
+    checks.errors.push(`State format invalid: biounit_id=${stateComponentId}`);
   }
   
   // 2. Steps completed (account for shareable_data optimization)
-  checks.steps_complete = state.steps_completed?.length || 0;
+  // Support both old (state.steps_completed) and new (state.arweave.steps_completed)
+  checks.steps_complete = state.arweave?.steps_completed?.length || state.steps_completed?.length || 0;
   
   // Shareable data is uploaded ONLY for first component (i === 0)
   // Expected steps: 5 for first component, 4 for subsequent components
-  const hasShareableData = state.steps_completed?.includes('shareable_data_uploaded');
+  const arweaveSteps = state.arweave?.steps_completed || state.steps_completed || [];
+  const hasShareableData = arweaveSteps.includes('shareable_data_uploaded');
   checks.steps_expected = hasShareableData ? 5 : 4;
   
   if (checks.steps_complete < checks.steps_expected) {
     checks.errors.push(`Incomplete upload: ${checks.steps_complete}/${checks.steps_expected} steps completed`);
   }
   
+  // ✅ CHANGE (2025-12-02): Support new structure (arweave section)
+  const simpleFields = state.arweave?.simple_fields || state.simple_fields || {};
+  const complexFields = state.arweave?.complex_fields || state.complex_fields || {};
+  const rootMetadata = state.arweave?.root_metadata || state.root_metadata || {};
+  
   // 3. CIDs present
-  if (state.simple_fields) {
+  if (simpleFields) {
     checks.cids_present.simple_fields = [
-      state.simple_fields.title_cid,
-      state.simple_fields.dosage_cid
+      simpleFields.title_cid,
+      simpleFields.dosage_cid
     ].filter(Boolean).length;
   }
   
-  if (state.complex_fields) {
-    checks.cids_present.complex_fields = Object.keys(state.complex_fields).length;
+  if (complexFields) {
+    checks.cids_present.complex_fields = Object.keys(complexFields).length;
   }
   
-  checks.cids_present.root = !!state.root_metadata?.cid;
+  checks.cids_present.root = !!rootMetadata.cid;
   
-  // 4. Contract registration
+  // ✅ CHANGE (2025-12-02): Support new structure (deployments per network)
+  // Old: state.contract_registration
+  // New: state.deployments[network]
+  const deployment = state.deployments?.[network] || state.contract_registration;
+  
   checks.contract_registration = !!(
-    state.contract_registration?.componentId &&
-    state.contract_registration?.txHash
+    (deployment?.blockchain_id || deployment?.componentId) &&
+    deployment?.txHash
   );
   
   if (!checks.contract_registration) {
@@ -566,9 +587,9 @@ async function validateComplexFieldsUniqueness(componentIds, network) {
   
   try {
     const { ethers } = require('hardhat');
-    const ContractManager = require('./lib/services/ContractManager');
-    const EthersUtils = require('./lib/utils/EthersUtils');
-    const config = require('./lib/config');
+    const ContractManager = require('../lib/services/ContractManager');
+    const EthersUtils = require('../lib/utils/EthersUtils');
+    const config = require('../lib/config');
     
     const rpcUrl = network === 'localhost' ? 'http://127.0.0.1:8545' : config.get('network.rpcUrl');
     const provider = new ethers.JsonRpcProvider(rpcUrl);

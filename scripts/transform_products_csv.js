@@ -242,8 +242,15 @@ async function transformProduct(row, index) {
     console.log(`   → Source language: ${SOURCE_LANG}`);
     console.log(`   → Source title: ${row.product_name}`);
     
+    // Единый формат для bot слоя:
+    // - business_id (не product_id)
+    // - organic_components массив (не components)
+    // - component_id в компонентах (не component_business_id)
+    // - cover_image_url (не images.cover_cid)
+    // - forms массив (уже правильно)
+    // - species (обязательное поле)
     const productData = {
-      product_id: row.product_business_id,
+      business_id: row.product_business_id,  // ✅ Единый формат: business_id
       seller_id: SELLER_ID,
       created_at: new Date().toISOString(),
       last_updated: new Date().toISOString(),
@@ -251,10 +258,12 @@ async function transformProduct(row, index) {
       
       title: null, // Заглушка для CID из Arweave
       
-      components: [
+      // ✅ Единый формат: organic_components массив (всегда массив, даже для 1 компонента)
+      organic_components: [
         {
-          component_business_id: row.component_business_id,
+          component_id: row.component_business_id,  // ✅ Единый формат: component_id
           proportion: "100%",
+          // Дополнительные поля для отладки (не используются в bot слое, но сохраняются)
           form: formMapping.standard_form,
           form_mapping_confidence: formMapping.confidence,
           form_original: formMapping.original_form,
@@ -262,10 +271,21 @@ async function transformProduct(row, index) {
         }
       ],
       
+      // ✅ Единый формат: forms массив (всегда массив)
       forms: [formMapping.standard_form],
       
       prices: prices,
       
+      // ✅ Единый формат: cover_image_url (не images.cover_cid)
+      cover_image_url: null,  // Will be filled in upload step from images.cover_cid
+      
+      // ✅ Обязательное поле: species (из компонента)
+      species: component.scientific_title || row.component_business_id,
+      
+      // ✅ Опциональные поля
+      categories: component.categories || [],
+      
+      // Дополнительные поля (не используются в bot слое, но сохраняются)
       images: {
         cover: row.image_file || null,
         cover_cid: null,  // Will be filled in upload step

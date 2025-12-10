@@ -6,6 +6,7 @@
  */
 
 const logger = require('../utils/Logger');
+const hre = require('hardhat');
 
 class ComponentActions {
   constructor(contractManager, arweaveManager, ethersUtils, config, inviteActions) {
@@ -63,11 +64,29 @@ class ComponentActions {
       
       // ШАГ 3/3: Загрузка компонентов
       console.log("\n📦 Шаг 3/3: Загрузка компонентов...");
+      
+      // ✅ FIX (2025-12-01): Определяем сеть из hardhat runtime для правильного именования state файлов
+      // Приоритет: hre.network.name (из --network CLI) > config.get('network.name') > 'localhost'
+      let networkName = 'localhost';
+      try {
+        if (hre && hre.network && hre.network.name) {
+          networkName = hre.network.name;
+          console.log(`🌐 Network определена из Hardhat: ${networkName}`);
+        } else {
+          networkName = this.config.get('network.name') || 'localhost';
+          console.log(`🌐 Network определена из config: ${networkName}`);
+        }
+      } catch (error) {
+        // Fallback если hardhat недоступен (например, в unit тестах)
+        networkName = this.config.get('network.name') || 'localhost';
+        console.log(`🌐 Network fallback: ${networkName} (hardhat недоступен)`);
+      }
+      
       try {
         const uploadResults = await this.uploadComponentsCore(
           sellerAddress,
           "data/components",
-          this.config.get('network.name') || 'localhost',
+          networkName,
           dryRun,
           process.env.ARWEAVE !== 'false'
         );
@@ -291,23 +310,36 @@ class ComponentActions {
           supportedLanguages: uploadUtils.getSupportedLanguages()
         };
         
-        // Загрузка state
+        // ✅ CHANGE (2025-12-02): Load state with new structure
         let state = stateManager.loadComponentState(componentDir, networkName) || {
-          steps_completed: [],
-          biounit_id: componentId,  // ✅ biounit_id - текстовое значение (например "amanita_muscaria")
-          network: networkName,
-          created_at: new Date().toISOString()
+          biounit_id: componentId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          arweave: {
+            steps_completed: [],
+            simple_fields: {},
+            complex_fields: {},
+            root_metadata: {}
+          },
+          deployments: {}
         };
         
-        // Проверка выполненных шагов
+        // ✅ CHANGE (2025-12-02): Check arweave section for steps
         const isStepCompleted = (stepName) => {
-          return state.steps_completed && state.steps_completed.includes(stepName);
+          return state.arweave?.steps_completed?.includes(stepName) || false;
         };
         
         console.log(`💾 Загрузка component state: ${componentId} (biounit_id: ${context.biounit_id})`);
-        if (state.steps_completed && state.steps_completed.length > 0) {
-          console.log(`✅ State найден, шагов завершено: ${state.steps_completed.length}`);
-          console.log(`   → Завершенные шаги: ${state.steps_completed.join(', ')}`);
+        const arweaveSteps = state.arweave?.steps_completed || [];
+        const deployments = Object.keys(state.deployments || {});
+        
+        if (arweaveSteps.length > 0 || deployments.length > 0) {
+          console.log(`✅ State найден:`);
+          console.log(`   → Arweave шагов: ${arweaveSteps.length}`);
+          console.log(`   → Deployments: ${deployments.join(', ') || 'none'}`);
+          if (arweaveSteps.length > 0) {
+            console.log(`   → Завершенные шаги: ${arweaveSteps.join(', ')}`);
+          }
         } else {
           console.log(`🆕 State файл не найден, создаем новый`);
         }
@@ -315,23 +347,11 @@ class ComponentActions {
         console.log(`📝 Начинаем полную загрузку компонента...`);
         
         // Выполнение шагов
-        let simpleFieldCIDs = {};
-        if (isStepCompleted('simple_fields_uploaded')) {
-          console.log(`\n⏭️  ШАГ 1: Simple Fields уже загружены (пропуск)`);
-          simpleFieldCIDs = state.simple_fields || {};
-        } else {
-          simpleFieldCIDs = await uploadSteps.uploadSimpleFields(context, state);
-          console.log(`✅ Simple Fields загружены`);
-        }
-        
-        let complexFieldCIDs = {};
-        if (isStepCompleted('complex_fields_uploaded')) {
-          console.log(`\n⏭️  ШАГ 2: Complex Fields уже загружены (пропуск)`);
-          complexFieldCIDs = state.complex_fields || {};
-        } else {
-          complexFieldCIDs = await uploadSteps.uploadComplexFields(context, state);
-          console.log(`✅ Complex Fields загружены`);
-        }
+        // ✅ ВАЖНО: Функции uploadSimpleFields() и uploadComplexFields() сами проверяют
+        //    state + контракт и автоматически восстанавливают при несоответствии.
+        //    Поэтому всегда вызываем их - они решат, что делать.
+        let simpleFieldCIDs = await uploadSteps.uploadSimpleFields(context, state);
+        let complexFieldCIDs = await uploadSteps.uploadComplexFields(context, state);
         
         if (i === 0) {
           if (isStepCompleted('shareable_data_uploaded')) {
@@ -345,7 +365,7 @@ class ComponentActions {
         let finalRootData;
         if (isStepCompleted('root_metadata_updated')) {
           console.log(`\n⏭️  ШАГ 4: Root Metadata уже обновлен (пропуск)`);
-          finalRootData = state.root_metadata?.data;
+          finalRootData = state.arweave?.root_metadata?.data;
         } else {
           finalRootData = uploadSteps.updateRootMetadata(context, simpleFieldCIDs, complexFieldCIDs, state);
           console.log(`✅ Root Metadata обновлен`);
@@ -354,54 +374,17 @@ class ComponentActions {
         let rootCID;
         if (isStepCompleted('root_metadata_uploaded')) {
           console.log(`\n⏭️  ШАГ 5: Root Metadata уже загружен в Arweave (пропуск)`);
-          rootCID = state.root_metadata?.cid;
+          rootCID = state.arweave?.root_metadata?.cid;
         } else {
           rootCID = await uploadSteps.uploadRootMetadata(context, finalRootData, state);
           console.log(`✅ Root Metadata загружен в Arweave: ${rootCID}`);
         }
         
-        let componentIdResult;
-        if (isStepCompleted('component_registered')) {
-          // ✅ FIX: Verify component actually exists in contract before skipping
-          console.log(`\n🔍 ШАГ 6: Проверка регистрации компонента в контракте...`);
-          console.log(`   State file: зарегистрирован (block ${state.contract_registration?.blockNumber || 'N/A'})`);
-          
-          try {
-            const componentExists = await context.contracts.organicComponentRegistry.componentExists(context.biounit_id);
-            
-            if (componentExists) {
-              // Component confirmed in contract - safe to skip
-              console.log(`   ✅ Подтверждено в контракте: componentExists() = TRUE`);
-              
-              const blockchainId = await context.contracts.organicComponentRegistry.businessIdToComponentId(context.biounit_id);
-              console.log(`   ✅ Blockchain ID: ${blockchainId}`);
-              console.log(`   → Пропуск регистрации (компонент уже в контракте)`);
-              
-              componentIdResult = blockchainId.toString();
-              
-            } else {
-              // Critical mismatch: state says registered but component not in contract
-              console.warn(`   ❌ НЕСООТВЕТСТВИЕ: State file говорит "зарегистрирован", но componentExists() = FALSE`);
-              console.warn(`   💡 Вероятная причина: Node был перезапущен, blockchain state сброшен`);
-              console.warn(`   🔧 Выполняем регистрацию заново с сохранённым Arweave CID...`);
-              
-              componentIdResult = await uploadSteps.registerComponent(context, rootCID, state);
-              console.log(`   ✅ Компонент зарегистрирован в контракте: ID ${componentIdResult}`);
-            }
-            
-          } catch (verifyError) {
-            // Contract verification failed - fail-safe: re-register
-            console.error(`   ❌ Ошибка проверки контракта: ${verifyError.message}`);
-            console.warn(`   🔧 Fail-safe: Регистрируем заново...`);
-            
-            componentIdResult = await uploadSteps.registerComponent(context, rootCID, state);
-            console.log(`   ✅ Компонент зарегистрирован в контракте: ID ${componentIdResult}`);
-          }
-          
-        } else {
-          componentIdResult = await uploadSteps.registerComponent(context, rootCID, state);
-          console.log(`✅ Компонент зарегистрирован в контракте: ID ${componentIdResult}`);
-        }
+        // ✅ CHANGE (2025-12-02): Step 6 logic now handles deployments internally
+        // registerComponent checks state.deployments[network] and componentExists()
+        // We just call it - it will decide whether to skip or register
+        let componentIdResult = await uploadSteps.registerComponent(context, rootCID, state);
+        console.log(`✅ Компонент обработан: ID ${componentIdResult}`);
         
         results.push({
           componentId,
