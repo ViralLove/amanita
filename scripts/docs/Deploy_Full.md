@@ -193,7 +193,7 @@ AMANITA_PAYMENT_ROUTER_CONTRACT_ADDRESS=0x...
 npx hardhat node
 
 # Деплой на localhost (способ 1 - через переменную окружения)
-DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full_new.js --network localhost
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
 
 # Деплой на localhost (способ 2 - через аргументы командной строки)
 npx hardhat run scripts/deploy_full.js --network localhost 1
@@ -373,6 +373,9 @@ DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost <CONT
 npx hardhat run scripts/deploy_full.js --network localhost 5 <CONTRACT_NAME>
 ```
 **Описание:** Деплоит конкретный контракт по имени
+
+**Примечание:** Action 5 автоматически определяет тип контракта (UUPS, SBT, regular) и применяет соответствующую логику деплоя. Любой контракт с доступным artifact может быть задеплоен через Action 5.
+
 **Поддерживаемые контракты:**
 
 #### Основная экосистема Amanita
@@ -383,6 +386,7 @@ npx hardhat run scripts/deploy_full.js --network localhost 5 <CONTRACT_NAME>
 - **`ProductRegistry` (UUPS)** - Реестр продуктов (автоматически деплоит Logic + Proxy)
   - `ProductRegistryLogic` - Logic implementation (можно деплоить отдельно)
   - `ProductRegistryProxy` - Proxy entry point (можно деплоить отдельно)
+- **`OrganicComponentRegistry` (UUPS)** - Реестр органических компонентов (автоматически деплоит Logic + Proxy)
 - `LoveDoPostNFT` - NFT для постов о любви
 - `LoveEmissionEngine` - Движок эмиссии любви
 - `Lovecoin` - Основной токен экосистемы (заменил AmanitaToken)
@@ -438,27 +442,6 @@ npx hardhat run scripts/deploy_full.js --network localhost 5 SoulMetadata
 npx hardhat run scripts/deploy_full.js --network localhost 5 SoulIdentity
 ```
 
-#### `10` - Диагностика состояния селлера
-```bash
-# Способ 1 - через переменную окружения (использует SELLER_ADDRESS)
-DEPLOY_ACTION=10 npx hardhat run scripts/deploy_full.js --network polygon
-
-# Способ 2 - через аргументы командной строки
-npx hardhat run scripts/deploy_full.js --network polygon 10
-```
-**Описание:** Полная диагностика состояния селлера из .env
-**Функциональность:**
-- Проверка активации пользователя в SpiralEngine
-- Проверка ролей (SELLER_ROLE, ACTIVATOR_ROLE)
-- Получение и сохранение инвайтов селлера в файл
-- Проверка каталога продуктов (количество, активность)
-- Итоговая оценка готовности селлера (0-100%)
-**Результат:** 
-- Подробный отчет о состоянии селлера
-- Сохранение инвайтов в `bot/flowers/{SELLER_ADDRESS}_invites.txt`
-- Оценка готовности к работе
-**Использование:** Диагностика проблем, проверка готовности селлера
-
 #### `11` - Генерация инвайтов для активного селлера
 ```bash
 # Способ 1 - через переменную окружения (12 инвайтов по умолчанию)
@@ -475,26 +458,6 @@ npx hardhat run scripts/deploy_full.js --network localhost 11 <COUNT>
 - SELLER_PRIVATE_KEY в .env (для подписи транзакций)
 **Результат:** Сохраняет инвайты в `bot/flowers/{SELLER_ADDRESS}_invites.txt`
 **Использование:** Регулярное пополнение инвайтов для приглашения аудитории
-
-#### `12` - Получение полного каталога с данными
-```bash
-# Способ 1 - через переменную окружения (использует SELLER_ADDRESS)
-DEPLOY_ACTION=12 npx hardhat run scripts/deploy_full.js --network localhost
-
-# Способ 2 - через аргументы командной строки (указать адрес продавца)
-npx hardhat run scripts/deploy_full.js --network localhost 12 <SELLER_ADDRESS>
-```
-**Описание:** Получает полный каталог продавца из блокчейна и загружает все связанные данные через CID
-**Параметры:**
-- `SELLER_ADDRESS`: адрес продавца (если не указан, используется SELLER_ADDRESS из .env)
-**Функциональность:**
-- Получает все продукты продавца из блокчейна
-- Загружает данные продуктов через IPFS CID
-- Загружает описания компонентов через их CID
-- Анализирует проблемы валидации (пустые cover_image_url, дефисы в biounit_id)
-- Сохраняет полные данные в JSON файл
-**Результат:** Сохраняет данные в `bot/catalog_data/catalog_{SELLER_ADDRESS}_{timestamp}.json`
-**Использование:** Отладка проблем валидации, анализ данных каталога
 
 #### `13` - Диагностика состояния селлера
 ```bash
@@ -713,10 +676,10 @@ DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-XXXX-YYYY npx hardhat run scripts/depl
 | Контракт | Зависимости | Настройка ролей | Описание |
 |----------|-------------|-----------------|----------|
 | `AmanitaRegistry` | Нет | Нет | Центральный реестр контрактов |
-| `InviteNFT` | Нет | Да (SELLER_ROLE) | Система инвайт-кодов |
-| `ProductRegistry` | InviteNFT | Нет | Реестр продуктов |
-| `LoveDoPostNFT` | InviteNFT, AmanitaRegistry | Нет | NFT для постов о любви |
-| `LoveEmissionEngine` | AmanitaToken, AmanitaGovToken, LoveDoPostNFT, InviteNFT | Да (EMITTER_ROLE) | Движок эмиссии любви |
+| `SpiralEngine` | Нет | Да (SELLER_ROLE) | Система инвайт-кодов |
+| `ProductRegistry` | SpiralEngine | Нет | Реестр продуктов |
+| `LoveDoPostNFT` | SpiralEngine, AmanitaRegistry | Нет | NFT для постов о любви |
+| `LoveEmissionEngine` | AmanitaToken, AmanitaGovToken, LoveDoPostNFT, SpiralEngine | Да (EMITTER_ROLE) | Движок эмиссии любви |
 | `AmanitaToken` | Нет | Нет | Утилити токен |
 | `AmanitaGovToken` | Нет | Нет | Governance токен |
 | `AmanitaPaymentRouter` | AmanitaToken | Нет | Роутер платежей |
@@ -764,46 +727,46 @@ DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-XXXX-YYYY npx hardhat run scripts/depl
 
 ```bash
 # Деплой токенов (без зависимостей)
-node deploy_full.js 5 AmanitaToken
-node deploy_full.js 5 AmanitaGovToken
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost Lovecoin
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost AmanitaGovToken
 
-# Деплой InviteNFT (требует настройки ролей)
-node deploy_full.js 5 InviteNFT
+# Деплой SpiralEngine (требует настройки ролей)
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngine
 
-# Деплой ProductRegistry (требует InviteNFT)
-node deploy_full.js 5 ProductRegistry
+# Деплой ProductRegistry (требует SpiralEngine)
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost ProductRegistry
 
-# Деплой LoveDoPostNFT (требует InviteNFT и AmanitaRegistry)
-node deploy_full.js 5 LoveDoPostNFT
+# Деплой LoveDoPostNFT (требует SpiralEngine и AmanitaRegistry)
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost LoveDoPostNFT
 
 # Деплой LoveEmissionEngine (требует все токены и контракты)
-node deploy_full.js 5 LoveEmissionEngine
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost LoveEmissionEngine
 ```
 
 ##### SBT экосистема
 
 ```bash
 # Деплой базового SBT контракта
-node deploy_full.js 5 SoulboundCore
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SoulboundCore
 
 # Деплой системы метаданных (требует SoulboundCore)
-node deploy_full.js 5 SoulMetadata
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SoulMetadata
 
 # Деплой системы восстановления (требует SoulboundCore)
-node deploy_full.js 5 SoulRecovery
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SoulRecovery
 
 # Деплой интеграции с SpiralEngine (требует SoulboundCore)
-node deploy_full.js 5 SoulIntegration
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SoulIntegration
 
 # Деплой SoulIdentity (мост с SpiralEngine)
-node deploy_full.js 5 SoulIdentity
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SoulIdentity
 ```
 
 ##### Localization System (3-Contract Architecture)
 
 ```bash
 # Деплой AmanitaInternational (деплоит все 3 контракта автоматически!)
-node deploy_full.js 5 AmanitaInternationalProxy
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost AmanitaInternationalProxy
 
 # ПРИМЕЧАНИЕ: Storage и LogicV1 НЕ деплоятся отдельно!
 # Они автоматически создаются при деплое Proxy
@@ -813,9 +776,9 @@ node deploy_full.js 5 AmanitaInternationalProxy
 
 ```bash
 # Деплой mock контрактов
-node deploy_full.js 5 MockSpiralEngine
-node deploy_full.js 5 FaultySpiralEngine
-node deploy_full.js 5 BytesErrorEngine
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost MockSpiralEngine
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost FaultySpiralEngine
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost BytesErrorEngine
 ```
 
 ## Логирование и отладка
@@ -982,7 +945,7 @@ npx hardhat run scripts/upgrade-implementation.js --network localhost ProductReg
 DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network polygon
 
 # ИЛИ отдельный деплой AmanitaInternational
-CONTRACT_NAME=AmanitaInternationalProxy npx hardhat run scripts/deploy_full.js 5 --network polygon
+DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network polygon AmanitaInternationalProxy
 
 # Результат в логах:
 # === 🌐 Деплой AmanitaInternational (3-контрактная архитектура) ===

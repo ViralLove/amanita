@@ -331,7 +331,7 @@ Optional .env:
 
 ```yaml
 User:
-  - CLI: node deploy_full_new.js 5 SpiralEngine
+  - CLI: DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngine
   - Script: actionsManager.executeAction(5, 'SpiralEngine')
 ```
 

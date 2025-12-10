@@ -81,7 +81,7 @@ node scripts/validators/validate_catalog_upload.js --network localhost --seller 
 
 # Step 3: Если все ✅ → safe to run Action 444
 echo "=== Safe to run Action 444 ==="
-DEPLOY_ACTION=444 npx hardhat run scripts/deploy_full_new.js --network localhost
+DEPLOY_ACTION=444 npx hardhat run scripts/deploy_full.js --network localhost
 
 # ========================================
 # TROUBLESHOOTING VALIDATION
@@ -98,7 +98,7 @@ DEPLOY_ACTION=444 npx hardhat run scripts/deploy_full_new.js --network localhost
 # Issue: "Component not registered in OrganicComponentRegistry"
 # Solution: Re-run Action 555
 #   → DEPLOY_ACTION=555 DEPLOYER_INVITE=<INVITE> \
-#     npx hardhat run scripts/deploy_full_new.js --network localhost
+#     npx hardhat run scripts/deploy_full.js --network localhost
 
 # Issue: Quality Score < 8.0
 # Solution: Check specific phase failures
@@ -165,14 +165,14 @@ node scripts/validators/validate_component_upload.js --component amanita_muscari
 # ========================================
 
 # 1. Deploy contracts
-DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full_new.js --network localhost
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
 
 # 2. Create root invites
-DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full_new.js --network localhost
+DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
 
 # 3. Upload components
 DEPLOY_ACTION=555 DEPLOYER_INVITE=<INVITE_1> \
-  npx hardhat run scripts/deploy_full_new.js --network localhost
+  npx hardhat run scripts/deploy_full.js --network localhost
 
 # 4. VALIDATE COMPONENTS ✅
 for comp in amanita_muscaria blue_lotus lions_mane; do
