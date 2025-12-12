@@ -10,22 +10,23 @@ lsof -ti:8545
 # Убить процесс:
 kill -9 $(lsof -ti:8545)
 
-# Или kill все hardhat node процессы:
-pkill -f "hardhat node"
+# Или kill все anvil процессы:
+pkill -f "anvil"
 
 # Проверить что порт свободен:
 lsof -ti:8545
 # (должно быть пусто)
 
 # Теперь можно запускать ноду:
-npx hardhat node
+./anvil-start.sh
+# Или напрямую: anvil --host 0.0.0.0
 
 # ========================================
-# 🔋 ANVIL ONLY: FUND DEPLOYER (if using Anvil instead of Hardhat node)
+# 🔋 ANVIL: FUND DEPLOYER (обязательно для Anvil)
 # ========================================
 
-# ⚠️ SKIP THIS SECTION IF USING HARDHAT NODE (npx hardhat node)
-# ⚠️ ONLY FOR ANVIL USERS (anvil --port 8545)
+# ⚠️ ОБЯЗАТЕЛЬНО ДЛЯ ANVIL (используется по умолчанию)
+# ⚠️ Hardhat node больше не используется
 
 # Anvil doesn't include custom deployer (0x8F6251F6...) in pre-funded accounts.
 # Auto-funding доступен в тестах, но для manual deploy нужно профинансировать вручную:
@@ -66,15 +67,14 @@ cast balance 0x8F6251F6332A8e8479cD371e1bdA8102d2088d99 --rpc-url http://localho
 
 # Убедитесь что .env содержит эти переменные:
 #
-# For Hardhat Node (default):
+# For Anvil (default):
 # DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 # DEPLOYER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 # SELLER_PRIVATE_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 # SELLER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 #
-# For Anvil (alternative):
-# - Same accounts (Anvil uses same mnemonic as Hardhat)
-# - But need to fund deployer manually (see section above)
+# ⚠️ ВАЖНО: Anvil использует те же аккаунты что и Hardhat (same mnemonic)
+#           Но deployer (0x8F6251F6...) нужно профинансировать вручную (см. секцию выше)
 #
 # ⚠️ NOTE: Current .env may have different deployer (0x8F6251F6...)
 #          That's OK - just ensure it's funded before deploy!
@@ -88,8 +88,8 @@ cast balance 0x8F6251F6332A8e8479cD371e1bdA8102d2088d99 --rpc-url http://localho
 # 1. Очистка локальных данных (сохраняем CID)
 bash scripts/clean_components_upload.bash --keep-cids
 
-# 2. Restart hardhat node
-# Ctrl+C в терминале с нодой → npx hardhat node
+# 2. Restart Anvil
+# Ctrl+C в терминале с нодой → ./anvil-start.sh
 
 # 3. Передеплой контрактов
 DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
@@ -99,7 +99,7 @@ DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
 #   grep "SPIRAL_ENGINE_PROXY_ADDRESS" .env      # → должен вернуть адрес
 
 # 4. Создание рутовых инвайтов
-mkdir -p bot/flowers  # ← ВАЖНО: создать директорию перед Action 777!
+mkdir -p bot/flowers  # ← ВАЖНО: создать директорию перед Action 777! если ее нет (проверить)
 DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
 
 # ✓ ПРОВЕРКА: После успеха:
@@ -178,8 +178,8 @@ DEPLOY_ACTION=888 DEPLOYER_INVITE=<PASTE_INVITE_2_HERE> \
 bash scripts/clean_components_upload.bash --full
 # → Вводим 'DELETE' для подтверждения
 
-# 2. Restart hardhat node
-# Ctrl+C в терминале с нодой → npx hardhat node
+# 2. Restart Anvil
+# Ctrl+C в терминале с нодой → ./anvil-start.sh
 
 # 3. Передеплой контрактов
 DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
@@ -216,8 +216,8 @@ DEPLOY_ACTION=888 DEPLOYER_INVITE=<PASTE_INVITE_2_HERE> \
 # 1. Очистка
 bash scripts/clean_components_upload.bash --keep-cids
 
-# 2. Restart node
-# Ctrl+C → npx hardhat node
+# 2. Restart Anvil
+# Ctrl+C → ./anvil-start.sh
 
 # 3-6. Единая команда chain (после restart):
 mkdir -p bot/flowers && \

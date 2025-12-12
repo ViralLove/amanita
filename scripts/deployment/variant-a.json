@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "name": "Вариант A: С сохранением Arweave CID",
+  "description": "Полный пайплайн деплоя с переиспользованием CID",
+  "network": "localhost",
+  
+  "prerequisites": {
+    "anvil_running": {
+      "check": "lsof -ti:8545",
+      "description": "Anvil должен быть запущен на порту 8545",
+      "action_if_failed": "Запустить: ./anvil-start.sh"
+    },
+    "env_vars": [
+      "DEPLOYER_PRIVATE_KEY",
+      "DEPLOYER_ADDRESS",
+      "SELLER_PRIVATE_KEY",
+      "SELLER_ADDRESS"
+    ],
+    "deployer_funded": {
+      "check": "cast balance 0x8F6251F6332A8e8479cD371e1bdA8102d2088d99 --rpc-url http://localhost:8545",
+      "min_balance": "100000000000000000000",
+      "description": "Deployer должен быть профинансирован (100 ETH)",
+      "action_if_failed": "cast rpc anvil_setBalance 0x8F6251F6332A8e8479cD371e1bdA8102d2088d99 0x56BC75E2D63100000 --rpc-url http://localhost:8545"
+    }
+  },
+
+  "steps": [
+    {
+      "id": "cleanup",
+      "name": "Очистка локальных данных (сохраняем CID)",
+      "type": "bash",
+      "command": "bash scripts/clean_components_upload.bash --keep-cids",
+      "description": "Очищает локальные данные, но сохраняет Arweave CID",
+      "continue_on_error": false,
+      "validations": [
+        {
+          "type": "exit_code",
+          "expected": 0
+        }
+      ]
+    },
+    {
+      "id": "restart_anvil",
+      "name": "Restart Anvil",
+      "type": "manual",
+      "description": "Остановить текущий Anvil (Ctrl+C) и запустить ./anvil-start.sh",
+      "note": "Можно автоматизировать через pkill + запуск, но требует подтверждения",
+      "skip_if": {
+        "condition": "anvil_running",
+        "description": "Пропустить если Anvil уже запущен"
+      }
+    },
+    {
+      "id": "deploy_contracts",
+      "name": "Передеплой контрактов",
+      "type": "hardhat",
+      "command": "npx hardhat run scripts/deploy_full.js --network localhost",
+      "env": {
+        "DEPLOY_ACTION": "1"
+      },
+      "description": "Деплой всех контрактов системы",
+      "dependencies": ["cleanup"],
+      "continue_on_error": false,
+      "validations": [
+        {
+          "type": "exit_code",
+          "expected": 0
+        },
+        {
+          "type": "grep",
+          "file": ".env",
+          "pattern": "MAGIC_REGISTRY_CONTRACT_ADDRESS",
+          "description": "Проверка наличия адреса MagicRegistry в .env"
+        },
+        {
+          "type": "grep",
+          "file": ".env",
+          "pattern": "SPIRAL_ENGINE_PROXY_ADDRESS",
+          "description": "Проверка наличия адреса SpiralEngine в .env"
+        }
+      ]
+    },
+    {
+      "id": "create_invites",
+      "name": "Создание рутовых инвайтов",
+      "type": "hardhat",
+      "command": "npx hardhat run scripts/deploy_full.js --network localhost",
+      "env": {
+        "DEPLOY_ACTION": "777"
+      },
+      "description": "Создает 12 рутовых инвайтов для деплоя",
+      "dependencies": ["deploy_contracts"],
+      "pre_commands": [
+        {
+          "type": "bash",
+          "command": "mkdir -p bot/flowers",
+          "description": "Создание директории для инвайтов"
+        }
+      ],
+      "continue_on_error": false,
+      "validations": [
+        {
+          "type": "exit_code",
+          "expected": 0
+        },
+        {
+          "type": "file_exists",
+          "path": "bot/flowers/deployer_invites_localhost.txt",
+          "description": "Файл с инвайтами должен быть создан"
+        },
+        {
+          "type": "file_content",
+          "path": "bot/flowers/deployer_invites_localhost.txt",
+          "min_lines": 12,
+          "description": "Должно быть минимум 12 инвайтов"
+        }
+      ],
+      "extractors": [
+        {
+          "name": "invite_1",
+          "type": "file_line",
+          "source": "bot/flowers/deployer_invites_localhost.txt",
+          "line_index": 0,
+          "description": "Первый инвайт для Action 555",
+          "store_in": "state.invites.invite_1"
+        }
+      ]
+    },
+    {
+      "id": "load_components",
+      "name": "Загрузка компонентов + активация seller",
+      "type": "hardhat",
+      "command": "npx hardhat run scripts/deploy_full.js --network localhost",
+      "env": {
+        "DEPLOY_ACTION": "555",
+        "DEPLOYER_INVITE": "${state.invites.invite_1}"
+      },
+      "description": "Загружает компоненты и активирует seller (БЕЗ роли активатора)",
+      "dependencies": ["create_invites"],
+      "continue_on_error": false,
+      "validations": [
+        {
+          "type": "exit_code",
+          "expected": 0
+        },
+        {
+          "type": "log_contains",
+          "patterns": [
+            "Seller активирован в SpiralEngine",
+            "Seller получил SELLER_ROLE",
+            "CID источник: arweave_state"
+          ],
+          "description": "Проверка успешной активации seller"
+        }
+      ],
+      "post_commands": [
+        {
+          "type": "validation",
+          "command": "for comp in data/components/*; do [ -d \"$comp\" ] && node scripts/validators/validate_component_upload.js --component $(basename $comp) --network localhost; done",
+          "description": "Валидация всех компонентов (обязательно)",
+          "optional": false,
+          "continue_on_error": false
+        }
+      ]
+    },
+    {
+      "id": "assign_activator_role",
+      "name": "Назначение ACTIVATOR_ROLE для seller",
+      "type": "hardhat",
+      "command": "npx hardhat run scripts/deploy_full.js --network localhost",
+      "env": {
+        "DEPLOY_ACTION": "9"
+      },
+      "description": "КРИТИЧЕСКИЙ ШАГ: Без этого онбординг не работает!",
+      "dependencies": ["load_components"],
+      "continue_on_error": false,
+      "critical": true,
+      "validations": [
+        {
+          "type": "exit_code",
+          "expected": 0
+        },
+        {
+          "type": "log_contains",
+          "patterns": [
+            "ACTIVATOR_ROLE назначена успешно",
+            "Verification passed"
+          ],
+          "description": "Проверка успешного назначения роли"
+        }
+      ]
+    },
+    {
+      "id": "clear_catalog",
+      "name": "Очищение каталога",
+      "type": "hardhat",
+      "command": "npx hardhat run scripts/deploy_full.js --network localhost",
+      "env": {
+        "DEPLOY_ACTION": "6"
+      },
+      "description": "Очищает каталог перед инициализацией",
+      "dependencies": ["assign_activator_role"],
+      "continue_on_error": false,
+      "validations": [
+        {
+          "type": "exit_code",
+          "expected": 0
+        }
+      ]
+    },
+    {
+      "id": "init_catalog",
+      "name": "Инициализация каталога",
+      "type": "hardhat",
+      "command": "npx hardhat run scripts/deploy_full.js --network localhost",
+      "env": {
+        "DEPLOY_ACTION": "444"
+      },
+      "description": "Инициализирует каталог продуктов",
+      "dependencies": ["clear_catalog"],
+      "continue_on_error": false,
+      "validations": [
+        {
+          "type": "exit_code",
+          "expected": 0
+        }
+      ],
+      "post_commands": [
+        {
+          "type": "validation",
+          "command": "node scripts/validators/validate_catalog_pipeline.js --seller iveta --network localhost --full-arweave-check",
+          "description": "Валидация каталога с полной проверкой Arweave CID (обязательно)",
+          "optional": false,
+          "continue_on_error": false
+        }
+      ]
+    }
+  ],
+
+  "state": {
+    "invites": {
+      "invite_1": null
+    },
+    "contracts": {},
+    "validation_results": {}
+  },
+
+  "options": {
+    "skip_validations": false,
+    "skip_optional_validations": false,
+    "stop_on_error": true,
+    "parallel_execution": false,
+    "verbose": true
+  }
+}
