@@ -53,7 +53,7 @@ def real_arweave_data_ru():
     - Emoji (🔬 🔹 🌿 🌀 ⚠️)
     - Newlines (\n)
     - Quotes ("текст")
-    - Long text (~700 characters)
+    - Long text (в реальных файлах может быть > 1000 символов)
     """
     # ✅ ИСПРАВЛЕНО: Используем паттерн из E2E тестов для единообразия
     # bot/tests/unit/test_component_description.py -> parents[3] -> корень проекта
@@ -93,7 +93,7 @@ class TestComponentDescriptionValidation:
     Test __post_init__ validation logic.
     
     Validates:
-    - generic_description length (10-1000 characters)
+    - generic_description length (10..MAX_GENERIC_DESCRIPTION_LEN characters)
     - dosage_instructions type and content
     - features type and content
     """
@@ -179,8 +179,9 @@ class TestComponentDescriptionValidation:
             ComponentDescription(generic_description="Short")  # 5 chars
     
     def test_reject_too_long_generic_description(self):
-        """Test ValueError for generic_description > 1000 characters"""
-        long_text = "x" * 1001
+        """Test ValueError for generic_description > MAX_GENERIC_DESCRIPTION_LEN"""
+        from model.component_description import MAX_GENERIC_DESCRIPTION_LEN
+        long_text = "x" * (MAX_GENERIC_DESCRIPTION_LEN + 1)
         with pytest.raises(ValueError, match="слишком длинный"):
             ComponentDescription(generic_description=long_text)
     
@@ -226,10 +227,17 @@ class TestComponentDescriptionValidation:
         assert len(desc.generic_description) == 10
     
     def test_boundary_exactly_1000_characters(self):
-        """Test boundary: exactly 1000 characters (maximum valid)"""
+        """Test boundary: exactly 1000 characters (legacy max, still valid)"""
         text_1000 = "x" * 1000
         desc = ComponentDescription(generic_description=text_1000)
         assert len(desc.generic_description) == 1000
+
+    def test_boundary_exactly_max_generic_description_len(self):
+        """Test boundary: exactly MAX_GENERIC_DESCRIPTION_LEN characters (maximum valid)"""
+        from model.component_description import MAX_GENERIC_DESCRIPTION_LEN
+        text_max = "x" * MAX_GENERIC_DESCRIPTION_LEN
+        desc = ComponentDescription(generic_description=text_max)
+        assert len(desc.generic_description) == MAX_GENERIC_DESCRIPTION_LEN
 
 
 # ==============================================================================

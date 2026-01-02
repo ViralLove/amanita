@@ -34,7 +34,7 @@ class TestArWeaveUploaderTDD:
             importlib.reload(ar_weave)
             ar_weave.ARWEAVE_PRIVATE_KEY = test_key
             
-        uploader = ArWeaveUploader()
+            uploader = ArWeaveUploader()
             assert uploader.private_key == test_key
         finally:
             # Восстанавливаем оригинальное значение
@@ -52,8 +52,8 @@ class TestArWeaveUploaderTDD:
             importlib.reload(ar_weave)
             ar_weave.ARWEAVE_PRIVATE_KEY = None
             
-        with pytest.raises(FileNotFoundError):
-            ArWeaveUploader()
+            with pytest.raises(FileNotFoundError):
+                ArWeaveUploader()
         finally:
             # Восстанавливаем оригинальное значение
             config_module.ARWEAVE_PRIVATE_KEY = original_key

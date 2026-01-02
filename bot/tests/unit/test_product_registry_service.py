@@ -16,6 +16,12 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 from services.product.exceptions import InvalidProductIdError as InvalidProductIdErrorService
+from services.product.storage import ProductStorageService
+from bot.services.core.contracts.product_registry_codec import (
+    ProductRegistryCodecError,
+    ProductRegistryGetProduct,
+    decode_get_product_tuple,
+)
 
 # Настройка логирования
 handler = logging.StreamHandler(sys.stdout)
@@ -191,7 +197,7 @@ async def test_update_product_success(mock_registry_service):
     from bot.model.organic_component import OrganicComponent
     test_component = OrganicComponent(
         component_id="Amanita_muscaria",
-        description_cid="QmDescCID123",
+        description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         proportion="100%"
     )
     
@@ -257,14 +263,14 @@ async def test_update_product_not_found(mock_registry_service):
     update_data = {
         "business_id": "999",
         "title": "Non-existent Product",
-        "description_cid": "QmDescCID123",
+        "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         "categories": ["mushroom"],
         "cover_image_url": "QmImageCID123",
         "forms": ["powder"],
         "species": "Amanita muscaria",
         "organic_components": [{
             "component_id": "Amanita_muscaria",
-            "description_cid": "QmDescCID123",
+            "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "proportion": "100%"
         }],
         "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
@@ -311,7 +317,7 @@ async def test_update_product_validation_error(mock_registry_service):
         "species": "Amanita muscaria",
         "organic_components": [{
             "component_id": "Amanita_muscaria",
-            "description_cid": "QmDescCID123",
+            "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
             "proportion": "100%"
         }],
         "prices": [{"weight": "100", "weight_unit": "g", "price": "80", "currency": "EUR"}]
@@ -345,8 +351,17 @@ async def test_update_product_status_success(mock_registry_service):
     # Настраиваем моки через зависимости сервиса
     registry_service.blockchain_service.update_product_status = AsyncMock(return_value="0xTxHash123")
     registry_service.blockchain_service.seller_key = "0x1234567890abcdef"
-    # Мокаем get_product для возврата валидных данных блокчейна (5 элементов)
-    registry_service.blockchain_service.get_product = Mock(return_value=(1, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", ["component1"], "QmCID123", True))
+    # Мокаем structured read для проверки прав/идемпотентности (без "магических индексов" tuple)
+    registry_service.blockchain_service.get_product_structured = Mock(
+        return_value=ProductRegistryGetProduct(
+            id=1,
+            seller="0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            business_id="test_business_id",
+            component_ids=["component1"],
+            metadata_cid="QmCID123",
+            active=False,
+        )
+    )
     
     # Мокаем метод get_product для возврата валидного продукта
     from bot.model.product import Product, PriceInfo
@@ -354,7 +369,7 @@ async def test_update_product_status_success(mock_registry_service):
     
     test_component = OrganicComponent(
         component_id="Amanita_muscaria",
-        description_cid="QmDescCID123",
+        description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         proportion="100%"
     )
     
@@ -365,7 +380,7 @@ async def test_update_product_status_success(mock_registry_service):
         cid="QmCID123",
         title="Test Product",
         organic_components=[test_component],
-        cover_image_url="QmImageCID123",
+        cover_image_url="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         categories=["mushroom"],
         forms=["powder"],
         species="Amanita muscaria",
@@ -422,8 +437,16 @@ async def test_update_product_status_idempotency(mock_registry_service):
     
     # Настраиваем моки через зависимости сервиса
     registry_service.blockchain_service.seller_key = "0x1234567890abcdef"
-    # Мокаем get_product для возврата валидных данных блокчейна (5 элементов)
-    registry_service.blockchain_service.get_product = Mock(return_value=(1, "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", ["component1"], "QmCID123", True))
+    registry_service.blockchain_service.get_product_structured = Mock(
+        return_value=ProductRegistryGetProduct(
+            id=1,
+            seller="0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            business_id="test_business_id",
+            component_ids=["component1"],
+            metadata_cid="QmCID123",
+            active=True,
+        )
+    )
     
     # Мокаем метод get_product для возврата валидного продукта
     from bot.model.product import Product, PriceInfo
@@ -431,7 +454,7 @@ async def test_update_product_status_idempotency(mock_registry_service):
     
     test_component = OrganicComponent(
         component_id="Amanita_muscaria",
-        description_cid="QmDescCID123",
+        description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         proportion="100%"
     )
     
@@ -442,7 +465,7 @@ async def test_update_product_status_idempotency(mock_registry_service):
         cid="QmCID123",
         title="Test Product",
         organic_components=[test_component],
-        cover_image_url="QmImageCID123",
+        cover_image_url="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         categories=["mushroom"],
         forms=["powder"],
         species="Amanita muscaria",
@@ -472,17 +495,18 @@ async def test_update_product_status_access_denied(mock_registry_service):
     # Используем фикстуру mock_registry_service
     registry_service = mock_registry_service
     
-    # ✅ ИСПРАВЛЕНО: Настраиваем мок для возврата продукта с другим владельцем
-    # Адрес текущего селлера: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
-    different_owner_address = "0x1111111111111111111111111111111111111111"  # Отличается от seller_account.address
-    registry_service.blockchain_service.get_product = Mock(return_value=(
-        1,  # id
-        different_owner_address,  # seller (другой адрес)
-        "test_business_id",  # businessId
-        ["component1"],  # componentIds
-        "QmCID1",  # metadataCID
-        True  # active
-    ))
+    # ✅ ИСПРАВЛЕНО: owner mismatch через structured read (прод-логика)
+    different_owner_address = "0x1111111111111111111111111111111111111111"
+    registry_service.blockchain_service.get_product_structured = Mock(
+        return_value=ProductRegistryGetProduct(
+            id=1,
+            seller=different_owner_address,
+            business_id="test_business_id",
+            component_ids=["component1"],
+            metadata_cid="QmCID1",
+            active=True,
+        )
+    )
     
     logger.info("🚀 Вызываем update_product_status без прав доступа")
     result = await registry_service.update_product_status(1, 1)
@@ -493,6 +517,42 @@ async def test_update_product_status_access_denied(mock_registry_service):
     assert result is False
     
     logger.info("✅ Юнит-тест обновления статуса без прав доступа завершен")
+
+
+def test_decode_get_product_tuple_uups_ok():
+    """Codec: UUPS ProductRegistryLogic ABI (len=6) декодируется корректно."""
+    raw = (
+        7,
+        "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "amanita_muscaria",
+        ["comp1", "comp2"],
+        "QmCID123",
+        True,
+    )
+    decoded = decode_get_product_tuple(raw)
+    assert decoded.id == 7
+    assert decoded.seller.lower().startswith("0x")
+    assert decoded.business_id == "amanita_muscaria"
+    assert decoded.component_ids == ["comp1", "comp2"]
+    assert decoded.metadata_cid == "QmCID123"
+    assert decoded.active is True
+
+
+def test_decode_get_product_tuple_unexpected_len_raises():
+    """Codec: неожиданная длина tuple должна падать (fail-loud)."""
+    with pytest.raises(ProductRegistryCodecError):
+        decode_get_product_tuple((1, 2, 3))  # len=3
+
+
+def test_decode_get_product_tuple_legacy_requires_flag():
+    """Codec: legacy len=4 допускается только при allow_legacy=True."""
+    legacy_raw = (1, "0xabc", "QmCID", False)
+    with pytest.raises(ProductRegistryCodecError):
+        decode_get_product_tuple(legacy_raw)
+    decoded = decode_get_product_tuple(legacy_raw, allow_legacy=True)
+    assert decoded.id == 1
+    assert decoded.metadata_cid == "QmCID"
+    assert decoded.active is False
 
 @pytest.mark.asyncio
 async def test_validate_product_update():
@@ -1943,7 +2003,7 @@ async def test_deserialize_product_success():
     from bot.model.organic_component import OrganicComponent
     test_component = OrganicComponent(
         component_id="test_species",
-        description_cid="QmDescCID123",
+        description_cid="QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         proportion="100%"
     )
     
@@ -1977,7 +2037,7 @@ async def test_deserialize_product_success():
     mock_storage.download_json = Mock(return_value={
         "business_id": "test-product",
         "title": "Test Product",
-        "description_cid": "QmDescCID123",
+        "description_cid": "QmdoqBWBZoupjQWFfBxMJD5N9dJSFTyjVEV1AVL8oNEVSG",
         "cover_image_url": "QmImageCID123",
         "categories": ["test"],
         "forms": ["powder"],
@@ -2357,7 +2417,10 @@ def test_validate_ipfs_cid_valid():
     # Arrange
     # Создаем моки напрямую
     mock_blockchain = Mock()
-    mock_storage = Mock()
+    # Важно: используем реальную валидацию CID, а не Mock(), потому что:
+    # bool(Mock()) == True и hasattr(Mock(), "validate_ipfs_cid") == True (ленивые атрибуты),
+    # что ломает смысл теста.
+    mock_storage = ProductStorageService(storage_provider=Mock())
     mock_validation = Mock()
     mock_account = Mock()
     
@@ -2396,7 +2459,8 @@ def test_validate_ipfs_cid_invalid():
     # Arrange
     # Создаем моки напрямую
     mock_blockchain = Mock()
-    mock_storage = Mock()
+    # Важно: используем реальную валидацию CID, а не Mock() (см. комментарий в valid-тесте).
+    mock_storage = ProductStorageService(storage_provider=Mock())
     mock_validation = Mock()
     mock_account = Mock()
     

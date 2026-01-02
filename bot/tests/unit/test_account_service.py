@@ -170,14 +170,29 @@ class TestAccountServiceUnit:
             invite_code = "SPIRAL-EXIST-CODE"
             wallet_address = "0x9999999999999999999999999999999999999999"  # Новый пользователь
             
+            invites_before = set(mock_blockchain_service.spiral_engine_state["invite_codes"].keys())
             new_codes = await account_service.activate_and_mint_invites(invite_code, wallet_address)
             
             assert isinstance(new_codes, list)
             assert len(new_codes) == 12
             assert all(code.startswith("SPIRAL-") for code in new_codes)
             
+            # Anti-false-success: проверяем, что была выполнена предварительная валидация пары активатор↔инвайт
+            assert len(mock_blockchain_service.validate_activator_invite_pair_calls) == 1
+
+            # Anti-false-success: проверяем, что activate_invite реально был вызван
+            assert len(mock_blockchain_service.activate_invite_calls) == 1
+            assert mock_blockchain_service.activate_invite_calls[0]["invite_code"] == invite_code
+            assert mock_blockchain_service.activate_invite_calls[0]["user_address"] == wallet_address
+
             # Проверяем, что пользователь был активирован в моке
             assert mock_blockchain_service.is_user_activated(wallet_address) == True
+
+            # Anti-false-success: инвайт-коды реально добавлены в состояние
+            invites_after = set(mock_blockchain_service.spiral_engine_state["invite_codes"].keys())
+            assert len(invites_after - invites_before) == 12
+            for code in new_codes:
+                assert code in mock_blockchain_service.spiral_engine_state["invite_codes"]
             logger.info(f"✅ Активация и минт инвайтов завершены: {len(new_codes)} новых кодов")
 
     @pytest.mark.asyncio
@@ -195,8 +210,11 @@ class TestAccountServiceUnit:
             wallet_address = "0x9999999999999999999999999999999999999999"
         
         # При несуществующем коде метод должен выбросить исключение
-            with pytest.raises(Exception, match="Ошибка активации: Invite code not found"):
+            with pytest.raises(Exception, match="Инвайт-код .* не найден"):
                 await account_service.activate_and_mint_invites(fake_code, wallet_address)
+
+            # Anti-false-success: транзакция не должна запускаться
+            assert len(mock_blockchain_service.activate_invite_calls) == 0
         
         logger.info("✅ Ошибка при несуществующем коде корректно обработана")
 
@@ -218,6 +236,12 @@ class TestAccountServiceUnit:
             # При попытке активации уже активированного пользователя должно выбросить исключение
             with pytest.raises(Exception, match="Ошибка активации: User already activated"):
                 await account_service.activate_and_mint_invites(invite_code, wallet_address)
+
+            # Anti-false-success: предварительная валидация была выполнена
+            assert len(mock_blockchain_service.validate_activator_invite_pair_calls) == 1
+
+            # Anti-false-success: попытка activate_invite была сделана и вернула reason
+            assert len(mock_blockchain_service.activate_invite_calls) == 1
         
         logger.info("✅ Ошибка при повторной активации корректно обработана")
     

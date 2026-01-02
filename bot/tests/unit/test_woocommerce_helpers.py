@@ -425,6 +425,31 @@ class TestPrepareImagesList:
         assert result[2]["form"] == "capsules"
         assert result[2]["product_sku"] == "123_capsules"
 
+    def test_prepare_images_list_arweave_txid_converted_to_url(self):
+        """
+        prepare_images_list() конвертирует Arweave txId (43 base64url) в публичный URL.
+        
+        GIVEN: продукт с cover_image_url как Arweave txId
+        WHEN: prepare_images_list() вызывается
+        THEN: image_url = https://arweave.net/<txId>
+        """
+        # Arrange
+        txid = "A" * 43
+        product = MockProduct(
+            business_id="prod_001",
+            blockchain_id=123,
+            cover_image_url=txid,
+            forms=["dried"]
+        )
+        html_adapter = MockHTMLFormatAdapter()
+        
+        # Act
+        result = prepare_images_list([product], "ru", html_adapter)
+        
+        # Assert
+        assert len(result) == 1
+        assert result[0]["image_url"] == f"https://arweave.net/{txid}"
+
 
 @pytest.mark.unit
 class TestValidateSkuUniqueness:
