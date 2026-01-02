@@ -6,9 +6,21 @@
 
 // Configure Chai plugins
 const chai = require('chai');
-const chaiAsPromised = require('chai-as-promised');
-
+let chaiAsPromised;
+try {
+  chaiAsPromised = require('chai-as-promised');
+  // Handle both CommonJS and ES module exports
+  if (typeof chaiAsPromised === 'function') {
 chai.use(chaiAsPromised);
+  } else if (chaiAsPromised && typeof chaiAsPromised.default === 'function') {
+    chai.use(chaiAsPromised.default);
+  } else if (chaiAsPromised && chaiAsPromised.default) {
+    chai.use(chaiAsPromised.default);
+  }
+} catch (error) {
+  // chai-as-promised not available, skip
+  console.warn('chai-as-promised not available, skipping plugin setup');
+}
 
 // Suppress console output during tests (optional)
 if (process.env.SUPPRESS_LOGS === 'true') {

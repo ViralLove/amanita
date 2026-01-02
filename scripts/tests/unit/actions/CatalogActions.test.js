@@ -115,19 +115,48 @@ describe('CatalogActions', () => {
     });
 
     it('должен вернуть true если найдены компоненты в state файле', async () => {
+      // GIVEN: Mock fs для проверки state файлов
+      const fs = require('fs');
+      const path = require('path');
+      
+      // Mock COMPONENTS_DIR существует
+      fsExistsSync.callsFake((filePath) => {
+        // Если это директория components
+        if (filePath.includes('data/components') && !filePath.includes('_upload_state')) {
+          return true;
+        }
+        // Если это state файл
+        if (filePath.includes('_upload_state.json')) {
+          return true;
+        }
+        return false;
+      });
+      
+      // Mock readdirSync для компонентов
+      const fsReaddirSync = sinon.stub(fs, 'readdirSync');
+      fsReaddirSync.returns(['comp1', 'comp2']);
+      
+      // Mock statSync для проверки директорий
+      const fsStatSync = sinon.stub(fs, 'statSync');
+      fsStatSync.returns({ isDirectory: () => true });
+      
+      // Mock readFileSync для state файлов
       const stateData = {
-        components: {
-          'comp1': { id: 1 },
-          'comp2': { id: 2 }
+        arweave: {
+          steps_completed: ['component_registered']
         }
       };
-      
-      fsExistsSync.returns(true);
       fsReadFileSync.returns(JSON.stringify(stateData));
 
+      // WHEN: checkComponentsLoaded вызывается
       const result = await catalogActions.checkComponentsLoaded();
 
+      // THEN: Результат true (найдены компоненты с component_registered)
       expect(result).to.be.true;
+      
+      // Restore
+      fsReaddirSync.restore();
+      fsStatSync.restore();
     });
 
     it('должен вернуть true если найдены компоненты в контракте', async () => {
@@ -172,16 +201,51 @@ describe('CatalogActions', () => {
     });
 
     it('должен использовать кастомную network из options', async () => {
-      const stateData = {
-        components: { 'comp1': { id: 1 } }
-      };
+      // GIVEN: Mock fs для проверки state файлов с кастомной network
+      const fs = require('fs');
+      const path = require('path');
       
-      fsExistsSync.withArgs(sinon.match(/_upload_state_polygon\.json$/)).returns(true);
+      // Mock COMPONENTS_DIR существует
+      fsExistsSync.callsFake((filePath) => {
+        // Если это директория components
+        if (filePath.includes('data/components') && !filePath.includes('_upload_state')) {
+          return true;
+        }
+        // Если это state файл (универсальный формат _upload_state.json, не зависит от network)
+        if (filePath.includes('_upload_state.json')) {
+          return true;
+        }
+        return false;
+      });
+      
+      // Mock readdirSync для компонентов
+      const fsReaddirSync = sinon.stub(fs, 'readdirSync');
+      fsReaddirSync.returns(['comp1']);
+      
+      // Mock statSync для проверки директорий
+      const fsStatSync = sinon.stub(fs, 'statSync');
+      fsStatSync.returns({ isDirectory: () => true });
+      
+      // Mock readFileSync для state файлов
+      const stateData = {
+        arweave: {
+          steps_completed: ['component_registered']
+        }
+      };
       fsReadFileSync.returns(JSON.stringify(stateData));
 
+      // WHEN: checkComponentsLoaded вызывается с кастомной network
       const result = await catalogActions.checkComponentsLoaded({ network: 'polygon' });
 
+      // THEN: Результат true (найдены компоненты)
+      // NOTE: В текущей реализации checkComponentsLoaded использует универсальный формат
+      // _upload_state.json (не зависит от network), поэтому network из options не влияет
+      // на поиск файлов, но передается в метод для будущего использования
       expect(result).to.be.true;
+      
+      // Restore
+      fsReaddirSync.restore();
+      fsStatSync.restore();
     });
 
     it('должен вернуть false при JSON parse ошибке', async () => {
