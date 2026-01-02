@@ -7,10 +7,13 @@ HTML Format Adapter for WooCommerce Export
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 from services.common.localization import Localization
 from handlers.common.formatting.product_formatter_service import ProductFormatterService
 from model.product import Product
+from model.component_description import ComponentDescription
+from model.organic_component import OrganicComponent
+from model.dosage_instruction import DosageInstruction
 
 
 class HTMLFormatAdapter:
@@ -344,6 +347,164 @@ class HTMLFormatAdapter:
             except:
                 return ''
     
+    def _aggregate_component_descriptions(self, product: Product) -> Dict[str, Any]:
+        """
+        Агрегирует описания из всех компонентов продукта.
+        Выполняется лениво только при рендеринге, а не при создании Product.
+
+        Фаза 1: Инициализация аккумуляторов
+        - Создаем словарь для сбора описаний по типам
+        - Каждый тип содержит список для накопления данных
+
+        Args:
+            product: Product с обогащенными компонентами
+
+        Returns:
+            Dict с агрегированными описаниями
+        """
+        self.logger.info(f"[HTMLFormatAdapter] Начинаем агрегацию описаний для продукта {getattr(product, 'business_id', 'unknown')}")
+
+        # Фаза 1: Инициализация аккумуляторов для агрегации
+        descriptions = {
+            'generic_description': [],
+            'effects': [],
+            'warnings': [],
+            'shamanic': [],
+            'dosage_instructions': [],
+            'features': []
+        }
+
+        self.logger.debug("[HTMLFormatAdapter] Инициализированы аккумуляторы для агрегации")
+
+        # Фаза 2: Итерация по компонентам продукта
+        total_components = len(product.organic_components)
+        self.logger.info(f"[HTMLFormatAdapter] Обрабатываем {total_components} компонентов продукта")
+
+        for i, component in enumerate(product.organic_components, 1):
+            self.logger.debug(f"[HTMLFormatAdapter] Обрабатываем компонент {i}/{total_components}: {getattr(component, 'component_id', 'unknown')}")
+
+            # Проверяем наличие описания у компонента
+            if hasattr(component, 'description') and component.description:
+                desc = component.description
+                self.logger.debug(f"[HTMLFormatAdapter] Найдено описание для компонента {getattr(component, 'component_id', 'unknown')}")
+
+                # Фаза 3: Определение названия компонента для заголовков
+                component_title = (
+                    getattr(desc, 'scientific_title', None) or
+                    getattr(desc, 'title', None) or
+                    getattr(component, 'component_id', 'Компонент')
+                )
+                self.logger.debug(f"[HTMLFormatAdapter] Определено название компонента: '{component_title}'")
+
+                # Фаза 4: Агрегация текстовых полей с заголовками
+                for field in ['generic_description', 'effects', 'warnings', 'shamanic']:
+                    field_value = getattr(desc, field, None)
+                    if field_value:
+                        formatted_entry = f"<strong>{component_title}:</strong><br>{field_value}"
+                        descriptions[field].append(formatted_entry)
+                        self.logger.debug(f"[HTMLFormatAdapter] Добавлено поле {field}: {len(field_value)} символов")
+
+                # Фаза 5: Специальная обработка списков
+                if hasattr(desc, 'dosage_instructions') and desc.dosage_instructions:
+                    descriptions['dosage_instructions'].extend(desc.dosage_instructions)
+                    self.logger.debug(f"[HTMLFormatAdapter] Добавлено {len(desc.dosage_instructions)} инструкций по дозировке")
+
+                if hasattr(desc, 'features') and desc.features:
+                    descriptions['features'].extend(desc.features)
+                    self.logger.debug(f"[HTMLFormatAdapter] Добавлено {len(desc.features)} особенностей")
+            else:
+                self.logger.debug(f"[HTMLFormatAdapter] Компонент {getattr(component, 'component_id', 'unknown')} не имеет описания")
+
+        # Фаза 6: Финализация результатов
+        result = {}
+        self.logger.info("[HTMLFormatAdapter] Финализируем результаты агрегации")
+
+        # Строковые поля: объединяем через разделитель параграфов
+        for field in ['generic_description', 'effects', 'warnings', 'shamanic']:
+            if descriptions[field]:
+                result[field] = '<br><br>'.join(descriptions[field])
+                self.logger.debug(f"[HTMLFormatAdapter] Сформировано поле {field}: {len(result[field])} символов")
+
+        # Списки: оставляем как есть
+        if descriptions['dosage_instructions']:
+            result['dosage_instructions'] = descriptions['dosage_instructions']
+            self.logger.debug(f"[HTMLFormatAdapter] Включено {len(result['dosage_instructions'])} инструкций по дозировке")
+
+        if descriptions['features']:
+            # Убираем дубликаты и сохраняем порядок
+            seen = set()
+            unique_features = []
+            for feature in descriptions['features']:
+                if feature not in seen:
+                    seen.add(feature)
+                    unique_features.append(feature)
+            result['features'] = unique_features
+            self.logger.debug(f"[HTMLFormatAdapter] Включено {len(result['features'])} уникальных особенностей")
+
+        self.logger.info(f"[HTMLFormatAdapter] Агрегация завершена. Сформировано {len(result)} полей описаний")
+        return result
+
+    def _format_aggregated_dosage_html(self, dosage_instructions: List[DosageInstruction]) -> str:
+        """
+        Рендерит агрегированные инструкции по дозировке.
+
+        Фаза 9: Форматирование списка инструкций
+        - Создаем HTML список с заголовком
+        - Экранируем каждую инструкцию
+        - Добавляем дополнительную информацию если есть
+
+        Args:
+            dosage_instructions: Список объектов DosageInstruction
+
+        Returns:
+            str: HTML секция с инструкциями по дозировке
+        """
+        self.logger.debug(f"[HTMLFormatAdapter] Форматируем {len(dosage_instructions)} инструкций по дозировке")
+
+        if not dosage_instructions:
+            return ''
+
+        html_parts = ["<h3>Дозировка</h3>\n<ul>"]
+
+        for i, instruction in enumerate(dosage_instructions, 1):
+            self.logger.debug(f"[HTMLFormatAdapter] Форматируем инструкцию {i}/{len(dosage_instructions)}")
+
+            title = self._escape_html(getattr(instruction, 'title', ''))
+            description = self._escape_html(getattr(instruction, 'description', ''))
+
+            html_parts.append(f"<li><strong>{title}</strong><br/>{description}")
+
+            # Добавляем тип дозировки если есть
+            if hasattr(instruction, 'type') and getattr(instruction, 'type', None):
+                type_info = self._escape_html(instruction.type)
+                html_parts.append(f"<br/><em>Тип: {type_info}</em>")
+
+            html_parts.append("</li>")
+
+        html_parts.append("</ul>")
+        result = ''.join(html_parts)
+        self.logger.debug(f"[HTMLFormatAdapter] Сформирован HTML для дозировки: {len(result)} символов")
+        return result
+
+    def _escape_html(self, text: str) -> str:
+        """
+        Безопасное экранирование HTML.
+
+        Фаза 10: Экранирование специальных символов
+        - Предотвращает XSS атаки
+        - Сохраняет читаемость текста
+
+        Args:
+            text: Исходный текст
+
+        Returns:
+            str: Экранированный HTML
+        """
+        import html
+        escaped = html.escape(text)
+        self.logger.debug(f"[HTMLFormatAdapter] Экранирован текст: {len(text)} → {len(escaped)} символов")
+        return escaped
+
     def format_product_html(self, product: Product, loc: Localization) -> str:
         """
         Форматирует продукт в HTML для WooCommerce.
@@ -390,8 +551,43 @@ class HTMLFormatAdapter:
             if details and details.strip():
                 html_parts.append(details)
             
+            # Фаза 7: Агрегация описаний компонентов
+            self.logger.debug(f"[HTMLFormatAdapter] Агрегируем описания компонентов для продукта {getattr(product, 'business_id', 'unknown')}")
+            aggregated_descriptions = self._aggregate_component_descriptions(product)
+
+            # Фаза 8: Рендеринг агрегированных секций
+            if aggregated_descriptions.get('generic_description'):
+                self.logger.debug("[HTMLFormatAdapter] Рендерим секцию generic_description")
+                html_parts.append(
+                    f"<h3>Описание</h3>\n<p>{self._escape_html(aggregated_descriptions['generic_description'])}</p>"
+                )
+
+            if aggregated_descriptions.get('effects'):
+                self.logger.debug("[HTMLFormatAdapter] Рендерим секцию effects")
+                html_parts.append(
+                    f"<h3>Эффекты</h3>\n<p>{self._escape_html(aggregated_descriptions['effects'])}</p>"
+                )
+
+            if aggregated_descriptions.get('shamanic'):
+                self.logger.debug("[HTMLFormatAdapter] Рендерим секцию shamanic")
+                html_parts.append(
+                    f"<h3>Шаманская перспектива</h3>\n<p>{self._escape_html(aggregated_descriptions['shamanic'])}</p>"
+                )
+
+            if aggregated_descriptions.get('warnings'):
+                self.logger.debug("[HTMLFormatAdapter] Рендерим секцию warnings")
+                html_parts.append(
+                    f"<h3>Предупреждения</h3>\n<p>{self._escape_html(aggregated_descriptions['warnings'])}</p>"
+                )
+
+            if aggregated_descriptions.get('dosage_instructions'):
+                self.logger.debug("[HTMLFormatAdapter] Рендерим секцию dosage_instructions")
+                html_parts.append(self._format_aggregated_dosage_html(aggregated_descriptions['dosage_instructions']))
+
             # Объединяем секции через двойной перевод строки для разделения
-            return '\n\n'.join(html_parts) if html_parts else ''
+            result = '\n\n'.join(html_parts) if html_parts else ''
+            self.logger.info(f"[HTMLFormatAdapter] Форматирование завершено. Итоговый HTML: {len(result)} символов")
+            return result
             
         except Exception as e:
             self.logger.error(
