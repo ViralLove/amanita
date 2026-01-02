@@ -232,7 +232,14 @@ function createProductDirectory(seller_id, product_id, outputDir = null) {
  * @returns {string} Путь к сохраненному файлу
  */
 function saveProductJSON(productData, productDir) {
-  const productFile = path.join(productDir, `${productData.product_id}.json`);
+  if (!productData.business_id) {
+    throw new Error(
+      'Product data must contain business_id. ' +
+      `Received keys: ${Object.keys(productData).join(', ')}`
+    );
+  }
+  
+  const productFile = path.join(productDir, `${productData.business_id}.json`);
   
   try {
     fs.writeFileSync(

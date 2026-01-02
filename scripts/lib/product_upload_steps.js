@@ -171,10 +171,17 @@ async function uploadTitleFiles(context, productsDir, outputDir) {
     try {
       console.log(`\n📦 Обработка продукта: ${productId}`);
       
-      // ✅ NEW: Check if already uploaded to Arweave
+      // ✅ ИСПРАВЛЕНО: Объявляем переменные до блока if для правильной области видимости
       let titleCID;
       let titleSkipped = false;
+      let result = null;  // ✅ Объявлено до блока if для доступа после него
       
+      // ✅ ИСПРАВЛЕНО: Читаем titleData один раз (убрано дублирование)
+      const titleData = JSON.parse(fs.readFileSync(titleFile, 'utf8'));
+      console.log(`   → Title файл: ${titleFile}`);
+      console.log(`   → Языки: ${Object.keys(titleData).join(', ')}`);
+      
+      // ✅ NEW: Check if already uploaded to Arweave
       if (existingMapping[productId]?.title_cid) {
         const existingCID = existingMapping[productId].title_cid;
         
@@ -198,23 +205,11 @@ async function uploadTitleFiles(context, productsDir, outputDir) {
       
       // Upload to Arweave only if not skipped
       if (!titleSkipped) {
-      
-        // Read title JSON
-        const titleData = JSON.parse(fs.readFileSync(titleFile, 'utf8'));
-        console.log(`   → Title файл: ${titleFile}`);
-        console.log(`   → Языки: ${Object.keys(titleData).join(', ')}`);
-        
         // Upload combined titles to Arweave
-        const result = await uploadToArweave(context, titleData, `${productId}.titles.json`);
+        result = await uploadToArweave(context, titleData, `${productId}.titles.json`);
         titleCID = result.txId;
         uploadedCount++;
-      } else {
-        // Title already in Arweave, just read the languages
-        const titleData = JSON.parse(fs.readFileSync(titleFile, 'utf8'));
       }
-      
-      // Read title JSON for language info
-      const titleData = JSON.parse(fs.readFileSync(titleFile, 'utf8'));
       
       // Prepare title mapping entry
       titleMapping[productId] = {
@@ -925,11 +920,11 @@ async function registerProductsInContract(context, productMapping, productData) 
           contractProductId: contractProductId,
           contractBusinessId: contractBusinessId,
           success: true,
-          txHash: receipt.transactionHash
+          txHash: receipt.hash
         };
         
         console.log(`   ✅ Продукт зарегистрирован: ID ${contractProductId}, businessId ${contractBusinessId}`);
-        console.log(`   → TX: ${receipt.transactionHash}`);
+        console.log(`   → TX: ${receipt.hash}`);
       }
       
     } catch (error) {
@@ -1003,11 +998,11 @@ async function activateProductsInContract(context, registrationResults) {
         activationResults[productId] = {
           contractProductId: contractProductId,
           success: true,
-          txHash: receipt.transactionHash
+          txHash: receipt.hash
         };
         
         console.log(`   ✅ Продукт активирован`);
-        console.log(`   → TX: ${receipt.transactionHash}`);
+        console.log(`   → TX: ${receipt.hash}`);
       }
       
     } catch (error) {

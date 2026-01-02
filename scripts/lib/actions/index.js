@@ -79,6 +79,9 @@ class ActionsManager {
       888: (inviteCode, sellerAddress, options) => this.inviteActions.action888(inviteCode, sellerAddress, options),
       
       // Component actions
+      51: () => this.componentActions.action51(),
+      52: () => this.componentActions.action52(),
+      53: () => this.componentActions.action53(),
       555: () => this.componentActions.action555(),
       
       // Catalog actions (new format)
@@ -102,7 +105,7 @@ class ActionsManager {
    * @returns {Array} - List of available action numbers
    */
   getAvailableActions() {
-    return [0, 1, 2, 4, 5, 6, 7, 9, 11, 13, 40, 41, 42, 43, 46, 444, 555, 777, 888];
+    return [0, 1, 2, 4, 5, 6, 7, 9, 11, 13, 40, 41, 42, 43, 46, 51, 52, 53, 444, 555, 777, 888];
   }
 
   /**
@@ -128,7 +131,10 @@ class ActionsManager {
       43: "Contract Registration",
       46: "Activate existing products in catalog",
       444: "Automatic Pipeline (CSV → Arweave → Contract)",
-      555: "Upload Components",
+      51: "Activate seller in SpiralEngine",
+      52: "Upload components to Arweave",
+      53: "Register components in OrganicComponentRegistry",
+      555: "Component Upload Pipeline (51 → 52 → 53)",
       777: "Create Root Invites",
       888: "Full Seller Initialization Pipeline (Complete Workflow)"
     };

@@ -41,6 +41,30 @@ const contractVerification = require('./contract_verification');
 async function uploadSimpleFields(context, state, onProgress = null) {
   console.log("\n🔹 ШАГ 1: Загрузка Simple Fields");
   
+  // ✅ НОВОЕ: Проверка флага useExistingCids
+  if (context.useExistingCids) {
+    console.log("🔍 [USE_EXISTING_CIDS] Проверяем наличие существующих CID в state...");
+    
+    const existingSimpleFields = state.arweave?.simple_fields || {};
+    const hasTitleCID = existingSimpleFields.title?.cid;
+    const hasDosageCID = existingSimpleFields.dosage_types?.cid;
+    
+    if (hasTitleCID && hasDosageCID) {
+      console.log("✅ [USE_EXISTING_CIDS] Найдены существующие CID:");
+      console.log(`   → title.cid: ${hasTitleCID}`);
+      console.log(`   → dosage_types.cid: ${hasDosageCID}`);
+      console.log("✅ [USE_EXISTING_CIDS] Используем существующие CID, пропускаем загрузку");
+      return existingSimpleFields;
+    } else {
+      const missing = [];
+      if (!hasTitleCID) missing.push('title');
+      if (!hasDosageCID) missing.push('dosage_types');
+      console.warn(`⚠️ [USE_EXISTING_CIDS] CID отсутствуют для: ${missing.join(', ')}`);
+      console.warn(`   🔄 Fallback: выполняем загрузку в Arweave...`);
+      // Продолжаем обычную логику загрузки (fallback)
+    }
+  }
+  
   // ✅ CHANGE (2025-12-02): Check arweave section for steps
   const verification = await contractVerification.verifyStepCompletion({
     state: state.arweave,  // ← Pass arweave section instead of full state
@@ -208,6 +232,39 @@ async function uploadSimpleFields(context, state, onProgress = null) {
  */
 async function uploadComplexFields(context, state, onProgress = null) {
   console.log("\n🔹 ШАГ 2: Загрузка Complex Fields");
+  
+  // ✅ НОВОЕ: Проверка флага useExistingCids
+  if (context.useExistingCids) {
+    console.log("🔍 [USE_EXISTING_CIDS] Проверяем наличие существующих CID в state...");
+    
+    const existingComplexFields = state.arweave?.complex_fields || {};
+    const languages = context.supportedLanguages || utils.getSupportedLanguages();
+    const missingLanguages = [];
+    
+    // Проверяем наличие CID для каждого языка
+    for (const lang of languages) {
+      const langCID = existingComplexFields[lang]?.cid || 
+                     (typeof existingComplexFields[lang] === 'string' ? existingComplexFields[lang] : null);
+      
+      if (!langCID) {
+        missingLanguages.push(lang);
+      }
+    }
+    
+    if (missingLanguages.length === 0) {
+      console.log("✅ [USE_EXISTING_CIDS] Найдены существующие CID для всех языков:");
+      for (const lang of languages) {
+        const langCID = existingComplexFields[lang]?.cid || existingComplexFields[lang];
+        console.log(`   → ${lang}.cid: ${langCID?.substring(0, 20)}...`);
+      }
+      console.log("✅ [USE_EXISTING_CIDS] Используем существующие CID, пропускаем загрузку");
+      return existingComplexFields;
+    } else {
+      console.warn(`⚠️ [USE_EXISTING_CIDS] CID отсутствуют для языков: ${missingLanguages.join(', ')}`);
+      console.warn(`   🔄 Fallback: выполняем загрузку в Arweave...`);
+      // Продолжаем обычную логику загрузки (fallback)
+    }
+  }
   
   // ✅ CHANGE (2025-12-02): Check arweave section for steps
   const verification = await contractVerification.verifyStepCompletion({
@@ -512,18 +569,31 @@ function updateRootMetadata(context, simpleFieldCIDs, complexFieldCIDs, state) {
     const fs = require('fs');
     const path = require('path');
     
-    // 1. Читаем оригинальный root файл
-    console.log(`📖 Чтение оригинального файла: ${context.biounit_id}.json`);
-    const rootData = utils.readJSON(context.componentDir, `${context.biounit_id}.json`);
+    // ✅ НОВОЕ: Импорт ComponentTracking
+    const ComponentTracking = require('./tracking/ComponentTracking');
+    const tracking = new ComponentTracking();
+    
+    // ✅ НОВОЕ: Очистка исходного JSON файла от тестовых адресов
+    // Это обновит исходный файл на диске, заменив тестовые адреса на реальные
+    const sourceJsonPath = path.join(context.componentDir, `${context.biounit_id}.json`);
+    const cleanedRootData = tracking.cleanSourceJson(sourceJsonPath, context.seller?.address);
+    
+    // ✅ НОВОЕ: Обновление tracking-полей для финального metadata
+    // cleanedRootData уже содержит реальные адреса, но нужно добавить запись в change_history
+    const rootDataWithTracking = tracking.updateForCreation(cleanedRootData, {
+      actorAddress: context.seller?.address,
+      action: 'upload_to_arweave',
+      blockchain: null  // Blockchain данные будут добавлены при регистрации
+    });
     
     // 2. Создаем финальную структуру с CID references
     const finalRootData = {
-      ...rootData,
+      ...rootDataWithTracking,  // ← Используем данные с обновленным tracking
       localizations: {
         simple_fields: simpleFieldCIDs,
         complex_fields: complexFieldCIDs
       },
-      last_updated: new Date().toISOString(),
+      last_updated: rootDataWithTracking.last_updated,  // ← Уже обновлен в tracking
       network: context.network
     };
     
@@ -574,15 +644,35 @@ function updateRootMetadata(context, simpleFieldCIDs, complexFieldCIDs, state) {
 async function uploadRootMetadata(context, rootData, state, onProgress = null) {
   console.log("\n🔹 ШАГ 5: Загрузка Root Metadata");
   
+  // ✅ НОВОЕ: Проверка флага useExistingCids
+  if (context.useExistingCids) {
+    console.log("🔍 [USE_EXISTING_CIDS] Проверяем наличие существующего CID в state...");
+    
+    // ✅ CHANGE (2025-12-02): Check arweave section
+    const existingRootCID = state.arweave?.root_metadata?.cid || state.root_metadata?.cid;
+    
+    if (existingRootCID) {
+      console.log("✅ [USE_EXISTING_CIDS] Найден существующий CID:");
+      console.log(`   → root_metadata.cid: ${existingRootCID.substring(0, 20)}...`);
+      console.log("✅ [USE_EXISTING_CIDS] Используем существующий CID, пропускаем загрузку");
+      return existingRootCID;
+    } else {
+      console.warn(`⚠️ [USE_EXISTING_CIDS] CID отсутствует в state.arweave.root_metadata`);
+      console.warn(`   🔄 Fallback: выполняем загрузку в Arweave...`);
+      // Продолжаем обычную логику загрузки (fallback)
+    }
+  }
+  
   // Проверяем, был ли шаг уже выполнен
-  if (stateManager.isStepCompleted(state, 'root_metadata_uploaded')) {
-    const savedCID = state.root_metadata && state.root_metadata.cid;
+  // ✅ CHANGE (2025-12-02): Check arweave section
+  if (stateManager.isStepCompleted(state.arweave, 'root_metadata_uploaded')) {
+    const savedCID = state.arweave?.root_metadata?.cid || state.root_metadata?.cid;
     console.log("✅ Шаг уже выполнен, используем сохраненный CID");
     console.log(`   → Сохраненный CID: ${savedCID || 'ОТСУТСТВУЕТ!'}`);
     
     if (!savedCID) {
       console.error("❌ ОШИБКА: CID отсутствует в state, хотя шаг помечен как выполненный!");
-      console.error("   → State root_metadata:", JSON.stringify(state.root_metadata, null, 2));
+      console.error("   → State root_metadata:", JSON.stringify(state.arweave?.root_metadata || state.root_metadata, null, 2));
       throw new Error("Inconsistent state: step completed but CID missing");
     }
     
@@ -759,6 +849,79 @@ async function registerComponent(context, rootCID, state, onProgress = null) {
     // Ждем подтверждения транзакции
     const receipt = await tx.wait();
     console.log(`✅ Транзакция подтверждена: блок ${receipt.blockNumber}`);
+    
+    // ✅ НОВОЕ: Обновление change_history с blockchain данными
+    console.log(`\n📝 Обновление tracking-полей с blockchain данными...`);
+    const ComponentTracking = require('./tracking/ComponentTracking');
+    const tracking = new ComponentTracking();
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Загрузить финальный root metadata из state
+    const finalRootData = state.arweave?.root_metadata?.data;
+    
+    if (finalRootData) {
+      console.log(`   → Загружен root metadata из state`);
+      
+      // Обновить change_history в root metadata
+      const updatedData = tracking.addHistoryEntry(finalRootData, {
+        timestamp: new Date().toISOString(),
+        address: context.seller?.address,
+        action: 'register_in_contract',
+        changes: ['contract_registration'],
+        transaction_hash: receipt.hash,
+        block_number: receipt.blockNumber
+      });
+      
+      console.log(`   → Добавлена запись в change_history`);
+      console.log(`      → Action: register_in_contract`);
+      console.log(`      → TX Hash: ${receipt.hash}`);
+      console.log(`      → Block: ${receipt.blockNumber}`);
+      
+      // Сохранить обновленные данные обратно в state
+      state.arweave.root_metadata.data = updatedData;
+      console.log(`   → Обновлен state.arweave.root_metadata.data`);
+      
+      // ✅ НОВОЕ: Обновить исходный JSON файл компонента с blockchain данными
+      const sourceJsonPath = path.join(context.componentDir, `${context.biounit_id}.json`);
+      
+      if (fs.existsSync(sourceJsonPath)) {
+        console.log(`   → Чтение исходного JSON файла: ${path.basename(sourceJsonPath)}`);
+        const sourceJsonData = utils.readJSON(context.componentDir, `${context.biounit_id}.json`);
+        
+        const updatedSourceJson = tracking.addHistoryEntry(sourceJsonData, {
+          timestamp: new Date().toISOString(),
+          address: context.seller?.address,
+          action: 'register_in_contract',
+          changes: ['contract_registration'],
+          transaction_hash: receipt.hash,
+          block_number: receipt.blockNumber
+        });
+        
+        fs.writeFileSync(sourceJsonPath, JSON.stringify(updatedSourceJson, null, 2), 'utf8');
+        console.log(`   ✅ Обновлен исходный JSON с blockchain данными`);
+        console.log(`      → TX: ${receipt.hash}`);
+        console.log(`      → Block: ${receipt.blockNumber}`);
+      } else {
+        console.warn(`   ⚠️  Исходный JSON файл не найден: ${sourceJsonPath}`);
+      }
+      
+      // Обновить финальный файл на диске
+      const finalFileName = state.arweave?.root_metadata?.path;
+      if (finalFileName) {
+        const finalRootPath = path.join(context.componentDir, finalFileName);
+        if (fs.existsSync(finalRootPath)) {
+          fs.writeFileSync(finalRootPath, JSON.stringify(updatedData, null, 2), 'utf8');
+          console.log(`   ✅ Обновлен финальный JSON с blockchain данными: ${finalFileName}`);
+        }
+      }
+      
+      // Сохранить state (уже будет сохранен ниже, но сохраняем здесь для безопасности)
+      stateManager.saveComponentState(context.componentDir, state);
+      console.log(`   → State сохранен`);
+    } else {
+      console.warn(`   ⚠️  Root metadata не найден в state, пропускаем обновление tracking-полей`);
+    }
     
     // Извлекаем componentId из события ComponentCreated (ethers.js парсинг)
     let componentId = null;
@@ -1146,6 +1309,509 @@ async function restoreComplexFieldsToContract(context, state, missingLanguages) 
 }
 
 // ====================================================================
+// 🚀 ACTION 52: UNIFIED ARWEAVE UPLOAD FOR COMPONENTS
+// ====================================================================
+
+/**
+ * Action 52: Unified Arweave Upload для компонентов
+ * 
+ * Загружает все компоненты в Arweave:
+ * - Simple Fields (title, dosage) → Arweave → CID в AmanitaInternational
+ * - Complex Fields (переводы) → Arweave → CID в AmanitaInternational
+ * - Shareable Data (один раз) → Arweave
+ * - Root Metadata (обновленный) → Arweave → root CID в state
+ * 
+ * @param {Object} context - Upload context
+ * @param {string} componentsDir - Директория с компонентами (default: "data/components")
+ * @param {string} networkName - Название сети
+ * @param {boolean} dryRun - Режим dry-run
+ * @returns {Promise<Object>} - Upload results
+ */
+async function action52_UnifiedArweaveUpload(context, componentsDir, networkName, dryRun = false) {
+  console.log("\n" + "=".repeat(80));
+  console.log("🚀 ACTION 52: ЗАГРУЗКА КОМПОНЕНТОВ В ARWEAVE");
+  console.log("=".repeat(80));
+  console.log(`📁 Components dir: ${componentsDir}`);
+  console.log(`🌐 Network: ${networkName}`);
+  console.log(`🔍 Dry-run: ${dryRun ? 'YES' : 'NO'}`);
+  
+  const startTime = Date.now();
+  const results = [];
+  let successCount = 0;
+  let failCount = 0;
+  
+  try {
+    // 1. Валидация context
+    if (!context.arweave || !context.arweave.client) {
+      throw new Error("Arweave client not initialized in context");
+    }
+    
+    if (!context.contracts || !context.contracts.amanitaInternational) {
+      throw new Error("AmanitaInternational contract not initialized in context");
+    }
+    
+    if (!context.seller || !context.seller.address) {
+      throw new Error("Seller not initialized in context");
+    }
+    
+    // 2. Валидация seller (требует Action 51)
+    if (context.contracts.spiralEngine) {
+      const usedInvite = await context.contracts.spiralEngine.usedInviteByUser(context.seller.address);
+      if (usedInvite == 0) {
+        throw new Error(`Seller ${context.seller.address} не активирован! Запустите Action 51 сначала.`);
+      }
+      
+      const SELLER_ROLE = await context.contracts.spiralEngine.SELLER_ROLE();
+      const hasSellerRole = await context.contracts.spiralEngine.hasRole(SELLER_ROLE, context.seller.address);
+      if (!hasSellerRole) {
+        throw new Error(`Seller ${context.seller.address} не имеет SELLER_ROLE! Запустите Action 51 сначала.`);
+      }
+    }
+    
+    // 3. Поиск компонентов
+    const fs = require('fs');
+    const path = require('path');
+    // scripts/lib/upload_steps.js находится в <projectRoot>/scripts/lib
+    // поэтому projectRoot = два уровня вверх.
+    const projectRoot = path.join(__dirname, '..', '..');
+    const componentsPath = path.join(projectRoot, componentsDir);
+    
+    if (!fs.existsSync(componentsPath)) {
+      throw new Error(`Директория компонентов не найдена: ${componentsPath}`);
+    }
+    
+    const entries = fs.readdirSync(componentsPath, { withFileTypes: true });
+    const componentIds = entries
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name)
+      .filter(name => {
+        if (name.startsWith('_') || name.startsWith('.')) return false;
+        const componentDir = path.join(componentsPath, name);
+        const rootFile = path.join(componentDir, `${name}.json`);
+        return fs.existsSync(rootFile);
+      })
+      .sort();
+    
+    if (componentIds.length === 0) {
+      throw new Error(`Компоненты не найдены в ${componentsPath}`);
+    }
+    
+    console.log(`✅ Найдено компонентов: ${componentIds.length}`);
+    
+    // 4. Обработка компонентов
+    console.log(`\n🚀 Обработка компонентов...`);
+    
+    let shareableDataUploaded = false;
+    
+    for (let i = 0; i < componentIds.length; i++) {
+      const componentId = componentIds[i];
+      const componentDir = path.join(componentsPath, componentId);
+      
+      console.log(`\n${'='.repeat(70)}`);
+      console.log(`🔷 Компонент ${i + 1}/${componentIds.length}: ${componentId}`);
+      console.log(`${'='.repeat(70)}`);
+      
+      try {
+        // Создаем context для upload_steps
+        const componentContext = {
+          biounit_id: componentId,
+          componentDir: componentDir,
+          network: networkName,
+          dryRun: dryRun,
+          useExistingCids: context.useExistingCids,  // ✅ НОВОЕ: Передаем флаг для использования существующих CID
+          seller: context.seller,
+          deployer: context.deployer,
+          contracts: context.contracts,
+          arweave: context.arweave,
+          ethersProvider: context.ethersProvider,
+          supportedLanguages: context.supportedLanguages || utils.getSupportedLanguages()
+        };
+        
+        // Загрузка state
+        let state = stateManager.loadComponentState(componentDir, networkName) || {
+          biounit_id: componentId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          arweave: {
+            steps_completed: [],
+            simple_fields: {},
+            complex_fields: {},
+            root_metadata: {}
+          },
+          deployments: {}
+        };
+        
+        // Проверка завершенных шагов
+        const isStepCompleted = (stepName) => {
+          return state.arweave?.steps_completed?.includes(stepName) || false;
+        };
+        
+        console.log(`💾 Загрузка component state: ${componentId} (biounit_id: ${componentContext.biounit_id})`);
+        const arweaveSteps = state.arweave?.steps_completed || [];
+        
+        if (arweaveSteps.length > 0) {
+          console.log(`✅ State найден:`);
+          console.log(`   → Arweave шагов: ${arweaveSteps.length}`);
+          console.log(`   → Завершенные шаги: ${arweaveSteps.join(', ')}`);
+        } else {
+          console.log(`🆕 State файл не найден, создаем новый`);
+        }
+        
+        // Шаг 1: Upload Simple Fields
+        let simpleFieldCIDs = await uploadSimpleFields(componentContext, state);
+        
+        // Шаг 2: Upload Complex Fields
+        let complexFieldCIDs = await uploadComplexFields(componentContext, state);
+        
+        // Шаг 3: Upload Shareable Data (один раз, для первого компонента)
+        if (!shareableDataUploaded) {
+          if (isStepCompleted('shareable_data_uploaded')) {
+            console.log(`\n⏭️  Shareable Data уже загружены (пропуск)`);
+          } else {
+            await uploadShareableData(componentContext, state);
+            console.log(`✅ Shareable Data загружены`);
+          }
+          shareableDataUploaded = true;
+        }
+        
+        // Шаг 4: Update Root Metadata
+        let finalRootData;
+        if (isStepCompleted('root_metadata_updated')) {
+          console.log(`\n⏭️  Root Metadata уже обновлен (пропуск)`);
+          finalRootData = state.arweave?.root_metadata?.data;
+        } else {
+          finalRootData = updateRootMetadata(componentContext, simpleFieldCIDs, complexFieldCIDs, state);
+          console.log(`✅ Root Metadata обновлен`);
+        }
+        
+        // Шаг 5: Upload Root Metadata
+        let rootCID;
+        if (isStepCompleted('root_metadata_uploaded')) {
+          console.log(`\n⏭️  Root Metadata уже загружен в Arweave (пропуск)`);
+          rootCID = state.arweave?.root_metadata?.cid;
+        } else {
+          rootCID = await uploadRootMetadata(componentContext, finalRootData, state);
+          console.log(`✅ Root Metadata загружен в Arweave: ${rootCID}`);
+        }
+        
+        // ❌ НЕ ВКЛЮЧАТЬ: registerComponent() - это Action 53
+        
+        results.push({
+          componentId,
+          success: true,
+          rootCID: rootCID,
+          simpleFields: Object.keys(simpleFieldCIDs).length,
+          complexFields: Object.keys(complexFieldCIDs).length
+        });
+        successCount++;
+        
+      } catch (error) {
+        console.error(`❌ Ошибка обработки компонента ${componentId}:`);
+        console.error(`   ${error.message}`);
+        
+        results.push({
+          componentId,
+          success: false,
+          error: error.message
+        });
+        failCount++;
+        
+        console.log(`⏭️  Продолжаем со следующим компонентом...`);
+      }
+    }
+    
+    // 5. Финальный отчет
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`📊 ФИНАЛЬНЫЙ ОТЧЁТ ACTION 52`);
+    console.log(`${'='.repeat(80)}`);
+    console.log(`✅ Успешно: ${successCount}`);
+    console.log(`❌ Ошибок: ${failCount}`);
+    console.log(`📊 Всего: ${componentIds.length}`);
+    console.log(`⏱️ Время выполнения: ${duration}s`);
+    
+    if (successCount > 0) {
+      console.log(`\n🎉 Успешно загружены:`);
+      results.filter(r => r.success).forEach((result, index) => {
+        console.log(`   ${index + 1}. ${result.componentId}`);
+        console.log(`      → Root CID: ${result.rootCID}`);
+        console.log(`      → Simple Fields: ${result.simpleFields}`);
+        console.log(`      → Complex Fields: ${result.complexFields}`);
+      });
+    }
+    
+    if (failCount > 0) {
+      console.log(`\n❌ Ошибки:`);
+      results.filter(r => !r.success).forEach((result, index) => {
+        console.log(`   ${index + 1}. ${result.componentId}: ${result.error}`);
+      });
+    }
+    
+    console.log(`\n✅ ACTION 52 завершен`);
+    console.log(`${'='.repeat(80)}`);
+    
+    return {
+      success: failCount === 0,
+      successCount,
+      failCount,
+      totalCount: componentIds.length,
+      results,
+      duration: parseFloat(duration)
+    };
+    
+  } catch (error) {
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.error(`\n❌ ACTION 52 завершен с ошибкой: ${error.message}`);
+    console.error(`⏱️ Время выполнения: ${duration}s`);
+    throw error;
+  }
+}
+
+// ====================================================================
+// 🚀 ACTION 53: UNIFIED CONTRACT REGISTRATION FOR COMPONENTS
+// ====================================================================
+
+/**
+ * Action 53: Unified Contract Registration для компонентов
+ * 
+ * Регистрирует все компоненты в OrganicComponentRegistry:
+ * - Читает root CID из state файлов
+ * - Проверяет существование компонента в контракте
+ * - Регистрирует компонент (biounit_id, rootCID)
+ * - Выполняет финальную валидацию
+ * 
+ * @param {Object} context - Upload context
+ * @param {string} componentsDir - Директория с компонентами (default: "data/components")
+ * @param {string} networkName - Название сети
+ * @param {boolean} dryRun - Режим dry-run
+ * @returns {Promise<Object>} - Registration results
+ */
+async function action53_UnifiedContractRegistration(context, componentsDir, networkName, dryRun = false) {
+  console.log("\n" + "=".repeat(80));
+  console.log("🚀 ACTION 53: РЕГИСТРАЦИЯ КОМПОНЕНТОВ В КОНТРАКТЕ");
+  console.log("=".repeat(80));
+  console.log(`📁 Components dir: ${componentsDir}`);
+  console.log(`🌐 Network: ${networkName}`);
+  console.log(`🔍 Dry-run: ${dryRun ? 'YES' : 'NO'}`);
+  
+  const startTime = Date.now();
+  const results = [];
+  let successCount = 0;
+  let failCount = 0;
+  
+  try {
+    // 1. Валидация контракта
+    if (!context.contracts || !context.contracts.organicComponentRegistry) {
+      throw new Error("OrganicComponentRegistry contract not initialized in context");
+    }
+    
+    // 2. Валидация seller
+    if (!context.seller || !context.seller.address) {
+      throw new Error("Seller not initialized in context");
+    }
+    
+    // Проверка активации seller (требует Action 51)
+    if (context.contracts.spiralEngine) {
+      const usedInvite = await context.contracts.spiralEngine.usedInviteByUser(context.seller.address);
+      if (usedInvite == 0) {
+        throw new Error(`Seller ${context.seller.address} не активирован! Запустите Action 51 сначала.`);
+      }
+      
+      const SELLER_ROLE = await context.contracts.spiralEngine.SELLER_ROLE();
+      const hasSellerRole = await context.contracts.spiralEngine.hasRole(SELLER_ROLE, context.seller.address);
+      if (!hasSellerRole) {
+        throw new Error(`Seller ${context.seller.address} не имеет SELLER_ROLE! Запустите Action 51 сначала.`);
+      }
+    }
+    
+    // 3. Поиск компонентов
+    const fs = require('fs');
+    const path = require('path');
+    // scripts/lib/upload_steps.js находится в <projectRoot>/scripts/lib
+    // поэтому projectRoot = два уровня вверх.
+    const projectRoot = path.join(__dirname, '..', '..');
+    const componentsPath = path.join(projectRoot, componentsDir);
+    
+    if (!fs.existsSync(componentsPath)) {
+      throw new Error(`Директория компонентов не найдена: ${componentsPath}`);
+    }
+    
+    const entries = fs.readdirSync(componentsPath, { withFileTypes: true });
+    const componentIds = entries
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name)
+      .filter(name => {
+        if (name.startsWith('_') || name.startsWith('.')) return false;
+        const componentDir = path.join(componentsPath, name);
+        const rootFile = path.join(componentDir, `${name}.json`);
+        return fs.existsSync(rootFile);
+      })
+      .sort();
+    
+    if (componentIds.length === 0) {
+      throw new Error(`Компоненты не найдены в ${componentsPath}`);
+    }
+    
+    console.log(`✅ Найдено компонентов: ${componentIds.length}`);
+    
+    // 4. Регистрация компонентов
+    console.log(`\n🚀 Регистрация компонентов в контракте...`);
+    
+    // stateManager уже импортирован в начале файла (строка 12), используем его
+    
+    for (let i = 0; i < componentIds.length; i++) {
+      const componentId = componentIds[i];
+      const componentDir = path.join(componentsPath, componentId);
+      
+      console.log(`\n${'='.repeat(70)}`);
+      console.log(`🔷 Компонент ${i + 1}/${componentIds.length}: ${componentId}`);
+      console.log(`${'='.repeat(70)}`);
+      
+      try {
+        // Загрузка state
+        const state = stateManager.loadComponentState(componentDir, networkName);
+        
+        if (!state) {
+          throw new Error(`State файл не найден для компонента ${componentId}. Запустите Action 52 сначала.`);
+        }
+        
+        // Получение root CID из state
+        const rootCID = state.arweave?.root_metadata?.cid;
+        
+        if (!rootCID) {
+          throw new Error(`Root CID не найден в state для компонента ${componentId}. Запустите Action 52 сначала.`);
+        }
+        
+        console.log(`📋 Root CID из state: ${rootCID}`);
+        
+        // Создание context для registerComponent
+        const componentContext = {
+          biounit_id: componentId,
+          componentDir: componentDir,
+          network: networkName,
+          dryRun: dryRun,
+          seller: context.seller,
+          deployer: context.deployer,
+          contracts: context.contracts,
+          arweave: context.arweave,
+          ethersProvider: context.ethersProvider,
+          supportedLanguages: context.supportedLanguages || require('../upload_utils').getSupportedLanguages()
+        };
+        
+        // Регистрация компонента
+        const componentIdResult = await registerComponent(componentContext, rootCID, state);
+        console.log(`✅ Компонент зарегистрирован: ID ${componentIdResult}`);
+        
+        results.push({
+          componentId,
+          success: true,
+          rootCID: rootCID,
+          contractComponentId: componentIdResult
+        });
+        successCount++;
+        
+      } catch (error) {
+        console.error(`❌ Ошибка регистрации компонента ${componentId}:`);
+        console.error(`   ${error.message}`);
+        
+        results.push({
+          componentId,
+          success: false,
+          error: error.message
+        });
+        failCount++;
+        
+        console.log(`⏭️  Продолжаем со следующим компонентом...`);
+      }
+    }
+    
+    // 5. Финальная валидация
+    if (!dryRun && successCount > 0) {
+      console.log(`\n${'='.repeat(70)}`);
+      console.log(`🔍 ФИНАЛЬНАЯ ВАЛИДАЦИЯ КОНТРАКТНОГО СОСТОЯНИЯ`);
+      console.log(`${'='.repeat(70)}`);
+      
+      const organicComponentRegistry = context.contracts.organicComponentRegistry;
+      
+      const totalInContract = await organicComponentRegistry.totalComponents();
+      console.log(`\n📊 Статистика OrganicComponentRegistry:`);
+      console.log(`   Всего компонентов в контракте: ${totalInContract}`);
+      console.log(`   Обработано в Action 53: ${successCount}`);
+      
+      if (totalInContract.toString() !== successCount.toString()) {
+        console.error(`\n❌ КРИТИЧЕСКАЯ ОШИБКА: Несоответствие количества компонентов!`);
+        console.error(`   Обработано: ${successCount}`);
+        console.error(`   В контракте: ${totalInContract}`);
+        throw new Error(`Component count mismatch: processed ${successCount}, in contract ${totalInContract}`);
+      }
+      
+      console.log(`\n🔍 Проверка каждого компонента:`);
+      let verifiedCount = 0;
+      for (const result of results.filter(r => r.success)) {
+        const exists = await organicComponentRegistry.componentExists(result.componentId);
+        const status = exists ? '✅ В КОНТРАКТЕ' : '❌ НЕ НАЙДЕН';
+        console.log(`   ${status}: ${result.componentId}`);
+        
+        if (!exists) {
+          console.error(`\n❌ КРИТИЧЕСКАЯ ОШИБКА: Component ${result.componentId} reported success but NOT in contract!`);
+          throw new Error(`Component ${result.componentId} validation failed - not found in OrganicComponentRegistry`);
+        }
+        verifiedCount++;
+      }
+      
+      console.log(`\n✅ ВАЛИДАЦИЯ ПРОЙДЕНА: Все ${verifiedCount} компонентов подтверждены в контракте`);
+      console.log(`${'='.repeat(70)}\n`);
+    }
+    
+    // 6. Финальный отчет
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`📊 ФИНАЛЬНЫЙ ОТЧЁТ ACTION 53`);
+    console.log(`${'='.repeat(80)}`);
+    console.log(`✅ Успешно: ${successCount}`);
+    console.log(`❌ Ошибок: ${failCount}`);
+    console.log(`📊 Всего: ${componentIds.length}`);
+    console.log(`⏱️ Время выполнения: ${duration}s`);
+    
+    if (successCount > 0) {
+      console.log(`\n🎉 Успешно зарегистрированы:`);
+      results.filter(r => r.success).forEach((result, index) => {
+        console.log(`   ${index + 1}. ${result.componentId}`);
+        console.log(`      → Root CID: ${result.rootCID}`);
+        console.log(`      → Contract ID: ${result.contractComponentId}`);
+      });
+    }
+    
+    if (failCount > 0) {
+      console.log(`\n❌ Ошибки:`);
+      results.filter(r => !r.success).forEach((result, index) => {
+        console.log(`   ${index + 1}. ${result.componentId}: ${result.error}`);
+      });
+    }
+    
+    console.log(`\n✅ ACTION 53 завершен`);
+    console.log(`${'='.repeat(80)}`);
+    
+    return {
+      success: failCount === 0,
+      successCount,
+      failCount,
+      totalCount: componentIds.length,
+      results,
+      duration: parseFloat(duration)
+    };
+    
+  } catch (error) {
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.error(`\n❌ ACTION 53 завершен с ошибкой: ${error.message}`);
+    console.error(`⏱️ Время выполнения: ${duration}s`);
+    throw error;
+  }
+}
+
+// ====================================================================
 // 🎯 EXPORTS
 // ====================================================================
 
@@ -1158,6 +1824,8 @@ module.exports = {
   registerComponent,
   uploadToArweave,
   restoreSimpleFieldsToContract,
-  restoreComplexFieldsToContract
+  restoreComplexFieldsToContract,
+  action52_UnifiedArweaveUpload,
+  action53_UnifiedContractRegistration
 };
 
