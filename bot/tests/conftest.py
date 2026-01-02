@@ -93,6 +93,10 @@ def mock_blockchain_service(monkeypatch):
             self.product_cids = {}
             # Ссылка на storage service для синхронизации
             self.storage_service = None
+
+            # Трекинг вызовов (для unit-тестов, чтобы избежать ложных успехов)
+            self.activate_invite_calls = []
+            self.validate_activator_invite_pair_calls = []
             
             # Состояние для SpiralEngine
             self.spiral_engine_state = {
@@ -743,9 +747,70 @@ def mock_blockchain_service(monkeypatch):
             return None
         
         # 🆕 Методы для AccountService тестов
+        def validate_activator_invite_pair(self, activator_address: str, invite_code: str) -> dict:
+            """
+            Валидирует синхронизацию активатора и инвайта перед активацией.
+
+            Контракт ответа должен совпадать с ожиданиями AccountService:
+            - valid: bool
+            - reason: str (при valid=False)
+            - circle_size / activator_capacity: int (для логов/UX)
+            """
+            # Трекинг вызовов
+            self.validate_activator_invite_pair_calls.append(
+                {"activator_address": activator_address, "invite_code": invite_code}
+            )
+
+            # 1) Invite exists
+            if invite_code not in self.spiral_engine_state["invite_codes"]:
+                return {
+                    "valid": False,
+                    "reason": "invite_not_found",
+                    "circle_size": len(self.spiral_engine_state.get("circle_members", {}).get(activator_address, [])),
+                    "activator_capacity": 12,
+                }
+
+            token_id = self.spiral_engine_state["invite_codes"][invite_code]
+
+            # 2) Invite already used
+            used_token_ids = set(self.spiral_engine_state.get("user_activations", {}).values())
+            if token_id in used_token_ids:
+                return {
+                    "valid": False,
+                    "reason": "invite_already_used",
+                    "circle_size": len(self.spiral_engine_state.get("circle_members", {}).get(activator_address, [])),
+                    "activator_capacity": 12,
+                }
+
+            # 3) Activator circle capacity
+            circle = self.spiral_engine_state.get("circle_members", {}).get(activator_address, [])
+            if isinstance(circle, list) and len(circle) >= 12:
+                return {
+                    "valid": False,
+                    "reason": "activator_circle_full",
+                    "circle_size": len(circle),
+                    "activator_capacity": 12,
+                }
+
+            return {
+                "valid": True,
+                "circle_size": len(circle) if isinstance(circle, list) else 0,
+                "activator_capacity": 12,
+            }
+
         async def activate_invite(self, invite_code, user_address, new_invite_codes, expiry, private_key):
             """Мок активации инвайта через SpiralEngine"""
             logger.info(f"🔍 [MockBlockchainService] activate_invite: {invite_code} -> {user_address}")
+
+            # Трекинг вызовов для тестов
+            self.activate_invite_calls.append(
+                {
+                    "invite_code": invite_code,
+                    "user_address": user_address,
+                    "new_invite_codes": list(new_invite_codes) if new_invite_codes else [],
+                    "expiry": expiry,
+                }
+            )
             
             if invite_code not in self.spiral_engine_state["invite_codes"]:
                 return {"success": False, "reason": "Invite code not found"}

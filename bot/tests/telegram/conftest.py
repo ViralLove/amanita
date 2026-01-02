@@ -86,8 +86,11 @@ def fallback_service():
 
 @pytest.fixture()
 def multilingual_ipfs_service(ipfs_factory, translation_cache_service, fallback_service, blockchain_service):
+    from services.product.storage import ProductStorageService
+    storage_provider = ipfs_factory.get_service() if hasattr(ipfs_factory, "get_service") else ipfs_factory.get_storage()
+    storage_service = ProductStorageService(storage_provider=storage_provider)
     return MultilingualIPFSService(
-        ipfs_factory=ipfs_factory,
+        storage_service=storage_service,
         cache_service=translation_cache_service,
         fallback_service=fallback_service,
         blockchain_service=blockchain_service,
@@ -98,8 +101,11 @@ def localization_service(ipfs_factory, translation_cache_service, fallback_servi
     """
     LocalizationService с DI-зависимостями (совместим с форматтером).
     """
+    from services.product.storage import ProductStorageService
+    storage_provider = ipfs_factory.get_service() if hasattr(ipfs_factory, "get_service") else ipfs_factory.get_storage()
+    storage_service = ProductStorageService(storage_provider=storage_provider)
     ml = MultilingualIPFSService(
-        ipfs_factory=ipfs_factory,
+        storage_service=storage_service,
         cache_service=translation_cache_service,
         fallback_service=fallback_service,
         blockchain_service=blockchain_service,
@@ -120,16 +126,22 @@ def localization_service_primed(localization_service, ipfs_factory, blockchain_s
     ipfs = ipfs_factory.get_service()
     # Product payload (плоская форма, ожидаемая ProductLocalizationService)
     p_id = "prod-tg-001"
-    p_payload = {"title": "TG Product", "description": "Product for Telegram carousel"}
+    # Реальный формат simple field payload: dict(lang->str) под одним CID (по fieldKey ProductName.<business_id>)
+    p_payload = {"en": "TG Product"}
     p_cid = ipfs.upload_json(p_payload)
     # Component payload
     c_id = "comp-tg-001"
-    c_payload = {"title": "TG Component", "description": "Component for Telegram carousel"}
-    c_cid = ipfs.upload_json(c_payload)
+    # Component translations идут через complex fields (ComponentDescription.<id>) в MultilingualIPFSService
+    c_complex_payload = {
+        "label": "ComponentDescription",
+        "type": "complex",
+        "fields": {"title": "TG Component", "description": "Component for Telegram carousel"},
+    }
+    c_cid = ipfs.upload_json(c_complex_payload)
     # Записываем CID’ы в контракт
     contract = blockchain_service.get_contract("AmanitaInternational")
-    contract.functions.setSimpleFieldCID("product", p_id, "*", "en", p_cid).transact()
-    contract.functions.setSimpleFieldCID("component", c_id, "*", "en", c_cid).transact()
+    contract.functions.setSimpleFieldCID(f"ProductName.{p_id}", p_cid).transact()
+    contract.functions.setComplexFieldCID(f"ComponentDescription.{c_id}", "en", c_cid).transact()
     return localization_service, {"product_id": p_id, "component_id": c_id}
 
 

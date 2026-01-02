@@ -21,12 +21,12 @@ from .exceptions import (
 
 class CIDValidator(ValidationRule[str]):
     """
-    Валидатор для IPFS CID.
+    Валидатор для Content Identifier (IPFS CID или Arweave transaction id).
     
-    Проверяет, что CID соответствует формату IPFS:
-    - Начинается с 'Qm'
-    - Содержит только буквы и цифры
-    - Имеет минимальную длину
+    Поддерживаемые форматы (строго):
+    - IPFS CID v0: Qm + base58btc (46 символов)
+    - IPFS CID v1 (упрощенно, как в проекте): bafy + base32 (фикс. длина в текущем паттерне)
+    - Arweave txId: 43 символа base64url (A-Za-z0-9_-)
     """
     
     def __init__(self, min_length: int = 3):
@@ -37,7 +37,15 @@ class CIDValidator(ValidationRule[str]):
             min_length: Минимальная длина CID
         """
         self.min_length = min_length
-        self.cid_pattern = re.compile(r'^Qm[a-zA-Z0-9]+$')
+        
+        # IPFS CID v0 (Qm..., base58btc, 46 chars total)
+        self.ipfs_v0_pattern = re.compile(r'^Qm[1-9A-HJ-NP-Za-km-z]{44}$')
+        
+        # IPFS CID v1 (bafy..., base32). В проекте уже используется упрощенный паттерн.
+        self.ipfs_v1_pattern = re.compile(r'^bafy[A-Za-z2-7]{55}$')
+        
+        # Arweave transaction id (43 chars base64url)
+        self.arweave_txid_pattern = re.compile(r'^[A-Za-z0-9_-]{43}$')
     
     def validate(self, value: str) -> ValidationResult:
         """
@@ -82,24 +90,22 @@ class CIDValidator(ValidationRule[str]):
                 error_code="CID_TOO_SHORT"
             )
         
-        logger.info(f"🔍 Проверяем префикс CID: '{value}' начинается с 'Qm'? {value.startswith('Qm')}")
-        if not value.startswith('Qm'):
-            logger.warning(f"⚠️ CID не начинается с 'Qm': '{value}'")
-            return ValidationResult.failure(
-                "CID должен начинаться с 'Qm'",
-                field_name="cid",
-                field_value=value,
-                error_code="INVALID_CID_PREFIX"
-            )
+        is_ipfs_v0 = bool(self.ipfs_v0_pattern.match(value))
+        is_ipfs_v1 = bool(self.ipfs_v1_pattern.match(value))
+        is_arweave = bool(self.arweave_txid_pattern.match(value))
         
-        logger.info(f"🔍 Проверяем паттерн CID: '{value}' соответствует паттерну? {bool(self.cid_pattern.match(value))}")
-        if not self.cid_pattern.match(value):
-            logger.warning(f"⚠️ CID содержит недопустимые символы: '{value}'")
+        logger.info(
+            "🔍 CIDValidator.validate: формат CID "
+            f"(ipfs_v0={is_ipfs_v0}, ipfs_v1={is_ipfs_v1}, arweave_txid={is_arweave})"
+        )
+        
+        if not (is_ipfs_v0 or is_ipfs_v1 or is_arweave):
+            logger.warning(f"⚠️ CID не соответствует поддерживаемым форматам: '{value}'")
             return ValidationResult.failure(
-                "CID содержит недопустимые символы",
+                "CID должен быть валидным IPFS CID (Qm.../bafy...) или Arweave txId (43 base64url)",
                 field_name="cid",
                 field_value=value,
-                error_code="INVALID_CID_CHARACTERS"
+                error_code="INVALID_CID_FORMAT"
             )
         
         logger.info(f"✅ CID '{value}' валидирован успешно!")

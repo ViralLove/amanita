@@ -352,6 +352,7 @@ class NetworkStateTracker:
         Возвращает отсортированных по generation (lowest first).
         """
         state = self.refresh_state()
+        UNKNOWN_GENERATION = 10**9  # "unknown" поколения сортируем в конец
         
         activators = []
         processed_addresses = set()
@@ -371,12 +372,15 @@ class NetworkStateTracker:
                 # Only add if capacity > 0
                 if capacity > 0:
                     generation = self.get_generation_level(user_addr)
-                    if generation is not None:
-                        activators.append({
-                            'address': user_addr,
-                            'capacity': capacity,
-                            'generation': generation
-                        })
+                    # Важно: generation — это метка для стратегии/сортировки,
+                    # но не обязательное условие "валидности" активатора по capacity.
+                    # Если generation не удалось вычислить, мы всё равно включаем активатора,
+                    # помечая generation как unknown (уходит в конец сортировки).
+                    activators.append({
+                        'address': user_addr,
+                        'capacity': capacity,
+                        'generation': generation if generation is not None else UNKNOWN_GENERATION
+                    })
             except Exception as e:
                 # Skip this user if query fails (may not be activated or contract error)
                 # Log for debugging but don't fail
@@ -1056,8 +1060,11 @@ def multilingual_ipfs_service(ipfs_factory, translation_cache_service, fallback_
     """
     Собранный MultilingualIPFSService с blockchain_service, ipfs_factory и реальным TranslationCacheService.
     """
+    from bot.services.product.storage import ProductStorageService
+    storage_provider = ipfs_factory.get_service() if hasattr(ipfs_factory, "get_service") else ipfs_factory.get_storage()
+    storage_service = ProductStorageService(storage_provider=storage_provider)
     return MultilingualIPFSService(
-        ipfs_factory=ipfs_factory,
+        storage_service=storage_service,
         cache_service=translation_cache_service,
         fallback_service=fallback_service,
         blockchain_service=blockchain_service,

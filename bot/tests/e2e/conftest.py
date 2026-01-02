@@ -598,7 +598,7 @@ def upload_product_payload_to_ipfs(payload: Dict[str, Any], ipfs_factory, langua
             description="Premium dried Amanita muscaria powder"
         )
         cid_en = upload_product_payload_to_ipfs(payload_en, ipfs_factory, language="en")
-        # Returns: "cid://..."
+        # Returns: "Qm..." (validate_ipfs_cid()-compatible stub CID)
     """
     ipfs_service = ipfs_factory.get_service()
     
@@ -635,7 +635,7 @@ def upload_multilingual_product_payloads_to_ipfs(payloads: Dict[str, Dict[str, A
             )
         }
         cids = upload_multilingual_product_payloads_to_ipfs(payloads, ipfs_factory)
-        # Returns: {"en": "cid://...", "ru": "cid://..."}
+        # Returns: {"en": "Qm...", "ru": "Qm..."} (validate_ipfs_cid()-compatible stub CIDs)
     """
     cids: Dict[str, str] = {}
     
@@ -670,7 +670,7 @@ def set_product_cid_in_blockchain(product_id: str, field: str, lang: str, cid: s
             product_id="amanita1",
             field="title",
             lang="en",
-            cid="cid://...",
+            cid="Qm...",
             blockchain_service=real_blockchain_service
         )
         
@@ -679,7 +679,7 @@ def set_product_cid_in_blockchain(product_id: str, field: str, lang: str, cid: s
             product_id="amanita1",
             field="*",
             lang="en",
-            cid="cid://...",
+            cid="Qm...",
             blockchain_service=real_blockchain_service
         )
     """
@@ -688,11 +688,12 @@ def set_product_cid_in_blockchain(product_id: str, field: str, lang: str, cid: s
         if not contract:
             raise ValueError("AmanitaInternational contract not found")
         
-        # Вызываем setSimpleFieldCID через transact
-        fn = contract.functions.setSimpleFieldCID("product", product_id, field, lang, cid)
+        # Реальный ABI: setSimpleFieldCID(fieldKey, cid). Язык хранится в IPFS payload (dict(lang->str)).
+        field_key = f"ProductName.{product_id}"
+        fn = contract.functions.setSimpleFieldCID(field_key, cid)
         result = fn.transact()
         
-        logger.info(f"[set_product_cid_in_blockchain] Set CID for product={product_id}, field={field}, lang={lang}")
+        logger.info(f"[set_product_cid_in_blockchain] Set CID for product={product_id} (fieldKey={field_key})")
         logger.info(f"   CID: {cid}")
         logger.debug(f"   Transaction result: {result}")
         
@@ -717,8 +718,8 @@ def set_multilingual_product_cids_in_blockchain(product_id: str, cids_by_lang: D
         
     Example:
         cids_by_lang = {
-            "en": "cid://...",
-            "ru": "cid://..."
+            "en": "Qm...",
+            "ru": "Qm..."
         }
         results = set_multilingual_product_cids_in_blockchain(
             product_id="amanita1",
@@ -774,7 +775,7 @@ def create_minimal_product_metadata(product_id: str, component_ids: list, metada
         metadata = create_minimal_product_metadata(
             product_id="e2e-test-product",
             component_ids=["amanita_muscaria"],
-            cover_image_cid="cid://cover123",
+            cover_image_cid="QmCoverCidPlaceholder",
             forms=["powder"],
             species="Amanita muscaria",
             prices=[{"price": "19.99", "currency": "USD"}]
@@ -786,6 +787,7 @@ def create_minimal_product_metadata(product_id: str, component_ids: list, metada
         "id": product_id,
         "business_id": product_id,
         "title": "[title]",  # Плейсхолдер - должен быть перезаписан из IPFS
+        "description": "[description]",  # Плейсхолдер - должен быть перезаписан из IPFS
         "cover_image": cover_image_cid if cover_image_cid else "",
         "species": species if species else "[species]",  # Плейсхолдер или реальное значение
     }
@@ -997,8 +999,11 @@ def create_localization_service_for_e2e(
     if not translation_cache_service:
         raise ValueError("translation_cache_service is required for LocalizationService")
     
+    from services.product.storage import ProductStorageService
+    storage_provider = ipfs_factory.get_service() if hasattr(ipfs_factory, "get_service") else ipfs_factory.get_storage()
+    storage_service = ProductStorageService(storage_provider=storage_provider)
     multilingual_ipfs_service = MultilingualIPFSService(
-        ipfs_factory=ipfs_factory,
+        storage_service=storage_service,
         cache_service=translation_cache_service,
         fallback_service=fallback_service,
         blockchain_service=blockchain_service,
