@@ -1,6 +1,12 @@
 """
-Сервис локализации для продуктов
-Обрабатывает переводы данных о продуктах с поддержкой IPFS и мультиязычности
+Product localization service.
+
+This module resolves keys like `product.<business_id>.<field>` into localized strings.
+
+Data sources:
+- cached translations (in-memory + optional external cache service)
+- IPFS/Arweave payloads via `MultilingualIPFSService.get_product_translations(business_id, language)`
+- fallback service and local template JSONs
 """
 
 import logging
@@ -15,25 +21,20 @@ logger = logging.getLogger(__name__)
 
 class ProductLocalizationService:
     """
-    Сервис для работы с переводами продуктов
-    
-    Обрабатывает ключи типа 'product.{business_id}.{field}'
-    и возвращает локализованные значения с поддержкой:
-    - IPFS загрузки переводов
-    - Мультиязычности
-    - Кэширования
-    - Fallback стратегий
+    Localizes product fields.
+
+    Key format: `product.<business_id>.<field>`
     """
     
     def __init__(self, language: str = 'ru', cache_service=None, fallback_service=None, ipfs_service=None):
         """
-        Инициализация сервиса локализации продуктов
+        Initializes ProductLocalizationService.
         
         Args:
-            language: Язык по умолчанию
-            cache_service: Сервис кэширования (TranslationCacheService)
-            fallback_service: Сервис fallback стратегий (FallbackLocalizationService)
-            ipfs_service: Сервис работы с IPFS (MultilingualIPFSService)
+            language: Default language code
+            cache_service: Translation cache service (optional)
+            fallback_service: Fallback localization service (optional)
+            ipfs_service: MultilingualIPFSService (optional)
         """
         self.language = language
         self.cache_service = cache_service
@@ -53,7 +54,7 @@ class ProductLocalizationService:
         logger.info(f"[ProductLocalizationService] Инициализирован для языка: {language}")
     
     def _load_fallback_data(self) -> None:
-        """Загружает fallback данные из JSON файлов"""
+        """Loads fallback data from local JSON templates."""
         try:
             from config import APP_ROOT_DIR
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
@@ -73,15 +74,15 @@ class ProductLocalizationService:
     
     def get_translation(self, key: str, default: Optional[str] = None, **kwargs) -> str:
         """
-        Получает перевод продукта с поддержкой IPFS и fallback стратегий
+        Returns a localized translation for a product key with IPFS + fallback support.
         
         Args:
-            key: Ключ в формате 'product.{business_id}.{field}'
-            default: Значение по умолчанию
-            **kwargs: Параметры для подстановки
+            key: Key in format `product.<business_id>.<field>`
+            default: Default value if translation is missing
+            **kwargs: Optional formatting parameters for `.format()`
             
         Returns:
-            str: Переведенный текст
+            str
         """
         logger.debug(f"[ProductLocalizationService] Запрос перевода: {key}")
         

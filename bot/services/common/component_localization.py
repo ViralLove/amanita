@@ -1,6 +1,15 @@
 """
-Сервис локализации для компонентов (биологических единиц)
-Обрабатывает переводы shared компонентов между продавцами с поддержкой IPFS и мультиязычности
+Component localization service (shared components / biounits).
+
+This module resolves keys like `component.<component_id>.<field>` into localized strings.
+
+Important terminology (SSOT for this repo):
+- The per-component description payload is stored off-chain and referenced from the on-chain
+  AmanitaInternational mapping via `getComplexFieldCID(className, language)` where
+  `className="ComponentDescription.<component_id>"`.
+- The actual stored JSON for ComponentDescription is typically a *plain dict* with keys like
+  `generic_description/effects/shamanic/warnings` (see `data/components/.../complex_fields/*.json`).
+- `MultilingualIPFSService` is responsible for fetching this payload and normalizing it when needed.
 """
 
 import logging
@@ -15,14 +24,14 @@ logger = logging.getLogger(__name__)
 
 class ComponentLocalizationService:
     """
-    Сервис для работы с переводами компонентов
-    
-    Обрабатывает ключи типа 'component.{component_id}.{field}'
-    и возвращает локализованные значения с поддержкой:
-    - IPFS загрузки переводов
-    - Мультиязычности
-    - Кэширования
-    - Fallback стратегий
+    Localizes component fields.
+
+    Key format: `component.<component_id>.<field>`
+
+    Data sources:
+    - cached translations (in-memory + optional external cache service)
+    - IPFS/Arweave payloads via `MultilingualIPFSService`
+    - fallback service and local template JSONs
     """
     
     def __init__(self, language: str = 'ru', cache_service=None, fallback_service=None, ipfs_service=None):
@@ -47,11 +56,12 @@ class ComponentLocalizationService:
         # Поддерживаемые языки
         self.supported_languages = ['ru', 'en', 'es', 'fr', 'de', 'it', 'pt', 'zh', 'ja', 'ko', 'ar', 'hi', 'tr', 'pl', 'uk']
         
-        # Complex fields - поля, которые хранятся как полный JSON на класс и язык (глобальные шаблоны)
-        # ПРИМЕЧАНИЕ: Per-component поля (generic_description, effects, etc.) НЕ являются complex fields
-        # Они хранятся как simple fields через get_component_translations(biounit_id, language)
-        # Complex fields зарезервированы для глобальных шаблонов (если понадобятся в будущем)
-        self.COMPLEX_COMPONENT_FIELDS = set()  # Пусто, так как в production не используются глобальные шаблоны
+        # "Complex fields" here means global templates (NOT per-component payloads).
+        # Per-component ComponentDescription is fetched via `MultilingualIPFSService.get_component_translations()`
+        # using the AmanitaInternational complex-field CID mapping.
+        #
+        # This set is intentionally empty in current production flows (reserved for future global templates).
+        self.COMPLEX_COMPONENT_FIELDS = set()
         
         # Загружаем fallback данные из JSON файлов
         self._load_fallback_data()
@@ -79,31 +89,31 @@ class ComponentLocalizationService:
     
     def _is_complex_field(self, field: str) -> bool:
         """
-        Проверяет, является ли поле complex field (глобальный шаблон).
-        
-        ПРИМЕЧАНИЕ: Per-component поля (generic_description, effects, etc.) НЕ являются complex fields.
-        Они хранятся как simple fields через get_component_translations(biounit_id, language).
-        Complex fields предназначены только для глобальных шаблонов (если используются).
-        
+        Returns True only for global template fields (reserved).
+
+        Per-component fields like `generic_description/effects/...` are retrieved via
+        `MultilingualIPFSService.get_component_translations(component_id, language)` and are NOT
+        routed through this template mechanism.
+
         Args:
-            field: Название поля (например, 'generic_description', 'title')
+            field: Field name (e.g., "generic_description", "title")
             
         Returns:
-            bool: True если поле является complex field (глобальный шаблон)
+            bool: True if the field is a global template field
         """
         return field in self.COMPLEX_COMPONENT_FIELDS
     
     def _extract_field_from_complex_data(self, complex_data: Dict[str, Any], field: str) -> Optional[str]:
         """
-        Извлекает конкретное поле из complex field JSON.
+        Extracts a specific field from a ComponentDescription payload.
         
         Args:
-            complex_data: JSON с полями ComponentDescription (результат get_component_description())
-                         Формат: {"generic_description": "...", "effects": "...", ...}
-            field: Название поля (generic_description, effects, shamanic, warnings)
+            complex_data: ComponentDescription fields dict
+                         Format: {"generic_description": "...", "effects": "...", ...}
+            field: Field name (generic_description/effects/shamanic/warnings/...)
             
         Returns:
-            str или None: Значение поля или None если поле отсутствует
+            str or None: Field value, if present
         """
         try:
             if not isinstance(complex_data, dict):
@@ -328,29 +338,26 @@ class ComponentLocalizationService:
     
     def _load_from_ipfs(self, component_id: str, field: str) -> Optional[str]:
         """
-        Загружает перевод из IPFS с учетом типа поля (simple или complex).
+        Loads a translation from IPFS/Arweave.
         
         Args:
-            component_id: ID биологической единицы (не используется для complex fields)
-            field: Поле для перевода
+            component_id: Component business id (biounit_id)
+            field: Field name
             
         Returns:
-            str или None: Переведенный текст
+            str or None: Translation
         """
         try:
             if not self.ipfs_service:
                 return None
             
-            # Определяем тип поля
+            # Determine the field routing strategy
             if self._is_complex_field(field):
-                # Complex field → глобальный шаблон (если используется в будущем)
-                # ПРИМЕЧАНИЕ: В production complex fields не используются для per-component данных
-                # Если понадобятся глобальные шаблоны, здесь будет логика для них
+                # Global template (reserved; not used in current production flows)
                 logger.warning(f"[ComponentLocalizationService] Complex field {field} запрошен, но не используется в production")
                 return None
             else:
-                # Per-component поле → используем simple fields через get_component_translations()
-                # component_id = biounit_id (строка, например "amanita_muscaria")
+                # Per-component field → fetch ComponentDescription fields for this component_id+language.
                 component_data = self.ipfs_service.get_component_translations(component_id, self.language)
                 if component_data and field in component_data:
                     logger.debug(f"[ComponentLocalizationService] Загружен per-component field {field} из IPFS для {component_id}")
@@ -364,15 +371,15 @@ class ComponentLocalizationService:
     
     def _get_fallback_translation(self, component_id: str, field: str, default: Optional[str]) -> Optional[str]:
         """
-        Получает fallback перевод для per-component полей через simple fields.
+        Returns a fallback translation for per-component fields.
         
         Args:
-            component_id: ID биологической единицы (biounit_id, строка, например "amanita_muscaria")
-            field: Поле для перевода
-            default: Значение по умолчанию
+            component_id: Component business id (biounit_id)
+            field: Field name
+            default: Default value
             
         Returns:
-            str или None: Fallback перевод
+            str or None
         """
         try:
             if not self.fallback_service:
@@ -383,17 +390,14 @@ class ComponentLocalizationService:
             # Готовим источники переводов (nested dict под требования fallback сервиса)
             sources: Dict[str, Any] = {}
             
-            # Определяем тип поля
+            # Determine the field routing strategy
             if self._is_complex_field(field):
-                # Complex field → глобальный шаблон (если используется в будущем)
-                # ПРИМЕЧАНИЕ: В production complex fields не используются для per-component данных
-                # Если понадобятся глобальные шаблоны, здесь будет логика для них
+                # Global template (reserved; not used in current production flows)
                 logger.warning(f"[ComponentLocalizationService] Complex field {field} в fallback запрошен, но не используется в production")
                 sources[self.language] = {}
                 sources['ru'] = {}  # default language
             else:
-                # Per-component поле → используем simple fields через get_component_translations()
-                # component_id = biounit_id (строка, например "amanita_muscaria")
+                # Per-component field → build sources from cache and/or IPFS payload for fallback service.
                 
                 # requested language
                 requested_data = self.get_cached_data(component_id, self.language) or {}

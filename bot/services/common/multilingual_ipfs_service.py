@@ -1,8 +1,19 @@
 """
-MultilingualIPFSService - Сервис для работы с мультиязычными данными в IPFS
+MultilingualIPFSService.
 
-Обеспечивает загрузку, кэширование и валидацию переводов продуктов и компонентов
-из IPFS с поддержкой fallback стратегий и оптимизации производительности.
+High-level responsibility:
+- resolve CIDs from AmanitaInternational (on-chain mapping)
+- download JSON payloads via SSOT `ProductStorageService`
+- cache results and apply safe fallbacks
+
+Terminology (SSOT for this repo):
+- "AmanitaInternational complex field": `getComplexFieldCID(className, language)` → CID
+  - per-component description uses `className="ComponentDescription.<component_id>"`
+  - global template (reserved) uses `className="ComponentDescription"`
+  - NOTE: `language` is a separate argument, not a suffix in `className`
+- The stored JSON for ComponentDescription is commonly a *plain dict* of fields
+  (see `data/components/.../complex_fields/*.json`). We normalize it to a wrapper
+  `{label,type,fields}` internally to keep caching and downstream logic uniform.
 """
 
 import logging
@@ -36,42 +47,62 @@ class IPFSCacheEntry:
 
 class MultilingualIPFSService:
     """
-    Сервис для работы с мультиязычными данными в IPFS
-    
-    Обеспечивает:
-    - Загрузку переводов продуктов и компонентов из IPFS
-    - Кэширование для оптимизации производительности
-    - Валидацию структуры данных
-    - Fallback стратегии при недоступности IPFS
-    - Поддержку множественных языков
-    
-    АРХИТЕКТУРА ДАННЫХ:
-    - Complex fields (per-component): используются для per-component данных через get_component_translations(biounit_id, language)
-      Формат ключа в блокчейне: "ComponentDescription.{biounit_id}.{language}"
-      Пример: "ComponentDescription.amanita_muscaria.ru" → CID с переводами для amanita_muscaria
-      Соответствует scripts слою, который записывает с className = "ComponentDescription.{biounit_id}"
-    
-    - Complex fields (глобальные шаблоны): предназначены для глобальных шаблонов через get_component_description_template(language)
-      Формат ключа в блокчейне: "ComponentDescription.{language}" (БЕЗ biounit_id)
-      Пример: "ComponentDescription.ru" → CID с глобальным шаблоном (НЕ используется в production)
+    Multilingual IPFS/Arweave integration service.
+
+    What it does:
+    - Loads product/component translations (JSON) by resolving CIDs from the AmanitaInternational contract.
+    - Uses SSOT storage layer (`ProductStorageService`) for I/O (sync/async/hybrid + CID validation).
+    - Caches payloads and supports graceful fallback.
+
+    AmanitaInternational mapping (important):
+    - Simple fields: `getSimpleFieldCID(fieldKey)` → CID
+    - Complex fields: `getComplexFieldCID(className, language)` → CID
+      - per-component ComponentDescription: `className="ComponentDescription.<component_id>"`
+      - global template (reserved): `className="ComponentDescription"`
+
+    Payload formats for ComponentDescription:
+    - Plain dict (real data): `{"generic_description": "...", "effects": "...", ...}`
+    - Wrapper (some tests/mocks): `{"label": "...", "type": "...", "fields": {...}}`
+    Internally we normalize plain dict → wrapper to keep downstream logic consistent.
     """
     
-    def __init__(self, ipfs_factory=None, cache_service=None, fallback_service=None, blockchain_service=None):
+    def __init__(
+        self,
+        cache_service=None,
+        fallback_service=None,
+        blockchain_service=None,
+        storage_service=None,
+    ):
         """
         Инициализация сервиса IPFS
         
         Args:
-            ipfs_factory: Фабрика IPFS сервисов
             cache_service: Сервис кэширования (TranslationCacheService)
             fallback_service: Сервис fallback стратегий (FallbackLocalizationService)
             blockchain_service: Сервис работы с блокчейном (BlockchainService)
+            storage_service: SSOT слой I/O по CID (ProductStorageService совместимый интерфейс)
         """
         self.logger = logging.getLogger(__name__)
-        self.ipfs_factory = ipfs_factory
         self.cache_service = cache_service
         self.fallback_service = fallback_service
         # DI: BlockchainService для доступа к AmanitaInternational контракту
         self.blockchain_service = blockchain_service
+
+        # SSOT: storage_service отвечает за download_json(cid) (sync/async/hybrid + CID validation)
+        # NOTE: storage_provider может быть как реальный провайдер (ArWeaveUploader),
+        # так и тестовый InMemoryIPFSService (у него есть download_json/upload_json).
+        self.storage_service = storage_service
+        if self.storage_service is None:
+            try:
+                from services.product.storage import ProductStorageService
+                # Важно: MultilingualIPFSService больше не должен сам обращаться к IPFSFactory.
+                # Если storage_service не прокинут через DI, создаём дефолтный ProductStorageService,
+                # который уже сам использует SSOT-проводку к провайдеру.
+                self.storage_service = ProductStorageService()
+            except Exception as e:
+                # Fail-safe: не ломаем создание сервиса, но дальнейшая загрузка из IPFS будет невозможна.
+                self.logger.error(f"[MultilingualIPFSService] storage_service init failed: {e}")
+                self.storage_service = None
         
         # Локальный кэш IPFS данных
         self.ipfs_cache: Dict[str, IPFSCacheEntry] = {}
@@ -86,7 +117,8 @@ class MultilingualIPFSService:
             'fallback': 1800     # 30 минут
         }
         
-        # Complex fields - поля, которые хранятся как полный JSON на класс и язык
+        # Conceptual classification of complex fields (component descriptions / templates).
+        # Actual contract mapping is resolved via getComplexFieldCID(className, language).
         self.COMPLEX_FIELDS = {
             'component': {
                 'description', 'generic_description', 'effects', 'shamanic', 'warnings'
@@ -244,8 +276,8 @@ class MultilingualIPFSService:
             str или None: CID загруженных данных
         """
         try:
-            if not self.ipfs_factory:
-                self.logger.error("[MultilingualIPFSService] IPFS фабрика не инициализирована")
+            if not self.storage_service:
+                self.logger.error("[MultilingualIPFSService] storage_service не инициализирован")
                 return None
             
             # Валидируем данные
@@ -261,9 +293,8 @@ class MultilingualIPFSService:
                 'version': '1.0'
             }
             
-            # Загружаем в IPFS
-            ipfs_service = self.ipfs_factory.get_service()
-            cid = ipfs_service.upload_json(upload_data)
+            # Загружаем JSON через SSOT storage_service (а не через ipfs_factory)
+            cid = self.storage_service.upload_json(upload_data)
             
             if cid:
                 self.logger.info(f"[MultilingualIPFSService] Загружены переводы продукта {business_id} в IPFS: {cid}")
@@ -289,8 +320,8 @@ class MultilingualIPFSService:
             str или None: CID загруженных данных
         """
         try:
-            if not self.ipfs_factory:
-                self.logger.error("[MultilingualIPFSService] IPFS фабрика не инициализирована")
+            if not self.storage_service:
+                self.logger.error("[MultilingualIPFSService] storage_service не инициализирован")
                 return None
             
             # Валидируем данные
@@ -306,9 +337,8 @@ class MultilingualIPFSService:
                 'version': '1.0'
             }
             
-            # Загружаем в IPFS
-            ipfs_service = self.ipfs_factory.get_service()
-            cid = ipfs_service.upload_json(upload_data)
+            # Загружаем JSON через SSOT storage_service (а не через ipfs_factory)
+            cid = self.storage_service.upload_json(upload_data)
             
             if cid:
                 self.logger.info(f"[MultilingualIPFSService] Загружены переводы компонента {component_id} в IPFS: {cid}")
@@ -496,6 +526,47 @@ class MultilingualIPFSService:
             self.logger.debug(f"[MultilingualIPFSService] Локальный кэш восстановлен из внешнего: {cache_key}")
         except Exception as e:
             self.logger.error(f"[MultilingualIPFSService] Ошибка восстановления локального кэша: {e}")
+
+    def _build_simple_field_key(self, entity_type: str, entity_id: str, field: str) -> Optional[str]:
+        """
+        SSOT helper: builds AmanitaInternational Simple Field key (fieldKey) used by scripts + on-chain ABI.
+
+        Important:
+        - language must NOT be part of fieldKey (Solidity ABI: getSimpleFieldCID(string fieldKey)).
+        - This helper must follow the scripts-layer contract:
+          - product title: "ProductName.<productId>" (see `scripts/lib/product_upload_steps.js`)
+          - component title: "ComponentDescription.title" (see `scripts/lib/upload_steps.js`)
+          - dosage types: "DosageInstruction.description" (see `scripts/lib/upload_steps.js`)
+        """
+        try:
+            entity_type_norm = (entity_type or "").strip().lower()
+            field_norm = (field or "").strip().lower()
+            entity_id_norm = (entity_id or "").strip()
+
+            if not entity_type_norm or not field_norm:
+                return None
+
+            # Product-level simple fields
+            if entity_type_norm == "product":
+                # MVP scope: product title only (drives WooCommerce Name + UI title).
+                if field_norm in ("title", "name"):
+                    if not entity_id_norm:
+                        return None
+                    return f"ProductName.{entity_id_norm}"
+                return None
+
+            # Component/global simple fields (not per-component; scripts store them as global keys)
+            if entity_type_norm == "component":
+                if field_norm in ("title",):
+                    return "ComponentDescription.title"
+                if field_norm in ("dosage_types", "dosage", "dosage_type", "dosage_instructions"):
+                    return "DosageInstruction.description"
+                return None
+
+            return None
+        except Exception:
+            # Fail-safe: never raise from builder; caller will handle None.
+            return None
     
     def _load_from_ipfs(self, entity_id: str, language: str, entity_type: str) -> Optional[Dict[str, Any]]:
         """
@@ -510,20 +581,32 @@ class MultilingualIPFSService:
             Dict[str, Any] или None: Загруженные данные
         """
         try:
-            if not self.ipfs_factory:
-                self.logger.warning("[MultilingualIPFSService] ipfs_factory не инициализирован")
+            if not self.storage_service:
+                self.logger.warning("[MultilingualIPFSService] storage_service не инициализирован")
                 return None
-            ipfs_service = self.ipfs_factory.get_service()
             
-            # 1) Получаем CID через blockchain_service напрямую
+            # 1) Получаем CID через blockchain_service напрямую (Simple Field ABI: getSimpleFieldCID(fieldKey))
             cid: Optional[str] = None
             try:
                 if self.blockchain_service:
                     contract = self.blockchain_service.get_contract("AmanitaInternational")
                     if contract:
-                        cid = contract.functions.getSimpleFieldCID(entity_type, entity_id, "*", language).call()
-                        self.logger.debug(f"[MultilingualIPFSService] CID от blockchain_service: {cid} "
-                                          f"(entity_type={entity_type}, entity_id={entity_id}, lang={language})")
+                        # MVP: For product translations we currently resolve only product title.
+                        # SSOT fieldKey is built from entity_type/entity_id/field (language is NOT part of fieldKey).
+                        field_for_key = "title" if (entity_type or "").strip().lower() == "product" else "*"
+                        field_key = self._build_simple_field_key(entity_type, entity_id, field_for_key)
+                        if not field_key:
+                            self.logger.warning(
+                                f"[MultilingualIPFSService] Не удалось построить fieldKey для simple field "
+                                f"(entity_type={entity_type}, entity_id={entity_id}, field={field_for_key})"
+                            )
+                            return None
+
+                        cid = contract.functions.getSimpleFieldCID(field_key).call()
+                        self.logger.debug(
+                            f"[MultilingualIPFSService] CID от blockchain_service: {cid} "
+                            f"(fieldKey={field_key}, lang={language})"
+                        )
                     else:
                         self.logger.warning("[MultilingualIPFSService] AmanitaInternational контракт не найден")
                 else:
@@ -536,8 +619,8 @@ class MultilingualIPFSService:
                 self.logger.warning(f"[MultilingualIPFSService] Пустой CID для {entity_type}:{entity_id} lang={language}")
                 return None
             
-            # 2) Загружаем JSON с IPFS по CID
-            payload = ipfs_service.download_json(cid)
+            # 2) Загружаем JSON с IPFS/Arweave по CID
+            payload = self.storage_service.download_json(cid)
             # Строгая валидация результата загрузки
             if payload is None:
                 self.logger.warning(f"[MultilingualIPFSService] Пустой IPFS payload для CID={cid}")
@@ -548,6 +631,20 @@ class MultilingualIPFSService:
             if not payload:
                 self.logger.warning(f"[MultilingualIPFSService] Пустой словарь IPFS payload для CID={cid}")
                 return None
+
+            # 2.1) Normalize product-title payload into ProductLocalizationService-friendly dict
+            # SSOT (scripts): product title payload is a language map like {"ru": "...", "en": "..."} stored under a single CID.
+            entity_type_norm = (entity_type or "").strip().lower()
+            if entity_type_norm == "product":
+                title_value = payload.get(language)
+                if not isinstance(title_value, str) or not title_value.strip():
+                    # Graceful: do not raise; let fallback chain handle it.
+                    self.logger.warning(
+                        f"[MultilingualIPFSService] Некорректный формат title payload для продукта {entity_id}: "
+                        f"ожидался dict(lang->str), lang={language}, keys={list(payload.keys())}"
+                    )
+                    return None
+                return {"title": title_value.strip()}
 
             # 3) Валидация структуры по типу (минимальная)
             if entity_type not in ("product", "component"):
@@ -614,8 +711,8 @@ class MultilingualIPFSService:
             Dict[str, Any] или None: JSON с полями complex field (структура: {label, type, fields})
         """
         try:
-            if not self.ipfs_factory:
-                self.logger.warning("[MultilingualIPFSService] ipfs_factory не инициализирован для complex field")
+            if not self.storage_service:
+                self.logger.warning("[MultilingualIPFSService] storage_service не инициализирован для complex field")
                 return None
             
             cache_key = f"complex_{className}_{language}"
@@ -637,8 +734,7 @@ class MultilingualIPFSService:
                 return None
             
             # 4) Загрузка JSON из IPFS
-            ipfs_service = self.ipfs_factory.get_service()
-            payload = ipfs_service.download_json(cid)
+            payload = self.storage_service.download_json(cid)
             
             if payload is None:
                 self.logger.warning(f"[MultilingualIPFSService] Пустой IPFS payload для complex field {className}.{language} CID={cid}")
@@ -647,8 +743,37 @@ class MultilingualIPFSService:
             if not isinstance(payload, dict):
                 self.logger.error(f"[MultilingualIPFSService] Некорректный тип IPFS payload для complex field {className}.{language} (type={type(payload)})")
                 return None
-            
-            # 5) Валидация структуры (label, type, fields)
+
+            # 5) Нормализация формата payload (SSOT-факт: реальные ComponentDescription данные часто плоские)
+            #
+            # Поддерживаем 2 формата:
+            # 1) Wrapper: {"label": "...", "type": "...", "fields": {...}}
+            # 2) Plain dict (legacy/real data): {"generic_description": "...", "effects": "...", ...}
+            #
+            # Внутренний SSOT-контракт: ниже по цепочке мы работаем с wrapper (чтобы кэш/вызовы были единообразны).
+            if 'fields' not in payload:
+                # Heuristic: treat as ComponentDescription fields if it looks like a description dict.
+                looks_like_description_fields = any(
+                    key in payload for key in ("generic_description", "effects", "shamanic", "warnings", "title")
+                )
+                if looks_like_description_fields:
+                    payload = {
+                        "label": "ComponentDescription",
+                        "type": "ComponentDescription",
+                        "fields": payload,
+                    }
+                    self.logger.info(
+                        f"[MultilingualIPFSService] Нормализован плоский payload в wrapper для complex field "
+                        f"{className}.{language} CID={cid}"
+                    )
+                else:
+                    self.logger.error(
+                        f"[MultilingualIPFSService] Отсутствует поле 'fields' и payload не похож на ComponentDescription "
+                        f"для complex field {className}.{language}"
+                    )
+                    return None
+
+            # 6) Валидация структуры wrapper (label, type, fields)
             if 'label' not in payload:
                 self.logger.error(f"[MultilingualIPFSService] Отсутствует поле 'label' в complex field {className}.{language}")
                 return None
@@ -657,15 +782,11 @@ class MultilingualIPFSService:
                 self.logger.error(f"[MultilingualIPFSService] Отсутствует поле 'type' в complex field {className}.{language}")
                 return None
             
-            if 'fields' not in payload:
-                self.logger.error(f"[MultilingualIPFSService] Отсутствует поле 'fields' в complex field {className}.{language}")
-                return None
-            
-            if not isinstance(payload['fields'], dict):
+            if not isinstance(payload.get('fields'), dict):
                 self.logger.error(f"[MultilingualIPFSService] Поле 'fields' должно быть словарем в complex field {className}.{language}")
                 return None
             
-            # 6) Кэширование через TranslationCacheService
+            # 7) Кэширование через TranslationCacheService
             self._save_to_cache(cache_key, payload, 'component')
             
             self.stats['ipfs_hits'] += 1
