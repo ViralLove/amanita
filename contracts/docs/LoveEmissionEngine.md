@@ -146,7 +146,7 @@ IInviteGraph public inviteGraph;                        // Граф инвайт
 ### Защита от reentrancy
 ```solidity
 // Обнуляем до трансфера — защита от reentrancy
-amanitaAccrued[msg.sender] = 0;
+loveAccrued[msg.sender] = 0;
 bool success = lovecoin.transfer(msg.sender, amount);
 ```
 
