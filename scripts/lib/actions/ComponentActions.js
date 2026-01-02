@@ -18,131 +18,465 @@ class ComponentActions {
   }
 
   /**
-   * Action 555: Базовая активация seller + загрузка компонентов
-   * @returns {Promise<Object>} - Upload result
+   * Action 555: Композитный Pipeline (51 → 52 → 53)
+   * 
+   * Последовательно выполняет:
+   * 1. Action 51: Активация seller
+   * 2. Action 52: Загрузка компонентов в Arweave
+   * 3. Action 53: Регистрация компонентов в контракте
+   * 
+   * Environment Variables Required:
+   * - DEPLOYER_INVITE: Root invite code (e.g., "AMANITA-XXXX-YYYY")
+   * - SELLER_ADDRESS: Seller address to activate
+   * 
+   * Environment Variables Optional:
+   * - COMPONENTS_DIR: Components directory (default: "data/components")
+   * - DRY_RUN: Dry-run mode (default: false)
+   * - ARWEAVE: Enable Arweave upload (default: true)
+   * 
+   * @returns {Promise<Object>} - Pipeline result
    */
   async action555() {
     console.log("\n" + "=".repeat(70));
-    console.log("🔷 Action 555: Базовая активация seller + загрузка компонентов");
+    console.log("🔷 Action 555: Component Upload Pipeline (51 → 52 → 53)");
     console.log("=".repeat(70));
+    
+    logger.action(555, "Component Upload Pipeline");
+    
+    const pipelineResults = {
+      action51: null,
+      action52: null,
+      action53: null,
+      success: false,
+      errors: []
+    };
+    
+    try {
+      // ====================================================================
+      // ACTION 51: АКТИВАЦИЯ SELLER
+      // ====================================================================
+      console.log("\n" + "=".repeat(60));
+      console.log("🔄 ACTION 51: АКТИВАЦИЯ SELLER");
+      console.log("=".repeat(60));
+      
+      try {
+        const result51 = await this.action51();
+        pipelineResults.action51 = {
+          success: result51.success,
+          result: result51
+        };
+        console.log("✅ ACTION 51 завершен успешно");
+      } catch (error) {
+        console.error("❌ ACTION 51 завершен с ошибкой:", error.message);
+        pipelineResults.action51 = {
+          success: false,
+          error: error.message
+        };
+        pipelineResults.errors.push(`Action 51: ${error.message}`);
+        throw error; // Прерываем pipeline при ошибке активации
+      }
+      
+      // ====================================================================
+      // ACTION 52: ЗАГРУЗКА В ARWEAVE
+      // ====================================================================
+      console.log("\n" + "=".repeat(60));
+      console.log("🔄 ACTION 52: ЗАГРУЗКА В ARWEAVE");
+      console.log("=".repeat(60));
+      
+      try {
+        const result52 = await this.action52();
+        pipelineResults.action52 = {
+          success: result52.success,
+          result: result52.result
+        };
+        if (result52.success) {
+          console.log("✅ ACTION 52 завершен успешно");
+        } else {
+          throw new Error(result52.result?.error || 'Unknown error');
+        }
+      } catch (error) {
+        console.error("❌ ACTION 52 завершен с ошибкой:", error.message);
+        pipelineResults.action52 = {
+          success: false,
+          error: error.message
+        };
+        pipelineResults.errors.push(`Action 52: ${error.message}`);
+        throw error; // Прерываем pipeline при ошибке загрузки
+      }
+      
+      // ====================================================================
+      // ACTION 53: РЕГИСТРАЦИЯ В КОНТРАКТЕ
+      // ====================================================================
+      console.log("\n" + "=".repeat(60));
+      console.log("🔄 ACTION 53: РЕГИСТРАЦИЯ В КОНТРАКТЕ");
+      console.log("=".repeat(60));
+      
+      try {
+        const result53 = await this.action53();
+        pipelineResults.action53 = {
+          success: result53.success,
+          result: result53.result
+        };
+        if (result53.success) {
+          console.log("✅ ACTION 53 завершен успешно");
+        } else {
+          throw new Error(result53.result?.error || 'Unknown error');
+        }
+      } catch (error) {
+        console.error("❌ ACTION 53 завершен с ошибкой:", error.message);
+        pipelineResults.action53 = {
+          success: false,
+          error: error.message
+        };
+        pipelineResults.errors.push(`Action 53: ${error.message}`);
+        throw error; // Прерываем pipeline при ошибке регистрации
+      }
+      
+      // ====================================================================
+      // ФИНАЛЬНЫЙ РЕЗУЛЬТАТ
+      // ====================================================================
+      pipelineResults.success = true;
+      
+      console.log("\n" + "=".repeat(70));
+      console.log("✅ ACTION 555 ЗАВЕРШЕН УСПЕШНО");
+      console.log("=".repeat(70));
+      console.log(`📊 Статистика:`);
+      console.log(`   → Action 51 (Активация): ${pipelineResults.action51.success ? '✅' : '❌'}`);
+      console.log(`   → Action 52 (Arweave): ${pipelineResults.action52.success ? '✅' : '❌'}`);
+      console.log(`   → Action 53 (Контракт): ${pipelineResults.action53.success ? '✅' : '❌'}`);
+      
+      if (pipelineResults.action52.success && pipelineResults.action52.result) {
+        console.log(`   → Компонентов загружено: ${pipelineResults.action52.result.successCount || 'N/A'}`);
+      }
+      if (pipelineResults.action53.success && pipelineResults.action53.result) {
+        console.log(`   → Компонентов зарегистрировано: ${pipelineResults.action53.result.successCount || 'N/A'}`);
+      }
+      
+      logger.success(555);
+      return {
+        success: true,
+        pipelineResults: pipelineResults
+      };
+      
+    } catch (error) {
+      console.error("\n" + "=".repeat(70));
+      console.error("❌ ACTION 555 ЗАВЕРШЕН С ОШИБКОЙ");
+      console.error("=".repeat(70));
+      console.error(`Ошибки:`);
+      pipelineResults.errors.forEach((err, idx) => {
+        console.error(`   ${idx + 1}. ${err}`);
+      });
+      
+      logger.failure(555, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Action 51: Активация seller в SpiralEngine
+   * 
+   * Environment Variables Required:
+   * - SELLER_ADDRESS: Seller address to activate
+   * - DEPLOYER_INVITE: Root invite code (e.g., "AMANITA-XXXX-YYYY") - требуется только если seller НЕ активирован
+   * 
+   * @returns {Promise<Object>} - Activation result
+   */
+  async action51() {
+    logger.action(51, "Activate seller in SpiralEngine");
     
     try {
       // Получение параметров из env
-      const deployerInvite = process.env.DEPLOYER_INVITE;
       const sellerAddress = process.env.SELLER_ADDRESS || this.config.get('seller.address');
-      const dryRun = process.env.DRY_RUN === 'true';
       
-      if (!deployerInvite) {
-        throw new Error("Action 555: требуется DEPLOYER_INVITE (рутовый инвайт из Action 777)");
-      }
       if (!sellerAddress) {
-        throw new Error("Action 555: требуется SELLER_ADDRESS");
+        throw new Error("Action 51: требуется SELLER_ADDRESS");
       }
       
-      // ШАГ 1/3: Загрузка SpiralEngine
-      console.log("\n📦 Шаг 1/3: Загрузка SpiralEngine...");
+      // Загрузка SpiralEngine
+      console.log("\n📦 Загрузка SpiralEngine...");
       const spiralEngine = await this.contractManager.loadUUPSContract('SpiralEngine');
       const spiralEngineAddress = await spiralEngine.getAddress();
       console.log("✅ SpiralEngine загружен:", spiralEngineAddress);
       
-      // ШАГ 2/3: Базовая активация seller (delegation → InviteActions)
-      console.log("\n👤 Шаг 2/3: Базовая активация seller...");
-      try {
-        const activationResult = await this.inviteActions.activateSeller(
-          spiralEngine,
-          deployerInvite,
-          sellerAddress
-        );
-        console.log("✅ Базовая активация завершена успешно!");
-        console.log(`   Активирован: ${activationResult.wasActivated ? 'Да' : 'Уже был активирован'}`);
-        console.log(`   Роль назначена: ${activationResult.wasRoleGranted ? 'Да' : 'Уже была назначена'}`);
-      } catch (error) {
-        console.error("❌ Ошибка при базовой активации seller:");
-        console.error(`   ${error.message}`);
-        throw error;
+      // ✅ НОВОЕ: Проверка активации ДО требования DEPLOYER_INVITE
+      console.log("\n🔍 Проверка текущего статуса активации...");
+      const usedInvite = await spiralEngine.usedInviteByUser(sellerAddress);
+      const SELLER_ROLE = await spiralEngine.SELLER_ROLE();
+      const hasSellerRole = await spiralEngine.hasRole(SELLER_ROLE, sellerAddress);
+      
+      const isActivated = usedInvite > 0;
+      console.log(`   Активирован: ${isActivated ? '✅' : '❌'}`);
+      console.log(`   SELLER_ROLE: ${hasSellerRole ? '✅' : '❌'}`);
+      
+      if (isActivated && hasSellerRole) {
+        // ✅ Seller уже активирован - пропускаем активацию
+        console.log("\n✅ Seller уже активирован, пропуск активации");
+        console.log(`   Seller: ${sellerAddress}`);
+        console.log(`   Активирован: Уже был активирован`);
+        console.log(`   SELLER_ROLE: Уже была назначена`);
+        
+        logger.success(51);
+        return {
+          success: true,
+          sellerAddress: sellerAddress,
+          spiralEngineAddress: spiralEngineAddress,
+          wasActivated: false,
+          wasRoleGranted: false,
+          newInvites: [],
+          skipActivation: true
+        };
       }
       
-      // ШАГ 3/3: Загрузка компонентов
-      console.log("\n📦 Шаг 3/3: Загрузка компонентов...");
+      // ✅ Seller НЕ активирован - требуем DEPLOYER_INVITE
+      const deployerInvite = process.env.DEPLOYER_INVITE;
+      if (!deployerInvite) {
+        throw new Error("Action 51: требуется DEPLOYER_INVITE (рутовый инвайт из Action 777)");
+      }
       
-      // ✅ FIX (2025-12-01): Определяем сеть из hardhat runtime для правильного именования state файлов
-      // Приоритет: hre.network.name (из --network CLI) > config.get('network.name') > 'localhost'
+      // Активация seller
+      console.log("\n👤 Активация seller...");
+      const activationResult = await this.inviteActions.activateSeller(
+        spiralEngine,
+        deployerInvite,
+        sellerAddress
+      );
+      
+      // Валидация результата через blockchain (не полагаемся на поля результата)
+      console.log("\n🔍 Валидация активации через blockchain...");
+      const usedInviteAfter = await spiralEngine.usedInviteByUser(sellerAddress);
+      if (usedInviteAfter == 0) {
+        throw new Error(`Seller ${sellerAddress} не активирован после вызова activateSeller!`);
+      }
+      
+      const hasSellerRoleAfter = await spiralEngine.hasRole(SELLER_ROLE, sellerAddress);
+      if (!hasSellerRoleAfter) {
+        throw new Error(`Seller ${sellerAddress} не имеет SELLER_ROLE после активации!`);
+      }
+      
+      console.log("✅ Базовая активация завершена успешно!");
+      console.log(`   Seller: ${sellerAddress}`);
+      console.log(`   Активирован: ${activationResult.wasActivated ? 'Да (только что активирован)' : 'Уже был активирован'}`);
+      console.log(`   SELLER_ROLE: ${activationResult.wasRoleGranted ? 'Назначена (только что)' : 'Уже была назначена'}`);
+      if (activationResult.newInvites && activationResult.newInvites.length > 0) {
+        console.log(`   Инвайтов создано: ${activationResult.newInvites.length}`);
+      }
+      
+      logger.success(51);
+      return {
+        success: true,
+        sellerAddress: sellerAddress,
+        spiralEngineAddress: spiralEngineAddress,
+        wasActivated: activationResult.wasActivated,
+        wasRoleGranted: activationResult.wasRoleGranted,
+        newInvites: activationResult.newInvites || [],
+        inviteCodeUsed: deployerInvite
+      };
+    } catch (error) {
+      logger.failure(51, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Action 52: Загрузка компонентов в Arweave из JSON
+   * 
+   * Environment Variables Required:
+   * - SELLER_ADDRESS: Seller address (must be activated via Action 51)
+   * 
+   * Environment Variables Optional:
+   * - COMPONENTS_DIR: Components directory (default: "data/components")
+   * - DRY_RUN: Dry-run mode (default: false)
+   * - ARWEAVE: Enable Arweave upload (default: true)
+   * - USE_EXISTING_CIDS: Use existing CID from state files instead of uploading to Arweave (default: false)
+   * 
+   * @returns {Promise<Object>} - Upload result
+   */
+  async action52() {
+    logger.action(52, "Upload components to Arweave");
+    
+    try {
+      // Получение параметров из env
+      const sellerAddress = process.env.SELLER_ADDRESS || this.config.get('seller.address');
+      const componentsDir = process.env.COMPONENTS_DIR || 'data/components';
+      const dryRun = process.env.DRY_RUN === 'true';
+      const useExistingCids = process.env.USE_EXISTING_CIDS === 'true';  // ✅ НОВОЕ
+      
+      if (!sellerAddress) {
+        throw new Error("Action 52: требуется SELLER_ADDRESS");
+      }
+      
+      // Определение сети
       let networkName = 'localhost';
       try {
         if (hre && hre.network && hre.network.name) {
           networkName = hre.network.name;
-          console.log(`🌐 Network определена из Hardhat: ${networkName}`);
         } else {
           networkName = this.config.get('network.name') || 'localhost';
-          console.log(`🌐 Network определена из config: ${networkName}`);
         }
       } catch (error) {
-        // Fallback если hardhat недоступен (например, в unit тестах)
         networkName = this.config.get('network.name') || 'localhost';
-        console.log(`🌐 Network fallback: ${networkName} (hardhat недоступен)`);
       }
       
-      try {
-        const uploadResults = await this.uploadComponentsCore(
-          sellerAddress,
-          "data/components",
-          networkName,
-          dryRun,
-          process.env.ARWEAVE !== 'false'
-        );
-        
-        // Финальный отчет
-        console.log("\n" + "=".repeat(70));
-        console.log("📊 ФИНАЛЬНЫЙ ОТЧЕТ Action 555");
-        console.log("=".repeat(70));
-        console.log(`✅ Seller активирован: ${sellerAddress}`);
-        console.log(`✅ Компонентов обработано: ${uploadResults.totalCount}`);
-        console.log(`   → Успешно: ${uploadResults.successCount}`);
-        console.log(`   → Пропущено: ${uploadResults.skippedCount || 0}`);
-        console.log(`   → Ошибок: ${uploadResults.failCount}`);
-        
-        // ✅ CRITICAL FIX: Honest error reporting - throw error if ANY component failed
-        if (uploadResults.failCount > 0) {
-          const failedComponents = uploadResults.results.filter(r => !r.success).map(r => r.componentId);
-          const successPercent = Math.round((uploadResults.successCount / uploadResults.totalCount) * 100);
-          const failPercent = Math.round((uploadResults.failCount / uploadResults.totalCount) * 100);
-          
-          console.log(`\n${'='.repeat(70)}`);
-          console.error(`❌ КРИТИЧЕСКАЯ ОШИБКА: ${uploadResults.failCount} компонентов НЕ зарегистрированы!`);
-          console.error(`${'='.repeat(70)}`);
-          console.error(`Успешно: ${uploadResults.successCount}/${uploadResults.totalCount} (${successPercent}%)`);
-          console.error(`Провалено: ${uploadResults.failCount}/${uploadResults.totalCount} (${failPercent}%)`);
-          console.error(`\nПровалившиеся компоненты:`);
-          failedComponents.forEach((id, idx) => {
-            const result = uploadResults.results.find(r => r.componentId === id);
-            console.error(`   ${idx + 1}. ${id}`);
-            console.error(`      → Ошибка: ${result.error}`);
-          });
-          console.error(`\n⚠️ Action 555 НЕ МОЖЕТ считаться успешным!`);
-          console.error(`Необходимо исправить ошибки и перезапустить.`);
-          console.error(`${'='.repeat(70)}\n`);
-          
-          throw new Error(
-            `Action 555 failed: ${uploadResults.failCount}/${uploadResults.totalCount} components not registered. ` +
-            `Failed: [${failedComponents.join(', ')}]`
-          );
+      // Инициализация Arweave
+      if (!this.arweaveManager.isReady()) {
+        const initResult = await this.arweaveManager.initialize();
+        if (!initResult.success) {
+          throw new Error(`ArweaveManager initialization failed: ${initResult.error || 'Unknown error'}`);
         }
-        
-        console.log("\n" + "=".repeat(70));
-        console.log(`✅ Action 555 завершен успешно: ${uploadResults.successCount}/${uploadResults.totalCount} компонентов`);
-        console.log("=".repeat(70));
-        
-      return {
-        success: true,
-          uploadResults: uploadResults
-      };
-      } catch (error) {
-        console.error("❌ Ошибка при загрузке компонентов:");
-        console.error(`   ${error.message}`);
-        throw error;
       }
+      
+      // Подготовка контрактов
+      const organicRegistry = await this.contractManager.loadUUPSContract('OrganicComponentRegistry');
+      const amanitaIntl = await this.contractManager.loadUUPSContract('AmanitaInternational');
+      const spiralEngine = await this.contractManager.loadUUPSContract('SpiralEngine');
+      
+      // Создание signers
+      const deployerSigner = this.ethersUtils.getSigner();
+      const deployerAddress = await deployerSigner.getAddress();
+      
+      const sellerPrivateKey = this.config.get('seller.privateKey');
+      if (!sellerPrivateKey) {
+        throw new Error('SELLER_PRIVATE_KEY не найден в .env');
+      }
+      const sellerSigner = this.ethersUtils.getSigner(sellerPrivateKey);
+      
+      // Создание context
+      const context = {
+        seller: {
+          address: sellerAddress,
+          signer: sellerSigner
+        },
+        deployer: {
+          address: deployerAddress,
+          signer: deployerSigner
+        },
+        contracts: {
+          organicComponentRegistry: organicRegistry,
+          amanitaInternational: amanitaIntl,
+          spiralEngine: spiralEngine
+        },
+        arweave: {
+          client: this.arweaveManager.getClient(),
+          key: this.arweaveManager.getKey()
+        },
+        ethersProvider: this.ethersUtils.provider,
+        supportedLanguages: require('../upload_utils').getSupportedLanguages(),
+        useExistingCids: useExistingCids  // ✅ НОВОЕ: Флаг для использования существующих CID
+      };
+      
+      // Импорт функции загрузки
+      const { action52_UnifiedArweaveUpload } = require('../upload_steps');
+      
+      // Вызов функции загрузки
+      const result = await action52_UnifiedArweaveUpload(
+        context,
+        componentsDir,
+        networkName,
+        dryRun
+      );
+      
+      logger.success(52);
+      return {
+        success: result.success,
+        result: result
+      };
     } catch (error) {
-      logger.failure(555, error.message);
+      logger.failure(52, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Action 53: Регистрация компонентов в OrganicComponentRegistry
+   * 
+   * Environment Variables Required:
+   * - SELLER_ADDRESS: Seller address (must be activated via Action 51)
+   * 
+   * Environment Variables Optional:
+   * - COMPONENTS_DIR: Components directory (default: "data/components")
+   * - DRY_RUN: Dry-run mode (default: false)
+   * 
+   * @returns {Promise<Object>} - Registration result
+   */
+  async action53() {
+    logger.action(53, "Register components in OrganicComponentRegistry");
+    
+    try {
+      // Получение параметров из env
+      const sellerAddress = process.env.SELLER_ADDRESS || this.config.get('seller.address');
+      const componentsDir = process.env.COMPONENTS_DIR || 'data/components';
+      const dryRun = process.env.DRY_RUN === 'true';
+      
+      if (!sellerAddress) {
+        throw new Error("Action 53: требуется SELLER_ADDRESS");
+      }
+      
+      // Определение сети
+      let networkName = 'localhost';
+      try {
+        if (hre && hre.network && hre.network.name) {
+          networkName = hre.network.name;
+        } else {
+          networkName = this.config.get('network.name') || 'localhost';
+        }
+      } catch (error) {
+        networkName = this.config.get('network.name') || 'localhost';
+      }
+      
+      // Подготовка контрактов
+      const organicRegistry = await this.contractManager.loadUUPSContract('OrganicComponentRegistry');
+      const spiralEngine = await this.contractManager.loadUUPSContract('SpiralEngine');
+      
+      // Создание signers
+      const deployerSigner = this.ethersUtils.getSigner();
+      const deployerAddress = await deployerSigner.getAddress();
+      
+      const sellerPrivateKey = this.config.get('seller.privateKey');
+      if (!sellerPrivateKey) {
+        throw new Error('SELLER_PRIVATE_KEY не найден в .env');
+      }
+      const sellerSigner = this.ethersUtils.getSigner(sellerPrivateKey);
+      
+      // Создание context
+      const context = {
+        seller: {
+          address: sellerAddress,
+          signer: sellerSigner
+        },
+        deployer: {
+          address: deployerAddress,
+          signer: deployerSigner
+        },
+        contracts: {
+          organicComponentRegistry: organicRegistry,
+          spiralEngine: spiralEngine
+        },
+        arweave: {
+          client: this.arweaveManager.getClient(),
+          key: this.arweaveManager.getKey()
+        },
+        ethersProvider: this.ethersUtils.provider,
+        supportedLanguages: require('../upload_utils').getSupportedLanguages()
+      };
+      
+      // Импорт функции регистрации
+      const { action53_UnifiedContractRegistration } = require('../upload_steps');
+      
+      // Вызов функции регистрации
+      const result = await action53_UnifiedContractRegistration(
+        context,
+        componentsDir,
+        networkName,
+        dryRun
+      );
+      
+      logger.success(53);
+      return {
+        success: result.success,
+        result: result
+      };
+    } catch (error) {
+      logger.failure(53, error.message);
       throw error;
     }
   }
@@ -243,6 +577,15 @@ class ComponentActions {
     console.log(`✅ Seller валиден: активирован + SELLER_ROLE`);
     
     // 3. Поиск компонентов
+    // scripts/lib/actions/ComponentActions.js находится в <projectRoot>/scripts/lib/actions
+    // поэтому projectRoot = три уровня вверх (actions -> lib -> scripts -> projectRoot) = '..','..','..'
+    // НО: путь выше уже используется как base для относительных данных, и нам нужен именно <projectRoot>.
+    // Из actions достаточно подняться на 3 уровня? Проверка:
+    // __dirname = <projectRoot>/scripts/lib/actions
+    // '..' -> <projectRoot>/scripts/lib
+    // '..' -> <projectRoot>/scripts
+    // '..' -> <projectRoot>
+    // => оставляем 3 уровня, но предыдущая логика ломала путь из других файлов; здесь корректно.
     const projectRoot = path.join(__dirname, '..', '..', '..');
     const componentsPath = path.join(projectRoot, componentsDir);
     
