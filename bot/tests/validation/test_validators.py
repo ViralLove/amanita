@@ -32,10 +32,12 @@ class TestCIDValidator:
     def test_valid_cid(self):
         """Тест валидного CID."""
         valid_cids = [
-            "Qm123456789",
-            "Qmabcdef123",
-            "QmABCDEF456",
-            "Qm123456789abcdef"
+            # IPFS CID v0 (Qm + 44 base58btc chars)
+            "Qm" + ("1" * 44),
+            # IPFS CID v1 (bafy + 55 base32 chars в текущем паттерне проекта)
+            "bafy" + ("a" * 55),
+            # Arweave txId (43 base64url chars)
+            "A" * 43,
         ]
         
         for cid in valid_cids:
@@ -77,8 +79,8 @@ class TestCIDValidator:
         assert result.error_code == "CID_TOO_SHORT"
         assert "не менее 10 символов" in result.error_message
     
-    def test_invalid_cid_wrong_prefix(self):
-        """Тест CID с неправильным префиксом."""
+    def test_invalid_cid_wrong_format(self):
+        """Тест CID с неправильным форматом."""
         invalid_cids = [
             "qm123456789",
             "QM123456789",
@@ -89,23 +91,23 @@ class TestCIDValidator:
         for cid in invalid_cids:
             result = self.validator.validate(cid)
             assert not result.is_valid, f"CID {cid} должен быть невалидным"
-            assert result.error_code == "INVALID_CID_PREFIX"
-            assert "начинаться с 'Qm'" in result.error_message
+            assert result.error_code == "INVALID_CID_FORMAT"
     
     def test_invalid_cid_special_characters(self):
         """Тест CID со специальными символами."""
         invalid_cids = [
-            "Qm123-456",
-            "Qm123_456",
-            "Qm123.456",
-            "Qm123@456"
+            # IPFS v0: содержит запрещенный символ '0' (не входит в base58btc алфавит)
+            "Qm" + ("0" * 44),
+            # IPFS v1: base32 в паттерне проекта не допускает '1'
+            "bafy" + ("1" * 55),
+            # Arweave txId: запрещенный символ '+'
+            ("A" * 42) + "+",
         ]
         
         for cid in invalid_cids:
             result = self.validator.validate(cid)
             assert not result.is_valid, f"CID {cid} должен быть невалидным"
-            assert result.error_code == "INVALID_CID_CHARACTERS"
-            assert "недопустимые символы" in result.error_message
+            assert result.error_code == "INVALID_CID_FORMAT"
 
 
 class TestProportionValidator:
@@ -365,8 +367,7 @@ class TestProductValidator:
         result = self.validator.validate(invalid_product)
         assert not result.is_valid
         assert result.field_name == "cover_image_url"
-        # CID валидатор возвращает INVALID_CID_PREFIX для CID, не начинающегося с 'Qm'
-        assert result.error_code in ["INVALID_CID_PREFIX", "INVALID_CID_FORMAT"]
+        assert result.error_code == "INVALID_CID_FORMAT"
 
     def test_invalid_price(self):
         """Тест невалидной цены."""
