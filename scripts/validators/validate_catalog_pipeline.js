@@ -44,7 +44,11 @@ const SUPPORTED_LANGUAGES = ['ru', 'en', 'de', 'es', 'fr', 'nl', 'et'];
 
 // Expected file structures
 const REQUIRED_CSV_COLUMNS = ['product_business_id', 'component_business_id', 'form', 'price', 'title'];
-const REQUIRED_PRODUCT_FIELDS = ['product_id', 'title', 'components', 'prices'];
+// ✅ Schema-aware validation:
+// New schema (primary): business_id + organic_components
+// Legacy schema (fallback): product_id + components
+const REQUIRED_PRODUCT_FIELDS_NEW = ['business_id', 'title', 'organic_components', 'prices'];
+const REQUIRED_PRODUCT_FIELDS_OLD = ['product_id', 'title', 'components', 'prices'];
 const REQUIRED_TITLE_FIELDS = SUPPORTED_LANGUAGES; // At least one language
 
 // Validation thresholds
@@ -54,6 +58,108 @@ const ARWEAVE_SAMPLE_SIZE = 5; // Sample first 5 CIDs for quick check
 // ====================================================================
 // 🛠️ HELPER UTILITIES
 // ====================================================================
+
+/**
+ * Detect product schema version based on real keys
+ * @param {Object} data - Product JSON
+ * @returns {'new'|'old'|'unknown'}
+ */
+function detectProductSchema(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return 'unknown';
+  const hasNew = Object.prototype.hasOwnProperty.call(data, 'business_id') ||
+                 Object.prototype.hasOwnProperty.call(data, 'organic_components');
+  const hasOld = Object.prototype.hasOwnProperty.call(data, 'product_id') ||
+                 Object.prototype.hasOwnProperty.call(data, 'components');
+
+  if (hasNew) return 'new';
+  if (hasOld) return 'old';
+  return 'unknown';
+}
+
+/**
+ * Normalize product JSON to a schema-independent view.
+ * New schema is the primary contract for this validator.
+ *
+ * @param {Object} data - Raw product JSON
+ * @param {string} fallbackId - Product directory name (business id)
+ * @returns {Object} normalized
+ */
+function normalizeProduct(data, fallbackId) {
+  const schema = detectProductSchema(data);
+  const warnings = [];
+
+  // Keep "id" as business id for internal consistency (dir name is business id in current pipeline)
+  const idFromNew = (data && Object.prototype.hasOwnProperty.call(data, 'business_id')) ? data.business_id : null;
+  const idFromOld = (data && Object.prototype.hasOwnProperty.call(data, 'product_id')) ? data.product_id : null;
+  const id = (idFromNew || idFromOld || fallbackId || null);
+
+  // Required-fields presence check must allow null (e.g., title placeholder) but not undefined.
+  const hasOwn = (k) => data && Object.prototype.hasOwnProperty.call(data, k);
+
+  const requiredFields = schema === 'old' ? REQUIRED_PRODUCT_FIELDS_OLD : REQUIRED_PRODUCT_FIELDS_NEW; // new is default
+  const missingFields = requiredFields.filter((f) => !hasOwn(f));
+
+  // Prices
+  const pricesRaw = data && hasOwn('prices') ? data.prices : null;
+  const prices = Array.isArray(pricesRaw) ? pricesRaw : null;
+  if (hasOwn('prices') && !Array.isArray(pricesRaw)) {
+    warnings.push('prices is not an array');
+  }
+
+  // Title (can be null pre-upload; acceptable but warn)
+  const title = hasOwn('title') ? data.title : null;
+  if (hasOwn('title') && (title === null || title === '')) {
+    warnings.push('title is empty (placeholder)');
+  }
+
+  // Components extraction
+  let componentBusinessIds = [];
+  if (schema === 'new' || schema === 'unknown') {
+    const oc = hasOwn('organic_components') ? data.organic_components : null;
+    if (Array.isArray(oc)) {
+      componentBusinessIds = oc
+        .map((c) => (c && typeof c === 'object' ? c.component_id : null))
+        .filter((v) => typeof v === 'string' && v.trim().length > 0);
+      if (oc.length > 0 && componentBusinessIds.length === 0) {
+        warnings.push('organic_components present but no valid component_id found');
+      }
+    } else if (hasOwn('organic_components')) {
+      warnings.push('organic_components is not an array');
+    }
+  }
+
+  // Fallback to legacy components if new missing/empty
+  if (componentBusinessIds.length === 0 && (schema === 'old' || schema === 'unknown')) {
+    const comps = hasOwn('components') ? data.components : null;
+    if (Array.isArray(comps)) {
+      componentBusinessIds = comps
+        .map((c) => (c && typeof c === 'object' ? c.component_business_id : null))
+        .filter((v) => typeof v === 'string' && v.trim().length > 0);
+      if (comps.length > 0 && componentBusinessIds.length === 0) {
+        warnings.push('components present but no valid component_business_id found');
+      }
+    } else if (hasOwn('components')) {
+      warnings.push('components is not an array');
+    }
+  }
+
+  // Schema policy: new is primary. Old is acceptable but should be flagged.
+  if (schema === 'old') {
+    warnings.push('legacy product schema detected (product_id/components)');
+  } else if (schema === 'unknown') {
+    warnings.push('unknown product schema (neither business_id/organic_components nor product_id/components detected)');
+  }
+
+  return {
+    schema,
+    id,
+    title,
+    prices,
+    componentBusinessIds,
+    missingFields,
+    warnings
+  };
+}
 
 /**
  * Build context object from CLI options
@@ -68,9 +174,33 @@ function buildContext(options) {
   const sellerBasePath = path.join(PROJECT_ROOT, 'data', 'sellers', sellerId);
   const csvFilename = `${sellerId.charAt(0).toUpperCase() + sellerId.slice(1)}_catalog.csv`;
   const csvPath = options.csv || path.join(sellerBasePath, 'catalog', csvFilename);
-  const outputDir = path.join(sellerBasePath, 'output');
+
+  // ✅ FIX: Search for mapping file in multiple locations and pick the newest one
+  const possibleMappingPaths = [
+    path.join(sellerBasePath, 'output', 'product_combined_mapping.json'), // Standard location
+    path.join(sellerBasePath, 'product_combined_mapping.json'),           // Alternative location
+  ];
+
+  let mappingPath = null;
+  let newestMtime = 0;
+
+  for (const possiblePath of possibleMappingPaths) {
+    if (fs.existsSync(possiblePath)) {
+      const stats = fs.statSync(possiblePath);
+      if (stats.mtime.getTime() > newestMtime) {
+        newestMtime = stats.mtime.getTime();
+        mappingPath = possiblePath;
+      }
+    }
+  }
+
+  // Fallback to standard location if not found
+  if (!mappingPath) {
+    mappingPath = possibleMappingPaths[0];
+  }
+
+  const outputDir = path.dirname(mappingPath);
   const productsDir = path.join(outputDir, 'products');
-  const mappingPath = path.join(outputDir, 'product_combined_mapping.json');
   
   // Get seller address from .env
   const sellerAddress = process.env.SELLER_ADDRESS || 
@@ -233,28 +363,31 @@ async function validatePhase1_CSV_FileSystem(context) {
         
         try {
           const data = JSON.parse(fs.readFileSync(productJsonPath, 'utf8'));
-          
-          // Validate required fields
-          const hasRequired = REQUIRED_PRODUCT_FIELDS.every(field => 
-            data[field] !== undefined
-          );
-          
-          if (hasRequired) {
+
+          const normalized = normalizeProduct(data, productId);
+
+          // Validate required fields presence (schema-aware, new schema is primary)
+          if (normalized.missingFields.length === 0) {
             checks.product_json_valid++;
-            
-            // Additional validation: components array structure
-            if (!Array.isArray(data.components) || data.components.length === 0) {
-              checks.warnings.push(`Product ${productId}: components array empty or invalid`);
+
+            // Emit schema/structure warnings
+            normalized.warnings.forEach((w) => {
+              checks.warnings.push(`Product ${productId}: ${w}`);
+            });
+
+            // Additional validation: component linkage must exist for Action 444 compatibility
+            if (normalized.componentBusinessIds.length === 0) {
+              checks.warnings.push(`Product ${productId}: no component ids found (organic_components/components empty or invalid)`);
             }
-            
+
             // Additional validation: prices array structure
-            if (!Array.isArray(data.prices) || data.prices.length === 0) {
+            if (!Array.isArray(normalized.prices) || normalized.prices.length === 0) {
               checks.warnings.push(`Product ${productId}: prices array empty or invalid`);
             }
-            
           } else {
-            const missing = REQUIRED_PRODUCT_FIELDS.filter(f => data[f] === undefined);
-            checks.errors.push(`Invalid product JSON: ${productId} (missing: ${missing.join(', ')})`);
+            checks.errors.push(
+              `Invalid product JSON: ${productId} (missing: ${normalized.missingFields.join(', ')})`
+            );
           }
         } catch (e) {
           checks.errors.push(`Product JSON parse error: ${productId} - ${e.message}`);
@@ -482,21 +615,28 @@ async function validatePhase2_ArweaveLayer(context) {
         if (response.ok) {
           const content = await response.json();
           
-          // Validate structure: should have components and prices arrays
-          if (content && content.components && content.prices) {
+          const normalized = normalizeProduct(content, productId);
+          if (normalized.missingFields.length === 0) {
             checks.product_cids_accessible++;
-            
-            // Additional validation: components array structure
-            if (!Array.isArray(content.components) || content.components.length === 0) {
+
+            // Schema-aware warnings
+            normalized.warnings.forEach((w) => {
+              checks.warnings.push(`Product CID ${productId}: ${w}`);
+            });
+
+            // Additional validation: components existence
+            if (normalized.componentBusinessIds.length === 0) {
               checks.warnings.push(`Product CID has empty components: ${productId}`);
             }
-            
+
             // Additional validation: prices array structure
-            if (!Array.isArray(content.prices) || content.prices.length === 0) {
+            if (!Array.isArray(normalized.prices) || normalized.prices.length === 0) {
               checks.warnings.push(`Product CID has empty prices: ${productId}`);
             }
           } else {
-            checks.warnings.push(`Product CID has invalid structure: ${productId} (missing components or prices)`);
+            checks.warnings.push(
+              `Product CID has invalid structure: ${productId} (missing: ${normalized.missingFields.join(', ')})`
+            );
           }
         } else {
           checks.warnings.push(`Product CID not accessible (HTTP ${response.status}): ${productId}`);
@@ -744,7 +884,7 @@ async function validatePhase3_ContractLayer(context) {
         } else {
           productDetail.metadata_cid_match = false;
           checks.metadata_cid_mismatch_count++;
-          checks.warnings.push(`Product ${i}: metadata CID not found in mapping (${product.metadataCID})`);
+          checks.warnings.push(`Product ${productId}: metadata CID not found in mapping (${product.metadataCID})`);
         }
         
         // Count active/inactive
@@ -1222,12 +1362,9 @@ async function validatePhase5_ComponentIntegration(context) {
         const productJsonPath = path.join(productsDir, productId, `${productId}.json`);
         if (fs.existsSync(productJsonPath)) {
           const productData = JSON.parse(fs.readFileSync(productJsonPath, 'utf8'));
-          if (productData.components) {
-            productData.components.forEach(comp => {
-              if (comp.component_business_id) {
-                componentSet.add(comp.component_business_id);
-              }
-            });
+          const normalized = normalizeProduct(productData, productId);
+          if (normalized.componentBusinessIds.length > 0) {
+            normalized.componentBusinessIds.forEach((id) => componentSet.add(id));
           }
         }
       }
