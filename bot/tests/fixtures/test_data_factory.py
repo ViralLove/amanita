@@ -80,7 +80,8 @@ class TestDataFactory:
         base_product = {
             "business_id": "test_product_1",
             "title": "Test Product",
-            "cover_image_url": "Qm123456789abcdefghijklmnopqrstuvwxyz1234567890",
+            # Валидный IPFS CID v0 (Qm + 44 base58btc chars)
+            "cover_image_url": "Qm" + ("1" * 44),
             "species": "Amanita muscaria",
             # ✅ forms всегда массив (даже для одного элемента)
             "forms": ["powder"],

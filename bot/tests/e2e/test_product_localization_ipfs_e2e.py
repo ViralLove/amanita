@@ -203,10 +203,12 @@ class TestProductLocalizationIPFSE2E:
         # Проверки CID
         assert cid_en is not None, "CID should be returned from IPFS upload"
         
-        # Если stub, CID должен начинаться с "cid://"
+        # Если stub, CID должен быть validate_ipfs_cid()-compatible (после миграции на ProductStorageService)
         use_stubs = os.getenv("E2E_USE_STUBS") == "true"
         if use_stubs and hasattr(ipfs_service, '_storage'):
-            assert cid_en.startswith("cid://"), f"Stub CID should start with 'cid://', got '{cid_en}'"
+            assert cid_en.startswith("Qm") and len(cid_en) == 46, (
+                f"Stub CID should look like CIDv0 (Qm + 44 base58 chars), got '{cid_en}'"
+            )
         
         logger.info("✅ 2.2: IPFS payload uploaded")
         logger.info(f"   CID: {cid_en}")

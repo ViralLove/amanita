@@ -20,12 +20,14 @@ class _TxWrapper:
 class AmanitaInternationalContractStub:
     """
     Простейший stub контракта AmanitaInternational.
-    Хранит CID'ы в памяти по ключу (entity_type, entity_id, field, lang).
+    Хранит CID'ы в памяти по ключу fieldKey (реальный ABI).
     Имплементирует web3-подобный интерфейс: contract.functions.METHOD(...).call()/transact()
     """
 
     def __init__(self):
-        self._storage: Dict[Tuple[str, str, str, str], str] = {}  # For simple fields
+        # Simple fields ABI: getSimpleFieldCID(fieldKey) -> cid
+        # fieldKey не содержит язык; язык хранится внутри IPFS payload (dict(lang->str)).
+        self._storage: Dict[str, str] = {}
         self._complex_storage: Dict[Tuple[str, str], str] = {}  # For complex fields: (className, language) -> CID
         self.get_cid_calls: int = 0
         self.set_cid_calls: int = 0
@@ -34,22 +36,27 @@ class AmanitaInternationalContractStub:
         self.functions = self.Functions(self, self._storage, self._complex_storage)
 
     class Functions:
-        def __init__(self, parent: "AmanitaInternationalContractStub", storage: Dict[Tuple[str, str, str, str], str], complex_storage: Dict[Tuple[str, str], str]):
+        def __init__(
+            self,
+            parent: "AmanitaInternationalContractStub",
+            storage: Dict[str, str],
+            complex_storage: Dict[Tuple[str, str], str],
+        ):
             self._parent = parent
             self._storage = storage
             self._complex_storage = complex_storage
 
-        def getSimpleFieldCID(self, entity_type: str, entity_id: str, field: str, lang: str):
+        def getSimpleFieldCID(self, fieldKey: str):
             def _do():
                 self._parent.get_cid_calls += 1
-                return self._storage.get((entity_type, entity_id, field, lang), None)
+                return self._storage.get(fieldKey, "")
 
             return _CallWrapper(_do)
 
-        def setSimpleFieldCID(self, entity_type: str, entity_id: str, field: str, lang: str, cid: str):
+        def setSimpleFieldCID(self, fieldKey: str, cid: str):
             def _do():
                 self._parent.set_cid_calls += 1
-                self._storage[(entity_type, entity_id, field, lang)] = cid
+                self._storage[fieldKey] = cid
                 return True
 
             return _TxWrapper(_do)

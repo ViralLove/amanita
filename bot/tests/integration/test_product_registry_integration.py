@@ -731,7 +731,7 @@ async def test_integration_service_initialization(integration_registry_service_r
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_integration_get_all_products_basic(integration_registry_service_real_full):
+async def test_integration_get_all_products_basic(integration_registry_service_real_full, caplog):
     """
     Базовый тест получения всех продуктов из контракта.
     
@@ -754,6 +754,24 @@ async def test_integration_get_all_products_basic(integration_registry_service_r
     assert isinstance(products, list), "get_all_products() должен возвращать список"
     logger.info(f"✅ Получено {len(products)} продуктов из контракта")
     
+    # --- Диагностическое логирование содержимого каталога (коротко, без секретов) ---
+    # Важно: мы НЕ печатаем приватные ключи/адреса. Только поля продукта.
+    # Это помогает быстро увидеть, что именно приезжает из on-chain + storage (title/description/cid).
+    preview_count = int(os.getenv("CATALOG_DEBUG_PREVIEW_COUNT", "5") or "5")
+    logger.info(f"🔎 [CATALOG DEBUG] Preview first {min(preview_count, len(products))} products:")
+    for idx, p in enumerate(products[:preview_count]):
+        business_id = getattr(p, "business_id", getattr(p, "id", None))
+        blockchain_id = getattr(p, "blockchain_id", None)
+        title = getattr(p, "title", None)
+        cid = getattr(p, "cid", None)
+        desc = getattr(p, "description", None)
+        desc_type = type(desc).__name__
+        desc_len = len(desc) if isinstance(desc, str) else None
+        logger.info(
+            f"  - [{idx}] business_id={business_id} blockchain_id={blockchain_id} "
+            f"title={title!r} cid={cid!r} description={desc_type}(len={desc_len})"
+        )
+
     # Проверяем количество продуктов (ожидается 17 после Action 444)
     expected_count = 17
     if len(products) == 0:
@@ -762,11 +780,16 @@ async def test_integration_get_all_products_basic(integration_registry_service_r
             "Убедитесь, что Action 444 выполнен успешно."
         )
     
+    strict_count = (os.getenv("STRICT_CATALOG_COUNT", "false").lower() == "true")
     if len(products) != expected_count:
-        logger.warning(
+        msg = (
             f"⚠️ Ожидалось {expected_count} продуктов после Action 444, "
             f"получено {len(products)}. Убедитесь, что Action 444 выполнен успешно."
         )
+        if strict_count:
+            pytest.fail(msg)
+        else:
+            logger.warning(msg)
     
     # Проверяем структуру первого продукта (если есть)
     if products:
@@ -774,6 +797,107 @@ async def test_integration_get_all_products_basic(integration_registry_service_r
         assert hasattr(first_product, 'business_id') or hasattr(first_product, 'id'), "Продукт должен иметь поле business_id или id"
         assert hasattr(first_product, 'title'), "Продукт должен иметь поле title"
         logger.info(f"✅ Структура продукта корректна: {getattr(first_product, 'business_id', getattr(first_product, 'id', 'N/A'))}")
+
+        # Дополнительно: вытаскиваем первый продукт через get_product(blockchain_id),
+        # чтобы получить «полный» объект после сборки (metadata/components enrichment).
+        #
+        # P0 контракт рефактора:
+        # - тест должен быть КРАСНЫМ, если вернулась ошибка старого пути ('get_service').
+        # - остальные ошибки могут быть диагностическими (данные/инфраструктура) и не должны
+        #   превращаться в ложные регрессы без явных предикатов доступности данных.
+        first_blockchain_id = getattr(first_product, "blockchain_id", None)
+        if first_blockchain_id is None:
+            logger.warning("🔎 [CATALOG DEBUG] First product has no blockchain_id; skipping get_product() debug.")
+        else:
+            # Capture warnings to evaluate "No description available" rate.
+            caplog.set_level(logging.WARNING)
+            try:
+                full_product = await integration_registry_service_real_full.get_product(first_blockchain_id)
+            except Exception as e:
+                # P0: Do not swallow the old regression signal.
+                msg = str(e)
+                if "get_service" in msg:
+                    raise
+                # Do not swallow assertion/skip failures.
+                if isinstance(e, (AssertionError, pytest.skip.Exception)):
+                    raise
+                logger.warning(f"🔎 [CATALOG DEBUG] Failed to fetch full first product via get_product(): {e}")
+                full_product = None
+
+            if full_product is not None:
+                # Note: Product model currently has no 'description' field (only components).
+                logger.info(
+                    f"🔎 [CATALOG DEBUG] Full first product: "
+                    f"business_id={getattr(full_product, 'business_id', getattr(full_product, 'id', None))} "
+                    f"blockchain_id={getattr(full_product, 'blockchain_id', None)} "
+                    f"title={getattr(full_product, 'title', None)!r} "
+                    f"organic_components={len(getattr(full_product, 'organic_components', []) or [])}"
+                )
+
+                # ---- Data predicates: validate "description effect" only when data is available ----
+                language = os.getenv("CATALOG_LANGUAGE", "ru")
+                organic_components = getattr(full_product, "organic_components", []) or []
+                component_ids = [getattr(c, "component_id", None) for c in organic_components if getattr(c, "component_id", None)]
+
+                # Try to detect availability: contract has CID AND storage returns expected complex payload.
+                data_available = False
+                try:
+                    assembler = getattr(integration_registry_service_real_full, "assembler", None)
+                    component_service = getattr(assembler, "component_service", None) if assembler else None
+                    ml = getattr(component_service, "multilingual_ipfs_service", None) if component_service else None
+                    storage = getattr(ml, "storage_service", None) if ml else None
+
+                    def _is_plain_component_description_dict(payload: object) -> bool:
+                        if not isinstance(payload, dict):
+                            return False
+                        # SSOT-fact: real data/components/.../complex_fields/*.json is a plain dict with these keys
+                        required = ("generic_description", "effects", "shamanic", "warnings")
+                        return any(k in payload for k in required)
+
+                    for cid_component_id in component_ids[:5]:
+                        class_name = f"ComponentDescription.{cid_component_id}"
+                        complex_cid = ml._get_complex_field_cid(class_name, language) if ml else None
+                        if isinstance(complex_cid, str) and complex_cid:
+                            payload = storage.download_json(complex_cid) if storage else None
+                            # Accept both formats:
+                            # - wrapper: {label,type,fields}
+                            # - plain dict: {generic_description,effects,shamanic,warnings,...}
+                            if (
+                                isinstance(payload, dict)
+                                and isinstance(payload.get("fields"), dict)
+                                and payload.get("label") in ("ComponentDescription", "Component Description")
+                            ):
+                                data_available = True
+                                break
+                            if _is_plain_component_description_dict(payload):
+                                data_available = True
+                                break
+                except Exception as e:
+                    logger.warning(f"🔎 [CATALOG DEBUG] Data availability predicate failed (non-P0): {e}")
+
+                # Count warnings from ComponentService about missing descriptions
+                max_missing = int(os.getenv("CATALOG_MAX_NO_DESCRIPTION_WARNINGS", "0") or "0")
+                no_desc_warnings = [
+                    r for r in caplog.records
+                    if getattr(r, "levelno", 0) >= logging.WARNING
+                    and "No description available" in (getattr(r, "message", "") or "")
+                    and str(getattr(r, "name", "")).endswith("services.product.component_service")
+                ]
+                if data_available:
+                    # When data is available, warnings should be rare/absent.
+                    assert len(no_desc_warnings) <= max_missing, (
+                        f"Expected 'No description available' warnings <= {max_missing} when data is available, "
+                        f"got {len(no_desc_warnings)}"
+                    )
+                    # And at least one OrganicComponent should have a populated ComponentDescription
+                    assert any(getattr(c, "description", None) is not None for c in organic_components), (
+                        "Expected at least one OrganicComponent.description to be populated when data is available"
+                    )
+                else:
+                    pytest.skip(
+                        "ComponentDescription data is not available in this environment "
+                        f"(lang={language}); skipping effect-level assertions to avoid false regressions."
+                    )
     
     logger.info("✅ Базовый тест получения всех продуктов завершен")
 
@@ -837,6 +961,10 @@ async def test_integration_product_lifecycle_deactivation(
             await asyncio.sleep(2)
             
             # Assert - Проверяем деактивацию
+            chain_product = integration_registry_service_real_full.blockchain_service.get_product_structured(blockchain_id)
+            assert chain_product.active is False, f"On-chain active должен быть False, получен: {chain_product.active}"
+
+            # Дополнительная проверка согласованности слоя сборки (не первичная истина)
             deactivated_product = await integration_registry_service_real_full.get_product(blockchain_id)
             assert deactivated_product is not None, "Деактивированный продукт должен быть доступен"
             assert deactivated_product.status == 0, f"Статус должен быть 0, получен: {deactivated_product.status}"
@@ -854,6 +982,9 @@ async def test_integration_product_lifecycle_deactivation(
             await asyncio.sleep(2)
             
             # Assert - Проверяем активацию
+            chain_product = integration_registry_service_real_full.blockchain_service.get_product_structured(blockchain_id)
+            assert chain_product.active is True, f"On-chain active должен быть True, получен: {chain_product.active}"
+
             activated_product = await integration_registry_service_real_full.get_product(blockchain_id)
             assert activated_product is not None, "Активированный продукт должен быть доступен"
             assert activated_product.status == 1, f"Статус должен быть 1, получен: {activated_product.status}"
@@ -874,6 +1005,9 @@ async def test_integration_product_lifecycle_deactivation(
             await asyncio.sleep(2)
             
             # Assert - Проверяем активацию
+            chain_product = integration_registry_service_real_full.blockchain_service.get_product_structured(blockchain_id)
+            assert chain_product.active is True, f"On-chain active должен быть True, получен: {chain_product.active}"
+
             activated_product = await integration_registry_service_real_full.get_product(blockchain_id)
             assert activated_product is not None, "Активированный продукт должен быть доступен"
             assert activated_product.status == 1, f"Статус должен быть 1, получен: {activated_product.status}"
@@ -890,6 +1024,9 @@ async def test_integration_product_lifecycle_deactivation(
             await asyncio.sleep(2)
             
             # Assert - Проверяем деактивацию
+            chain_product = integration_registry_service_real_full.blockchain_service.get_product_structured(blockchain_id)
+            assert chain_product.active is False, f"On-chain active должен быть False, получен: {chain_product.active}"
+
             deactivated_product = await integration_registry_service_real_full.get_product(blockchain_id)
             assert deactivated_product is not None, "Деактивированный продукт должен быть доступен"
             assert deactivated_product.status == 0, f"Статус должен быть 0, получен: {deactivated_product.status}"
@@ -1018,19 +1155,25 @@ async def test_integration_product_metadata_integrity(
         
         # 3. Проверяем валидность значений
         
-        # CID должен быть валидным IPFS CID
-        import re
-        cid_pattern = re.compile(r'^(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[A-Za-z2-7]{55})$')
-        assert cid_pattern.match(product.cid), f"CID должен быть валидным IPFS CID: {product.cid}"
+        # CID должен быть валидным идентификатором контента по правилам проекта
+        # (IPFS CID v0/v1 или Arweave txId). Не дублируем regex в тесте.
+        from validation import ValidationFactory
+        cid_validator = ValidationFactory.get_cid_validator()
+        cid_result = cid_validator.validate(product.cid)
+        assert cid_result.is_valid, (
+            f"CID должен быть валидным (IPFS v0/v1 или Arweave txId). "
+            f"cid={product.cid!r}, error_code={cid_result.error_code}, error={cid_result.error_message}"
+        )
         
         # Title не должен быть пустым
         assert len(product.title.strip()) > 0, "title не должен быть пустым"
         
-        # Categories не должны быть пустыми
-        assert len(product.categories) > 0, "categories не должны быть пустыми"
+        # Categories: в проекте допускаются пустые категории.
+        # Но если категории указаны — каждая должна быть непустой строкой.
+        assert isinstance(product.categories, list), "categories должен быть списком"
         for category in product.categories:
-            assert isinstance(category, str), f"category должна быть строкой"
-            assert len(category.strip()) > 0, "category не должна быть пустой"
+            assert isinstance(category, str), "category должна быть строкой"
+            assert category.strip(), "category не должна быть пустой"
         
         # Forms не должны быть пустыми
         assert len(product.forms) > 0, "forms не должны быть пустыми"
@@ -1041,11 +1184,14 @@ async def test_integration_product_metadata_integrity(
         # Species не должен быть пустым
         assert len(product.species.strip()) > 0, "species не должен быть пустым"
         
-        # Prices не должны быть пустыми
+        # Prices не должны быть пустыми.
+        # Важно: не проверяем isinstance(..., PriceInfo), потому что в репо встречаются два пути импорта
+        # (`model.product.PriceInfo` vs `bot.model.product.PriceInfo`), и это ломает identity-класс даже при одинаковом коде.
+        # Проверяем контрактно: наличие полей и валидность значений.
         assert len(product.prices) > 0, "prices не должны быть пустыми"
-        from bot.model.product import PriceInfo
         for price in product.prices:
-            assert isinstance(price, PriceInfo), f"price должна быть объектом PriceInfo"
+            assert hasattr(price, "price"), "price должен иметь поле price"
+            assert hasattr(price, "currency"), "price должен иметь поле currency"
             assert price.price > 0, f"price должна быть положительной: {price.price}"
             assert price.currency in ['EUR', 'USD', 'GBP', 'JPY', 'RUB', 'CNY', 'USDT', 'ETH', 'BTC'], \
                 f"currency должна быть валидной: {price.currency}"

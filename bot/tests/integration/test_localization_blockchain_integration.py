@@ -22,8 +22,9 @@ def test_ipfs_upload_payload_returns_cids_for_en_and_ru(ipfs_factory):
     cid_en = service.upload_json(payload_en)
     cid_ru = service.upload_json(payload_ru)
 
-    assert isinstance(cid_en, str) and cid_en.startswith("cid://")
-    assert isinstance(cid_ru, str) and cid_ru.startswith("cid://")
+    # CID produced by IPFSFactoryStub must be validate_ipfs_cid()-compatible
+    assert isinstance(cid_en, str) and cid_en.startswith("Qm") and len(cid_en) == 46
+    assert isinstance(cid_ru, str) and cid_ru.startswith("Qm") and len(cid_ru) == 46
     # Разные payload → разные CID
     assert cid_en != cid_ru
 
@@ -38,18 +39,17 @@ def test_blockchain_set_and_get_simple_field_cid(ipfs_factory, blockchain_servic
     и убедиться, что getSimpleFieldCID возвращает тот же CID.
     """
     business_id = "prod-int-001"
-    entity_type = "product"
-    field = "*"
-    lang = "en"
+    field_key = f"ProductName.{business_id}"
 
     ipfs = ipfs_factory.get_service()
-    cid = ipfs.upload_json({"product": {"title": {"en": "Integration Title"}}})
+    # Реальный формат simple field payload: dict(lang->str) под одним CID.
+    cid = ipfs.upload_json({"en": "Integration Title"})
 
     contract = blockchain_service.get_contract("AmanitaInternational")
     # Устанавливаем CID
-    contract.functions.setSimpleFieldCID(entity_type, business_id, field, lang, cid).transact()
+    contract.functions.setSimpleFieldCID(field_key, cid).transact()
     # Читаем обратно
-    got = contract.functions.getSimpleFieldCID(entity_type, business_id, field, lang).call()
+    got = contract.functions.getSimpleFieldCID(field_key).call()
     assert got == cid
 
 @pytest.mark.integration
@@ -59,18 +59,17 @@ def test_localization_service_fetches_via_blockchain_and_ipfs(multilingual_ipfs_
     и убедиться, что данные подтягиваются через цепочку Blockchain → IPFS → Cache → Localization.
     """
     business_id = "prod-int-002"
-    entity_type = "product"
-    field = "*"
     lang = "en"
+    field_key = f"ProductName.{business_id}"
 
     # Готовим IPFS payload и CID
     ipfs = ipfs_factory.get_service()
-    payload = {"product": {"title": {"en": "Block → IPFS → Loc"}, "description": {"en": "Integration path"}}}
+    payload = {"en": "Block → IPFS → Loc"}
     cid = ipfs.upload_json(payload)
 
     # Записываем CID в контракт
     contract = blockchain_service.get_contract("AmanitaInternational")
-    contract.functions.setSimpleFieldCID(entity_type, business_id, field, lang, cid).transact()
+    contract.functions.setSimpleFieldCID(field_key, cid).transact()
 
     # Снимем счётчики до вызова
     contract = blockchain_service.get_contract("AmanitaInternational")
@@ -83,8 +82,7 @@ def test_localization_service_fetches_via_blockchain_and_ipfs(multilingual_ipfs_
 
     # Проверки результата и кэша
     assert isinstance(result, dict)
-    # Это исходный JSON из IPFS
-    assert result == payload
+    assert result == {"title": "Block → IPFS → Loc"}
     # 4.1: были вызваны getSimpleFieldCID и download_json
     assert contract.get_cid_calls == start_get_cid_calls + 1
     assert ipfs.download_calls == start_download_calls + 1
@@ -98,7 +96,7 @@ def test_localization_service_fetches_via_blockchain_and_ipfs(multilingual_ipfs_
     start_download_calls_2 = ipfs.download_calls
     result2 = multilingual_ipfs_service.get_product_translations(business_id, lang)
     assert isinstance(result2, dict)
-    assert result2 == payload
+    assert result2 == {"title": "Block → IPFS → Loc"}
     assert contract.get_cid_calls == start_get_cid_calls_2  # без доп. вызова
     assert ipfs.download_calls == start_download_calls_2     # без доп. вызова
 
@@ -112,32 +110,31 @@ def test_update_cid_invalidates_cache(multilingual_ipfs_service, ipfs_factory, b
     - повторный вызов должен сходить в IPFS заново и вернуть v2
     """
     business_id = "prod-int-003"
-    entity_type = "product"
-    field = "*"
     lang = "en"
+    field_key = f"ProductName.{business_id}"
     cache_key = f"product_{business_id}_{lang}"
 
     contract = blockchain_service.get_contract("AmanitaInternational")
     ipfs = ipfs_factory.get_service()
 
     # v1
-    payload_v1 = {"product": {"title": {"en": "v1"}, "description": {"en": "first"}}}
+    payload_v1 = {"en": "v1"}
     cid_v1 = ipfs.upload_json(payload_v1)
-    contract.functions.setSimpleFieldCID(entity_type, business_id, field, lang, cid_v1).transact()
+    contract.functions.setSimpleFieldCID(field_key, cid_v1).transact()
 
     start_get_cid = contract.get_cid_calls
     start_downloads = ipfs.download_calls
     first = multilingual_ipfs_service.get_product_translations(business_id, lang)
-    assert first == payload_v1
+    assert first == {"title": "v1"}
     assert contract.get_cid_calls == start_get_cid + 1
     assert ipfs.download_calls == start_downloads + 1
     # внешний кэш записан
     assert translation_cache_service.get(cache_key, 'ipfs') is not None
 
     # v2
-    payload_v2 = {"product": {"title": {"en": "v2"}, "description": {"en": "second"}}}
+    payload_v2 = {"en": "v2"}
     cid_v2 = ipfs.upload_json(payload_v2)
-    contract.functions.setSimpleFieldCID(entity_type, business_id, field, lang, cid_v2).transact()
+    contract.functions.setSimpleFieldCID(field_key, cid_v2).transact()
 
     # Инвалидируем внешний кэш и истечём локальный
     translation_cache_service.invalidate(cache_key, 'ipfs')
@@ -147,17 +144,17 @@ def test_update_cid_invalidates_cache(multilingual_ipfs_service, ipfs_factory, b
     start_get_cid_2 = contract.get_cid_calls
     start_downloads_2 = ipfs.download_calls
     second = multilingual_ipfs_service.get_product_translations(business_id, lang)
-    assert second == payload_v2
+    assert second == {"title": "v2"}
     # Должен быть новый сетевой заход
     assert contract.get_cid_calls == start_get_cid_2 + 1
     assert ipfs.download_calls == start_downloads_2 + 1
     # 5.2: Кэш перезаписан значением v2 (внешний и локальный)
     cached_v2 = translation_cache_service.get(cache_key, 'ipfs')
-    assert cached_v2 == payload_v2
+    assert cached_v2 == {"title": "v2"}
     assert cache_key in multilingual_ipfs_service.ipfs_cache
-    assert multilingual_ipfs_service.ipfs_cache[cache_key].data == payload_v2
+    assert multilingual_ipfs_service.ipfs_cache[cache_key].data == {"title": "v2"}
     # 5.3: Нет ложных успехов — не возвращаем старое v1
-    assert second != payload_v1
+    assert second != {"title": "v1"}
 
 @pytest.mark.integration
 def test_component_description_flow(multilingual_ipfs_service, ipfs_factory, blockchain_service, translation_cache_service):
@@ -256,15 +253,14 @@ def test_localization_service_product_smoke(localization_service, ipfs_factory, 
     P2: Smoke через фасад LocalizationService для продукта: t('product.{id}.title')
     """
     business_id = "prod-int-facade-001"
-    entity_type = "product"
-    field = "*"
     lang = "en"
+    field_key = f"ProductName.{business_id}"
 
     ipfs = ipfs_factory.get_service()
-    payload = {"title": "Facade Product Title", "description": "Desc"}
+    payload = {"en": "Facade Product Title"}
     cid = ipfs.upload_json(payload)
     contract = blockchain_service.get_contract("AmanitaInternational")
-    contract.functions.setSimpleFieldCID(entity_type, business_id, field, lang, cid).transact()
+    contract.functions.setSimpleFieldCID(field_key, cid).transact()
 
     value = localization_service.t(f"product.{business_id}.title")
     assert isinstance(value, str)
@@ -285,8 +281,11 @@ def test_localization_service_component_smoke(ipfs_factory, real_blockchain_serv
     logger = logging.getLogger(__name__)
     
     # Создаем multilingual_ipfs_service с real_blockchain_service
+    from bot.services.product.storage import ProductStorageService
+    storage_provider = ipfs_factory.get_service() if hasattr(ipfs_factory, "get_service") else ipfs_factory.get_storage()
+    storage_service = ProductStorageService(storage_provider=storage_provider)
     multilingual_ipfs_service = MultilingualIPFSService(
-        ipfs_factory=ipfs_factory,
+        storage_service=storage_service,
         cache_service=translation_cache_service,
         blockchain_service=real_blockchain_service,
     )
@@ -457,8 +456,10 @@ def test_localization_service_mock_component(multilingual_ipfs_service, ipfs_fac
     # Создаём полные mock данные (не TODO!)
     ipfs = ipfs_factory.get_service()
     
-    # Payload для complex field ComponentDescription должен содержать label, type, fields
-    # get_component_translations() возвращает только fields часть
+    # ComponentDescription payload formats:
+    # - real storage data is often a plain dict of fields (see data/components/.../complex_fields/*.json)
+    # - some mocks/tests use a wrapper {label,type,fields}
+    # MultilingualIPFSService supports both and returns only the `fields` part from get_component_translations().
     expected_fields = {
         "title": "Mock Amanita Muscaria",  # Значения напрямую для языка en
         "generic_description": "Amanita muscaria is a mushroom with psychoactive properties.",

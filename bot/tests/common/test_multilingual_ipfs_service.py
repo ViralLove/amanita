@@ -24,9 +24,17 @@ class TestMultilingualIPFSService(unittest.TestCase):
     """Первые падающие тесты для MultilingualIPFSService"""
 
     def setUp(self):
+        # Backward-compatible test harness:
+        # Many existing tests refer to self.ipfs_service.* for convenience.
+        # The SSOT contract is still enforced: MultilingualIPFSService uses storage_service for I/O.
         self.ipfs_service = MagicMock(name="IPFSService")
-        self.ipfs_factory = MagicMock(name="IPFSFactory")
-        self.ipfs_factory.get_service.return_value = self.ipfs_service
+
+        # SSOT injection for read/write path:
+        # MultilingualIPFSService must use storage_service.download_json/upload_json (no ipfs_factory).
+        self.storage_service = MagicMock(name="ProductStorageService")
+        # Alias storage_service I/O to ipfs_service mocks so older assertions remain valid.
+        self.storage_service.download_json = self.ipfs_service.download_json
+        self.storage_service.upload_json = self.ipfs_service.upload_json
 
         self.cache_service = MagicMock(name="TranslationCacheService")
         self.fallback_service = MagicMock(name="FallbackLocalizationService")
@@ -35,10 +43,12 @@ class TestMultilingualIPFSService(unittest.TestCase):
 
         # имитируем цепочку contract.functions.getSimpleFieldCID(...).call() -> CID
         self.blockchain_service.get_contract.return_value = self.amanita_contract
-        self.amanita_contract.functions.getSimpleFieldCID.return_value.call.return_value = "cid://0xabc"
+        # CID должен быть validate_ipfs_cid()-compatible после миграции на ProductStorageService
+        self.valid_cid = "Qm" + ("1" * 44)
+        self.amanita_contract.functions.getSimpleFieldCID.return_value.call.return_value = self.valid_cid
 
         self.service = MultilingualIPFSService(
-            ipfs_factory=self.ipfs_factory,
+            storage_service=self.storage_service,
             cache_service=self.cache_service,
             fallback_service=self.fallback_service,
             blockchain_service=self.blockchain_service
@@ -52,7 +62,7 @@ class TestMultilingualIPFSService(unittest.TestCase):
         cache_key = f"product_{business_id}_{language}"
         # 5.1: внешнего кэша нет перед первым вызовом
         self.cache_service.get.return_value = None
-        self.ipfs_service.download_json.return_value = expected_payload
+        self.storage_service.download_json.return_value = expected_payload
 
         result = self.service.get_product_translations(business_id, language)
 
@@ -61,8 +71,7 @@ class TestMultilingualIPFSService(unittest.TestCase):
         self.amanita_contract.functions.getSimpleFieldCID.assert_called_once()
 
         # ожидаем загрузку JSON по CID
-        self.ipfs_factory.get_service.assert_called_once()
-        self.ipfs_service.download_json.assert_called_once_with("cid://0xabc")
+        self.storage_service.download_json.assert_called_once_with(self.valid_cid)
 
         # 5.2: результат должен сохраниться в TranslationCacheService c правильными аргументами (динамический TTL)
         expected_ttl = self.service.cache_ttl['product']
@@ -70,6 +79,115 @@ class TestMultilingualIPFSService(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertIsInstance(result, dict)  # 5.4: результат — dict
         self.assertEqual(result, expected_payload)
+
+    def test_get_product_translations_uses_storage_service_download_json(self):
+        """SSOT contract: get_product_translations() должен звать storage_service.download_json(cid)"""
+        business_id = "prod-ssot-001"
+        language = "en"
+        expected_payload = {"title": {"en": "SSOT Title"}}
+
+        # GIVEN: external cache miss + storage_service возвращает dict
+        self.cache_service.get.return_value = None
+        self.storage_service.download_json.return_value = expected_payload
+
+        # WHEN
+        result = self.service.get_product_translations(business_id, language)
+
+        # THEN
+        self.assertEqual(result, expected_payload)
+        self.storage_service.download_json.assert_called_once()
+
+    def test_upload_product_translations_uses_storage_service_upload_json(self):
+        """SSOT contract: upload_product_translations() использует storage_service.upload_json"""
+        business_id = "prod-up-001"
+        translations = {
+            "en": {"title": "T", "description": "D"},
+            "ru": {"title": "Т", "description": "Д"},
+        }
+        expected_cid = "Qm" + ("9" * 44)
+
+        # GIVEN
+        self.storage_service.upload_json.return_value = expected_cid
+
+        # WHEN
+        cid = self.service.upload_product_translations(business_id, translations)
+
+        # THEN
+        self.assertEqual(cid, expected_cid)
+        self.storage_service.upload_json.assert_called_once()
+        uploaded = self.storage_service.upload_json.call_args[0][0]
+        self.assertEqual(uploaded["business_id"], business_id)
+        self.assertEqual(uploaded["type"], "product")
+        self.assertEqual(uploaded["versions"], translations)
+
+    def test_upload_component_translations_uses_storage_service_upload_json(self):
+        """SSOT contract: upload_component_translations() использует storage_service.upload_json"""
+        component_id = "comp-up-001"
+        translations = {
+            "en": {"name": "N", "description": "D"},
+            "ru": {"name": "Н", "description": "Д"},
+        }
+        expected_cid = "Qm" + ("8" * 44)
+
+        # GIVEN
+        self.storage_service.upload_json.return_value = expected_cid
+
+        # WHEN
+        cid = self.service.upload_component_translations(component_id, translations)
+
+        # THEN
+        self.assertEqual(cid, expected_cid)
+        self.storage_service.upload_json.assert_called_once()
+        uploaded = self.storage_service.upload_json.call_args[0][0]
+        self.assertEqual(uploaded["component_id"], component_id)
+        self.assertEqual(uploaded["type"], "component")
+        self.assertEqual(uploaded["versions"], translations)
+
+    def test_upload_methods_return_none_when_storage_service_missing(self):
+        """Fail-safe: если storage_service отсутствует — upload_* возвращают None и не падают"""
+        service = MultilingualIPFSService(
+            storage_service=None,
+            cache_service=self.cache_service,
+            fallback_service=self.fallback_service,
+            blockchain_service=self.blockchain_service,
+        )
+
+        product_cid = service.upload_product_translations("prod-x", {"en": {"title": "T", "description": "D"}})
+        self.assertIsNone(product_cid)
+        component_cid = service.upload_component_translations("comp-x", {"en": {"name": "N", "description": "D"}})
+        self.assertIsNone(component_cid)
+
+    def test_upload_product_translations_exception_returns_none_and_increments_errors(self):
+        """P0: storage_service.upload_json throws → returns None, no crash, stats['errors']++ (product)"""
+        business_id = "prod-up-ex-001"
+        translations = {"en": {"title": "T", "description": "D"}}
+
+        # GIVEN
+        before_errors = self.service.stats["errors"]
+        self.storage_service.upload_json.side_effect = Exception("upload failed")
+
+        # WHEN
+        cid = self.service.upload_product_translations(business_id, translations)
+
+        # THEN
+        self.assertIsNone(cid)
+        self.assertEqual(self.service.stats["errors"], before_errors + 1)
+
+    def test_upload_component_translations_exception_returns_none_and_increments_errors(self):
+        """P0: storage_service.upload_json throws → returns None, no crash, stats['errors']++ (component)"""
+        component_id = "comp-up-ex-001"
+        translations = {"en": {"name": "N", "description": "D"}}
+
+        # GIVEN
+        before_errors = self.service.stats["errors"]
+        self.storage_service.upload_json.side_effect = Exception("upload failed")
+
+        # WHEN
+        cid = self.service.upload_component_translations(component_id, translations)
+
+        # THEN
+        self.assertIsNone(cid)
+        self.assertEqual(self.service.stats["errors"], before_errors + 1)
 
     def test_caches_ipfs_payload_per_entity_language(self):
         """Проверка TTL/инвалидации (Phase 2.2 @unit-test-build)"""
@@ -80,23 +198,23 @@ class TestMultilingualIPFSService(unittest.TestCase):
         cache_key = f"product_{business_id}_{language}"
         # 5.1: внешнего кэша нет перед первым вызовом
         self.cache_service.get.return_value = None
-        self.ipfs_service.download_json.return_value = payload_first
+        self.storage_service.download_json.return_value = payload_first
         self.service.cache_ttl["product"] = 1  # ускоряем TTL
 
         # 1 вызов — должен ходить в блокчейн+IPFS и сохранить в кэш
         first = self.service.get_product_translations(business_id, language)
         self.assertEqual(first, payload_first)
-        self.assertEqual(self.ipfs_service.download_json.call_count, 1)
+        self.assertEqual(self.storage_service.download_json.call_count, 1)
 
         # 2 вызов — смоделируем отсутствие локального кэша, но внешний вернёт данные → IPFS не дергается
-        self.ipfs_service.download_json.reset_mock()
+        self.storage_service.download_json.reset_mock()
         # очищаем локальный кэш, чтобы проверить путь external cache
         if cache_key in self.service.ipfs_cache:
             del self.service.ipfs_cache[cache_key]
         self.cache_service.get.return_value = payload_first
         second = self.service.get_product_translations(business_id, language)
         self.assertEqual(second, payload_first)
-        self.ipfs_service.download_json.assert_not_called()
+        self.storage_service.download_json.assert_not_called()
         # локальный кэш восстановлен из external и имеет корректный TTL
         self.assertIn(cache_key, self.service.ipfs_cache)
         self.assertEqual(self.service.ipfs_cache[cache_key].ttl, self.service.cache_ttl['product'])
@@ -111,12 +229,12 @@ class TestMultilingualIPFSService(unittest.TestCase):
             # Реальный TranslationCacheService с отдельной директорией
             real_cache = TranslationCacheService(cache_dir=os.path.join(tmpdir, "cache/translations"))
             # 1) Первый инстанс сервиса — загрузка из IPFS и запись в внешний кэш
+            from services.product.storage import ProductStorageService
             ipfs_service_1 = MagicMock(name="IPFSService1")
-            ipfs_factory_1 = MagicMock(name="IPFSFactory1")
-            ipfs_factory_1.get_service.return_value = ipfs_service_1
             ipfs_service_1.download_json.return_value = payload
+            storage_service_1 = ProductStorageService(storage_provider=ipfs_service_1)
             service1 = MultilingualIPFSService(
-                ipfs_factory=ipfs_factory_1,
+                storage_service=storage_service_1,
                 cache_service=real_cache,
                 fallback_service=self.fallback_service,
                 blockchain_service=self.blockchain_service
@@ -127,10 +245,9 @@ class TestMultilingualIPFSService(unittest.TestCase):
             self.assertTrue(ipfs_service_1.download_json.called)
             # 2) Новый инстанс сервиса — должен прочитать из внешнего кэша без IPFS
             ipfs_service_2 = MagicMock(name="IPFSService2")
-            ipfs_factory_2 = MagicMock(name="IPFSFactory2")
-            ipfs_factory_2.get_service.return_value = ipfs_service_2
+            storage_service_2 = ProductStorageService(storage_provider=ipfs_service_2)
             service2 = MultilingualIPFSService(
-                ipfs_factory=ipfs_factory_2,
+                storage_service=storage_service_2,
                 cache_service=real_cache,
                 fallback_service=self.fallback_service,
                 blockchain_service=self.blockchain_service
@@ -188,14 +305,21 @@ class TestMultilingualIPFSService(unittest.TestCase):
         """NO_FALSE_SUCCESSES: IPFS fail + no fallback (component) → None (не 'error_*')"""
         component_id = "comp-007"
         language = "en"
+        className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
+        expected_cid = "Qm" + ("1" * 44)
         self.cache_service.get.return_value = None  # external miss
         self.ipfs_service.download_json.return_value = None  # IPFS fail
         self.fallback_service.get_translation_with_fallback.return_value = None  # no fallback
+        # CID есть (валидный как строка), но payload не скачался → None
+        complex_field_fn = MagicMock()
+        complex_field_fn.call.return_value = expected_cid
+        self.amanita_contract.functions.getComplexFieldCID.return_value = complex_field_fn
 
         result = self.service.get_component_translations(component_id, language)
 
         self.cache_service.get.assert_called()
-        self.ipfs_service.download_json.assert_called_once()
+        self.amanita_contract.functions.getComplexFieldCID.assert_called_once_with(className, language)
+        self.ipfs_service.download_json.assert_called_once_with(expected_cid)
         self.fallback_service.get_translation_with_fallback.assert_called_once()
         self.assertIsNone(result)
         self.assertFalse(isinstance(result, str) and result.startswith("error_"))
@@ -223,7 +347,7 @@ class TestMultilingualIPFSService(unittest.TestCase):
         component_id = "comp-001"
         language = "en"
         className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
-        expected_cid = "QmComponentCID123"
+        expected_cid = "Qm" + ("2" * 44)
         expected_complex_data = {
             "label": "ComponentDescription",
             "type": "complex",
@@ -274,7 +398,7 @@ class TestMultilingualIPFSService(unittest.TestCase):
         
         # Настраиваем mocks для complex fields
         complex_field_fn = MagicMock()
-        complex_field_fn.call.return_value = "QmCID123"
+        complex_field_fn.call.return_value = "Qm" + ("3" * 44)
         self.amanita_contract.functions.getComplexFieldCID.return_value = complex_field_fn
         self.cache_service.get.return_value = None
         self.ipfs_service.download_json.return_value = complex_data_first
@@ -329,20 +453,22 @@ class TestMultilingualIPFSService(unittest.TestCase):
         className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
         fallback_fields = {"generic_description": "Fallback Component description", "effects": "Fallback effects"}
         
-        # Настраиваем mocks для complex fields (возвращает None)
+        # Настраиваем mocks для complex fields: CID есть, но IPFS отдаёт None → fallback
         complex_field_fn = MagicMock()
-        complex_field_fn.call.return_value = ""  # Пустой CID
+        expected_cid = "Qm" + ("1" * 44)
+        complex_field_fn.call.return_value = expected_cid
         self.amanita_contract.functions.getComplexFieldCID.return_value = complex_field_fn
         self.cache_service.get.return_value = None
-        # _load_component_description_from_ipfs вернет None, поэтому будет использован fallback
-        self.service._load_component_description_from_ipfs = MagicMock(return_value=None)
+        # IPFS "недоступен"/не вернул payload
+        self.ipfs_service.download_json.return_value = None
         self.fallback_service.get_translation_with_fallback.return_value = fallback_fields
 
         result = self.service.get_component_translations(component_id, language)
 
         self.cache_service.get.assert_called()
-        # Проверяем, что был вызов getComplexFieldCID (через _load_component_description_from_ipfs)
+        # Проверяем, что был вызов getComplexFieldCID (через complex fields путь)
         self.amanita_contract.functions.getComplexFieldCID.assert_called_once_with(className, language)
+        self.ipfs_service.download_json.assert_called_once_with(expected_cid)
         self.fallback_service.get_translation_with_fallback.assert_called_once()
         self.assertIsInstance(result, dict)
         self.assertEqual(result, fallback_fields)
@@ -578,7 +704,7 @@ class TestMultilingualIPFSService(unittest.TestCase):
         # GIVEN: Настроенный сервис с blockchain_service
         className = "ComponentDescription"
         language = "ru"
-        expected_cid = "QmComplexFieldCID123"
+        expected_cid = "Qm" + ("4" * 44)
         
         # Настраиваем mock для getComplexFieldCID
         complex_field_fn = MagicMock()
@@ -633,7 +759,7 @@ class TestMultilingualIPFSService(unittest.TestCase):
         # GIVEN: Настроенный сервис
         className = "ComponentDescription"
         language = "ru"
-        expected_cid = "QmComplexFieldCID123"
+        expected_cid = "Qm" + ("5" * 44)
         expected_payload = {
             "label": "ComponentDescription",
             "type": "complex_fields",
@@ -678,7 +804,7 @@ class TestMultilingualIPFSService(unittest.TestCase):
         invalid_payload = {"some_field": "value"}
         
         complex_field_fn = MagicMock()
-        complex_field_fn.call.return_value = "QmCID"
+        complex_field_fn.call.return_value = "Qm" + ("6" * 44)
         self.amanita_contract.functions.getComplexFieldCID.return_value = complex_field_fn
         self.cache_service.get.return_value = None
         self.ipfs_service.download_json.return_value = invalid_payload
@@ -783,7 +909,7 @@ class TestMultilingualIPFSService(unittest.TestCase):
         component_id = "amanita_muscaria"
         language = "ru"
         className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
-        expected_cid = "QmComponentDescriptionCID123"
+        expected_cid = "Qm" + ("7" * 44)
         expected_complex_data = {
             "label": "ComponentDescription",
             "type": "complex",
@@ -860,7 +986,7 @@ class TestMultilingualIPFSService(unittest.TestCase):
         }
         
         complex_field_fn = MagicMock()
-        complex_field_fn.call.return_value = "QmCID"
+        complex_field_fn.call.return_value = "Qm" + ("8" * 44)
         self.amanita_contract.functions.getComplexFieldCID.return_value = complex_field_fn
         self.cache_service.get.return_value = None
         self.ipfs_service.download_json.return_value = invalid_complex_data
@@ -892,7 +1018,7 @@ class TestMultilingualIPFSService(unittest.TestCase):
         component_id = "amanita_muscaria"
         language = "ru"
         className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
-        expected_cid = "QmTranslationsCID"
+        expected_cid = "Qm" + ("9" * 44)
         expected_fields = {
             "generic_description": "Test description",
             "effects": "Test effects",

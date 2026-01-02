@@ -112,18 +112,17 @@ def test_stats_reflect_actual_usage(localization_service, ipfs_factory, blockcha
     
     # GIVEN: Подготовка данных для локализации
     business_id = "prod-metrics-001"
-    entity_type = "product"
-    field = "*"
     lang = "en"
+    field_key = f"ProductName.{business_id}"
     
     # Загружаем payload в IPFS
     ipfs = ipfs_factory.get_service()
-    payload = {"title": {"en": "Metrics Test Product"}, "description": {"en": "Testing metrics export"}}
+    payload = {"en": "Metrics Test Product"}  # simple-field payload (dict(lang->str))
     cid = ipfs.upload_json(payload)
     
     # Записываем CID в контракт
     contract = blockchain_service.get_contract("AmanitaInternational")
-    contract.functions.setSimpleFieldCID(entity_type, business_id, field, lang, cid).transact()
+    contract.functions.setSimpleFieldCID(field_key, cid).transact()
     
     # WHEN: Выполняем реальные операции локализации
     # Запрос 1: Получаем перевод через LocalizationService

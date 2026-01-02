@@ -121,10 +121,17 @@ def test_create_bridge_to_next_generation(exponential_activator_pool, spiral_eng
     
     # 5. Проверяем структуру каждого элемента
     for i, (new_activator_account, invite_code) in enumerate(bridge_activators):
-        # Проверяем тип account
-        from eth_account import Account
-        assert isinstance(new_activator_account, Account), (
-            f"Элемент {i} должен быть Account, got {type(new_activator_account)}"
+        # Проверяем "контракт" account (duck-typing), а не конкретный класс.
+        # Причина: web3.eth.account.create() возвращает LocalAccount, и строгий isinstance(Account)
+        # здесь даёт ложное падение при корректной функциональности.
+        assert hasattr(new_activator_account, "address"), (
+            f"Элемент {i} должен иметь address, got {type(new_activator_account)}"
+        )
+        assert Web3.is_address(new_activator_account.address), (
+            f"Элемент {i} должен иметь валидный address, got {new_activator_account.address!r}"
+        )
+        assert hasattr(new_activator_account, "sign_transaction"), (
+            f"Элемент {i} должен уметь подписывать транзакции (sign_transaction), got {type(new_activator_account)}"
         )
         
         # Проверяем тип invite_code

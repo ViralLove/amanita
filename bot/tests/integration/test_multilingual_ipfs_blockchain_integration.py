@@ -40,15 +40,8 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
         # GIVEN: Blockchain contract returns CID
         className = "ComponentDescription"
         language = "ru"
-        cid = "QmTestCID123456789"
-        
-        # Setup blockchain contract stub to return CID via setComplexFieldCID
-        contract = blockchain_service.get_contract("AmanitaInternational")
-        
-        # Use contract.functions.setComplexFieldCID to set the CID in the stub
-        contract.functions.setComplexFieldCID(className, language, cid).transact()
-        
-        # GIVEN: IPFS service returns valid JSON
+
+        # GIVEN: IPFS service returns valid JSON under validate_ipfs_cid()-compatible CID
         ipfs_service = ipfs_factory.get_service()
         valid_payload = {
             "label": "ComponentDescription",
@@ -59,7 +52,11 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
                 "contraindications": "Test contraindications"
             }
         }
-        ipfs_service._storage[cid] = valid_payload
+        cid = ipfs_service.upload_json(valid_payload)
+
+        # Setup blockchain contract stub to return CID via setComplexFieldCID
+        contract = blockchain_service.get_contract("AmanitaInternational")
+        contract.functions.setComplexFieldCID(className, language, cid).transact()
         
         # WHEN: Loading complex field
         result = multilingual_ipfs_service._load_complex_field_from_ipfs(className, language)
@@ -78,6 +75,35 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
         assert "fields" in result
         assert "generic_description" in result["fields"]
         assert result["fields"]["generic_description"] == "Test description"
+
+    def test_load_complex_field_plain_payload_normalizes_to_wrapper(self, multilingual_ipfs_service, blockchain_service, ipfs_factory):
+        """
+        P0 regression test (SSOT data reality):
+        Real ComponentDescription JSON in data/components/.../complex_fields/*.json is a plain dict
+        (no {label,type,fields}). MultilingualIPFSService must accept it and normalize to wrapper.
+        """
+        className = "ComponentDescription"
+        language = "ru"
+
+        ipfs_service = ipfs_factory.get_service()
+        plain_payload = {
+            "generic_description": "Plain generic description",
+            "effects": "Plain effects",
+            "shamanic": "Plain shamanic",
+            "warnings": "Plain warnings",
+        }
+        cid = ipfs_service.upload_json(plain_payload)
+
+        contract = blockchain_service.get_contract("AmanitaInternational")
+        contract.functions.setComplexFieldCID(className, language, cid).transact()
+
+        result = multilingual_ipfs_service._load_complex_field_from_ipfs(className, language)
+
+        assert result is not None
+        assert result["label"] == "ComponentDescription"
+        assert result["type"] == "ComponentDescription"
+        assert isinstance(result["fields"], dict)
+        assert result["fields"]["generic_description"] == "Plain generic description"
     
     def test_load_complex_field_empty_cid(self, multilingual_ipfs_service, blockchain_service):
         """Test handling of empty CID (complex field not found)"""
@@ -181,19 +207,18 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
         # GIVEN: Blockchain returns valid CID, but IPFS returns invalid structure
         className = "ComponentDescription"
         language = "ru"
-        cid = "QmInvalidCID"
         
         contract = blockchain_service.get_contract("AmanitaInternational")
-        
-        # Set CID in blockchain stub
-        contract.functions.setComplexFieldCID(className, language, cid).transact()
         
         # GIVEN: IPFS returns invalid structure (missing required fields)
         ipfs_service = ipfs_factory.get_service()
         invalid_payload = {
             "invalid": "structure"  # Missing 'label', 'type', 'fields'
         }
-        ipfs_service._storage[cid] = invalid_payload
+        cid = ipfs_service.upload_json(invalid_payload)
+
+        # Set CID in blockchain stub (CID must pass validate_ipfs_cid to reach structure validation)
+        contract.functions.setComplexFieldCID(className, language, cid).transact()
         
         # WHEN: Loading complex field
         result = multilingual_ipfs_service._load_complex_field_from_ipfs(className, language)
@@ -209,7 +234,7 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
         # GIVEN: Blockchain returns valid CID, but IPFS download fails
         className = "ComponentDescription"
         language = "ru"
-        cid = "QmErrorCID"
+        cid = "Qm" + ("1" * 44)
         
         contract = blockchain_service.get_contract("AmanitaInternational")
         
@@ -283,13 +308,9 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
         """Test full caching flow: first load → cache → second load from cache"""
         className = "ComponentDescription"
         language = "ru"
-        cid = "QmCacheFlowCID"
         
         # GIVEN: First load - no cache
         contract = blockchain_service.get_contract("AmanitaInternational")
-        
-        # Set CID in blockchain stub
-        contract.functions.setComplexFieldCID(className, language, cid).transact()
         
         ipfs_service = ipfs_factory.get_service()
         payload = {
@@ -297,7 +318,10 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
             "type": "complex",
             "fields": {"generic_description": "Cache flow test"}
         }
-        ipfs_service._storage[cid] = payload
+        cid = ipfs_service.upload_json(payload)
+
+        # Set CID in blockchain stub
+        contract.functions.setComplexFieldCID(className, language, cid).transact()
         
         # Clear cache before first load
         multilingual_ipfs_service.clear_cache()
@@ -329,12 +353,8 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
         component_id = "amanita_muscaria"
         language = "ru"
         className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
-        cid = "QmTestCID123456789"
         
         contract = blockchain_service.get_contract("AmanitaInternational")
-        
-        # Set CID in blockchain stub with className containing biounit_id
-        contract.functions.setComplexFieldCID(className, language, cid).transact()
         
         # GIVEN: IPFS service returns valid JSON with fields
         ipfs_service = ipfs_factory.get_service()
@@ -348,7 +368,10 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
                 "warnings": "Test warnings"
             }
         }
-        ipfs_service._storage[cid] = valid_payload
+        cid = ipfs_service.upload_json(valid_payload)
+
+        # Set CID in blockchain stub with className containing biounit_id
+        contract.functions.setComplexFieldCID(className, language, cid).transact()
         
         # WHEN: Loading component description
         result = multilingual_ipfs_service._load_component_description_from_ipfs(component_id, language)
@@ -438,12 +461,8 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
         component_id = "amanita_muscaria"
         language = "ru"
         className = f"ComponentDescription.{component_id}"  # ✅ С biounit_id
-        cid = "QmTranslationsCID"
         
         contract = blockchain_service.get_contract("AmanitaInternational")
-        
-        # Set CID in blockchain stub with className containing biounit_id
-        contract.functions.setComplexFieldCID(className, language, cid).transact()
         
         # GIVEN: IPFS service returns valid JSON with translations
         ipfs_service = ipfs_factory.get_service()
@@ -458,7 +477,10 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
             "type": "complex",
             "fields": translations
         }
-        ipfs_service._storage[cid] = valid_payload
+        cid = ipfs_service.upload_json(valid_payload)
+
+        # Set CID in blockchain stub with className containing biounit_id
+        contract.functions.setComplexFieldCID(className, language, cid).transact()
         
         # WHEN: Getting component translations
         result = multilingual_ipfs_service.get_component_translations(component_id, language)
