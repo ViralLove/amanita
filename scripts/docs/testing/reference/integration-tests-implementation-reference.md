@@ -945,16 +945,16 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
         return Mock(spec=TranslationCacheService)
     
     @pytest.fixture
-    def multilingual_ipfs_service(self, mock_blockchain_service, mock_ipfs_factory, mock_cache_service):
-        """Create MultilingualIPFSService instance"""
+    def multilingual_ipfs_service(self, mock_blockchain_service, mock_cache_service):
+        """Create MultilingualIPFSService instance (SSOT: uses storage_service for I/O)"""
+        mock_storage_service = Mock()
         return MultilingualIPFSService(
             blockchain_service=mock_blockchain_service,
-            ipfs_factory=mock_ipfs_factory,
+            storage_service=mock_storage_service,
             cache_service=mock_cache_service,
-            default_language="ru"
         )
     
-    def test_load_complex_field_success(self, multilingual_ipfs_service, mock_blockchain_service, mock_ipfs_factory):
+    def test_load_complex_field_success(self, multilingual_ipfs_service, mock_blockchain_service):
         """Test successful loading of complex field through blockchain"""
         # GIVEN: Blockchain contract returns CID
         mock_contract = Mock()
@@ -963,9 +963,8 @@ class TestMultilingualIPFSServiceBlockchainIntegration:
         ))
         mock_blockchain_service.get_contract = Mock(return_value=mock_contract)
         
-        # GIVEN: IPFS service returns valid JSON
-        mock_ipfs_service = mock_ipfs_factory.get_service()
-        mock_ipfs_service.download_json = Mock(return_value={
+        # GIVEN: storage_service returns valid JSON
+        multilingual_ipfs_service.storage_service.download_json = Mock(return_value={
             "label": "ComponentDescription",
             "type": "complex",
             "fields": {

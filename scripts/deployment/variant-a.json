@@ -5,6 +5,30 @@
   "description": "Полный пайплайн деплоя с переиспользованием CID",
   "network": "localhost",
   
+  "scenario": "SCENARIO_1_1",
+  "scenarios": {
+    "SCENARIO_1_1": {
+      "description": "Seller с активацией + перезагрузка Arweave",
+      "requires_deployer_invite": true,
+      "use_existing_cids": false
+    },
+    "SCENARIO_1_2": {
+      "description": "Seller с активацией + использовать существующие CID",
+      "requires_deployer_invite": true,
+      "use_existing_cids": true
+    },
+    "SCENARIO_2_1": {
+      "description": "Seller уже активирован + перезагрузка Arweave",
+      "requires_deployer_invite": false,
+      "use_existing_cids": false
+    },
+    "SCENARIO_2_2": {
+      "description": "Seller уже активирован + использовать существующие CID",
+      "requires_deployer_invite": false,
+      "use_existing_cids": true
+    }
+  },
+  
   "prerequisites": {
     "anvil_running": {
       "check": "lsof -ti:8545",
@@ -134,10 +158,19 @@
       "command": "npx hardhat run scripts/deploy_full.js --network localhost",
       "env": {
         "DEPLOY_ACTION": "555",
-        "DEPLOYER_INVITE": "${state.invites.invite_1}"
+        "DEPLOYER_INVITE": "${scenarios[scenario].requires_deployer_invite ? state.invites.invite_1 : ''}",
+        "USE_EXISTING_CIDS": "${scenarios[scenario].use_existing_cids ? 'true' : 'false'}"
       },
-      "description": "Загружает компоненты и активирует seller (БЕЗ роли активатора)",
+      "description": "Загружает компоненты согласно выбранному сценарию (см. поле 'scenario' в корне JSON)",
+      "note": "Параметры автоматически подставляются из секции 'scenarios' на основе поля 'scenario'. Для сценариев 1.x требуется DEPLOYER_INVITE, для 2.x - не требуется (seller уже активирован). USE_EXISTING_CIDS определяется выбранным сценарием.",
       "dependencies": ["create_invites"],
+      "conditions": [
+        {
+          "if": "scenarios[scenario].requires_deployer_invite == true",
+          "require": ["state.invites.invite_1"],
+          "description": "DEPLOYER_INVITE требуется для сценариев 1.x (SCENARIO_1_1, SCENARIO_1_2)"
+        }
+      ],
       "continue_on_error": false,
       "validations": [
         {
@@ -147,11 +180,9 @@
         {
           "type": "log_contains",
           "patterns": [
-            "Seller активирован в SpiralEngine",
-            "Seller получил SELLER_ROLE",
-            "CID источник: arweave_state"
+            "Seller получил SELLER_ROLE"
           ],
-          "description": "Проверка успешной активации seller"
+          "description": "Проверка успешной активации seller (или пропуска активации для сценариев 2.x)"
         }
       ],
       "post_commands": [

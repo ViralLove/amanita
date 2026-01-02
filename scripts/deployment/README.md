@@ -134,6 +134,137 @@
 3. **Валидации** - AI знает что проверять после каждого шага
 4. **Извлечение данных** - AI автоматически извлекает нужные данные
 5. **Обработка ошибок** - Явные инструкции что делать при ошибках
+6. **Поддержка сценариев** - Система кодов для выбора параметров выполнения
+
+### Обработка сценариев в JSON
+
+**Структура**:
+```json
+{
+  "scenario": "SCENARIO_1_1",  // Выбранный сценарий (опционально, default: SCENARIO_1_1)
+  "scenarios": {
+    "SCENARIO_1_1": {
+      "requires_deployer_invite": true,
+      "use_existing_cids": false
+    },
+    ...
+  },
+  "steps": [
+    {
+      "id": "load_components",
+      "env": {
+        "DEPLOYER_INVITE": "${scenarios[scenario].requires_deployer_invite ? state.invites.invite_1 : ''}",
+        "USE_EXISTING_CIDS": "${scenarios[scenario].use_existing_cids ? 'true' : 'false'}"
+      }
+    }
+  ]
+}
+```
+
+**Алгоритм для AI**:
+1. Прочитать поле `scenario` (или использовать default "SCENARIO_1_1")
+2. Найти определение в `scenarios[scenario]`
+3. Подставить параметры в шаг `load_components`:
+   - Если `requires_deployer_invite == true` → установить `DEPLOYER_INVITE=${state.invites.invite_1}`
+   - Если `requires_deployer_invite == false` → не устанавливать `DEPLOYER_INVITE` (или пустая строка)
+   - Установить `USE_EXISTING_CIDS=${scenarios[scenario].use_existing_cids ? 'true' : 'false'}`
+
+**Примеры**:
+- `"scenario": "SCENARIO_1_1"` → `DEPLOYER_INVITE` требуется, `USE_EXISTING_CIDS=false`
+- `"scenario": "SCENARIO_2_2"` → `DEPLOYER_INVITE` не требуется, `USE_EXISTING_CIDS=true`
+
+## Система кодов для сценариев создания компонентов
+
+Для автоматизации через AI-промпты используется система кодов, которая определяет параметры выполнения Action 555.
+
+### Сценарии
+
+#### **SCENARIO_1_1**: Seller с активацией + перезагрузка Arweave
+- **Описание**: Seller НЕ активирован, требуется активация через инвайт. Все компоненты загружаются заново в Arweave, CID перезаписываются.
+- **Параметры**:
+  - `DEPLOYER_INVITE`: ✅ **Требуется** (рутовый инвайт из Action 777)
+  - `USE_EXISTING_CIDS`: `false` (или не устанавливать, default=false)
+- **Поведение**:
+  - Action 51: Выполнит активацию seller через `activateSeller()`
+  - Action 52: Загрузит все компоненты заново в Arweave, перезапишет CID в `_upload_state.json`
+- **Пример команды**:
+  ```bash
+  DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-XXXX-YYYY \
+    npx hardhat run scripts/deploy_full.js --network localhost
+  ```
+
+#### **SCENARIO_1_2**: Seller с активацией + использовать существующие CID
+- **Описание**: Seller НЕ активирован, требуется активация через инвайт. Используются существующие CID из state файлов, загрузка в Arweave не выполняется.
+- **Параметры**:
+  - `DEPLOYER_INVITE`: ✅ **Требуется** (рутовый инвайт из Action 777)
+  - `USE_EXISTING_CIDS`: `true`
+- **Поведение**:
+  - Action 51: Выполнит активацию seller через `activateSeller()`
+  - Action 52: Использует CID из `_upload_state.json`, не загружает в Arweave (fallback: если CID отсутствует → автоматическая загрузка)
+- **Пример команды**:
+  ```bash
+  DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-XXXX-YYYY USE_EXISTING_CIDS=true \
+    npx hardhat run scripts/deploy_full.js --network localhost
+  ```
+
+#### **SCENARIO_2_1**: Seller уже активирован + перезагрузка Arweave
+- **Описание**: Seller уже активирован (имеет `SELLER_ROLE`), активация пропускается. Все компоненты загружаются заново в Arweave, CID перезаписываются.
+- **Параметры**:
+  - `DEPLOYER_INVITE`: ❌ **Не требуется** (seller уже активирован)
+  - `USE_EXISTING_CIDS`: `false` (или не устанавливать, default=false)
+- **Поведение**:
+  - Action 51: Пропустит активацию (`skipActivation=true`), проверит статус через blockchain
+  - Action 52: Загрузит все компоненты заново в Arweave, перезапишет CID в `_upload_state.json`
+- **Пример команды**:
+  ```bash
+  DEPLOY_ACTION=555 USE_EXISTING_CIDS=false \
+    npx hardhat run scripts/deploy_full.js --network localhost
+  ```
+
+#### **SCENARIO_2_2**: Seller уже активирован + использовать существующие CID
+- **Описание**: Seller уже активирован (имеет `SELLER_ROLE`), активация пропускается. Используются существующие CID из state файлов, загрузка в Arweave не выполняется.
+- **Параметры**:
+  - `DEPLOYER_INVITE`: ❌ **Не требуется** (seller уже активирован)
+  - `USE_EXISTING_CIDS`: `true`
+- **Поведение**:
+  - Action 51: Пропустит активацию (`skipActivation=true`), проверит статус через blockchain
+  - Action 52: Использует CID из `_upload_state.json`, не загружает в Arweave (fallback: если CID отсутствует → автоматическая загрузка)
+- **Пример команды**:
+  ```bash
+  DEPLOY_ACTION=555 USE_EXISTING_CIDS=true \
+    npx hardhat run scripts/deploy_full.js --network localhost
+  ```
+
+### Использование для AI-промптов
+
+**Формат промпта**:
+```
+Выполни SCENARIO_X_Y для создания компонентов
+```
+
+**Примеры**:
+- `"Выполни SCENARIO_1_1 для создания компонентов"` → AI понимает: нужен DEPLOYER_INVITE, USE_EXISTING_CIDS=false, выполнить активацию и загрузить в Arweave
+- `"Выполни SCENARIO_2_2 для создания компонентов"` → AI понимает: DEPLOYER_INVITE не нужен, USE_EXISTING_CIDS=true, пропустить активацию и использовать существующие CID
+
+### Матрица сценариев
+
+| Сценарий | Код | DEPLOYER_INVITE | USE_EXISTING_CIDS | Action 51 | Action 52 |
+|----------|-----|-----------------|-------------------|-----------|-----------|
+| 1.1 | SCENARIO_1_1 | ✅ Требуется | false | Активация | Загрузка в Arweave |
+| 1.2 | SCENARIO_1_2 | ✅ Требуется | true | Активация | Использовать CID |
+| 2.1 | SCENARIO_2_1 | ❌ Не требуется | false | Пропуск | Загрузка в Arweave |
+| 2.2 | SCENARIO_2_2 | ❌ Не требуется | true | Пропуск | Использовать CID |
+
+### Важные замечания
+
+1. **Проверка активации**: Action 51 автоматически проверяет статус активации ДО требования DEPLOYER_INVITE. Если seller уже активирован → активация пропускается.
+
+2. **Fallback механизм**: Если `USE_EXISTING_CIDS=true`, но CID отсутствует в state файлах → автоматически выполняется загрузка в Arweave (fallback).
+
+3. **Валидация**: После выполнения Action 555 рекомендуется запустить валидацию компонентов:
+   ```bash
+   node scripts/validators/validate_component_upload.js --component <component_id> --network localhost
+   ```
 
 ## Файлы
 

@@ -109,12 +109,44 @@ DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
 #   Invite #1 (для Action 555): _________________________
 #   Invite #2 (для Action 888): _________________________
 
-# 5. Загрузка компонентов + активация seller (БЕЗ роли активатора)
+# ========================================
+# ОПЦИИ ДЛЯ ACTION 555 (Загрузка компонентов)
+# ========================================
+#
+# ОПЦИЯ 1: Seller с активацией (требуется DEPLOYER_INVITE)
+# ──────────────────────────────────────────────────────────
+# 1.1 Перезагрузка в Arweave (игнорировать существующие CID):
 DEPLOY_ACTION=555 DEPLOYER_INVITE=<PASTE_INVITE_1_HERE> \
-npx hardhat run scripts/deploy_full.js --network localhost
+  npx hardhat run scripts/deploy_full.js --network localhost
+# → Загрузит все компоненты заново в Arweave, перезапишет CID
+
+# 1.2 Использовать существующие CID (не грузить в Arweave):
+DEPLOY_ACTION=555 DEPLOYER_INVITE=<PASTE_INVITE_1_HERE> USE_EXISTING_CIDS=true \
+  npx hardhat run scripts/deploy_full.js --network localhost
+# → Использует CID из _upload_state.json, не загружает в Arweave
+
+# ОПЦИЯ 2: Seller уже активирован (DEPLOYER_INVITE НЕ требуется)
+# ───────────────────────────────────────────────────────────────
+# 2.1 Перезагрузка в Arweave (игнорировать существующие CID):
+DEPLOY_ACTION=555 USE_EXISTING_CIDS=false \
+  npx hardhat run scripts/deploy_full.js --network localhost
+# → Seller уже активирован, загрузит все заново в Arweave
+
+# 2.2 Использовать существующие CID (не грузить в Arweave):
+DEPLOY_ACTION=555 USE_EXISTING_CIDS=true \
+  npx hardhat run scripts/deploy_full.js --network localhost
+# → Seller уже активирован, использует существующие CID
+
+# ⚠️ ВАЖНО:
+# - Action 51 автоматически проверяет активацию ДО требования DEPLOYER_INVITE
+# - Если seller уже активирован → активация пропускается (skipActivation=true)
+# - Если USE_EXISTING_CIDS=true, но CID отсутствует → автоматический fallback на загрузку
 
 # Пример (НЕ КОПИРОВАТЬ, использовать свой invite!):
-DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-LGKZ-T8O8 npx hardhat run scripts/deploy_full.js --network localhost
+# DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-ZI06-UJ3T npx hardhat run scripts/deploy_full.js --network localhost
+
+DEPLOY_ACTION=555 npx hardhat run scripts/deploy_full.js --network localhost
+
 
 # ✓ ОЖИДАЕТСЯ В ЛОГАХ:
 #   → Seller активирован в SpiralEngine ✅
@@ -189,6 +221,7 @@ mkdir -p bot/flowers
 DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
 
 # 5. Загрузка компонентов (с PLACEHOLDER CID!)
+# ⚠️ ВАРИАНТ B: Полная очистка (включая CID) - используйте опцию 1.1 или 2.1
 DEPLOY_ACTION=555 DEPLOYER_INVITE=<PASTE_INVITE_1_HERE> \
   npx hardhat run scripts/deploy_full.js --network localhost
 
@@ -227,6 +260,7 @@ DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
 # → Скопировать 2 invites из вывода
 
 # Затем с real invites (полная цепочка):
+# ⚠️ ВАЖНО: Выберите опцию для Action 555 (1.1, 1.2, 2.1, 2.2) - см. секцию "ОПЦИИ ДЛЯ ACTION 555" выше
 DEPLOY_ACTION=555 DEPLOYER_INVITE=<INVITE_1> npx hardhat run scripts/deploy_full.js --network localhost && \
 DEPLOY_ACTION=9 npx hardhat run scripts/deploy_full.js --network localhost && \
 DEPLOY_ACTION=444 npx hardhat run scripts/deploy_full.js --network localhost && \

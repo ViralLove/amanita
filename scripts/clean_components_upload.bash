@@ -79,7 +79,7 @@ echo "Будут удалены:"
 echo "  ✓ bot/flowers/*_invites*.txt  (сгенерированные инвайты)"
 
 if [ "$MODE" = "full" ]; then
-  echo "  ✓ data/components/**/_upload_state_*.json  ⚠️  ARWEAVE CID ТОЖЕ!"
+  echo "  ✓ data/components/**/_upload_state*.json  ⚠️  ARWEAVE CID ТОЖЕ!"
   echo "  ✓ data/components/**/*_final_*.json  ⚠️  FINALIZED FILES ТОЖЕ!"
   echo ""
   echo "⚠️  РЕЖИМ --full: ВСЕ ДАННЫЕ ЗАГРУЗКИ БУДУТ УДАЛЕНЫ!"
@@ -91,11 +91,12 @@ fi
 echo ""
 echo "Будут СОХРАНЕНЫ:"
 if [ "$MODE" = "keep-cids" ]; then
-  echo "  ✓ data/components/**/_upload_state_*.json  ← РЕАЛЬНЫЕ Arweave CID!"
+  echo "  ✓ data/components/**/_upload_state*.json  ← РЕАЛЬНЫЕ Arweave CID!"
   echo "  ✓ data/components/**/*_final_*.json  ← Финализированные компоненты!"
 fi
+echo "  ✓ data/components/**/simple_fields/  (исходные simple fields)"
 echo "  ✓ data/components/**/complex_fields/  (переводы)"
-echo "  ✓ data/components/**/*.json  (исходные данные)"
+echo "  ✓ data/components/**/*.json  (исходные данные компонентов)"
 echo ""
 echo "Blockchain state НЕ очищается (требуется restart hardhat node)!"
 echo ""
@@ -148,14 +149,14 @@ if [ "$MODE" = "full" ]; then
   echo "🔥 РЕЖИМ FULL: Удаление всех state файлов с CID..."
   echo ""
   
-  # Удаляем _upload_state_*.json файлы
+  # Удаляем _upload_state*.json файлы (включая _upload_state.json и _upload_state_*.json)
   if [ -d "data/components" ]; then
-    STATE_FILES=$(find data/components -name "_upload_state_*.json" 2>/dev/null | wc -l | tr -d ' ')
+    STATE_FILES=$(find data/components -name "_upload_state*.json" 2>/dev/null | wc -l | tr -d ' ')
     
     if [ "$STATE_FILES" -gt 0 ]; then
       echo "Найдено state файлов: $STATE_FILES"
-      find data/components -name "_upload_state_*.json" -exec rm {} \;
-      echo "✅ Удалены все _upload_state_*.json файлы"
+      find data/components -name "_upload_state*.json" -exec rm {} \;
+      echo "✅ Удалены все _upload_state*.json файлы"
     else
       echo "ℹ️  State файлы не найдены"
     fi
@@ -185,13 +186,13 @@ else
   
   # Проверяем что state файлы с CID сохранены
   if [ -d "data/components" ]; then
-    STATE_FILES=$(find data/components -name "_upload_state_*.json" 2>/dev/null | wc -l | tr -d ' ')
+    STATE_FILES=$(find data/components -name "_upload_state*.json" 2>/dev/null | wc -l | tr -d ' ')
     echo "✅ Найдено state файлов с Arweave CID: $STATE_FILES"
     
     if [ "$STATE_FILES" -gt 0 ]; then
       echo ""
       echo "Примеры сохраненных CID (для переиспользования):"
-      find data/components -name "_upload_state_localhost.json" -type f | head -3 | while read file; do
+      find data/components -name "_upload_state*.json" -type f | head -3 | while read file; do
         COMPONENT=$(basename $(dirname "$file"))
         CID=$(grep -o '"cid": "[^"]*"' "$file" | head -1 | cut -d'"' -f4)
         if [ ! -z "$CID" ]; then
