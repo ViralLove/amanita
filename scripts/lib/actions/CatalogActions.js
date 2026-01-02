@@ -125,12 +125,59 @@ class CatalogActions {
     try {
       // Import the upload steps module
       const { action42_UnifiedArweaveUpload } = require('../product_upload_steps.js');
+      const fs = require('fs');
+      const path = require('path');
       
-      // ✅ Resolve paths from config
+      // ✅ ИСПРАВЛЕНО: Используем путь из конфига (как Action 41) или проверяем несколько мест
       const sellerId = this.config.get('seller.businessId') || 'iveta';
       const sellerDir = `data/sellers/${sellerId}`;
-      const productsDir = `${sellerDir}/output/products`;
-      const outputDir = `${sellerDir}/output`;
+      
+      // Приоритет 1: Путь из конфига (как Action 41)
+      const configOutputPath = this.config.get('paths.outputPath');
+      let productsDir;
+      let outputDir;
+      
+      if (configOutputPath && fs.existsSync(configOutputPath)) {
+        // Используем путь из конфига, если он существует
+        productsDir = path.resolve(configOutputPath);
+        outputDir = path.dirname(productsDir); // Родительская директория для mapping файлов
+        logger.info(`Using configured path: ${productsDir}`);
+      } else {
+        // Приоритет 2: Проверяем несколько возможных мест
+        const possiblePaths = [
+          path.join(process.cwd(), sellerDir, 'products'),      // data/sellers/iveta/products
+          path.join(process.cwd(), sellerDir, 'output', 'products'), // data/sellers/iveta/output/products
+        ];
+        
+        let foundPath = null;
+        for (const possiblePath of possiblePaths) {
+          if (fs.existsSync(possiblePath)) {
+            foundPath = possiblePath;
+            logger.info(`Found products directory: ${foundPath}`);
+            break;
+          }
+        }
+        
+        if (foundPath) {
+          productsDir = foundPath;
+          outputDir = path.dirname(productsDir); // Родительская директория
+        } else {
+          // Fallback на стандартный путь (для обратной совместимости)
+          productsDir = path.join(process.cwd(), sellerDir, 'output', 'products');
+          outputDir = path.join(process.cwd(), sellerDir, 'output');
+          
+          // Проверяем существование перед использованием
+          if (!fs.existsSync(productsDir)) {
+            throw new Error(
+              `Products directory not found. Checked locations:\n` +
+              `  1. Config path: ${configOutputPath || 'not set'}\n` +
+              `  2. ${possiblePaths[0]}\n` +
+              `  3. ${possiblePaths[1]}\n` +
+              `\nMake sure Action 41 was executed first, or set paths.outputPath in config.`
+            );
+          }
+        }
+      }
       
       // ✅ Use centralized context preparation (DRY principle)
       const context = await this._prepareArweaveContext({
@@ -153,20 +200,117 @@ class CatalogActions {
 
   /**
    * Action 43: Contract Registration
+   * 
+   * Automatically determines paths based on Seller ID:
+   * - Mapping file: data/sellers/{sellerId}/product_combined_mapping.json
+   * - Products dir: data/sellers/{sellerId}/products
+   * 
+   * Environment Variables (optional):
+   * - SELLER_BUSINESS_ID: Seller identifier (e.g., "iveta", default: "iveta")
+   * 
    * @returns {Promise<Object>} - Registration result
    */
   async action43() {
     logger.action(43, "Contract Registration");
     
     try {
+      const path = require('path');
+      const fs = require('fs');
+      
+      // ✅ Get seller ID from config/env (same pattern as Action 444 and Action 42)
+      const sellerId = this.config.get('catalog.sellerId') || 
+                       this.config.get('seller.businessId') || 
+                       process.env.SELLER_BUSINESS_ID || 
+                       'iveta';
+      
+      logger.info(`Action 43: Using seller ID: ${sellerId}`);
+      
+      // ✅ Build paths based on seller ID (same structure as Action 42/444)
+      const sellerBaseDir = path.join(process.cwd(), 'data', 'sellers', sellerId);
+      
+      // Mapping file location: can be in seller base dir or output dir
+      // Priority 1: Check in seller base dir (where Action 42 creates it)
+      let mappingFile = path.join(sellerBaseDir, 'product_combined_mapping.json');
+      
+      // Priority 2: Check in output dir (if Action 444 was used with custom outputDir)
+      if (!fs.existsSync(mappingFile)) {
+        const outputMappingFile = path.join(sellerBaseDir, 'output', 'product_combined_mapping.json');
+        if (fs.existsSync(outputMappingFile)) {
+          mappingFile = outputMappingFile;
+          logger.info(`Action 43: Found mapping file in output dir: ${mappingFile}`);
+        }
+      } else {
+        logger.info(`Action 43: Found mapping file in seller base dir: ${mappingFile}`);
+      }
+      
+      // Products directory: can be in seller base dir or output dir
+      // Priority 1: Check in seller base dir/products
+      let productsDir = path.join(sellerBaseDir, 'products');
+      
+      // Priority 2: Check in output/products (if Action 444 was used)
+      if (!fs.existsSync(productsDir)) {
+        const outputProductsDir = path.join(sellerBaseDir, 'output', 'products');
+        if (fs.existsSync(outputProductsDir)) {
+          productsDir = outputProductsDir;
+          logger.info(`Action 43: Found products dir in output: ${productsDir}`);
+        }
+      } else {
+        logger.info(`Action 43: Found products dir in seller base: ${productsDir}`);
+      }
+      
+      // Validate paths exist
+      if (!fs.existsSync(mappingFile)) {
+        throw new Error(
+          `Mapping file not found: ${mappingFile}\n` +
+          `Please run Action 42 first to create the mapping file, or ensure SELLER_BUSINESS_ID is correct.\n` +
+          `Current seller ID: ${sellerId}\n` +
+          `Searched locations:\n` +
+          `  1. ${path.join(sellerBaseDir, 'product_combined_mapping.json')}\n` +
+          `  2. ${path.join(sellerBaseDir, 'output', 'product_combined_mapping.json')}`
+        );
+      }
+      
+      if (!fs.existsSync(productsDir)) {
+        throw new Error(
+          `Products directory not found: ${productsDir}\n` +
+          `Please run Action 41 first to create product JSONs, or ensure SELLER_BUSINESS_ID is correct.\n` +
+          `Current seller ID: ${sellerId}\n` +
+          `Searched locations:\n` +
+          `  1. ${path.join(sellerBaseDir, 'products')}\n` +
+          `  2. ${path.join(sellerBaseDir, 'output', 'products')}`
+        );
+      }
+      
+      // ✅ Prepare context (same as Action 444 for consistency)
+      const context = await this._prepareArweaveContext({
+        dryRun: false,
+        arweaveOnly: false
+      });
+      
+      // ✅ Initialize ProductRegistry contract in context (required for registration)
+      if (context.contractManager) {
+        logger.info('Action 43: Initializing ProductRegistry contract...');
+        context.productRegistry = await context.contractManager.loadUUPSContract('ProductRegistry');
+        logger.info(`Action 43: ProductRegistry loaded: ${await context.productRegistry.getAddress()}`);
+        
+        // Connect seller signer to ProductRegistry for transactions
+        if (context.seller && context.seller.signer) {
+          context.productRegistry = context.productRegistry.connect(context.seller.signer);
+          logger.info(`Action 43: ProductRegistry connected to seller signer: ${context.seller.address}`);
+        } else {
+          logger.warn('Action 43: Seller signer not available, using deployer signer');
+        }
+      }
+      
       // Import the upload steps module
       const { action43_UnifiedContractRegistration } = require('../product_upload_steps.js');
       
-      const result = await action43_UnifiedContractRegistration({
-        contractManager: this.contractManager,
-        config: this.config,
-        logger: logger
-      });
+      // ✅ Call with all required parameters: context, mappingFile, productsDir
+      const result = await action43_UnifiedContractRegistration(
+        context,
+        mappingFile,
+        productsDir
+      );
       
       logger.success(43);
       return {
@@ -196,8 +340,35 @@ class CatalogActions {
     try {
       // Get parameters from config/env
       const csvPath = this.config.get('catalog.csvPath') || process.env.CSV_FILE;
-      const outputDir = this.config.get('catalog.outputDir') || process.env.OUTPUT_DIR || 'data/output';
       const sellerId = this.config.get('catalog.sellerId') || process.env.SELLER_BUSINESS_ID;
+
+      // ✅ FIX: Use same outputDir logic as Action 42 for consistency
+      const sellerDir = `data/sellers/${sellerId}`;
+      let outputDir;
+
+      // Same logic as Action 42: find existing products directory
+      const possiblePaths = [
+        path.join(process.cwd(), sellerDir, 'products'),      // data/sellers/iveta/products
+        path.join(process.cwd(), sellerDir, 'output', 'products'), // data/sellers/iveta/output/products
+      ];
+
+      let foundProductsDir = null;
+      for (const possiblePath of possiblePaths) {
+        if (fs.existsSync(possiblePath)) {
+          foundProductsDir = possiblePath;
+          break;
+        }
+      }
+
+      if (foundProductsDir) {
+        outputDir = path.dirname(foundProductsDir); // Same as Action 42
+        logger.info(`Using existing products directory: ${foundProductsDir}, outputDir: ${outputDir}`);
+      } else {
+        // Fallback to config/env if no existing directory found
+        outputDir = this.config.get('catalog.outputDir') || process.env.OUTPUT_DIR || 'data/output';
+        logger.info(`No existing products directory found, using configured outputDir: ${outputDir}`);
+      }
+
       const sourceLang = this.config.get('catalog.sourceLang') || process.env.SOURCE_LANG || 'en';
 
       // Validate required parameters
