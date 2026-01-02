@@ -356,7 +356,7 @@ class ProductAssembler:
                 self.logger.info(f"   [{i+1}/{components_count}] Загружаем '{component_id}' (proportion: {proportion})")
                 
                 # ──────────────────────────────────────────────────────────────────
-                # ШАГ 1: Получить полные данные компонента из реестра
+                # Step 1: Load full registry component (OrganicComponentRegistry + root metadata via CID)
                 # ──────────────────────────────────────────────────────────────────
                 registry_component = self.component_service.get_component_full(component_id)
                 
@@ -369,7 +369,7 @@ class ProductAssembler:
                 self.logger.info(f"      ✅ Загружен: {registry_component.scientific_title}")
                 
                 # ──────────────────────────────────────────────────────────────────
-                # ШАГ 2: Создать product component с proportion
+                # Step 2: Create a product component (registry component + proportion)
                 # ──────────────────────────────────────────────────────────────────
                 from model.organic_component import OrganicComponent
                 
@@ -381,7 +381,15 @@ class ProductAssembler:
                 component_dict = product_component.to_dict()
                 
                 # ──────────────────────────────────────────────────────────────────
-                # ШАГ 3: Fetch ComponentDescription с указанным языком
+                # Step 3: Fetch ComponentDescription for this component_id + language
+                #
+                # Data path (SSOT):
+                # - ComponentService.get_component_description(...)
+                #   → MultilingualIPFSService (AmanitaInternational getComplexFieldCID)
+                #   → ProductStorageService.download_json(cid)
+                #
+                # Note: Real ComponentDescription payloads are often "plain dict fields" and are
+                # normalized upstream in MultilingualIPFSService.
                 # ──────────────────────────────────────────────────────────────────
                 try:
                     self.logger.info(f"      🌍 Fetching ComponentDescription for '{component_id}' (lang: {language})")
@@ -505,9 +513,13 @@ class ProductAssembler:
         # ШАГ 1: Проверка обязательных полей продукта
         # ──────────────────────────────────────────────────────────────────────
         required_fields = ['business_id', 'title', 'organic_components', 'categories', 'forms', 'species']
+        # Поля, которым разрешено быть пустыми (но они обязаны существовать в metadata)
+        allow_empty_fields = {'categories'}
         for field in required_fields:
             if field not in metadata:
                 raise ValueError(f"Отсутствует обязательное поле: {field}")
+            if field in allow_empty_fields:
+                continue
             if not metadata[field]:
                 raise ValueError(f"Поле {field} не может быть пустым")
         
@@ -551,8 +563,12 @@ class ProductAssembler:
         # ──────────────────────────────────────────────────────────────────────
         if 'cover_image_url' in metadata and metadata['cover_image_url']:
             cover_image_url = metadata['cover_image_url'].strip()
-            if cover_image_url and not cover_image_url.startswith('Qm'):
-                raise ValueError(f"cover_image_url должен быть валидным CID или пустым: {cover_image_url}")
+            if cover_image_url:
+                # Единая валидация CID: IPFS (Qm/bafy) или Arweave txId (43 base64url)
+                cid_validator = ValidationFactory.get_cid_validator()
+                cid_result = cid_validator.validate(cover_image_url)
+                if not cid_result.is_valid:
+                    raise ValueError(f"cover_image_url: {cid_result.error_message} ({cover_image_url})")
         
         self.logger.info("✅ Валидация метаданных продукта прошла успешно")
     

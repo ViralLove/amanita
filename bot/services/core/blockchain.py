@@ -8,6 +8,23 @@ from eth_account import Account
 import logging
 from typing import Optional, Any, List, Dict, Union
 import asyncio
+from dataclasses import asdict
+
+# Contract tuple codecs: keep all "tuple index" knowledge in one place.
+try:
+    # When this module is imported as `services.core.blockchain`
+    from .contracts.product_registry_codec import (
+        ProductRegistryGetProduct,
+        ProductRegistryCodecError,
+        decode_get_product_tuple,
+    )
+except Exception:  # pragma: no cover
+    # Fallback for edge import setups (e.g., imported as `bot.services.core.blockchain`)
+    from bot.services.core.contracts.product_registry_codec import (  # type: ignore
+        ProductRegistryGetProduct,
+        ProductRegistryCodecError,
+        decode_get_product_tuple,
+    )
 try:
     # Попытка импорта для запуска из корня проекта
     from config import (
@@ -863,6 +880,35 @@ class BlockchainService:
         except Exception as e:
             logger.error(f"Error getting product {product_id}: {e}")
             return None
+
+    def get_product_raw(self, product_id: Union[int, str]) -> Any:
+        """
+        Возвращает сырой результат `ProductRegistry.getProduct()` из web3 (обычно tuple).
+        """
+        return self.get_product(int(product_id))
+
+    def get_product_structured(
+        self,
+        product_id: Union[int, str],
+        *,
+        allow_legacy: bool = False,
+    ) -> ProductRegistryGetProduct:
+        """
+        Возвращает типизированную структуру результата `ProductRegistry.getProduct()`.
+
+        По умолчанию (strict) ожидается UUPS ProductRegistryLogic ABI:
+          (id, seller, businessId, componentIds, metadataCID, active)
+
+        Если allow_legacy=True, дополнительно допускается legacy формат:
+          (id, seller, ipfsCID, active)
+
+        Raises:
+            ProductRegistryCodecError: если формат неожиданный (рассинхрон ABI/контракта).
+        """
+        raw = self.get_product_raw(product_id)
+        decoded = decode_get_product_tuple(raw, allow_legacy=allow_legacy)
+        logger.debug(f"[BlockchainService] Decoded ProductRegistry.getProduct: {asdict(decoded)}")
+        return decoded
 
     async def create_product(self, ipfs_cid: str) -> Optional[str]:
         """Создает новый продукт в смарт-контракте"""

@@ -128,7 +128,7 @@ class ComponentService:
             fallback_service = FallbackLocalizationService(default_language='ru')
             
             self.multilingual_ipfs_service = MultilingualIPFSService(
-                ipfs_factory=ipfs_factory,
+                storage_service=self.storage_service,
                 cache_service=cache_service,
                 fallback_service=fallback_service,
                 blockchain_service=self.blockchain_service
@@ -429,8 +429,12 @@ class ComponentService:
         """
         Get localized component description via LocalizationService (blockchain path).
         
-        Fetches description from blockchain through LocalizationService:
-        - LocalizationService → MultilingualIPFSService → AmanitaInternational contract → IPFS
+        Fetches description through the on-chain AmanitaInternational mapping:
+        - AmanitaInternational.getComplexFieldCID(className="ComponentDescription.<component_id>", language)
+          → CID
+        - ProductStorageService.download_json(cid) → JSON payload
+        - MultilingualIPFSService normalizes payload (plain dict ↔ wrapper) and returns a dict of fields
+        - ComponentDescription.from_dict(fields) → ComponentDescription model
         
         Caching:
         - Cache key: "desc:{component_id}:{language}"
@@ -468,9 +472,9 @@ class ComponentService:
             
             logger.info(f"🌍 Fetching description for '{component_id}' in language '{language}'")
             
-            # Step 2: Load description via MultilingualIPFSService (blockchain path for complex fields)
-            # Используем новый метод _load_component_description_from_ipfs() который формирует
-            # className с biounit_id для соответствия scripts слою
+            # Step 2: Load description via MultilingualIPFSService (AmanitaInternational complex-field mapping)
+            # `_load_component_description_from_ipfs()` builds className="ComponentDescription.<component_id>"
+            # and expects a dict of fields (plain dict in real data; normalized upstream if needed).
             description_data = None
             try:
                 # Загружаем ComponentDescription напрямую из блокчейна через MultilingualIPFSService

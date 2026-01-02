@@ -4,6 +4,12 @@ from .dosage_instruction import DosageInstruction
 from validation import ValidationFactory, ValidationResult
 
 
+# Максимальная длина "полного" описания компонента.
+# Важно: ограничения Telegram/UI должны применяться в слое форматирования/отображения,
+# а не на уровне модели хранения данных.
+MAX_GENERIC_DESCRIPTION_LEN = 5000
+
+
 @dataclass
 class ComponentDescription:
     """
@@ -49,8 +55,11 @@ class ComponentDescription:
         # Валидация длины generic_description (от 10 до 1000 символов)
         if len(self.generic_description) < 10:
             raise ValueError(f"generic_description слишком короткий: {len(self.generic_description)} символов. Минимум: 10")
-        if len(self.generic_description) > 1000:
-            raise ValueError(f"generic_description слишком длинный: {len(self.generic_description)} символов. Максимум: 1000")
+        if len(self.generic_description) > MAX_GENERIC_DESCRIPTION_LEN:
+            raise ValueError(
+                f"generic_description слишком длинный: {len(self.generic_description)} символов. "
+                f"Максимум: {MAX_GENERIC_DESCRIPTION_LEN}"
+            )
         
         # Валидация dosage_instructions если присутствуют
         if self.dosage_instructions is not None:

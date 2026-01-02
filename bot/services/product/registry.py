@@ -2,7 +2,7 @@ from services.core.blockchain import BlockchainService
 from datetime import datetime, timedelta
 from model.product import Product, PriceInfo, Description
 import logging
-from typing import Optional, List, Dict, Union, Tuple, Any
+from typing import Optional, List, Dict, Union, Tuple, Any, TYPE_CHECKING
 import dotenv
 import os
 from web3 import Account
@@ -17,11 +17,16 @@ import json
 from services.product.metadata import ProductMetadataService
 from services.product.cache import ProductCacheService
 from services.product.storage import ProductStorageService
+from services.core.contracts.product_registry_codec import ProductRegistryCodecError
 from services.product.validation import ProductValidationService
 from services.product.assembler import ProductAssembler
 from validation.exceptions import ValidationError
 from services.core.account import AccountService
 from services.product.exceptions import InvalidProductIdError, ProductNotFoundError
+
+if TYPE_CHECKING:
+    # For type-checkers / linters only (avoid import-time side effects).
+    from services.product.component_service import ComponentService
 
 dotenv.load_dotenv()
 logger = logging.getLogger(__name__)
@@ -122,17 +127,32 @@ class ProductRegistryService:
 
     def _validate_ipfs_cid(self, cid: str) -> bool:
         """
-        Проверяет валидность IPFS CID.
+        Проверяет валидность Content Identifier (IPFS CID или Arweave txId).
         
         Args:
-            cid: IPFS Content Identifier
+            cid: Content Identifier (IPFS CID / Arweave txId)
             
         Returns:
             bool: True если CID валиден, False если нет
         """
         if not cid:
             return False
-        return bool(self.IPFS_CID_PATTERN.match(cid))
+        
+        # Единая валидация CID (IPFS v0/v1 + Arweave txId) — через ProductStorageService,
+        # чтобы не дублировать паттерны и не расходиться с реальным storage-слоем.
+        try:
+            if hasattr(self, "storage_service") and hasattr(self.storage_service, "validate_ipfs_cid"):
+                return bool(self.storage_service.validate_ipfs_cid(cid))
+        except Exception:
+            # Fallback ниже
+            pass
+        
+        # Fallback: IPFS CID (Qm/bafy) по текущему паттерну
+        if bool(self.IPFS_CID_PATTERN.match(cid)):
+            return True
+        
+        # Fallback: Arweave txId (43 base64url)
+        return len(cid) == 43 and all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-' for c in cid)
 
     @lru_cache(maxsize=100)
     def _get_cached_description(self, description_cid: str) -> Optional[Description]:
@@ -884,6 +904,13 @@ class ProductRegistryService:
         try:
             self.logger.info(f"[ProductRegistry] Начинаем обновление статуса продукта {product_id} на {new_status}")
             
+            # Нормализуем product_id один раз (и для structured read, и для транзакции)
+            try:
+                product_id_int = int(product_id)
+            except (ValueError, TypeError) as e:
+                self.logger.error(f"[ProductRegistry] Неверный формат product_id: {product_id}, ошибка: {e}")
+                return False
+
             # Проверка существования продукта и прав доступа
             self.logger.info(f"[ProductRegistry] Проверяем существование продукта {product_id}")
             existing_product = await self.get_product(str(product_id))
@@ -904,62 +931,51 @@ class ProductRegistryService:
             self.logger.info(f"[ProductRegistry] Проверяем права доступа для продукта {product_id}")
             
             try:
-                # Получаем информацию о продукте из блокчейна для проверки владельца И статуса
-                product_blockchain_data = self.blockchain_service.get_product(product_id)
-                if product_blockchain_data and len(product_blockchain_data) >= 2:
-                    product_owner_address = product_blockchain_data[1]  # seller address
-                    current_seller_address = self.seller_account.address
+                # Получаем информацию о продукте из блокчейна (структурировано) для проверки владельца И статуса
+                # Важно: не используем "магические индексы" tuple.
+                chain_product = self.blockchain_service.get_product_structured(product_id_int)
+                product_owner_address = chain_product.seller
+                current_seller_address = self.seller_account.address
+
+                self.logger.info(f"[ProductRegistry] Владелец продукта: {product_owner_address}")
+                self.logger.info(f"[ProductRegistry] Текущий продавец: {current_seller_address}")
+
+                if product_owner_address.lower() != current_seller_address.lower():
+                    self.logger.error(f"[ProductRegistry] Недостаточно прав для обновления статуса продукта {product_id}")
+                    return False
+
+                self.logger.info(f"[ProductRegistry] Права доступа подтверждены для продукта {product_id}")
+
+                # ИСПРАВЛЕНИЕ: Проверка идемпотентности - получаем статус ТОЛЬКО из блокчейна
+                current_active = bool(chain_product.active)
+                current_status = 1 if current_active else 0
+
+                self.logger.info(
+                    f"[ProductRegistry] Текущий статус продукта {product_id} из блокчейна: "
+                    f"{current_status} (active={current_active})"
+                )
+                self.logger.info(f"[ProductRegistry] Запрашиваемый статус: {new_status}")
+
+                if current_status == new_status:
+                    self.logger.info(
+                        f"[ProductRegistry] Статус продукта {product_id} уже установлен на {new_status} (идемпотентность)"
+                    )
+                    return True
+
+                self.logger.info(
+                    f"[ProductRegistry] Статус продукта {product_id} будет изменен с {current_status} на {new_status}"
+                )
                     
-                    self.logger.info(f"[ProductRegistry] Владелец продукта: {product_owner_address}")
-                    self.logger.info(f"[ProductRegistry] Текущий продавец: {current_seller_address}")
-                    
-                    if product_owner_address.lower() != current_seller_address.lower():
-                        self.logger.error(f"[ProductRegistry] Недостаточно прав для обновления статуса продукта {product_id}")
-                        return False
-                    
-                    self.logger.info(f"[ProductRegistry] Права доступа подтверждены для продукта {product_id}")
-                    
-                    # ИСПРАВЛЕНИЕ: Проверка идемпотентности - получаем статус ТОЛЬКО из блокчейна
-                    if len(product_blockchain_data) >= 4:
-                        current_active = product_blockchain_data[3]  # active status (bool) из блокчейна
-                        current_status = 1 if current_active else 0  # Преобразуем bool в int
-                        self.logger.info(f"[ProductRegistry] Текущий статус продукта {product_id} из блокчейна: {current_status} (active: {current_active})")
-                        self.logger.info(f"[ProductRegistry] Запрашиваемый статус: {new_status}")
-                        
-                        # ДОПОЛНИТЕЛЬНАЯ ДИАГНОСТИКА: Логируем все данные из блокчейна
-                        self.logger.info(f"[ProductRegistry] ДЕТАЛЬНАЯ ДИАГНОСТИКА блокчейна:")
-                        self.logger.info(f"   - product_blockchain_data: {product_blockchain_data}")
-                        self.logger.info(f"   - product_blockchain_data[3]: {product_blockchain_data[3]} (тип: {type(product_blockchain_data[3])})")
-                        self.logger.info(f"   - current_active: {current_active} (тип: {type(current_active)})")
-                        self.logger.info(f"   - current_status: {current_status} (тип: {type(current_status)})")
-                        
-                        # Проверяем идемпотентность только если статус действительно совпадает
-                        if current_status == new_status:
-                            self.logger.info(f"[ProductRegistry] Статус продукта {product_id} уже установлен на {new_status} (идемпотентность)")
-                            return True
-                        else:
-                            self.logger.info(f"[ProductRegistry] Статус продукта {product_id} будет изменен с {current_status} на {new_status}")
-                    else:
-                        self.logger.warning(f"[ProductRegistry] Не удалось получить текущий статус продукта {product_id} из блокчейна")
-                        # Если не можем получить статус из блокчейна, продолжаем с обновлением
-                        self.logger.info(f"[ProductRegistry] Продолжаем обновление статуса без проверки идемпотентности")
-                        
-                else:
-                    self.logger.warning(f"[ProductRegistry] Не удалось получить данные владельца продукта {product_id}")
-                    
+            except ProductRegistryCodecError as e:
+                # Fail-loud: рассинхрон ABI/контракта — нельзя делать "тихую" идемпотентность.
+                self.logger.error(f"[ProductRegistry] Ошибка декодирования getProduct(): {e}")
+                return False
             except Exception as e:
                 self.logger.error(f"[ProductRegistry] Ошибка при проверке прав доступа: {e}")
                 return False
             
             # Выполнение операции в блокчейне
             self.logger.info(f"[ProductRegistry] Выполняем обновление статуса в блокчейне")
-            
-            # Преобразуем product_id в int для блокчейна
-            try:
-                product_id_int = int(product_id)
-            except (ValueError, TypeError) as e:
-                self.logger.error(f"[ProductRegistry] Неверный формат product_id: {product_id}, ошибка: {e}")
-                return False
             
             tx_hash = await self.blockchain_service.update_product_status(
                 self.blockchain_service.seller_key,

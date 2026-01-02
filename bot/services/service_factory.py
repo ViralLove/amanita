@@ -57,11 +57,13 @@ class ServiceFactory:
         
         # 3. Создаем IPFSFactory (можно кэшировать в ServiceFactory, но пока создаём каждый раз)
         ipfs_factory = IPFSFactory()
+        # 3.1 SSOT: один ProductStorageService для download_json(cid)
+        storage_service = ProductStorageService(storage_provider=ipfs_factory.get_storage())
         
         # 4. Создаем MultilingualIPFSService с полной DI цепочкой
         # Он уже содержит cache_service, fallback_service, blockchain_service
         ipfs_service = MultilingualIPFSService(
-            ipfs_factory=ipfs_factory,
+            storage_service=storage_service,
             cache_service=cache_service,
             fallback_service=fallback_service,
             blockchain_service=self.blockchain
