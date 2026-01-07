@@ -217,8 +217,8 @@ class ProductConverter(BaseConverter[ProductUploadIn, Product]):
                 'species': service_model.species,
                 'prices': [
                     {
-                        'weight': price.weight,
-                        'weight_unit': price.weight_unit,
+                        'quantity': price.quantity,
+                        'unit': price.unit,
                         'price': str(price.price),
                         'currency': price.currency
                     }

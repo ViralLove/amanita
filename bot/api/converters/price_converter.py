@@ -47,13 +47,10 @@ class PriceConverter(BaseConverter[PriceModel, PriceInfo]):
                 "form": api_model.form
             }
             
-            # Добавляем вес или объем в зависимости от того, что указано
-            if api_model.weight is not None:
-                kwargs["weight"] = api_model.weight
-                kwargs["weight_unit"] = api_model.weight_unit
-            elif api_model.volume is not None:
-                kwargs["volume"] = api_model.volume
-                kwargs["volume_unit"] = api_model.volume_unit
+            # Добавляем количество (quantity/unit)
+            if api_model.quantity is not None:
+                kwargs["quantity"] = api_model.quantity
+                kwargs["unit"] = api_model.unit
             
             # Создаем Service модель
             service_model = PriceInfo(**kwargs)
@@ -92,13 +89,10 @@ class PriceConverter(BaseConverter[PriceModel, PriceInfo]):
                 "form": service_model.form
             }
             
-            # Добавляем вес или объем в зависимости от того, что указано
-            if service_model.weight is not None:
-                kwargs["weight"] = str(service_model.weight)
-                kwargs["weight_unit"] = service_model.weight_unit
-            elif service_model.volume is not None:
-                kwargs["volume"] = str(service_model.volume)
-                kwargs["volume_unit"] = service_model.volume_unit
+            # Добавляем количество (quantity/unit)
+            if service_model.is_quantity_based:
+                kwargs["quantity"] = str(service_model.quantity)
+                kwargs["unit"] = service_model.unit
             
             # Создаем API модель
             api_model = PriceModel(**kwargs)
@@ -137,13 +131,10 @@ class PriceConverter(BaseConverter[PriceModel, PriceInfo]):
                 "form": api_model.form
             }
             
-            # Добавляем вес или объем
-            if api_model.weight is not None:
-                result["weight"] = api_model.weight
-                result["weight_unit"] = api_model.weight_unit
-            elif api_model.volume is not None:
-                result["volume"] = api_model.volume
-                result["volume_unit"] = api_model.volume_unit
+            # Добавляем количество (quantity/unit)
+            if api_model.quantity is not None:
+                result["quantity"] = api_model.quantity
+                result["unit"] = api_model.unit
             
             return result
             
@@ -175,13 +166,10 @@ class PriceConverter(BaseConverter[PriceModel, PriceInfo]):
                 "form": data.get("form")
             }
             
-            # Добавляем вес или объем
-            if "weight" in data:
-                kwargs["weight"] = data["weight"]
-                kwargs["weight_unit"] = data.get("weight_unit")
-            elif "volume" in data:
-                kwargs["volume"] = data["volume"]
-                kwargs["volume_unit"] = data.get("volume_unit")
+            # Добавляем количество (quantity/unit)
+            if "quantity" in data:
+                kwargs["quantity"] = data["quantity"]
+                kwargs["unit"] = data.get("unit")
             
             # Создаем API модель
             api_model = PriceModel(**kwargs)
@@ -212,11 +200,9 @@ class PriceConverter(BaseConverter[PriceModel, PriceInfo]):
             if not price_result.is_valid:
                 return False
             
-            # Проверяем, что указан либо вес, либо объем, но не оба
-            has_weight = api_model.weight is not None
-            has_volume = api_model.volume is not None
-            
-            if has_weight and has_volume:
+            # Проверяем, что указано количество
+            has_quantity = api_model.quantity is not None
+            if not has_quantity:
                 return False
             
             return True
@@ -241,11 +227,8 @@ class PriceConverter(BaseConverter[PriceModel, PriceInfo]):
             if not price_result.is_valid:
                 return False
             
-            # Проверяем, что указан либо вес, либо объем, но не оба
-            has_weight = service_model.weight is not None
-            has_volume = service_model.volume is not None
-            
-            if has_weight and has_volume:
+            # Проверяем, что указано количество
+            if not service_model.is_quantity_based:
                 return False
             
             return True
