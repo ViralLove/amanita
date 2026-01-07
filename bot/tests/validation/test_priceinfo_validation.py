@@ -16,15 +16,15 @@ def test_priceinfo_validation():
         price_info = PriceInfo(
             price=100,
             currency='EUR',
-            weight='100',
-            weight_unit='g'
+            quantity='100',
+            unit='g'
         )
         
         print('✅ PriceInfo создан успешно с валидацией')
         print(f'  - price: {price_info.price}')
         print(f'  - currency: {price_info.currency}')
-        print(f'  - weight: {price_info.weight}')
-        print(f'  - weight_unit: {price_info.weight_unit}')
+        print(f'  - quantity: {price_info.quantity}')
+        print(f'  - unit: {price_info.unit}')
         
         pass
         
@@ -33,7 +33,7 @@ def test_priceinfo_validation():
         assert False, "Тест не прошел"
 
 def test_priceinfo_simple():
-    """Тест создания простого PriceInfo без веса/объема"""
+    """Тест создания простого PriceInfo без quantity"""
     try:
         # Создаем простой PriceInfo
         price_info = PriceInfo(
@@ -44,8 +44,8 @@ def test_priceinfo_simple():
         print('✅ Простой PriceInfo создан успешно')
         print(f'  - price: {price_info.price}')
         print(f'  - currency: {price_info.currency}')
-        print(f'  - weight: {price_info.weight}')
-        print(f'  - volume: {price_info.volume}')
+        print(f'  - quantity: {price_info.quantity}')
+        print(f'  - unit: {price_info.unit}')
         
         pass
         
@@ -54,25 +54,25 @@ def test_priceinfo_simple():
         assert False, "Тест не прошел"
 
 def test_priceinfo_volume():
-    """Тест создания PriceInfo с объемом"""
+    """Тест создания PriceInfo с количеством (объем)"""
     try:
-        # Создаем PriceInfo с объемом
+        # Создаем PriceInfo с количеством (например, объем)
         price_info = PriceInfo(
             price=75,
             currency='EUR',
-            volume='30',
-            volume_unit='ml'
+            quantity='30',
+            unit='ml'
         )
         
-        print('✅ PriceInfo с объемом создан успешно')
+        print('✅ PriceInfo с количеством создан успешно')
         print(f'  - price: {price_info.price}')
-        print(f'  - volume: {price_info.volume}')
-        print(f'  - volume_unit: {price_info.volume_unit}')
+        print(f'  - quantity: {price_info.quantity}')
+        print(f'  - unit: {price_info.unit}')
         
         pass
         
     except Exception as e:
-        print(f'❌ Ошибка создания PriceInfo с объемом: {e}')
+        print(f'❌ Ошибка создания PriceInfo с количеством: {e}')
         assert False, "Тест не прошел"
 
 if __name__ == '__main__':
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     
     test_priceinfo_validation()
     test_priceinfo_simple()
-    test_priceinfo_volume()
+    test_priceinfo_with_quantity()
     
     print('=' * 50)
     print('✅ Тестирование завершено')

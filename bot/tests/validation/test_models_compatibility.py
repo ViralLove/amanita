@@ -58,10 +58,8 @@ def test_fixtures_compatibility():
                 price = PriceInfo(
                     price=price_data.get('price', 100),
                     currency=price_data.get('currency', 'EUR'),
-                    weight=price_data.get('weight'),
-                    weight_unit=price_data.get('weight_unit'),
-                    volume=price_data.get('volume'),
-                    volume_unit=price_data.get('volume_unit'),
+                    quantity=price_data.get('quantity') or price_data.get('weight') or price_data.get('volume'),
+                    unit=price_data.get('unit') or price_data.get('weight_unit') or price_data.get('volume_unit'),
                     form=price_data.get('form')
                 )
                 prices.append(price)
@@ -105,7 +103,7 @@ def test_real_world_scenarios():
             'name': 'Amanita Muscaria Powder',
             'components': [('amanita_muscaria', 'QmAmanita123', '100%')],
             'prices': [
-                (50, 'EUR', '25', 'g'),
+                (50, 'EUR', '25', 'g'),  # price, currency, quantity, unit
                 (90, 'EUR', '50', 'g'),
                 (160, 'EUR', '100', 'g')
             ]
@@ -123,8 +121,8 @@ def test_real_world_scenarios():
             'name': 'Liquid Extract',
             'components': [('blue_lotus', 'QmBlueLotus999', '100%')],
             'prices': [
-                (25, 'EUR', None, None, '30', 'ml'),
-                (45, 'EUR', None, None, '50', 'ml')
+                (25, 'EUR', '30', 'ml'),  # price, currency, quantity, unit
+                (45, 'EUR', '50', 'ml')
             ]
         },
         {
@@ -155,15 +153,11 @@ def test_real_world_scenarios():
                 if len(price_data) == 2:
                     # Простая цена
                     price, currency = price_data
-                    prices.append(PriceInfo(price, currency))
+                    prices.append(PriceInfo(price=price, currency=currency))
                 elif len(price_data) == 4:
-                    # Цена с весом
-                    price, currency, weight, weight_unit = price_data
-                    prices.append(PriceInfo(price, currency, weight, weight_unit))
-                elif len(price_data) == 6:
-                    # Цена с объемом
-                    price, currency, weight, weight_unit, volume, volume_unit = price_data
-                    prices.append(PriceInfo(price, currency, weight, weight_unit, volume, volume_unit))
+                    # Цена с количеством
+                    price, currency, quantity, unit = price_data
+                    prices.append(PriceInfo(price=price, currency=currency, quantity=quantity, unit=unit))
             
             # Создаем продукт
             product = Product(

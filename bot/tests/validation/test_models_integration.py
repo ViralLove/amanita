@@ -28,18 +28,18 @@ def test_complete_product_integration():
         )
         
         # Создаем разные типы цен
-        price_weight = PriceInfo(
+        price_quantity_g = PriceInfo(
             price=150,
             currency='EUR',
-            weight='100',
-            weight_unit='g'
+            quantity='100',
+            unit='g'
         )
         
-        price_volume = PriceInfo(
+        price_quantity_ml = PriceInfo(
             price=75,
             currency='USD', 
-            volume='50',
-            volume_unit='ml'
+            quantity='50',
+            unit='ml'
         )
         
         price_simple = PriceInfo(
@@ -58,7 +58,7 @@ def test_complete_product_integration():
             species='amanita_cordyceps_blend',
             cid='QmProductIntegration789',
             organic_components=[component1, component2],
-            prices=[price_weight, price_volume, price_simple],
+            prices=[price_quantity_g, price_quantity_ml, price_simple],
             cover_image_url='QmCoverIntegration999'
         )
         
@@ -120,10 +120,10 @@ def test_price_variations():
         # Разные варианты цен
         prices = [
             PriceInfo(price=50, currency='EUR'),  # Простая цена
-            PriceInfo(price=100, currency='USD', weight='50', weight_unit='g'),  # Вес
-            PriceInfo(price=75, currency='EUR', volume='30', volume_unit='ml'),  # Объем
-            PriceInfo(price=200, currency='GBP', weight='100', weight_unit='oz'),  # Другая единица веса
-            PriceInfo(price=150, currency='JPY', volume='100', volume_unit='l')   # Другая единица объема
+            PriceInfo(price=100, currency='USD', quantity='50', unit='g'),  # Количество (вес)
+            PriceInfo(price=75, currency='EUR', quantity='30', unit='ml'),  # Количество (объем)
+            PriceInfo(price=200, currency='GBP', quantity='100', unit='oz'),  # Другая единица (вес)
+            PriceInfo(price=150, currency='JPY', quantity='100', unit='l')   # Другая единица (объем)
         ]
         
         product = Product(
@@ -142,8 +142,7 @@ def test_price_variations():
         
         print('✅ Тест вариантов цен успешен')
         print(f'  - Total prices: {len(product.prices)}')
-        print(f'  - Weight-based prices: {sum(1 for p in prices if p.is_weight_based)}')
-        print(f'  - Volume-based prices: {sum(1 for p in prices if p.is_volume_based)}')
+        print(f'  - Quantity-based prices: {sum(1 for p in prices if p.is_quantity_based)}')
         
         pass
         

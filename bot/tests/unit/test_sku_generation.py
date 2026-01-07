@@ -49,21 +49,14 @@ class MockPriceInfo:
     """Mock PriceInfo для тестов"""
     price: Union[int, float, str, Decimal]
     currency: str = "EUR"
-    weight: Optional[Decimal] = None
-    weight_unit: Optional[str] = None
-    volume: Optional[Decimal] = None
-    volume_unit: Optional[str] = None
+    quantity: Optional[Decimal] = None
+    unit: Optional[str] = None
     form: Optional[str] = None
     
     @property
-    def is_weight_based(self) -> bool:
-        """Проверяет, основана ли цена на весе."""
-        return self.weight is not None and self.weight_unit is not None
-    
-    @property
-    def is_volume_based(self) -> bool:
-        """Проверяет, основана ли цена на объеме."""
-        return self.volume is not None and self.volume_unit is not None
+    def is_quantity_based(self) -> bool:
+        """Проверяет, основана ли цена на количестве."""
+        return self.quantity is not None and self.unit is not None
 
 
 @pytest.mark.unit
@@ -326,7 +319,7 @@ class TestGenerateVariationSku:
         """
         generate_variation_sku() генерирует правильный SKU для весового продукта
         
-        GIVEN: Product с blockchain_id=123, form="dried", PriceInfo с weight=Decimal("100"), weight_unit="g", currency="EUR"
+        GIVEN: Product с blockchain_id=123, form="dried", PriceInfo с quantity=Decimal("100"), unit="g", currency="EUR"
         WHEN: generate_variation_sku(product, "dried", price_info) вызывается
         THEN: Возвращается "123_dried_100g_EUR"
         """
@@ -335,8 +328,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=60,
             currency="EUR",
-            weight=Decimal("100"),
-            weight_unit="g"
+            quantity=Decimal("100"),
+            unit="g"
         )
         
         # Act
@@ -363,12 +356,12 @@ class TestGenerateVariationSku:
         ]
         
         # Act & Assert
-        for weight, unit, expected_sku in test_cases:
+        for quantity, unit, expected_sku in test_cases:
             price_info = MockPriceInfo(
                 price=60,
                 currency="EUR",
-                weight=weight,
-                weight_unit=unit
+                quantity=quantity,
+                unit=unit
             )
             result = generate_variation_sku(product, "dried", price_info)
             assert result == expected_sku
@@ -377,7 +370,7 @@ class TestGenerateVariationSku:
         """
         generate_variation_sku() конвертирует Decimal weight в int для SKU
         
-        GIVEN: Product с blockchain_id=123, PriceInfo с weight=Decimal("100.5"), weight_unit="g"
+        GIVEN: Product с blockchain_id=123, PriceInfo с quantity=Decimal("100.5"), unit="g"
         WHEN: generate_variation_sku(product, "dried", price_info) вызывается
         THEN: Возвращается "123_dried_100g_EUR" (Decimal конвертируется в int, округление вниз)
         """
@@ -386,8 +379,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=60,
             currency="EUR",
-            weight=Decimal("100.5"),
-            weight_unit="g"
+            quantity=Decimal("100.5"),
+            unit="g"
         )
         
         # Act
@@ -401,7 +394,7 @@ class TestGenerateVariationSku:
         """
         generate_variation_sku() корректно обрабатывает большие Decimal значения
         
-        GIVEN: Product с blockchain_id=123, PriceInfo с weight=Decimal("100.999"), weight_unit="g"
+        GIVEN: Product с blockchain_id=123, PriceInfo с quantity=Decimal("100.999"), unit="g"
         WHEN: generate_variation_sku(product, "dried", price_info) вызывается
         THEN: Возвращается "123_dried_100g_EUR" (округление вниз)
         """
@@ -410,8 +403,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=60,
             currency="EUR",
-            weight=Decimal("100.999"),
-            weight_unit="g"
+            quantity=Decimal("100.999"),
+            unit="g"
         )
         
         # Act
@@ -429,7 +422,7 @@ class TestGenerateVariationSku:
         """
         generate_variation_sku() генерирует правильный SKU для объемного продукта
         
-        GIVEN: Product с blockchain_id=456, form="tincture", PriceInfo с volume=Decimal("50"), volume_unit="ml", currency="USD"
+        GIVEN: Product с blockchain_id=456, form="tincture", PriceInfo с quantity=Decimal("50"), unit="ml", currency="USD"
         WHEN: generate_variation_sku(product, "tincture", price_info) вызывается
         THEN: Возвращается "456_tincture_50ml_USD"
         """
@@ -438,8 +431,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=20,
             currency="USD",
-            volume=Decimal("50"),
-            volume_unit="ml"
+            quantity=Decimal("50"),
+            unit="ml"
         )
         
         # Act
@@ -465,12 +458,12 @@ class TestGenerateVariationSku:
         ]
         
         # Act & Assert
-        for volume, unit, expected_sku in test_cases:
+        for quantity, unit, expected_sku in test_cases:
             price_info = MockPriceInfo(
                 price=20,
                 currency="USD",
-                volume=volume,
-                volume_unit=unit
+                quantity=quantity,
+                unit=unit
             )
             result = generate_variation_sku(product, "tincture", price_info)
             assert result == expected_sku
@@ -479,7 +472,7 @@ class TestGenerateVariationSku:
         """
         generate_variation_sku() конвертирует Decimal volume в int для SKU
         
-        GIVEN: Product с blockchain_id=456, PriceInfo с volume=Decimal("50.7"), volume_unit="ml"
+        GIVEN: Product с blockchain_id=456, PriceInfo с quantity=Decimal("50.7"), unit="ml"
         WHEN: generate_variation_sku(product, "tincture", price_info) вызывается
         THEN: Возвращается "456_tincture_50ml_USD" (Decimal конвертируется в int, округление вниз)
         """
@@ -488,8 +481,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=20,
             currency="USD",
-            volume=Decimal("50.7"),
-            volume_unit="ml"
+            quantity=Decimal("50.7"),
+            unit="ml"
         )
         
         # Act
@@ -505,29 +498,29 @@ class TestGenerateVariationSku:
     
     def test_generate_variation_sku_with_simple_price_no_weight_no_volume(self):
         """
-        generate_variation_sku() выбрасывает ValueError для простой цены без weight и volume
+        generate_variation_sku() выбрасывает ValueError для простой цены без quantity
         
-        GIVEN: Product с blockchain_id=123, form="dried", PriceInfo без weight и volume (простая цена)
+        GIVEN: Product с blockchain_id=123, form="dried", PriceInfo без quantity (простая цена)
         WHEN: generate_variation_sku(product, "dried", price_info) вызывается
-        THEN: Выбрасывается ValueError с сообщением содержащим "не имеет weight или volume"
+        THEN: Выбрасывается ValueError с сообщением содержащим "не имеет quantity"
         """
         # Arrange
         product = MockProduct(blockchain_id=123, business_id="test_product_001")
         price_info = MockPriceInfo(
             price=60,
             currency="EUR"
-            # Нет weight и volume
+            # Нет quantity
         )
         
         # Act & Assert
-        with pytest.raises(ValueError, match="не имеет weight или volume"):
+        with pytest.raises(ValueError, match="не имеет quantity"):
             generate_variation_sku(product, "dried", price_info)
     
     def test_generate_variation_sku_error_message_includes_business_id(self):
         """
         generate_variation_sku() включает business_id и form в сообщение об ошибке
         
-        GIVEN: Product с business_id="test_product_001", PriceInfo без weight и volume
+        GIVEN: Product с business_id="test_product_001", PriceInfo без quantity
         WHEN: generate_variation_sku(product, "dried", price_info) вызывается
         THEN: Сообщение об ошибке содержит "test_product_001" и "форма: dried"
         """
@@ -536,7 +529,7 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=60,
             currency="EUR"
-            # Нет weight и volume
+            # Нет quantity
         )
         
         # Act & Assert
@@ -564,8 +557,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=60,
             currency="EUR",
-            weight=Decimal("100"),
-            weight_unit="g"
+            quantity=Decimal("100"),
+            unit="g"
         )
         
         # Act
@@ -588,8 +581,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=70,
             currency="USD",
-            weight=Decimal("100"),
-            weight_unit="g"
+            quantity=Decimal("100"),
+            unit="g"
         )
         
         # Act
@@ -612,8 +605,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=5000,
             currency="RUB",
-            weight=Decimal("100"),
-            weight_unit="g"
+            quantity=Decimal("100"),
+            unit="g"
         )
         
         # Act
@@ -655,7 +648,7 @@ class TestGenerateVariationSku:
         """
         generate_variation_sku() использует базовый SKU из generate_product_sku()
         
-        GIVEN: Product с blockchain_id=123, form="dried", PriceInfo с weight=Decimal("100"), weight_unit="g"
+        GIVEN: Product с blockchain_id=123, form="dried", PriceInfo с quantity=Decimal("100"), unit="g"
         WHEN: generate_variation_sku(product, "dried", price_info) вызывается
         THEN: SKU начинается с "123_dried_" (базовый SKU из generate_product_sku())
         """
@@ -664,8 +657,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=60,
             currency="EUR",
-            weight=Decimal("100"),
-            weight_unit="g"
+            quantity=Decimal("100"),
+            unit="g"
         )
         
         # Act
@@ -680,7 +673,7 @@ class TestGenerateVariationSku:
         """
         generate_variation_sku() распространяет ошибки валидации из generate_product_sku()
         
-        GIVEN: Product с blockchain_id=None, PriceInfo с валидными weight и weight_unit
+        GIVEN: Product с blockchain_id=None, PriceInfo с валидными quantity и unit
         WHEN: generate_variation_sku(product, "dried", price_info) вызывается
         THEN: Выбрасывается ValueError из generate_product_sku() (ошибка валидации blockchain_id)
         """
@@ -689,8 +682,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=60,
             currency="EUR",
-            weight=Decimal("100"),
-            weight_unit="g"
+            quantity=Decimal("100"),
+            unit="g"
         )
         
         # Act & Assert
@@ -711,8 +704,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=60,
             currency="EUR",
-            weight=Decimal("100"),
-            weight_unit="g"
+            quantity=Decimal("100"),
+            unit="g"
         )
         
         # Act
@@ -724,19 +717,19 @@ class TestGenerateVariationSku:
     
     def test_generate_variation_sku_with_zero_weight(self):
         """
-        generate_variation_sku() обрабатывает weight=0 корректно
+        generate_variation_sku() обрабатывает quantity=0 корректно
         
-        GIVEN: Product с blockchain_id=123, PriceInfo с weight=Decimal("0"), weight_unit="g"
+        GIVEN: Product с blockchain_id=123, PriceInfo с quantity=Decimal("0"), unit="g"
         WHEN: generate_variation_sku(product, "dried", price_info) вызывается
-        THEN: Возвращается "123_dried_0g_EUR" (0 валиден для weight, но не должен встречаться в реальных данных)
+        THEN: Возвращается "123_dried_0g_EUR" (0 валиден для quantity, но не должен встречаться в реальных данных)
         """
         # Arrange
         product = MockProduct(blockchain_id=123)
         price_info = MockPriceInfo(
             price=60,
             currency="EUR",
-            weight=Decimal("0"),
-            weight_unit="g"
+            quantity=Decimal("0"),
+            unit="g"
         )
         
         # Act
@@ -747,9 +740,9 @@ class TestGenerateVariationSku:
     
     def test_generate_variation_sku_with_very_large_weight(self):
         """
-        generate_variation_sku() обрабатывает большие значения weight корректно
+        generate_variation_sku() обрабатывает большие значения quantity корректно
         
-        GIVEN: Product с blockchain_id=123, PriceInfo с weight=Decimal("10000"), weight_unit="g"
+        GIVEN: Product с blockchain_id=123, PriceInfo с quantity=Decimal("10000"), unit="g"
         WHEN: generate_variation_sku(product, "dried", price_info) вызывается
         THEN: Возвращается "123_dried_10000g_EUR" (большие значения обрабатываются корректно)
         """
@@ -758,8 +751,8 @@ class TestGenerateVariationSku:
         price_info = MockPriceInfo(
             price=60,
             currency="EUR",
-            weight=Decimal("10000"),
-            weight_unit="g"
+            quantity=Decimal("10000"),
+            unit="g"
         )
         
         # Act

@@ -106,8 +106,8 @@ def test_model_validation_errors():
         price = PriceInfo(
             price=-50,
             currency='INVALID',
-            weight='-100',
-            weight_unit='invalid_unit'
+            quantity='-100',
+            unit='invalid_unit'
         )
         print('  ❌ Ожидалась ошибка валидации')
     except ValueError as e:

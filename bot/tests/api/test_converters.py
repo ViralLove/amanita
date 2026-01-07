@@ -299,8 +299,8 @@ class TestPriceConverter:
         api_model = PriceModel(
             price=100,
             currency="EUR",
-            weight="100",
-            weight_unit="g"
+            quantity="100",
+            unit="g"
         )
         
         service_model = self.converter.api_to_service(api_model)
@@ -308,16 +308,16 @@ class TestPriceConverter:
         assert isinstance(service_model, PriceInfo)
         assert service_model.price == Decimal('100')
         assert service_model.currency == "EUR"
-        assert service_model.weight == Decimal('100')
-        assert service_model.weight_unit == "g"
+        assert service_model.quantity == Decimal('100')
+        assert service_model.unit == "g"
     
     def test_valid_service_to_api(self):
         """Тест конвертации валидной Service модели в API модель"""
         service_model = PriceInfo(
             price=100,
             currency="EUR",
-            weight="100",
-            weight_unit="g"
+            quantity="100",
+            unit="g"
         )
         
         api_model = self.converter.service_to_api(service_model)
@@ -325,16 +325,16 @@ class TestPriceConverter:
         assert isinstance(api_model, PriceModel)
         assert api_model.price == 100
         assert api_model.currency == "EUR"
-        assert api_model.weight == "100"
-        assert api_model.weight_unit == "g"
+        assert api_model.quantity == "100"
+        assert api_model.unit == "g"
     
     def test_api_to_dict(self):
         """Тест конвертации API модели в словарь"""
         api_model = PriceModel(
             price=100,
             currency="EUR",
-            weight="100",
-            weight_unit="g"
+            quantity="100",
+            unit="g"
         )
         
         result = self.converter.api_to_dict(api_model)
@@ -342,16 +342,16 @@ class TestPriceConverter:
         assert isinstance(result, dict)
         assert result["price"] == 100
         assert result["currency"] == "EUR"
-        assert result["weight"] == "100"
-        assert result["weight_unit"] == "g"
+        assert result["quantity"] == "100"
+        assert result["unit"] == "g"
     
     def test_dict_to_api(self):
         """Тест конвертации словаря в API модель"""
         data = {
             "price": 100,
             "currency": "EUR",
-            "weight": "100",
-            "weight_unit": "g"
+            "quantity": "100",
+            "unit": "g"
         }
         
         api_model = self.converter.dict_to_api(data)
@@ -359,8 +359,8 @@ class TestPriceConverter:
         assert isinstance(api_model, PriceModel)
         assert api_model.price == 100
         assert api_model.currency == "EUR"
-        assert api_model.weight == "100"
-        assert api_model.weight_unit == "g"
+        assert api_model.quantity == "100"
+        assert api_model.unit == "g"
     
     def test_invalid_price(self):
         """Тест обработки невалидной цены"""
@@ -371,17 +371,17 @@ class TestPriceConverter:
                 currency="EUR"
             )
     
-    def test_weight_and_volume_conflict(self):
-        """Тест обработки конфликта веса и объема"""
+    def test_quantity_without_unit(self):
+        """Тест обработки quantity без unit (невалидная модель)"""
+        # PriceModel позволяет quantity без unit, но PriceInfo валидирует это
         api_model = PriceModel(
             price=100,
             currency="EUR",
-            weight="100",
-            weight_unit="g",
-            volume="50",
-            volume_unit="ml"
+            quantity="100",
+            unit=None  # Отсутствует unit
         )
         
+        # PriceInfo.__post_init__() должен выбросить ValueError при quantity без unit
         with pytest.raises(ValueError):
             self.converter.api_to_service(api_model)
     
@@ -406,8 +406,8 @@ class TestPriceConverter:
             api_model = PriceModel(
                 price=100,
                 currency="EUR",
-                weight="100",
-                weight_unit="g"
+                quantity="100",
+                unit="g"
             )
             
             result = self.converter.validate_api_model(api_model)
@@ -439,8 +439,8 @@ class TestPriceConverter:
             api_model = PriceModel(
                 price=100,  # Валидная цена
                 currency="EUR",
-                weight="100",
-                weight_unit="g"
+                quantity="100",
+                unit="g"
             )
             
             result = self.converter.validate_api_model(api_model)
@@ -471,8 +471,8 @@ class TestPriceConverter:
             service_model = PriceInfo(
                 price=100,
                 currency="EUR",
-                weight="100",
-                weight_unit="g"
+                quantity="100",
+                unit="g"
             )
             
             result = self.converter.validate_service_model(service_model)
@@ -504,8 +504,8 @@ class TestPriceConverter:
             service_model = PriceInfo(
                 price=100,
                 currency="EUR",  # Валидная валюта
-                weight="100",
-                weight_unit="g"
+                quantity="100",
+                unit="g"
             )
             
             result = self.converter.validate_service_model(service_model)

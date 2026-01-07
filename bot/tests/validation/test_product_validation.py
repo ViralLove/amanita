@@ -26,15 +26,15 @@ def test_product_with_priceinfo():
         price1 = PriceInfo(
             price=100,
             currency='EUR',
-            weight='100',
-            weight_unit='g'
+            quantity='100',
+            unit='g'
         )
 
         price2 = PriceInfo(
             price=200,
             currency='EUR',
-            weight='200',
-            weight_unit='g'
+            quantity='200',
+            unit='g'
         )
 
         # Создаем продукт

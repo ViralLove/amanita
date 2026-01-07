@@ -54,17 +54,13 @@ class MockFormatterService:
             if hasattr(product, 'prices') and product.prices:
                 for price_info in product.prices:
                     # Обрабатываем как вес, так и объем
-                    weight = getattr(price_info, 'weight', None)
-                    volume = getattr(price_info, 'volume', None)
-                    weight_unit = getattr(price_info, 'weight_unit', 'г')
-                    volume_unit = getattr(price_info, 'volume_unit', 'мл')
+                    quantity = getattr(price_info, 'quantity', None)
+                    unit = getattr(price_info, 'unit', 'г')
                     price = getattr(price_info, 'price', 'Не указано')
                     currency = getattr(price_info, 'currency', 'EUR')
                     
-                    if weight:
-                        pricing += f"• {weight} {weight_unit}: {price} {currency}\n"
-                    elif volume:
-                        pricing += f"• {volume} {volume_unit}: {price} {currency}\n"
+                    if quantity:
+                        pricing += f"• {quantity} {unit}: {price} {currency}\n"
                     else:
                         pricing += f"• {price} {currency}\n"
             else:

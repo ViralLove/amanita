@@ -39,10 +39,8 @@ class MockPriceInfo:
     """Mock PriceInfo для тестов"""
     price: str
     currency: str = "RUB"
-    weight: Optional[str] = None
-    weight_unit: Optional[str] = None
-    volume: Optional[str] = None
-    volume_unit: Optional[str] = None
+    quantity: Optional[str] = None
+    unit: Optional[str] = None
     form: Optional[str] = None
 
 
@@ -434,15 +432,15 @@ class TestHTMLFormatAdapter:
                 MockPriceInfo(
                     price="1000",
                     currency="RUB",
-                    weight="100",
-                    weight_unit="g",
+                    quantity="100",
+                    unit="g",
                     form="dried"
                 ),
                 MockPriceInfo(
                     price="2000",
                     currency="RUB",
-                    weight="200",
-                    weight_unit="g",
+                    quantity="200",
+                    unit="g",
                     form="powder"
                 )
             ]
@@ -460,11 +458,11 @@ class TestHTMLFormatAdapter:
     
     def test_format_pricing_html_with_weight(self, html_format_adapter, mock_loc):
         """
-        _format_pricing_html() форматирует цену с весом
+        _format_pricing_html() форматирует цену с количеством
         
-        GIVEN: Цена с weight и weight_unit
+        GIVEN: Цена с quantity и unit
         WHEN: _format_pricing_html() вызывается
-        THEN: Формат "цена за вес"
+        THEN: Формат "цена за количество"
         """
         # Arrange
         product = MockProduct(
@@ -472,8 +470,8 @@ class TestHTMLFormatAdapter:
                 MockPriceInfo(
                     price="1000",
                     currency="RUB",
-                    weight="100",
-                    weight_unit="g"
+                    quantity="100",
+                    unit="g"
                 )
             ]
         )
@@ -488,11 +486,11 @@ class TestHTMLFormatAdapter:
     
     def test_format_pricing_html_with_volume(self, html_format_adapter, mock_loc):
         """
-        _format_pricing_html() форматирует цену с объемом
+        _format_pricing_html() форматирует цену с количеством (объем)
         
-        GIVEN: Цена с volume и volume_unit
+        GIVEN: Цена с quantity и unit (например, ml)
         WHEN: _format_pricing_html() вызывается
-        THEN: Формат "цена за объем"
+        THEN: Формат "цена за количество"
         """
         # Arrange
         product = MockProduct(
@@ -500,8 +498,8 @@ class TestHTMLFormatAdapter:
                 MockPriceInfo(
                     price="500",
                     currency="RUB",
-                    volume="50",
-                    volume_unit="ml"
+                    quantity="50",
+                    unit="ml"
                 )
             ]
         )
@@ -690,7 +688,7 @@ class TestHTMLFormatAdapter:
                 )
             ],
             prices=[
-                MockPriceInfo(price="1000", currency="RUB", weight="100", weight_unit="g")
+                MockPriceInfo(price="1000", currency="RUB", quantity="100", unit="g")
             ],
             forms=["dried"],
             categories=["mushrooms"]
@@ -1337,7 +1335,7 @@ class TestHTMLFormatAdapter:
                 )
             ],
             prices=[
-                MockPriceInfo(price="1000", currency="RUB", weight="100", weight_unit="g")
+                MockPriceInfo(price="1000", currency="RUB", quantity="100", unit="g")
             ],
             forms=["dried"],
             categories=["mushrooms"]
@@ -1397,7 +1395,7 @@ class TestHTMLFormatAdapter:
             species="Amanita muscaria",
             status=1,
             organic_components=[component],
-            prices=[MockPriceInfo(price="1500", currency="RUB", weight="100", weight_unit="g")],
+            prices=[MockPriceInfo(price="1500", currency="RUB", quantity="100", unit="g")],
             forms=["dried"],
             categories=["mushrooms"]
         )
@@ -1474,7 +1472,7 @@ class TestHTMLFormatAdapter:
             species="Mixed blend",
             status=1,
             organic_components=[component1, component2],
-            prices=[MockPriceInfo(price="2000", currency="RUB", weight="100", weight_unit="g")],
+            prices=[MockPriceInfo(price="2000", currency="RUB", quantity="100", unit="g")],
             forms=["powder"],
             categories=["blend"]
         )
@@ -1537,7 +1535,7 @@ class TestHTMLFormatAdapter:
             species="Test Species",
             status=1,
             organic_components=[component],
-            prices=[MockPriceInfo(price="1000", currency="RUB", weight="50", weight_unit="g")],
+            prices=[MockPriceInfo(price="1000", currency="RUB", quantity="50", unit="g")],
             forms=["capsules"],
             categories=["supplement"]
         )

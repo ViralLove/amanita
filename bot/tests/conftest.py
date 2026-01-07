@@ -2468,8 +2468,8 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     # Создаем тестовую цену
                     test_price = PriceInfo(
                         price=50.0,
-                        weight=100,
-                        weight_unit="g",
+                        quantity=100,
+                        unit="g",
                         currency="EUR"
                     )
                     
@@ -2516,8 +2516,8 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                         
                         test_price = PriceInfo(
                             price=50.0,
-                            weight=100,
-                            weight_unit="g",
+                            quantity=100,
+                            unit="g",
                             currency="EUR"
                         )
                         
@@ -2578,10 +2578,8 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                         PriceInfo(
                             price=50,
                             currency="EUR",
-                            weight="100",
-                            weight_unit="g",
-                            volume=None,
-                            volume_unit=None,
+                            quantity="100",
+                            unit="g",
                             form="powder"
                         )
                     ]
@@ -3016,8 +3014,8 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
                     
                     test_price = PriceInfo(
                         price=50.0,
-                        weight=100,
-                        weight_unit="g",
+                        quantity=100,
+                        unit="g",
                         currency="EUR"
                     )
                     
