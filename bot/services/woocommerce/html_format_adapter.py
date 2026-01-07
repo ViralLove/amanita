@@ -256,14 +256,11 @@ class HTMLFormatAdapter:
                     currency = getattr(price, 'currency', '')
                     price_html += f"<strong>{price.price} {currency}</strong>"
                 
-                # ✅ РЕЮЗ: Вес или объем (та же логика что в format_pricing_ux)
+                # ✅ РЕЮЗ: Количество (quantity/unit) (та же логика что в format_pricing_ux)
                 price_separator = self.formatter_service.config.get_template('price_separator')  # " за "
-                if hasattr(price, 'weight') and price.weight:
-                    weight_unit = getattr(price, 'weight_unit', '')
-                    price_html += f"{price_separator}<strong>{price.weight} {weight_unit}</strong>"
-                elif hasattr(price, 'volume') and price.volume:
-                    volume_unit = getattr(price, 'volume_unit', '')
-                    price_html += f"{price_separator}<strong>{price.volume} {volume_unit}</strong>"
+                if hasattr(price, 'quantity') and price.quantity:
+                    unit = getattr(price, 'unit', '')
+                    price_html += f"{price_separator}<strong>{price.quantity} {unit}</strong>"
                 
                 # ✅ РЕЮЗ: Форма продукта (та же логика что в format_pricing_ux)
                 form_separator = self.formatter_service.config.get_template('form_separator')  # " • "
@@ -504,7 +501,7 @@ class HTMLFormatAdapter:
         escaped = html.escape(text)
         self.logger.debug(f"[HTMLFormatAdapter] Экранирован текст: {len(text)} → {len(escaped)} символов")
         return escaped
-
+    
     def format_product_html(self, product: Product, loc: Localization) -> str:
         """
         Форматирует продукт в HTML для WooCommerce.
@@ -583,7 +580,7 @@ class HTMLFormatAdapter:
             if aggregated_descriptions.get('dosage_instructions'):
                 self.logger.debug("[HTMLFormatAdapter] Рендерим секцию dosage_instructions")
                 html_parts.append(self._format_aggregated_dosage_html(aggregated_descriptions['dosage_instructions']))
-
+            
             # Объединяем секции через двойной перевод строки для разделения
             result = '\n\n'.join(html_parts) if html_parts else ''
             self.logger.info(f"[HTMLFormatAdapter] Форматирование завершено. Итоговый HTML: {len(result)} символов")
