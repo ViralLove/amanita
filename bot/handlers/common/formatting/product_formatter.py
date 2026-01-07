@@ -102,11 +102,9 @@ def format_pricing_ux(product, loc: Localization) -> str:
         if hasattr(price, 'price') and price.price:
             pricing_text += f"<b>{price.price} {price.currency}</b>"
         
-        # Вес или объем - важно для понимания количества
-        if hasattr(price, 'weight') and price.weight:
-            pricing_text += f" за <b>{price.weight} {price.weight_unit}</b>"
-        elif hasattr(price, 'volume') and price.volume:
-            pricing_text += f" за <b>{price.volume} {price.volume_unit}</b>"
+        # Количество - важно для понимания количества
+        if hasattr(price, 'quantity') and price.quantity:
+            pricing_text += f" за <b>{price.quantity} {price.unit}</b>"
         
         # Форма продукта - важно для выбора
         if hasattr(price, 'form') and price.form:
@@ -256,10 +254,8 @@ def format_product_details_for_telegram(product, loc: Localization) -> str:
             for i, price in enumerate(product.prices, 1):
                 details_text += f"• <b>{price.format_price()}</b>"
                 
-                # Вес или объем
-                if price.is_weight_based:
-                    details_text += f" за <b>{price.format_amount()}</b>"
-                elif price.is_volume_based:
+                # Количество
+                if price.is_quantity_based:
                     details_text += f" за <b>{price.format_amount()}</b>"
                 
                 # Форма продукта
