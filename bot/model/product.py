@@ -101,7 +101,7 @@ class Description:
 class PriceInfo:
     """
     Структура для хранения и обработки информации о цене продукта.
-    Поддерживает работу с весом, объемом и различными валютами.
+    Поддерживает работу с количеством (quantity/unit) и различными валютами.
     """
     
     # Поддерживаемые валюты и их символы
@@ -118,30 +118,13 @@ class PriceInfo:
     }
 
     # Поддерживаемые единицы измерения
-    SUPPORTED_WEIGHT_UNITS = {'g', 'kg', 'oz', 'lb'}
-    SUPPORTED_VOLUME_UNITS = {'ml', 'l', 'oz_fl'}
-
-    # Коэффициенты конвертации для единиц измерения (к базовой единице)
-    WEIGHT_CONVERSION = {
-        'g': Decimal('1'),
-        'kg': Decimal('1000'),
-        'oz': Decimal('28.35'),
-        'lb': Decimal('453.59237')
-    }
-
-    VOLUME_CONVERSION = {
-        'ml': Decimal('1'),
-        'l': Decimal('1000'),
-        'oz_fl': Decimal('29.5735')
-    }
+    SUPPORTED_UNITS = {'g', 'kg', 'oz', 'lb', 'ml', 'l', 'oz_fl'}
 
     # Поля dataclass
     price: Union[int, float, str, Decimal]
     currency: str = 'EUR'
-    weight: Optional[Union[int, float, str]] = None
-    weight_unit: Optional[str] = None
-    volume: Optional[Union[int, float, str]] = None
-    volume_unit: Optional[str] = None
+    quantity: Optional[Union[int, float, str]] = None
+    unit: Optional[str] = None
     form: Optional[str] = None
 
     def __post_init__(self):
@@ -180,58 +163,22 @@ class PriceInfo:
                            f"Поддерживаемые валюты: {', '.join(self.SUPPORTED_CURRENCIES.keys())}")
         self.currency = currency
 
-        # Валидация веса/объема
-        if self.weight is not None and self.volume is not None:
-            raise ValueError("Нельзя одновременно указывать вес и объем")
-
-        # Обработка веса
-        if self.weight is not None:
-            if not self.weight_unit:
-                raise ValueError("weight_unit: Должен быть указан при указании веса")
+        # Валидация quantity/unit
+        if self.quantity is not None:
+            if not self.unit:
+                raise ValueError("unit: Должен быть указан при указании quantity")
             
-            if self.weight_unit not in self.SUPPORTED_WEIGHT_UNITS:
-                raise ValueError(f"weight_unit: Неподдерживаемая единица веса '{self.weight_unit}'. "
-                               f"Поддерживаемые единицы: {', '.join(self.SUPPORTED_WEIGHT_UNITS)}")
+            if self.unit not in self.SUPPORTED_UNITS:
+                raise ValueError(f"unit: Неподдерживаемая единица '{self.unit}'. "
+                               f"Поддерживаемые единицы: {', '.join(self.SUPPORTED_UNITS)}")
             
-            # Валидация числового значения веса
+            # Валидация числового значения quantity
             try:
-                self.weight = Decimal(str(self.weight))
-                if self.weight <= 0:
-                    raise ValueError("weight: Должен быть положительным числом")
+                self.quantity = Decimal(str(self.quantity))
+                if self.quantity <= 0:
+                    raise ValueError("quantity: Должен быть положительным числом")
             except (ValueError, TypeError, ArithmeticError) as e:
-                raise ValueError(f"weight: Некорректное значение '{self.weight}'") from e
-            
-            # Сбрасываем объем
-            self.volume = None
-            self.volume_unit = None
-        
-        # Обработка объема
-        elif self.volume is not None:
-            if not self.volume_unit:
-                raise ValueError("volume_unit: Должен быть указан при указании объема")
-            
-            if self.volume_unit not in self.SUPPORTED_VOLUME_UNITS:
-                raise ValueError(f"volume_unit: Неподдерживаемая единица объема '{self.volume_unit}'. "
-                               f"Поддерживаемые единицы: {', '.join(self.SUPPORTED_VOLUME_UNITS)}")
-            
-            # Валидация числового значения объема
-            try:
-                self.volume = Decimal(str(self.volume))
-                if self.volume <= 0:
-                    raise ValueError("volume: Должен быть положительным числом")
-            except (ValueError, TypeError, ArithmeticError) as e:
-                raise ValueError(f"volume: Некорректное значение '{self.volume}'") from e
-            
-            # Сбрасываем вес
-            self.weight = None
-            self.weight_unit = None
-        
-        # Если ни вес, ни объем не указаны - это нормально для простых цен
-        else:
-            self.weight = None
-            self.weight_unit = None
-            self.volume = None
-            self.volume_unit = None
+                raise ValueError(f"quantity: Некорректное значение '{self.quantity}'") from e
 
     # Устаревшие методы валидации удалены - теперь используется единая система валидации
 
@@ -241,58 +188,9 @@ class PriceInfo:
         return self.SUPPORTED_CURRENCIES[self.currency]
 
     @property
-    def is_weight_based(self) -> bool:
-        """Проверяет, основана ли цена на весе."""
-        return self.weight is not None and self.weight_unit is not None
-
-    @property
-    def is_volume_based(self) -> bool:
-        """Проверяет, основана ли цена на объеме."""
-        return self.volume is not None and self.volume_unit is not None
-
-    def convert_weight(self, target_unit: str) -> Decimal:
-        """
-        Конвертирует вес в указанную единицу измерения.
-
-        Args:
-            target_unit: Целевая единица измерения
-
-        Returns:
-            Decimal: Сконвертированное значение веса
-
-        Raises:
-            ValueError: Если конвертация невозможна
-        """
-        if not self.is_weight_based:
-            raise ValueError("Цена не основана на весе")
-        if target_unit not in self.SUPPORTED_WEIGHT_UNITS:
-            raise ValueError(f"Неподдерживаемая единица веса: {target_unit}")
-
-        # Конвертируем в базовую единицу (граммы), затем в целевую
-        base_value = self.weight * self.WEIGHT_CONVERSION[self.weight_unit]
-        return base_value / self.WEIGHT_CONVERSION[target_unit]
-
-    def convert_volume(self, target_unit: str) -> Decimal:
-        """
-        Конвертирует объем в указанную единицу измерения.
-
-        Args:
-            target_unit: Целевая единица измерения
-
-        Returns:
-            Decimal: Сконвертированное значение объема
-
-        Raises:
-            ValueError: Если конвертация невозможна
-        """
-        if not self.is_volume_based:
-            raise ValueError("Цена не основана на объеме")
-        if target_unit not in self.SUPPORTED_VOLUME_UNITS:
-            raise ValueError(f"Неподдерживаемая единица объема: {target_unit}")
-
-        # Конвертируем в базовую единицу (миллилитры), затем в целевую
-        base_value = self.volume * self.VOLUME_CONVERSION[self.volume_unit]
-        return base_value / self.VOLUME_CONVERSION[target_unit]
+    def is_quantity_based(self) -> bool:
+        """Проверяет, основана ли цена на количестве."""
+        return self.quantity is not None and self.unit is not None
 
     def convert_currency(self, target_currency: str, rate: Decimal) -> 'PriceInfo':
         """
@@ -315,10 +213,8 @@ class PriceInfo:
         
         return PriceInfo(
             price=new_price,
-            weight=self.weight,
-            weight_unit=self.weight_unit,
-            volume=self.volume,
-            volume_unit=self.volume_unit,
+            quantity=self.quantity,
+            unit=self.unit,
             currency=target_currency,
             form=self.form
         )
@@ -336,13 +232,9 @@ class PriceInfo:
         Raises:
             ValueError: Если вычисление невозможно
         """
-        if self.is_weight_based:
-            quantity = self.convert_weight(target_unit) if target_unit else self.weight
-        elif self.is_volume_based:
-            quantity = self.convert_volume(target_unit) if target_unit else self.volume
-        else:
+        if not self.is_quantity_based:
             return self.price
-
+        quantity = self.quantity  # TODO: конвертация единиц, если нужна
         return self.price / quantity
 
     def format_amount(self) -> str:
@@ -352,11 +244,9 @@ class PriceInfo:
         Returns:
             str: Отформатированная строка с количеством и единицей измерения
         """
-        if self.is_weight_based:
-            return f"{float(self.weight):.0f}{self.weight_unit}"
-        if self.is_volume_based:
-            return f"{float(self.volume):.0f}{self.volume_unit}"
-        return "1 шт"
+        if self.is_quantity_based:
+            return f"{float(self.quantity):.0f}{self.unit}"
+        return ""
 
     def format_price(self, use_symbol: bool = True) -> str:
         """
@@ -407,17 +297,30 @@ class PriceInfo:
         Raises:
             ValueError: Если данные некорректны
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         if not isinstance(data, dict):
             raise ValueError(f"Входные данные должны быть словарем: {data}")
 
-        return cls(
+        # Логирование входных данных для диагностики
+        logger.debug(f"[PriceInfo.from_dict] 📥 Входные данные: {data}")
+        logger.debug(f"[PriceInfo.from_dict] 📋 Доступные поля: {list(data.keys())}")
+        logger.debug(f"[PriceInfo.from_dict] 🔍 Поле 'form' в данных: {repr(data.get('form', 'ОТСУТСТВУЕТ'))}")
+        logger.debug(f"[PriceInfo.from_dict] 🔍 Поле 'quantity' в данных: {repr(data.get('quantity', 'ОТСУТСТВУЕТ'))}")
+        logger.debug(f"[PriceInfo.from_dict] 🔍 Поле 'unit' в данных: {repr(data.get('unit', 'ОТСУТСТВУЕТ'))}")
+
+        result = cls(
             price=data['price'],
-            weight=data.get('weight'),
-            weight_unit=data.get('weight_unit'),
-            volume=data.get('volume'),
-            volume_unit=data.get('volume_unit'),
-            currency=data.get('currency', 'EUR')
+            quantity=data.get('quantity'),
+            unit=data.get('unit'),
+            currency=data.get('currency', 'EUR'),
+            form=data.get('form')
         )
+        
+        logger.debug(f"[PriceInfo.from_dict] ✅ Создан PriceInfo: price={result.price}, currency={result.currency}, form={result.form}, quantity={result.quantity}, unit={result.unit}")
+        
+        return result
 
     def to_dict(self) -> Dict:
         """
@@ -434,15 +337,10 @@ class PriceInfo:
         if self.form:
             data['form'] = self.form
 
-        if self.is_weight_based:
+        if self.is_quantity_based:
             data.update({
-                'weight': str(self.weight),
-                'weight_unit': self.weight_unit
-            })
-        elif self.is_volume_based:
-            data.update({
-                'volume': str(self.volume),
-                'volume_unit': self.volume_unit
+                'quantity': str(self.quantity),
+                'unit': self.unit
             })
         
         return data
@@ -454,10 +352,8 @@ class PriceInfo:
         return (
             self.price == other.price and
             self.currency == other.currency and
-            self.weight == other.weight and
-            self.weight_unit == other.weight_unit and
-            self.volume == other.volume and
-            self.volume_unit == other.volume_unit
+            self.quantity == other.quantity and
+            self.unit == other.unit
         )
 
     def __repr__(self) -> str:
@@ -585,7 +481,22 @@ class Product:
                 raise
 
         # Создаем объекты PriceInfo
-        prices = [PriceInfo.from_dict(p) for p in data.get('prices', [])]
+        prices_data = data.get('prices', [])
+        logger.info(f"🏗️ Создаем {len(prices_data)} PriceInfo объектов из данных...")
+        logger.debug(f"📋 Исходные данные цен (raw): {prices_data}")
+        
+        prices = []
+        for i, price_data in enumerate(prices_data):
+            logger.debug(f"  [Цена {i+1}/{len(prices_data)}] Обрабатываем: {price_data}")
+            try:
+                price_obj = PriceInfo.from_dict(price_data)
+                prices.append(price_obj)
+                logger.debug(f"  ✅ Цена {i+1} создана успешно: price={price_obj.price}, form={price_obj.form}, quantity={price_obj.quantity}, unit={price_obj.unit}")
+            except Exception as e:
+                logger.error(f"  ❌ Ошибка создания цены {i+1}: {e}")
+                raise
+        
+        logger.info(f"✅ Создано {len(prices)} PriceInfo объектов")
 
         # Единый формат: требуется forms массив
         if 'forms' not in data:
@@ -594,6 +505,18 @@ class Product:
         forms_value = data.get('forms', [])
         if not isinstance(forms_value, list):
             raise ValueError("'forms' должен быть массивом")
+
+        # Автоматическая установка form при одной форме
+        if len(forms_value) == 1:
+            single_form = forms_value[0]
+            logger.info(f"🔧 Автоматическая установка form='{single_form}' для всех цен (одна форма в продукте)")
+            for price_obj in prices:
+                if price_obj.form is None:
+                    price_obj.form = single_form
+                    logger.debug(f"  ✅ Установлен form='{single_form}' для цены price={price_obj.price}")
+        elif len(forms_value) > 1:
+            # TODO: Реализовать проверку наличия form в каждой цене
+            logger.warning(f"⚠️ Продукт имеет {len(forms_value)} форм. Ожидается поле 'form' в каждой цене (TODO)")
 
         return cls(
             business_id=data['business_id'],
@@ -650,39 +573,26 @@ class Product:
         """
         return min((p.price for p in self.price_infos), default=0)
 
-    def get_price(self, weight: Optional[Union[int, str]] = None,
-                weight_unit: Optional[str] = None,
-                volume: Optional[Union[int, str]] = None,
-                volume_unit: Optional[str] = None,
+    def get_price(self, quantity: Optional[Union[int, str]] = None,
+                unit: Optional[str] = None,
                 currency: str = 'EUR') -> float:
         """
         Получает конкретную цену по параметрам.
         
         Args:
-            weight: Вес продукта
-            weight_unit: Единица измерения веса
-            volume: Объем продукта
-            volume_unit: Единица измерения объема
+            quantity: Количество продукта
+            unit: Единица измерения количества
             currency: Валюта цены
         
         Returns:
             float: Цена продукта для указанных параметров или 0, если не найдена
         """
         for price_info in self.price_infos:
-            if weight and volume:
-                continue  # Нельзя искать одновременно по весу и объему
-            
-            if weight and price_info.is_weight_based:
-                if (price_info.weight == str(weight) and 
-                    price_info.weight_unit == weight_unit and 
+            if quantity and price_info.is_quantity_based:
+                if (price_info.quantity == str(quantity) and 
+                    price_info.unit == unit and 
                     price_info.currency == currency):
-                    return price_info.price
-                    
-            if volume and price_info.is_volume_based:
-                if (price_info.volume == str(volume) and 
-                    price_info.volume_unit == volume_unit and 
-                    price_info.currency == currency):
-                    return price_info.price
+                    return float(price_info.price)
                     
         return 0
 
@@ -695,28 +605,21 @@ class Product:
         """
         return [price_info.format_full() for price_info in self.price_infos]
 
-    def get_price_info(self, weight: Optional[Union[int, str]] = None,
-                    weight_unit: Optional[str] = None,
-                    volume: Optional[Union[int, str]] = None,
-                    volume_unit: Optional[str] = None) -> Optional[PriceInfo]:
+    def get_price_info(self, quantity: Optional[Union[int, str]] = None,
+                    unit: Optional[str] = None) -> Optional[PriceInfo]:
         """
         Получает объект PriceInfo по параметрам.
         
         Args:
-            weight: Вес продукта
-            weight_unit: Единица измерения веса
-            volume: Объем продукта
-            volume_unit: Единица измерения объема
+            quantity: Количество продукта
+            unit: Единица измерения количества
         
         Returns:
             Optional[PriceInfo]: Объект с информацией о цене или None, если не найден
         """
         for price_info in self.price_infos:
-            if weight and price_info.is_weight_based:
-                if price_info.weight == str(weight) and price_info.weight_unit == weight_unit:
-                    return price_info
-            if volume and price_info.is_volume_based:
-                if price_info.volume == str(volume) and price_info.volume_unit == volume_unit:
+            if quantity and price_info.is_quantity_based:
+                if price_info.quantity == str(quantity) and price_info.unit == unit:
                     return price_info
         return None
 

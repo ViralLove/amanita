@@ -94,10 +94,8 @@ class OrganicComponentAPI(BaseModel):
 
 class PriceModel(BaseModel):
     """Модель цены продукта"""
-    weight: Optional[str] = Field(None, description="Вес продукта")
-    weight_unit: Optional[str] = Field(None, description="Единица измерения веса")
-    volume: Optional[str] = Field(None, description="Объем продукта")
-    volume_unit: Optional[str] = Field(None, description="Единица измерения объема")
+    quantity: Optional[str] = Field(None, description="Количество продукта")
+    unit: Optional[str] = Field(None, description="Единица измерения количества")
     price: int = Field(..., gt=0, description="Цена продукта (должна быть положительным числом)")
     currency: str = Field(default="EUR", description="Валюта цены")
     form: Optional[str] = Field(None, description="Форма продукта для данной цены")
