@@ -54,6 +54,23 @@ bytes32 public constant ACTIVATOR_ROLE = keccak256("ACTIVATOR_ROLE");
 **Возвращает:**
 - `uint256 tokenId` - идентификатор созданного NFT
 
+#### `mintInviteBatch(string[] calldata inviteCodes, uint256[] calldata expiries)`
+Создаёт несколько инвайтов за одну транзакцию (batch). Те же гарантии, что и у `mintInvite`: валидация, события, роли, пауза, reentrancy guard на всю batch.
+
+**Параметры:**
+- `inviteCodes` - массив уникальных кодов инвайтов
+- `expiries` - массив сроков действия (0 = бессрочный) для каждого инвайта; длина должна совпадать с `inviteCodes`
+
+**Требования:**
+- Вызывающий должен иметь `SELLER_ROLE`
+- `inviteCodes.length == expiries.length`, `inviteCodes.length > 0`, `inviteCodes.length <= MAX_BATCH_SIZE` (50)
+- Все коды уникальны (в т.ч. внутри batch)
+
+**Возвращает:**
+- `uint256[] tokenIds` - массив идентификаторов созданных NFT
+
+**Константа:** `uint256 public constant MAX_BATCH_SIZE = 50` — максимальный размер batch (защита от переполнения газа).
+
 ### Активация пользователей
 
 #### `activateUser(string memory inviteCode, address user, string[] memory newInviteCodes, uint256 expiry)`
@@ -368,6 +385,11 @@ const inviteCode = "INVITE-001";
 const expiry = 0; // Бессрочный
 
 const tokenId = await spiralEngine.mintInvite(inviteCode, expiry);
+
+// Создание нескольких инвайтов за одну транзакцию (batch, макс. MAX_BATCH_SIZE = 50)
+const inviteCodes = ["INVITE-002", "INVITE-003", "INVITE-004"];
+const expiries = [0n, 0n, 0n]; // BigInt для uint256
+const tokenIds = await spiralEngine.mintInviteBatch(inviteCodes, expiries);
 ```
 
 ### Активация пользователя
