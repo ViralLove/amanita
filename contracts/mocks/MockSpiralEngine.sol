@@ -3,11 +3,12 @@ pragma solidity ^0.8.22;
 
 /**
  * @title MockSpiralEngine
- * @dev Мок контракт SpiralEngine для тестирования ProductRegistry
+ * @dev Мок контракт SpiralEngine для тестирования ProductRegistry и ActivityRegistry
  * @notice Простая реализация ISpiralEngine для unit тестов
  */
 contract MockSpiralEngine {
     bytes32 public constant SELLER_ROLE = keccak256("SELLER_ROLE");
+    bytes32 public constant ACTIVITY_CREATOR_ROLE = keccak256("ACTIVITY_CREATOR_ROLE");
     
     mapping(address => uint256) public usedInviteByUser;
     mapping(bytes32 => mapping(address => bool)) private _roles;
