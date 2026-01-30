@@ -48,11 +48,13 @@
 
 ### Файлы
 - `contracts/docs/ActivityRegistry.md`
-- `contracts/docs/analysis/tasks/task-Activities-1/` (все файлы: solution-architecture, phase retrospectives, task1-acceptance-evaluation, roles-architecture-synthesis, decision-points, task-Activities-1.md, task-implement-activity-registry-contract-tdd.md, qualification report, phase4-gas-metrics, и др.)
+- `contracts/docs/roles-architecture-synthesis.md` — канонический архитектурный документ по системе ролей (перенесён в корень доков контрактов; self-explainable имя).
+- Зеркало для синхронизации: `contracts/docs/analysis/tasks/task-Activities-1/roles-architecture-synthesis.md` (указывает на канонический файл).
 
 ### Что изменено
-- ActivityRegistry.md: API, модель данных, события, роли, деплой.
-- Анализ и план: solution-architecture-task1-activity-registry.md, недореализованное и план реализации; ретроспективы фаз 2–6 и P1 qualification; оценка по критериям приёмки (task1-acceptance-evaluation.md); роли, decision-points, газовые метрики.
+- ActivityRegistry.md: API, модель данных, события, роли, деплой; ссылка на роли ведёт на канонический документ в корне.
+- Роли экосистемы: канонический документ **roles-architecture-synthesis.md** в корне `contracts/docs/`; в папке таска — зеркало для синхронизации ссылок.
+- Анализ и план по Task 1: solution-architecture, ретроспективы фаз, оценка приёмки, decision-points; ссылки на роли обновлены на канонический путь.
 
 ### Цель изменений
 Закрытие критерия «документация контракта»; фиксация архитектуры, решений и уроков по Task 1.

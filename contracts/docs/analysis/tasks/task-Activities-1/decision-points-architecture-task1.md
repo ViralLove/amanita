@@ -21,7 +21,7 @@
 | 7 | Зависимость от SpiralEngine | **Обязательна;** без инвайта — не стать activity provider (чистота рядов). | |
 | 8 | События | **С инициатором**, как у Products и Components (indexed address = актор). | |
 
-**Полный синтез архитектуры ролей (SpiralEngine + Products + Components + Activities):** см. **roles-architecture-synthesis.md** в этой же папке.
+**Полный синтез архитектуры ролей (SpiralEngine + Products + Components + Activities):** см. канонический документ **[roles-architecture-synthesis.md](../../../roles-architecture-synthesis.md)** в корне `contracts/docs/`.
 
 ---
 
@@ -34,7 +34,7 @@
 
 **Lifecycle on-chain:** только **active** (false = черновик, true = опубликовано). Контроль качества и «только свой UI» — в UI + API (валидация по гайду, авторизация приложений).
 
-Ниже — исходные точки принятия решений и варианты (исторический контекст); актуальная архитектура — в roles-architecture-synthesis.md.
+Ниже — исходные точки принятия решений и варианты (исторический контекст); актуальная архитектура — в [roles-architecture-synthesis.md](../../../roles-architecture-synthesis.md).
 
 ---
 

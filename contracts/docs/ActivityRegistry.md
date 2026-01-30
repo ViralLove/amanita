@@ -133,7 +133,7 @@
 - **SpiralEngine:** при `createActivity` требуется, чтобы у `msg.sender` в SpiralEngine были роль `ACTIVITY_CREATOR_ROLE` и `usedInviteByUser(msg.sender) != 0` (модификатор `onlyActivatedActivityCreator`).
 - **Владелец активности:** при `activateActivity` и `deactivateActivity` требуется `activities[activityId].creator == msg.sender` (модификатор `onlyOwnActivity`). Роль CREATOR в самом контракте не заведена.
 
-Подробнее о ролях: [roles-architecture-synthesis.md](analysis/tasks/task-Activities-1/roles-architecture-synthesis.md).
+Подробнее о ролях: [roles-architecture-synthesis.md](roles-architecture-synthesis.md).
 
 ---
 
