@@ -62,6 +62,9 @@ contract SpiralEngineLogic is
     /// @notice Роль администратора для управления системой
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     
+    /// @notice Максимальный размер batch для mintInviteBatch (защита от переполнения газа)
+    uint256 public constant MAX_BATCH_SIZE = 50;
+    
     // === CUSTOM ERRORS ===
     // Custom errors для экономии gas и улучшения читаемости
     
@@ -121,6 +124,17 @@ contract SpiralEngineLogic is
     
     /// @notice Ошибка: пользователь уже имеет роль продавца
     error UserAlreadyHasSellerRole();
+    
+    /// @notice Ошибка: пустой batch (длина массивов 0)
+    error BatchEmpty();
+    
+    /// @notice Ошибка: несовпадение длин массивов inviteCodes и expiries
+    error BatchLengthMismatch();
+    
+    /// @notice Ошибка: размер batch превышает MAX_BATCH_SIZE
+    /// @param size текущий размер
+    /// @param max максимально допустимый размер
+    error BatchTooLarge(uint256 size, uint256 max);
     
     // === STATE VARIABLES ===
     // ⚠️ КРИТИЧНО: Порядок переменных должен совпадать с оригинальным контрактом
@@ -302,20 +316,25 @@ contract SpiralEngineLogic is
         override 
         returns (uint256) 
     {
-        // Валидация входных данных с custom errors
+        return _mintInviteSingle(inviteCode, expiry);
+    }
+    
+    /**
+     * @dev Внутренняя логика минта одного инвайта (без модификаторов). Вызывается из mintInvite и mintInviteBatch.
+     * @param inviteCode уникальный код инвайта
+     * @param expiry срок действия (0 = бессрочный)
+     * @return tokenId идентификатор созданного NFT
+     */
+    function _mintInviteSingle(string calldata inviteCode, uint256 expiry) internal returns (uint256 tokenId) {
         if (bytes(inviteCode).length == 0) revert EmptyInviteCode();
         if (inviteCodeExists[inviteCode]) revert InviteCodeAlreadyExists();
         
-        // Газовая оптимизация: unchecked безопасен для uint256
-        uint256 tokenId;
         unchecked {
             tokenId = _tokenIdCounter++;
         }
         
-        // Минтим NFT текущему пользователю
         _mint(msg.sender, tokenId);
         
-        // Сохраняем данные инвайта
         inviteCodeToTokenId[inviteCode] = tokenId;
         inviteCodeExists[inviteCode] = true;
         tokenIdToInviteCode[tokenId] = inviteCode;
@@ -324,19 +343,48 @@ contract SpiralEngineLogic is
         inviteMinter[tokenId] = msg.sender;
         inviteFirstOwner[tokenId] = msg.sender;
         
-        // Добавляем в список инвайтов пользователя
         userInvites[msg.sender].push(tokenId);
         
-        // Газовая оптимизация: unchecked для счётчиков
         unchecked {
             userInviteCount[msg.sender]++;
             totalInvitesMinted++;
         }
         
-        // Эмитируем событие
         emit InviteMinted(msg.sender, tokenId, inviteCode, expiry);
         
         return tokenId;
+    }
+    
+    /**
+     * @dev Минт нескольких инвайтов в одной транзакции (batch)
+     * @param inviteCodes массив уникальных кодов инвайтов
+     * @param expiries массив сроков действия (0 = бессрочный) для каждого инвайта
+     * @return tokenIds массив идентификаторов созданных NFT
+     * @notice Доступно только пользователям с SELLER_ROLE; размер batch не более MAX_BATCH_SIZE
+     */
+    function mintInviteBatch(
+        string[] calldata inviteCodes,
+        uint256[] calldata expiries
+    )
+        external
+        whenNotPaused
+        nonReentrant
+        onlyRole(SELLER_ROLE)
+        override
+        returns (uint256[] memory tokenIds)
+    {
+        if (inviteCodes.length == 0) revert BatchEmpty();
+        if (inviteCodes.length != expiries.length) revert BatchLengthMismatch();
+        if (inviteCodes.length > MAX_BATCH_SIZE) revert BatchTooLarge(inviteCodes.length, MAX_BATCH_SIZE);
+        
+        tokenIds = new uint256[](inviteCodes.length);
+        for (uint256 i; i < inviteCodes.length;) {
+            tokenIds[i] = _mintInviteSingle(inviteCodes[i], expiries[i]);
+            unchecked {
+                ++i;
+            }
+        }
+        return tokenIds;
     }
     
     /**

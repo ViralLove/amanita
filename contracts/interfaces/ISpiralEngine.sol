@@ -145,6 +145,17 @@ interface ISpiralEngine {
     ) external returns (uint256 tokenId);
     
     /**
+     * @dev Минт нескольких инвайтов в одной транзакции (batch)
+     * @param inviteCodes массив уникальных кодов инвайтов
+     * @param expiries массив сроков действия (0 = бессрочный) для каждого инвайта
+     * @return tokenIds массив идентификаторов созданных NFT
+     */
+    function mintInviteBatch(
+        string[] calldata inviteCodes,
+        uint256[] calldata expiries
+    ) external returns (uint256[] memory tokenIds);
+    
+    /**
      * @dev Активация пользователя с помощью инвайта
      * @param inviteCode код инвайта
      * @param user адрес пользователя для активации
