@@ -10,7 +10,7 @@
 
 require('dotenv').config();
 
-const { ARWEAVE } = require('./constants');
+const { ARWEAVE, CONTRACT_ENV_MAPPING } = require('./constants');
 
 // Simple validation function
 const validateEnv = () => {
@@ -60,6 +60,7 @@ const config = {
     magicRegistry: validatedEnv.MAGIC_REGISTRY_CONTRACT_ADDRESS,
     spiralEngine: validatedEnv.SPIRAL_ENGINE_CONTRACT_ADDRESS,
     productRegistry: validatedEnv.PRODUCT_REGISTRY_CONTRACT_ADDRESS,
+    activityRegistry: validatedEnv.ACTIVITY_REGISTRY_CONTRACT_ADDRESS,
     soulIdentity: validatedEnv.SOUL_IDENTITY_CONTRACT_ADDRESS,
     organicComponentRegistry: validatedEnv.ORGANIC_COMPONENT_REGISTRY_PROXY,
     amanitaInternational: validatedEnv.AMANITA_INTERNATIONAL_PROXY
@@ -157,10 +158,13 @@ module.exports = {
   isSet,
   validateRequired,
   
-  // Backward compatibility
+  // Backward compatibility: config.contracts uses camelCase; fallback to env via CONTRACT_ENV_MAPPING
   getContractAddress: (contractName) => {
     const contractKey = contractName.toLowerCase().replace(/_/g, '');
-    return get(`contracts.${contractKey}`);
+    const fromConfig = get(`contracts.${contractKey}`);
+    if (fromConfig) return fromConfig;
+    const envVar = CONTRACT_ENV_MAPPING[contractName];
+    return (envVar && process.env[envVar]) || undefined;
   },
   
   getSellerConfig: () => config.seller,

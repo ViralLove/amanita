@@ -10,6 +10,7 @@ const CONTRACT_ENV_MAPPING = {
   'MagicRegistry': 'MAGIC_REGISTRY_CONTRACT_ADDRESS',
   'SpiralEngine': 'SPIRAL_ENGINE_CONTRACT_ADDRESS', 
   'ProductRegistry': 'PRODUCT_REGISTRY_CONTRACT_ADDRESS',
+  'ActivityRegistry': 'ACTIVITY_REGISTRY_CONTRACT_ADDRESS',
   'SoulIdentity': 'SOUL_IDENTITY_CONTRACT_ADDRESS',
   'OrganicComponentRegistry': 'ORGANIC_COMPONENT_REGISTRY_PROXY',
   'AmanitaInternational': 'AMANITA_INTERNATIONAL_PROXY'
@@ -20,6 +21,7 @@ const SUPPORTED_CONTRACTS = [
   'MagicRegistry',
   'SpiralEngine', 
   'ProductRegistry',
+  'ActivityRegistry',
   'SoulIdentity',
   'OrganicComponentRegistry',
   'AmanitaInternational'

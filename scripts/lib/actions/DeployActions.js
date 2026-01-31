@@ -9,6 +9,7 @@
 
 const logger = require('../utils/Logger');
 const SetupActions = require('./SetupActions');
+const { CONTRACT_ENV_MAPPING } = require('../config/constants');
 
 class DeployActions {
   constructor(contractManager, ethersUtils, config) {
@@ -30,7 +31,7 @@ class DeployActions {
    * @returns {Promise<Object>} - Deployment/upgrade result
    */
   async action5(contractName) {
-    const uupsContracts = ['SpiralEngine', 'ProductRegistry', 'OrganicComponentRegistry', 'AmanitaInternational'];
+    const uupsContracts = ['SpiralEngine', 'ProductRegistry', 'OrganicComponentRegistry', 'AmanitaInternational', 'ActivityRegistry'];
 
     contractName = contractName || process.env.DEPLOY_CONTRACT || this.config.get?.('deployment.contractName');
     if (!contractName) {
@@ -68,7 +69,7 @@ class DeployActions {
       const address = await contract.getAddress();
       logger.info(`${contractName} at: ${address}`);
 
-      const envVarName = `${contractName.toUpperCase()}_CONTRACT_ADDRESS`;
+      const envVarName = CONTRACT_ENV_MAPPING[contractName] || `${contractName.toUpperCase()}_CONTRACT_ADDRESS`;
       console.log('');
       console.log(`${envVarName}=${address}`);
       console.log('');
@@ -210,6 +211,13 @@ class DeployActions {
         registry: contracts.magicRegistry
       });
 
+      // Deploy ActivityRegistry (UUPS)
+      await waitForNonce();
+      contracts.activityRegistry = await this.contractManager.deploySingleContract('ActivityRegistry', {
+        isUUPS: true,
+        registry: contracts.magicRegistry
+      });
+
       // Deploy OrganicComponentRegistry (UUPS)
       await waitForNonce();
       contracts.organicComponentRegistry = await this.contractManager.deploySingleContract('OrganicComponentRegistry', {
@@ -286,6 +294,18 @@ class DeployActions {
       const logicAddr = await this.getUUPSImplementationAddress(proxyAddr);
       if (logicAddr) {
         console.log(`PRODUCT_REGISTRY_LOGIC_ADDRESS=${logicAddr}`);
+      }
+    }
+    
+    if (contracts.activityRegistry) {
+      const proxyAddr = await contracts.activityRegistry.getAddress();
+      console.log("");
+      console.log(`ACTIVITY_REGISTRY_PROXY_ADDRESS=${proxyAddr}`);
+      console.log(`ACTIVITY_REGISTRY_CONTRACT_ADDRESS=${proxyAddr}`); // Alias
+      
+      const logicAddr = await this.getUUPSImplementationAddress(proxyAddr);
+      if (logicAddr) {
+        console.log(`ACTIVITY_REGISTRY_LOGIC_ADDRESS=${logicAddr}`);
       }
     }
     

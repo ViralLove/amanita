@@ -68,7 +68,10 @@ class ContractManager {
     }
 
     try {
-      const artifact = this.loadContractArtifact(contractName);
+      // UUPS contracts: proxy is at address, use Logic ABI for calls
+      const uupsNames = ['SpiralEngine', 'ProductRegistry', 'OrganicComponentRegistry', 'AmanitaInternational', 'ActivityRegistry'];
+      const artifactName = uupsNames.includes(contractName) ? `${contractName}Logic` : contractName;
+      const artifact = this.loadContractArtifact(artifactName);
       const contract = new ethers.Contract(contractAddress, artifact.abi, this.provider);
       this.contracts.set(contractName, contract);
       logger.contract(contractName, 'loaded', { address: contractAddress });
@@ -495,7 +498,7 @@ class ContractManager {
    * @returns {Object} - The contract instance (Logic ABI) at same Proxy address
    */
   async upgradeUUPSContract(contractName, deployOptions = {}) {
-    const uupsContracts = ['SpiralEngine', 'ProductRegistry', 'OrganicComponentRegistry', 'AmanitaInternational'];
+    const uupsContracts = ['SpiralEngine', 'ProductRegistry', 'OrganicComponentRegistry', 'AmanitaInternational', 'ActivityRegistry'];
     if (!uupsContracts.includes(contractName)) {
       throw new Error(`Contract ${contractName} is not a UUPS contract. Supported: ${uupsContracts.join(', ')}`);
     }
@@ -583,10 +586,49 @@ class ContractManager {
       'SpiralEngineLogic': [],
       'ProductRegistryLogic': [],
       'OrganicComponentRegistryLogic': [],
-      'AmanitaInternationalLogic': []
+      'AmanitaInternationalLogic': [],
+      'ActivityRegistryLogic': []
     };
     
     return constructorArgsMap[contractName] || [];
+  }
+
+  /**
+   * Get SpiralEngine from Map, config (.env), or MagicRegistry.
+   * Used when action 5 deploys a UUPS contract that needs SpiralEngine; after action 1
+   * only MAGIC_REGISTRY_CONTRACT_ADDRESS may be in .env — адрес SpiralEngine берём из реестра.
+   * @returns {Promise<Object|null>} - SpiralEngine contract instance or null
+   */
+  async _getOrLoadSpiralEngine() {
+    let spiralEngine = this.getContract('SpiralEngine');
+    if (spiralEngine) return spiralEngine;
+    let address = this.config.getContractAddress?.('SpiralEngine');
+    if (address) {
+      spiralEngine = await this.loadContract('SpiralEngine', address);
+      return spiralEngine;
+    }
+    // Как в action 1 / loadUUPSContract: разрешаем адрес через MagicRegistry
+    let magicRegistry = this.contracts.get('MagicRegistry');
+    if (!magicRegistry) {
+      const registryAddress = this.config.getContractAddress?.('MagicRegistry') ||
+        process.env.MAGIC_REGISTRY_CONTRACT_ADDRESS;
+      if (registryAddress && registryAddress !== 'undefined') {
+        magicRegistry = await this.loadContract('MagicRegistry', registryAddress);
+      }
+    }
+    if (magicRegistry) {
+      try {
+        address = await magicRegistry.get('SpiralEngine');
+        if (address && address !== ethers.ZeroAddress) {
+          spiralEngine = await this.loadContract('SpiralEngine', address);
+          logger.info(`SpiralEngine адрес загружен из MagicRegistry: ${address}`);
+          return spiralEngine;
+        }
+      } catch (e) {
+        logger.debug(`MagicRegistry.get('SpiralEngine'): ${e.message}`);
+      }
+    }
+    return null;
   }
 
   /**
@@ -606,7 +648,7 @@ class ContractManager {
     
     // ProductRegistry: initialize(address admin, address _spiralEngine)
     if (contractName === 'ProductRegistry') {
-      const spiralEngine = this.getContract('SpiralEngine');
+      const spiralEngine = await this._getOrLoadSpiralEngine();
       if (!spiralEngine) {
         throw new Error('SpiralEngine must be deployed before ProductRegistry');
       }
@@ -620,9 +662,18 @@ class ContractManager {
     
     // AmanitaInternational: initialize(address admin, address _spiralEngine)
     if (contractName === 'AmanitaInternational') {
-      const spiralEngine = this.getContract('SpiralEngine');
+      const spiralEngine = await this._getOrLoadSpiralEngine();
       if (!spiralEngine) {
         throw new Error('SpiralEngine must be deployed before AmanitaInternational');
+      }
+      return [adminAddress, await spiralEngine.getAddress()];
+    }
+    
+    // ActivityRegistry: initialize(address admin, address _spiralEngine)
+    if (contractName === 'ActivityRegistry') {
+      const spiralEngine = await this._getOrLoadSpiralEngine();
+      if (!spiralEngine) {
+        throw new Error('SpiralEngine must be deployed before ActivityRegistry');
       }
       return [adminAddress, await spiralEngine.getAddress()];
     }
@@ -762,7 +813,8 @@ class ContractManager {
         'SpiralEngine',
         'ProductRegistry',
         'OrganicComponentRegistry',
-        'AmanitaInternational'
+        'AmanitaInternational',
+        'ActivityRegistry'
       ];
       
       const sbtContracts = [
