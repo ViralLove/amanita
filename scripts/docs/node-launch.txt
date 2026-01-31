@@ -93,6 +93,7 @@ bash scripts/clean_components_upload.bash --keep-cids
 
 # 3. Передеплой контрактов
 DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network localhost
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network polygon
 
 # ✓ ПРОВЕРКА: После успеха должны быть в .env:
 #   grep "MAGIC_REGISTRY_CONTRACT_ADDRESS" .env  # → должен вернуть адрес
@@ -110,6 +111,29 @@ DEPLOY_ACTION=777 npx hardhat run scripts/deploy_full.js --network localhost
 #   Invite #2 (для Action 888): _________________________
 
 # ========================================
+# ACTION 5: Deploy or Upgrade UUPS Contract
+# ========================================
+#
+# Requires DEPLOY_CONTRACT env (e.g. SpiralEngine, ProductRegistry).
+# If contract exists (address in .env) and is UUPS → upgrade Logic via upgradeToAndCall.
+# If contract does not exist → fresh deploy (Logic + Proxy).
+#
+# Fresh deploy (e.g. localhost, no address in .env):
+# DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network localhost
+#
+# Upgrade (e.g. polygon, SPIRAL_ENGINE_CONTRACT_ADDRESS in .env):
+# DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network polygon
+#
+# Supported UUPS contracts: SpiralEngine, ProductRegistry, ActivityRegistry, OrganicComponentRegistry, AmanitaInternational
+#
+# Example upgrade ActivityRegistry (ACTIVITY_REGISTRY_CONTRACT_ADDRESS in .env):
+# DEPLOY_ACTION=5 DEPLOY_CONTRACT=ActivityRegistry npx hardhat run scripts/deploy_full.js --network localhost
+#
+# Для upgrade: скопируйте ACTIVITY_REGISTRY_CONTRACT_ADDRESS (и SPIRAL_ENGINE_CONTRACT_ADDRESS)
+# из вывода action 1 в .env. Без ACTIVITY_REGISTRY_CONTRACT_ADDRESS скрипт сделает fresh deploy;
+# при fresh deploy SpiralEngine подгружается из .env, если задан SPIRAL_ENGINE_CONTRACT_ADDRESS.
+
+# ========================================
 # ОПЦИИ ДЛЯ ACTION 555 (Загрузка компонентов)
 # ========================================
 #
@@ -121,7 +145,7 @@ DEPLOY_ACTION=555 DEPLOYER_INVITE=<PASTE_INVITE_1_HERE> \
 # → Загрузит все компоненты заново в Arweave, перезапишет CID
 
 # 1.2 Использовать существующие CID (не грузить в Arweave):
-DEPLOY_ACTION=555 DEPLOYER_INVITE=<PASTE_INVITE_1_HERE> USE_EXISTING_CIDS=true \
+DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-CK64-8MUV USE_EXISTING_CIDS=true \
   npx hardhat run scripts/deploy_full.js --network localhost
 # → Использует CID из _upload_state.json, не загружает в Arweave
 
@@ -143,7 +167,7 @@ DEPLOY_ACTION=555 USE_EXISTING_CIDS=true \
 # - Если USE_EXISTING_CIDS=true, но CID отсутствует → автоматический fallback на загрузку
 
 # Пример (НЕ КОПИРОВАТЬ, использовать свой invite!):
-# DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-ZI06-UJ3T npx hardhat run scripts/deploy_full.js --network localhost
+# DEPLOY_ACTION=555 DEPLOYER_INVITE=AMANITA-YHKO-B8SO npx hardhat run scripts/deploy_full.js --network localhost
 
 DEPLOY_ACTION=555 npx hardhat run scripts/deploy_full.js --network localhost
 

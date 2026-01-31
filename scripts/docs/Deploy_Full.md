@@ -4,9 +4,9 @@
 
 `deploy_full.js` - это универсальный скрипт для развертывания и управления контрактами экосистемы Amanita. Скрипт поддерживает различные сценарии деплоя от полной инициализации экосистемы до обновления отдельных контрактов.
 
-**Версия документации**: 3.1  
-**Дата обновления**: 12 января 2025  
-**Статус**: Актуализировано с component-based архитектурой и Action 555
+**Версия документации**: 3.2  
+**Дата обновления**: 31 января 2026  
+**Статус**: Актуализировано: Action 5 deploy/upgrade UUPS с DEPLOY_CONTRACT
 
 ## 🔷 UUPS Архитектура (Upgradeable Contracts)
 
@@ -97,24 +97,28 @@ PRODUCT_REGISTRY_PROXY_ADDRESS=0x...  # Основной адрес для вз�
 
 ---
 
-### Upgrade Process
+### Upgrade Process (Action 5 with DEPLOY_CONTRACT)
 
-Для обновления UUPS контракта:
+Action 5 выполняет **deploy или upgrade** в зависимости от наличия контракта:
 
 ```bash
-# 1. Деплой новой версии Logic
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngineLogic
+# DEPLOY_CONTRACT обязателен для Action 5!
 
-# 2. Вызов upgradeToAndCall на Proxy (требуется UPGRADER_ROLE)
-# (реализуется через отдельный скрипт upgrade-implementation.js)
-npx hardhat run scripts/upgrade-implementation.js --network localhost SpiralEngine <NEW_LOGIC_ADDRESS>
+# Fresh deploy (контракт не существует, нет адреса в .env):
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network localhost
 
-# 3. Proxy теперь использует новую Logic
-# Адрес Proxy не изменился, state сохранён
+# Upgrade (контракт существует, SPIRAL_ENGINE_CONTRACT_ADDRESS в .env):
+# Деплоит новую Logic, вызывает proxy.upgradeToAndCall(newLogic, "0x")
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network polygon
 ```
 
+**Логика Action 5:**
+- Если адрес Proxy **есть** в config (.env) и контракт UUPS → **upgrade** (деплой новой Logic + upgradeToAndCall)
+- Если адреса **нет** → **fresh deploy** (Logic + Proxy)
+- UUPS контракты: SpiralEngine, ProductRegistry, ActivityRegistry, OrganicComponentRegistry, AmanitaInternational
+
 **Роли для upgrade:**
-- `UPGRADER_ROLE` - может обновлять Logic implementation
+- `UPGRADER_ROLE` - может обновлять Logic implementation (deployer получает при initialize)
 - `DEFAULT_ADMIN_ROLE` - может назначать UPGRADER_ROLE
 
 ---
@@ -151,6 +155,11 @@ SPIRAL_ENGINE_CONTRACT_ADDRESS=0x...  # Алиас → PROXY (обратная �
 PRODUCT_REGISTRY_PROXY_ADDRESS=0x...     # ← Основной адрес (для взаимодействия)
 PRODUCT_REGISTRY_LOGIC_ADDRESS=0x...     # Logic адрес (для upgrade)
 PRODUCT_REGISTRY_CONTRACT_ADDRESS=0x...  # Алиас → PROXY (обратная совместимость)
+
+# ActivityRegistry UUPS (Реестр активностей)
+ACTIVITY_REGISTRY_PROXY_ADDRESS=0x...     # ← Основной адрес (для взаимодействия)
+ACTIVITY_REGISTRY_LOGIC_ADDRESS=0x...     # Logic адрес (для upgrade)
+ACTIVITY_REGISTRY_CONTRACT_ADDRESS=0x...  # Алиас → PROXY (обратная совместимость)
 
 # === Остальные контракты ===
 
@@ -279,7 +288,8 @@ npx hardhat run scripts/deploy_full.js --network localhost 1
 **Включает:**
 - MagicRegistry (реестр контрактов)
 - **SpiralEngine (UUPS)** - Logic + Proxy автоматически
-- **ProductRegistry (UUPS)** - Logic + Proxy автоматически  
+- **ProductRegistry (UUPS)** - Logic + Proxy автоматически
+- **ActivityRegistry (UUPS)** - Logic + Proxy автоматически
 - SBT экосистема (5 контрактов: Core, Metadata, Recovery, Integration, Identity)
 - **AmanitaInternational (3-контрактная архитектура для локализации)**
 - Настройка ролей и связей
@@ -364,17 +374,19 @@ DEPLOY_ACTION=4 npx hardhat run scripts/deploy_full.js --network localhost
 
 **Важно:** С версии 3.1 продукты создаются с массивом componentIds, которые должны существовать в OrganicComponentRegistry
 
-#### `5` - Параметризуемый деплой контракта
+#### `5` - Deploy or Upgrade UUPS Contract
 ```bash
-# Способ 1 - через переменную окружения
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost <CONTRACT_NAME>
-
-# Способ 2 - через аргументы командной строки
-npx hardhat run scripts/deploy_full.js --network localhost 5 <CONTRACT_NAME>
+# DEPLOY_CONTRACT обязателен!
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network localhost
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network polygon
 ```
-**Описание:** Деплоит конкретный контракт по имени
+**Описание:** Деплоит или обновляет UUPS контракт по имени. Имя контракта задаётся через переменную окружения `DEPLOY_CONTRACT`.
 
-**Примечание:** Action 5 автоматически определяет тип контракта (UUPS, SBT, regular) и применяет соответствующую логику деплоя. Любой контракт с доступным artifact может быть задеплоен через Action 5.
+**Логика:**
+- **Контракт не существует** (нет адреса в .env) → fresh deploy (Logic + Proxy)
+- **Контракт существует** (адрес Proxy в .env) и это UUPS → upgrade: деплой новой Logic + `proxy.upgradeToAndCall(newLogic, "0x")`
+
+**UUPS контракты:** SpiralEngine, ProductRegistry, ActivityRegistry, OrganicComponentRegistry, AmanitaInternational
 
 **Поддерживаемые контракты:**
 
@@ -386,6 +398,9 @@ npx hardhat run scripts/deploy_full.js --network localhost 5 <CONTRACT_NAME>
 - **`ProductRegistry` (UUPS)** - Реестр продуктов (автоматически деплоит Logic + Proxy)
   - `ProductRegistryLogic` - Logic implementation (можно деплоить отдельно)
   - `ProductRegistryProxy` - Proxy entry point (можно деплоить отдельно)
+- **`ActivityRegistry` (UUPS)** - Реестр активностей (автоматически деплоит Logic + Proxy)
+  - `ActivityRegistryLogic` - Logic implementation (можно деплоить отдельно)
+  - `ActivityRegistryProxy` - Proxy entry point (можно деплоить отдельно)
 - **`OrganicComponentRegistry` (UUPS)** - Реестр органических компонентов (автоматически деплоит Logic + Proxy)
 - `LoveDoPostNFT` - NFT для постов о любви
 - `LoveEmissionEngine` - Движок эмиссии любви
@@ -412,24 +427,19 @@ npx hardhat run scripts/deploy_full.js --network localhost 5 <CONTRACT_NAME>
 
 **Примеры:**
 ```bash
-# UUPS Контракты (автоматический деплой Logic + Proxy)
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngine
+# UUPS: Fresh deploy (контракт не существует)
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network localhost
 # ✅ Результат: SpiralEngineLogic + SpiralEngineProxy задеплоены автоматически
 
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost ProductRegistry
-# ✅ Результат: ProductRegistryLogic + ProductRegistryProxy задеплоены автоматически
+# UUPS: Upgrade (контракт существует, SPIRAL_ENGINE_CONTRACT_ADDRESS в .env)
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network polygon
+# ✅ Результат: новая Logic задеплоена, Proxy обновлён через upgradeToAndCall
 
-# UUPS Контракты (отдельный деплой компонентов - для upgrade)
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngineLogic
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngineProxy
-
-# Основная экосистема (способ 1 - через переменную окружения)
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost Lovecoin
-
-# Основная экосистема (способ 2 - через аргументы командной строки)
-npx hardhat run scripts/deploy_full.js --network localhost 5 ProductRegistry
-npx hardhat run scripts/deploy_full.js --network localhost 5 SpiralEngine
-npx hardhat run scripts/deploy_full.js --network localhost 5 Lovecoin
+# Другие UUPS контракты
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=ProductRegistry npx hardhat run scripts/deploy_full.js --network localhost
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=ActivityRegistry npx hardhat run scripts/deploy_full.js --network localhost
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=OrganicComponentRegistry npx hardhat run scripts/deploy_full.js --network localhost
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=AmanitaInternational npx hardhat run scripts/deploy_full.js --network localhost
 
 # SBT экосистема (способ 1 - через переменную окружения)
 DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SoulboundCore
@@ -678,6 +688,7 @@ DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-XXXX-YYYY npx hardhat run scripts/depl
 | `AmanitaRegistry` | Нет | Нет | Центральный реестр контрактов |
 | `SpiralEngine` | Нет | Да (SELLER_ROLE) | Система инвайт-кодов |
 | `ProductRegistry` | SpiralEngine | Нет | Реестр продуктов |
+| `ActivityRegistry` | SpiralEngine | Нет | Реестр активностей |
 | `LoveDoPostNFT` | SpiralEngine, AmanitaRegistry | Нет | NFT для постов о любви |
 | `LoveEmissionEngine` | AmanitaToken, AmanitaGovToken, LoveDoPostNFT, SpiralEngine | Да (EMITTER_ROLE) | Движок эмиссии любви |
 | `AmanitaToken` | Нет | Нет | Утилити токен |
@@ -917,26 +928,23 @@ DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost Amani
 # npx hardhat run scripts/deploy_full.js --network localhost 5 AmanitaGovToken
 ```
 
-### Сценарий 4: UUPS Upgrade (v3.0)
+### Сценарий 4: UUPS Upgrade (Action 5)
 ```bash
-# Шаг 1: Деплой новой версии Logic
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost SpiralEngineLogic
-# Результат: Новый Logic задеплоен по адресу 0xNEW_LOGIC...
-
-# Шаг 2: Вызов upgradeToAndCall на Proxy (через отдельный скрипт)
-npx hardhat run scripts/upgrade-implementation.js --network localhost \
-  SpiralEngine \
-  0xNEW_LOGIC_ADDRESS
+# Upgrade SpiralEngine (SPIRAL_ENGINE_CONTRACT_ADDRESS должен быть в .env)
+# Action 5: деплой новой Logic + proxy.upgradeToAndCall(newLogic, "0x")
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network polygon
 
 # Результат:
-# ✅ Proxy теперь использует новую Logic
+# ✅ Новая Logic задеплоена
+# ✅ Proxy обновлён через upgradeToAndCall
 # ✅ Адрес Proxy не изменился
 # ✅ State сохранён
 # ✅ MagicRegistry не требует обновления
 
-# Аналогично для ProductRegistry:
-DEPLOY_ACTION=5 npx hardhat run scripts/deploy_full.js --network localhost ProductRegistryLogic
-npx hardhat run scripts/upgrade-implementation.js --network localhost ProductRegistry 0xNEW_LOGIC...
+# Аналогично для других UUPS контрактов:
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=ProductRegistry npx hardhat run scripts/deploy_full.js --network polygon
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=ActivityRegistry npx hardhat run scripts/deploy_full.js --network polygon
+DEPLOY_ACTION=5 DEPLOY_CONTRACT=OrganicComponentRegistry npx hardhat run scripts/deploy_full.js --network polygon
 ```
 
 ### Сценарий 5: Деплой AmanitaInternational (Localization System)
