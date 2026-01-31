@@ -230,6 +230,7 @@ describe('DeployActions', () => {
       // THEN: UUPS contracts deployed (action1 использует deploySingleContract)
       expect(mockContractManager.deploySingleContract.calledWith('SpiralEngine')).to.be.true;
       expect(mockContractManager.deploySingleContract.calledWith('ProductRegistry')).to.be.true;
+      expect(mockContractManager.deploySingleContract.calledWith('ActivityRegistry')).to.be.true;
       expect(mockContractManager.deploySingleContract.calledWith('OrganicComponentRegistry')).to.be.true;
       expect(mockContractManager.deploySingleContract.calledWith('AmanitaInternational')).to.be.true;
     });
