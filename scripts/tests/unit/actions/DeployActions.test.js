@@ -26,6 +26,9 @@ describe('DeployActions', () => {
       deployUUPSContract: sinon.stub(),
       deployContract: sinon.stub(),
       deploySingleContract: sinon.stub(),
+      upgradeUUPSContract: sinon.stub(),
+      checkExistingContract: sinon.stub(),
+      loadContract: sinon.stub().rejects(new Error('MagicRegistry not found')),
       registerContractInRegistry: sinon.stub().resolves()
     };
 
@@ -75,6 +78,76 @@ describe('DeployActions', () => {
 
     it('должен иметь метод printContractAddresses', () => {
       expect(deployActions.printContractAddresses).to.be.a('function');
+    });
+
+    it('должен иметь метод action5', () => {
+      expect(deployActions.action5).to.be.a('function');
+    });
+  });
+
+  // ================================================================
+  // REAL TESTS: action5 (deploy/upgrade UUPS)
+  // ================================================================
+
+  describe('action5() - Deploy or Upgrade UUPS Contract', () => {
+    beforeEach(() => {
+      mockConfig.get.returns(undefined);
+    });
+
+    it('должен вызвать upgradeUUPSContract при существующем UUPS контракте', async () => {
+      const mockContract = { getAddress: sinon.stub().resolves('0xProxy') };
+      mockContractManager.checkExistingContract.withArgs('SpiralEngine').resolves(mockContract);
+      mockContractManager.upgradeUUPSContract.withArgs('SpiralEngine').resolves(mockContract);
+
+      const result = await deployActions.action5('SpiralEngine');
+
+      expect(mockContractManager.checkExistingContract.calledWith('SpiralEngine')).to.be.true;
+      expect(mockContractManager.upgradeUUPSContract.calledWith('SpiralEngine')).to.be.true;
+      expect(mockContractManager.deploySingleContract.called).to.be.false;
+      expect(result.upgraded).to.be.true;
+      expect(result.address).to.equal('0xProxy');
+    });
+
+    it('должен вызвать deploySingleContract при отсутствии контракта', async () => {
+      mockContractManager.checkExistingContract.withArgs('SpiralEngine').resolves(null);
+      const mockContract = { getAddress: sinon.stub().resolves('0xNew') };
+      mockContractManager.deploySingleContract.withArgs('SpiralEngine').resolves(mockContract);
+
+      const result = await deployActions.action5('SpiralEngine');
+
+      expect(mockContractManager.checkExistingContract.calledWith('SpiralEngine')).to.be.true;
+      expect(mockContractManager.deploySingleContract.calledWith('SpiralEngine')).to.be.true;
+      expect(mockContractManager.upgradeUUPSContract.called).to.be.false;
+      expect(result.upgraded).to.not.equal(true);
+      expect(result.address).to.equal('0xNew');
+    });
+
+    it('должен выбросить ошибку при отсутствии contractName', async () => {
+      const orig = process.env.DEPLOY_CONTRACT;
+      delete process.env.DEPLOY_CONTRACT;
+      mockConfig.get.returns(undefined);
+
+      try {
+        await deployActions.action5();
+        expect.fail('Should have thrown');
+      } catch (e) {
+        expect(e.message).to.include('Contract name not provided');
+      } finally {
+        if (orig !== undefined) process.env.DEPLOY_CONTRACT = orig;
+      }
+    });
+
+    it('должен использовать process.env.DEPLOY_CONTRACT при отсутствии аргумента', async () => {
+      process.env.DEPLOY_CONTRACT = 'SpiralEngine';
+      mockContractManager.checkExistingContract.withArgs('SpiralEngine').resolves(null);
+      const mockContract = { getAddress: sinon.stub().resolves('0xNew') };
+      mockContractManager.deploySingleContract.withArgs('SpiralEngine').resolves(mockContract);
+
+      const result = await deployActions.action5();
+
+      expect(mockContractManager.deploySingleContract.calledWith('SpiralEngine')).to.be.true;
+      expect(result.contractName).to.equal('SpiralEngine');
+      delete process.env.DEPLOY_CONTRACT;
     });
   });
 

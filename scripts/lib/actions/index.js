@@ -53,12 +53,12 @@ class ActionsManager {
    * @param {number} actionNumber - The action number to execute
    * @returns {Promise<Object>} - Action result
    */
-  async executeAction(actionNumber) {
+  async executeAction(actionNumber, options = {}) {
     const actionMap = {
       // Deploy actions
       0: () => this.deployActions.action0(),
       1: () => this.deployActions.action1(),
-      5: (contractName) => this.deployActions.action5(contractName),
+      5: () => this.deployActions.action5(options.contractName),
 
       // Setup actions (re-setup connections without re-deploy)
       2: () => this.setupActions.setupSystemConnections(),

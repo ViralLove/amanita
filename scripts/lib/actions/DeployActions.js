@@ -21,28 +21,27 @@ class DeployActions {
   }
 
   /**
-   * Action 5: Deploy Single Contract by Name
-   * Deploys a specific contract without full deployment
-   * 
-   * @param {string} contractName - Contract name to deploy
-   * @returns {Promise<Object>} - Deployment result
+   * Action 5: Deploy or Upgrade UUPS Contract by Name
+   * - Contract name from input (arg, DEPLOY_CONTRACT env, or deployment.contractName)
+   * - If contract exists (address in config) and is UUPS → upgrade via upgradeToAndCall
+   * - If contract does not exist → fresh deploy (Logic + Proxy)
+   *
+   * @param {string} contractName - Contract name (SpiralEngine, ProductRegistry, etc.)
+   * @returns {Promise<Object>} - Deployment/upgrade result
    */
   async action5(contractName) {
-    logger.action(5, `Deploy single contract: ${contractName}`);
-    
+    const uupsContracts = ['SpiralEngine', 'ProductRegistry', 'OrganicComponentRegistry', 'AmanitaInternational'];
+
+    contractName = contractName || process.env.DEPLOY_CONTRACT || this.config.get?.('deployment.contractName');
+    if (!contractName) {
+      throw new Error(
+        'Contract name not provided. Use: DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network polygon'
+      );
+    }
+
+    logger.action(5, `Deploy/upgrade contract: ${contractName}`);
+
     try {
-      // 1. Validate contract name
-      if (!contractName) {
-        const configuredName = this.config.get('deployment.contractName');
-        if (!configuredName) {
-          throw new Error('Contract name not provided. Use: action5(contractName) or set deployment.contractName in config');
-        }
-        contractName = configuredName;
-      }
-      
-      logger.info(`Contract to deploy: ${contractName}`);
-      
-      // 2. Load MagicRegistry (optional, for registration)
       let magicRegistry = null;
       try {
         magicRegistry = await this.contractManager.loadContract('MagicRegistry');
@@ -50,29 +49,37 @@ class DeployActions {
       } catch (error) {
         logger.warn('MagicRegistry not found - contract will not be registered');
       }
-      
-      // 3. Deploy contract
-      logger.info(`Deploying ${contractName}...`);
-      const contract = await this.contractManager.deploySingleContract(contractName, {
-        registry: magicRegistry
-      });
-      
+
+      const existing = await this.contractManager.checkExistingContract(contractName);
+      const isUUPS = uupsContracts.includes(contractName);
+
+      let contract;
+      if (existing && isUUPS) {
+        logger.info(`UUPS contract ${contractName} exists - upgrading Logic...`);
+        contract = await this.contractManager.upgradeUUPSContract(contractName, {});
+      } else if (existing) {
+        logger.info(`Contract ${contractName} already exists at ${await existing.getAddress()} (not UUPS - skipping upgrade)`);
+        contract = existing;
+      } else {
+        logger.info(`Deploying ${contractName}...`);
+        contract = await this.contractManager.deploySingleContract(contractName, { registry: magicRegistry });
+      }
+
       const address = await contract.getAddress();
-      logger.info(`${contractName} deployed at: ${address}`);
-      
-      // 4. Print .env format
+      logger.info(`${contractName} at: ${address}`);
+
       const envVarName = `${contractName.toUpperCase()}_CONTRACT_ADDRESS`;
-      console.log("");
+      console.log('');
       console.log(`${envVarName}=${address}`);
-      console.log("");
-      
+      console.log('');
+
       logger.success(5);
       return {
         success: true,
-        contractName: contractName,
-        contract: contract,
-        address: address,
-        registered: !!magicRegistry
+        contractName,
+        contract,
+        address,
+        upgraded: existing && isUUPS
       };
     } catch (error) {
       logger.failure(5, error.message);
@@ -121,11 +128,28 @@ class DeployActions {
     try {
       const contracts = {};
       
-      // Helper: Wait between contract deployments to prevent nonce conflicts
+      // Get network info to determine delay (mainnet needs longer delays for rate limits)
+      let delayMs = 500; // Default delay for localhost/testnet
+      try {
+        const network = await this.ethersUtils.provider.getNetwork();
+        const chainId = Number(network.chainId);
+        // Polygon mainnet (137) needs longer delays to avoid rate limits
+        if (chainId === 137) {
+          delayMs = 2000; // 2 seconds for Polygon mainnet
+          logger.debug(`[NETWORK] Detected Polygon mainnet (Chain ID ${chainId}), using ${delayMs}ms delay between contracts`);
+        } else if (chainId === 80001) {
+          delayMs = 1000; // 1 second for Mumbai testnet
+          logger.debug(`[NETWORK] Detected Mumbai testnet (Chain ID ${chainId}), using ${delayMs}ms delay between contracts`);
+        }
+      } catch (networkError) {
+        logger.debug(`[NETWORK] Could not determine network, using default ${delayMs}ms delay`);
+      }
+      
+      // Helper: Wait between contract deployments to prevent nonce conflicts and rate limits
       // IMPORTANT: Define BEFORE using to avoid race conditions!
       const waitForNonce = async () => {
-        logger.info('⏱️ Waiting 500ms for nonce update between contracts...');
-        await new Promise(resolve => setTimeout(resolve, 500));
+        logger.info(`⏱️ Waiting ${delayMs}ms for nonce update between contracts...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
       };
       
       // Deploy MagicRegistry first

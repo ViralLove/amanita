@@ -28,6 +28,7 @@ const ArweaveManager = require('./lib/services/ArweaveManager');
 const EthersUtils = require('./lib/utils/EthersUtils');
 const { ActionsManager } = require('./lib/actions/index');
 const { CoreManager } = require('./lib/core/index');
+const RpcProviderManager = require('./lib/utils/RpcProviderManager');
 
 /**
  * Main Deploy Router Class
@@ -45,6 +46,7 @@ class DeployRouter {
     this.ethersUtils = null;
     this.actionsManager = null;
     this.coreManager = null;
+    this.rpcManager = null;
     this.initialized = false;
   }
 
@@ -61,7 +63,7 @@ class DeployRouter {
       
       // Initialize managers
       this.ethersUtils = new EthersUtils(this.provider, this.config);
-      this.contractManager = new ContractManager(this.provider, this.config, this.ethersUtils);
+      this.contractManager = new ContractManager(this.provider, this.config, this.ethersUtils, this.rpcManager);
       this.arweaveManager = new ArweaveManager(this.config);
       
       // Initialize action and core managers
@@ -88,31 +90,144 @@ class DeployRouter {
 
   /**
    * Initialize Provider connection
+   * Uses Hardhat's ethers.provider (respects --network flag), falls back to env vars
    * @returns {Promise<void>}
    */
   async initializeProvider() {
     try {
-      // Determine RPC URL: try RPC_URL, then WEB3_PROVIDER_URI, then use Hardhat network
-      const rpcUrl = process.env.RPC_URL || process.env.WEB3_PROVIDER_URI || 'http://localhost:8545';
-      this.logger.debug(`[DEBUG] RPC URL sources:`);
-      this.logger.debug(`  - RPC_URL: ${process.env.RPC_URL || 'undefined'}`);
-      this.logger.debug(`  - WEB3_PROVIDER_URI: ${process.env.WEB3_PROVIDER_URI || 'undefined'}`);
-      this.logger.debug(`  - Selected RPC URL: ${rpcUrl}`);
+      const hre = require('hardhat');
+      let provider;
+      let rpcUrl;
+      let networkName;
+      let providerSource;
       
-      this.provider = new ethers.JsonRpcProvider(rpcUrl);
+      // Try to use Hardhat's ethers.provider first (respects --network flag)
+      // This is the standard approach used throughout the codebase
+      try {
+        // ethers is already imported at the top, but we need to ensure it's from hardhat
+        provider = ethers.provider;
+        networkName = hre.network?.name || 'unknown';
+        rpcUrl = hre.network?.config?.url || 'unknown';
+        providerSource = 'Hardhat ethers.provider';
+        
+        this.logger.info(`[NETWORK] Using Hardhat ethers.provider for network: '${networkName}'`);
+        this.logger.debug(`[DEBUG] Network configuration from Hardhat:`);
+        this.logger.debug(`  - Network name: ${networkName}`);
+        this.logger.debug(`  - RPC URL: ${rpcUrl}`);
+        this.logger.debug(`  - Chain ID (from config): ${hre.network?.config?.chainId || 'unknown'}`);
+      } catch (hardhatError) {
+        // Fallback: create provider from config or env
+        this.logger.warn(`[NETWORK] Hardhat ethers.provider not available, using fallback`);
+        this.logger.debug(`[DEBUG] Hardhat error: ${hardhatError.message}`);
+        
+        // Try to get RPC URL from Hardhat config for the requested network
+        if (hre.network && hre.network.name && hre.config?.networks?.[hre.network.name]) {
+          const networkConfig = hre.config.networks[hre.network.name];
+          if (networkConfig.url) {
+            rpcUrl = networkConfig.url;
+            networkName = hre.network.name;
+            providerSource = `Hardhat config (${networkName})`;
+            this.logger.debug(`[DEBUG] Using RPC URL from hardhat.config.js for network '${networkName}'`);
+          }
+        }
+        
+        // If still no RPC URL, try env vars
+        if (!rpcUrl || rpcUrl === 'unknown') {
+          rpcUrl = process.env.RPC_URL || process.env.WEB3_PROVIDER_URI || 'http://localhost:8545';
+          providerSource = 'Environment variables or fallback';
+          this.logger.debug(`[DEBUG] RPC URL sources (fallback):`);
+          this.logger.debug(`  - RPC_URL: ${process.env.RPC_URL || 'undefined'}`);
+          this.logger.debug(`  - WEB3_PROVIDER_URI: ${process.env.WEB3_PROVIDER_URI || 'undefined'}`);
+          this.logger.debug(`  - Selected RPC URL: ${rpcUrl}`);
+        }
+        
+        provider = new ethers.JsonRpcProvider(rpcUrl);
+      }
       
-      // Test connection
+      this.provider = provider;
+      
+      // Test connection and get network info
       const network = await this.provider.getNetwork();
       const blockNumber = await this.provider.getBlockNumber();
       
-      this.logger.info(`Connected to network: ${network.chainId}`);
-      this.logger.info(`Current block: ${blockNumber}`);
-      this.logger.debug(`[DEBUG] Network details:`);
-      this.logger.debug(`  - Chain ID: ${network.chainId}`);
+      // Determine currency name based on chain ID
+      const chainId = Number(network.chainId);
+      const currency = chainId === 137 ? 'MATIC' : chainId === 80001 ? 'MATIC' : 'ETH';
+      
+      // Initialize RpcProviderManager for Polygon mainnet
+      if (chainId === 137) {
+        // Get primary endpoint from config or env
+        const primaryEndpoint = hre.network?.config?.url || 
+                               process.env.POLYGON_MAINNET_RPC || 
+                               null;
+        
+        // Create RpcProviderManager
+        this.rpcManager = new RpcProviderManager(
+          networkName,
+          chainId,
+          this.logger,
+          primaryEndpoint
+        );
+        
+        // If no primary endpoint was set, use first from alternatives
+        if (!primaryEndpoint) {
+          rpcUrl = this.rpcManager.getNextEndpoint();
+          provider = this.rpcManager.createProvider(rpcUrl);
+          this.provider = provider; // Update provider reference
+          this.logger.info(`[RPC] Using RpcProviderManager for Polygon mainnet`);
+          this.logger.info(`[RPC] Initial endpoint: ${rpcUrl}`);
+        } else {
+          // Primary endpoint was set, use it
+          rpcUrl = primaryEndpoint;
+          this.logger.info(`[RPC] Using primary endpoint from config: ${primaryEndpoint}`);
+        }
+      }
+      
+      // Get RPC URL for logging (if not already set)
+      if (!rpcUrl || rpcUrl === 'unknown') {
+        // Try to extract from provider connection
+        if (this.provider.connection) {
+          rpcUrl = typeof this.provider.connection === 'string' 
+            ? this.provider.connection 
+            : this.provider.connection.url || 'unknown';
+        } else if (this.provider._getConnection) {
+          const conn = this.provider._getConnection();
+          rpcUrl = typeof conn === 'string' ? conn : conn?.url || 'unknown';
+        }
+      }
+      
+      // Log comprehensive network information
+      this.logger.info(`[NETWORK] Connected to network`);
+      this.logger.info(`  - Network name: ${networkName || network.name || 'unknown'}`);
+      this.logger.info(`  - Chain ID: ${chainId}`);
+      this.logger.info(`  - Currency: ${currency}`);
+      this.logger.info(`  - Current block: ${blockNumber}`);
+      this.logger.info(`  - Provider source: ${providerSource}`);
+      this.logger.info(`  - RPC URL: ${rpcUrl}`);
+      
+      // Verify chain ID matches expected for known networks
+      if (networkName === 'polygon' && chainId !== 137) {
+        this.logger.warn(`[WARNING] Expected Polygon mainnet (Chain ID 137), but connected to Chain ID ${chainId}`);
+      } else if (networkName === 'mumbai' && chainId !== 80001) {
+        this.logger.warn(`[WARNING] Expected Mumbai testnet (Chain ID 80001), but connected to Chain ID ${chainId}`);
+      } else if (networkName === 'localhost' && chainId !== 31337) {
+        this.logger.warn(`[WARNING] Expected localhost (Chain ID 31337), but connected to Chain ID ${chainId}`);
+      }
+      
+      this.logger.debug(`[DEBUG] Full network details:`);
+      this.logger.debug(`  - Chain ID: ${chainId}`);
+      this.logger.debug(`  - Network name: ${networkName || network.name || 'unknown'}`);
       this.logger.debug(`  - RPC URL: ${rpcUrl}`);
       this.logger.debug(`  - Block number: ${blockNumber}`);
+      this.logger.debug(`  - Currency: ${currency}`);
+      this.logger.debug(`  - Provider type: ${provider.constructor.name}`);
     } catch (error) {
       this.logger.error('Failed to initialize Provider:', error.message);
+      this.logger.error(`[ERROR] Provider initialization failed. Check:`);
+      this.logger.error(`  - Network configuration in hardhat.config.js`);
+      this.logger.error(`  - RPC_URL or WEB3_PROVIDER_URI environment variables`);
+      this.logger.error(`  - Network connectivity`);
+      this.logger.error(`  - Error details: ${error.stack || 'No stack trace'}`);
       throw error;
     }
   }
@@ -120,19 +235,17 @@ class DeployRouter {
   /**
    * Route action to appropriate handler
    * @param {number} action - Action number to execute
+   * @param {Object} options - Optional parameters (e.g. { contractName } for action 5)
    * @returns {Promise<Object>} - Action result
    */
-  async route(action) {
+  async route(action, options = {}) {
     if (!this.initialized) {
       await this.initialize();
     }
 
     try {
       this.logger.info(`Routing action: ${action}`);
-      
-      // Execute action through ActionsManager
-      const result = await this.actionsManager.executeAction(action);
-      
+      const result = await this.actionsManager.executeAction(action, options);
       this.logger.info(`Action ${action} completed successfully`);
       return result;
     } catch (error) {
@@ -179,12 +292,13 @@ class DeployRouter {
 /**
  * Main function - entry point for the script
  * @param {number} action - Action number to execute
+ * @param {Object} options - Optional (e.g. DEPLOY_CONTRACT for action 5)
  * @returns {Promise<void>}
  */
-async function main(action) {
+async function main(action, options = {}) {
   try {
     const router = new DeployRouter();
-    await router.route(action);
+    await router.route(action, options);
   } catch (error) {
     logger.error('Main function failed:', error.message);
     process.exit(1);
@@ -204,7 +318,15 @@ if (require.main === module) {
   }
   
   const action = process.env.DEPLOY_ACTION ? parseInt(process.env.DEPLOY_ACTION) : null;
-  
+  // Action 5: deploy/upgrade UUPS contract. Requires DEPLOY_CONTRACT (e.g. SpiralEngine).
+  // Upgrade: DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network polygon
+  const contractName = process.env.DEPLOY_CONTRACT;
+  if (action === 5 && !contractName) {
+    logger.error('For action 5, DEPLOY_CONTRACT is required (e.g. DEPLOY_CONTRACT=SpiralEngine)');
+    logger.info('Example: DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network polygon');
+    process.exit(1);
+  }
+  const options = action === 5 ? { contractName } : {};
   if (!action) {
     logger.error('DEPLOY_ACTION environment variable is required');
     logger.info('Available actions:');
@@ -221,7 +343,7 @@ if (require.main === module) {
     return;
   }
 
-  main(action).catch(error => {
+  main(action, options).catch(error => {
     logger.error('Script execution failed:', error.message);
     process.exit(1);
   });
