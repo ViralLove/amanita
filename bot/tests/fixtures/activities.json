@@ -1,0 +1,61 @@
+{
+  "valid_activities": [
+    {
+      "activity_type": "event",
+      "title": "Minimal Event (active: false)",
+      "short_summary": "Test event draft",
+      "event_timing": {
+        "schedule_model": "fixed_dates",
+        "fixed_dates": [{"start": "2026-02-01T10:00:00Z", "end": "2026-02-01T12:00:00Z", "timezone": "Europe/Tallinn"}]
+      },
+      "event_capacity": {"group_capacity": 20, "max_participants": 20},
+      "event_duration": {"duration_type": "per_occurrence", "per_occurrence": {"duration_minutes": 120}},
+      "event_pricing": {"pricing_type": "ticket_price", "ticket_price": {"amount": 30, "currency": "EUR"}},
+      "event_cta": {"event_page_link": "https://example.com/event1"}
+    },
+    {
+      "activity_type": "event",
+      "title": "Full Event (active: true)",
+      "short_summary": "Published workshop",
+      "full_description": "A full description for the workshop.",
+      "delivery_mode": "in_person",
+      "location_info": {"city": "Tallinn", "venue": "Community Space"},
+      "event_timing": {
+        "schedule_model": "recurring",
+        "recurring": {"recurrence_rule": "FREQ=WEEKLY;BYDAY=MO", "start_date": "2026-02-01", "timezone": "Europe/Tallinn"}
+      },
+      "event_capacity": {"group_capacity": 15, "min_participants": 3, "max_participants": 15},
+      "event_duration": {"duration_type": "per_occurrence", "per_occurrence": {"duration_minutes": 90}},
+      "event_pricing": {"pricing_type": "donation"},
+      "event_cta": {"event_page_link": "https://example.com/workshop", "tickets_link": "https://example.com/tickets"}
+    },
+    {
+      "activity_type": "service",
+      "title": "Minimal Service (active: false)",
+      "short_summary": "Test service draft",
+      "service_timing": {"availability_type": "by_request", "booking_policy": "Contact to book"},
+      "service_participation": {"session_mode": "one_to_one", "concurrent_clients": 1},
+      "service_duration_options": [{"duration_minutes": 60, "label": "Standard"}],
+      "service_pricing_model": {"model": "per_session"},
+      "service_cta": {"booking_url": "https://calendly.com/example"}
+    },
+    {
+      "activity_type": "service",
+      "title": "Full Service (active: true)",
+      "short_summary": "Published 1:1 sessions",
+      "full_description": "Individual sessions by appointment.",
+      "delivery_mode": "hybrid",
+      "location_info": {"city": "Tallinn", "online_platform": "Zoom"},
+      "service_area": {"radius": 50, "districts": ["Tallinn", "Tartu"]},
+      "service_timing": {
+        "availability_type": "fixed_windows",
+        "availability_windows": [{"day_of_week": "monday", "start_time": "09:00", "end_time": "17:00", "timezone": "Europe/Tallinn"}],
+        "booking_policy": "Book via link"
+      },
+      "service_participation": {"session_mode": "one_to_one", "concurrent_clients": 1},
+      "service_duration_options": [{"duration_minutes": 60, "label": "Standard"}, {"duration_minutes": 90, "label": "Extended"}],
+      "service_pricing_model": {"model": "per_hour"},
+      "service_cta": {"booking_url": "https://calendly.com/example", "amanita_booking": false}
+    }
+  ]
+}

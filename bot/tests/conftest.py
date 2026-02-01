@@ -3090,6 +3090,58 @@ def mock_product_registry_service(mock_blockchain_service, mock_ipfs_storage, mo
         account_service=mock_account_service
     )
 
+
+# === ACTIVITY FIXTURES (no status enum — only active) ===
+
+@pytest.fixture(scope="function")
+def mock_activity_registry_service():
+    """Mock ActivityRegistryService: create_activity, get_activity, activate_activity, deactivate_activity, get_activities_by_creator."""
+    from unittest.mock import Mock, AsyncMock
+    mock = Mock()
+    mock._activities = {}
+    mock._activity_counter = 1
+    mock.create_activity = AsyncMock(return_value=1)
+    mock.get_activity = AsyncMock(return_value=None)
+    mock.activate_activity = AsyncMock(return_value=None)
+    mock.deactivate_activity = AsyncMock(return_value=None)
+    mock.get_activities_by_creator = AsyncMock(return_value=[])
+    return mock
+
+
+@pytest.fixture(scope="function")
+def mock_activity_storage_service():
+    """Mock ActivityStorageService: upload_metadata, download_metadata, validate_cid."""
+    from unittest.mock import Mock, AsyncMock
+    mock = Mock()
+    mock.upload_metadata = AsyncMock(return_value="QmMockCID")
+    mock.download_metadata = AsyncMock(return_value={})
+    mock.validate_cid = AsyncMock(return_value=True)
+    return mock
+
+
+@pytest.fixture(scope="function")
+def mock_activity_search_service():
+    """Mock ActivitySearchService: search, index_activity, update_activity_index."""
+    from unittest.mock import Mock, AsyncMock
+    mock = Mock()
+    mock.search = AsyncMock(return_value={"results": [], "total": 0})
+    mock.index_activity = AsyncMock(return_value=None)
+    mock.update_activity_index = AsyncMock(return_value=None)
+    return mock
+
+
+@pytest.fixture(scope="function")
+def mock_activity_embedding_service():
+    """Mock ActivityEmbeddingService: generate_content_embedding, generate_language_embedding, etc."""
+    from unittest.mock import Mock, AsyncMock
+    mock = Mock()
+    mock.generate_content_embedding = AsyncMock(return_value=[0.0] * 3072)
+    mock.generate_language_embedding = AsyncMock(return_value=[0.0] * 3072)
+    mock.generate_location_embedding = AsyncMock(return_value=[0.0] * 3072)
+    mock.generate_timing_embedding = AsyncMock(return_value=[0.0] * 3072)
+    return mock
+
+
 @pytest.fixture(scope="function")
 def mock_registry_service_with_failing_storage(mock_blockchain_service, mock_validation_service, mock_account_service, mock_ipfs_storage_failing):
     """ProductRegistryService с моканным IPFS storage, который симулирует ошибки"""
