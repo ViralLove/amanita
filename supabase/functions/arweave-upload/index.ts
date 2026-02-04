@@ -1,6 +1,11 @@
+/// <reference path="./deno_shim.d.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import Arweave from "https://esm.sh/arweave@1.15.7"
-import { signTransaction } from "./arweave/compatible.ts";
+import Arweave from "arweave"
+import { signTransaction } from "./arweave/compatible.ts"
+import { verifyUploadToken } from "./publish/validate-token.ts"
+import { putStatus, postCallback } from "./publish/backend-calls.ts"
+import { validateDataItem } from "./publish/validate-data-item.ts"
+import { bundleAndPublish } from "./publish/bundle-publish.ts"
 
 // Инициализация ArWeave клиента с правильными параметрами
 const arweave = Arweave.init({
@@ -190,6 +195,81 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
+    }
+
+    // Publish endpoint: signed Data Item + JWT, Backend status/callback
+    if (path.endsWith("/edge/v1/publish") && req.method === "POST") {
+      console.log("[publish] request received");
+      let body: { upload_token?: string; upload_id?: string; signed_data_item?: string; payload_size?: number };
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ code: "bad_request", message: "Invalid JSON body" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const uploadToken = body.upload_token
+      const uploadId = body.upload_id
+      const signedDataItem = body.signed_data_item
+      const payloadSize = body.payload_size
+      if (typeof uploadToken !== "string" || !uploadToken ||
+          typeof uploadId !== "string" || !uploadId ||
+          typeof signedDataItem !== "string" || !signedDataItem ||
+          typeof payloadSize !== "number" || payloadSize < 0) {
+        return new Response(
+          JSON.stringify({ code: "bad_request", message: "Missing required field" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const tokenResult = await verifyUploadToken(uploadToken, uploadId, payloadSize);
+      if (!tokenResult.ok) {
+        console.log("[publish] token invalid");
+        await putStatus(uploadId, "failed", "token_invalid");
+        return new Response(
+          JSON.stringify({ code: "token_invalid", message: "Invalid or expired token" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.log("[publish] token ok");
+      const dataItemResult = await validateDataItem(signedDataItem, uploadId);
+      if (!dataItemResult.ok) {
+        console.log("[publish] data item invalid");
+        await putStatus(uploadId, "failed", "signature_invalid");
+        return new Response(
+          JSON.stringify({ code: "signature_invalid", message: "Invalid Data Item or Upload-Id" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.log("[publish] data item ok");
+      await putStatus(uploadId, "queued_for_publish");
+      console.log("[publish] status updated");
+      const itemId = dataItemResult.ok ? dataItemResult.itemId : undefined;
+      const signedBytes = Uint8Array.from(
+        atob(signedDataItem.replace(/-/g, "+").replace(/_/g, "/")),
+        (c) => c.charCodeAt(0)
+      );
+      void (async () => {
+        try {
+          const privateKey = await loadArweavePrivateKey();
+          const result = await bundleAndPublish(signedBytes, arweave, privateKey);
+          if ("bundleTxId" in result) {
+            await postCallback(uploadId, itemId, result.bundleTxId, new Date().toISOString());
+            console.log("[publish] publish ok");
+            console.log("[publish] callback sent");
+          } else {
+            await putStatus(uploadId, "failed", "publish_failed");
+            console.log("[publish] publish failed");
+          }
+        } catch (e) {
+          await putStatus(uploadId, "failed", "publish_failed");
+          console.log("[publish] publish failed");
+        }
+      })();
+      return new Response(
+        JSON.stringify({ ack: true, status: "queued_for_publish" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Upload file endpoint

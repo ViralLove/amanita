@@ -8,6 +8,6 @@
   },
   "compilerOptions": {
     "allowJs": true,
-    "lib": ["deno.window"]
+    "lib": ["deno.ns", "dom", "deno.window"]
   }
 } 
