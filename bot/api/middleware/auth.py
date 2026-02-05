@@ -189,7 +189,8 @@ class HMACMiddleware(BaseHTTPMiddleware):
             "/redoc",
             "/openapi.json"
         }
-        return path in skip_paths
+        skip_prefixes = ("/activities", "/reference", "/v1/uploads")
+        return path in skip_paths or any(path.startswith(p) for p in skip_prefixes)
     
     def _extract_auth_headers(self, request: Request) -> Dict[str, str]:
         """Извлекает заголовки аутентификации из запроса"""

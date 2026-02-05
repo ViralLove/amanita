@@ -265,12 +265,15 @@ def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Opti
             "message": "Authentication successful"
         }
     
-    # Подключаем роутеры
-    from api.routes import api_keys, products, media, description
+    # Подключаем роутеры (8.1: activities, reference — Activities API mocks + Reference Data)
+    from api.routes import api_keys, products, media, description, activities, reference, uploads
     app.include_router(api_keys.router)
     app.include_router(products.router)
     app.include_router(media.router)
     app.include_router(description.router)
+    app.include_router(activities.router)
+    app.include_router(reference.router)
+    app.include_router(uploads.router)
     
     logger.info("FastAPI приложение создано с базовой конфигурацией", extra={
         "docs_url": "/docs",
