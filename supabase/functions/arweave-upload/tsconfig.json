@@ -9,5 +9,5 @@
     "allowImportingTsExtensions": true,
     "types": []
   },
-  "include": ["**/*.ts", "deno_shim.d.ts", "deno_global.d.ts"]
+  "include": ["**/*.ts", "deno_shim.d.ts", "deno_global.d.ts","npm-arweave.d.ts"]
 }

@@ -5,6 +5,11 @@
 
 let cachedPublicKey: CryptoKey | null = null;
 
+/** Сброс кэша публичного ключа (для тестов при смене UPLOAD_TOKEN_JWT_PUBLIC_KEY). */
+export function clearPublicKeyCache(): void {
+  cachedPublicKey = null;
+}
+
 async function getPublicKey(): Promise<CryptoKey | null> {
   if (cachedPublicKey) return cachedPublicKey;
   const raw = Deno.env.get("UPLOAD_TOKEN_JWT_PUBLIC_KEY");

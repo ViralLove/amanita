@@ -1,6 +1,7 @@
 /// <reference path="./deno_shim.d.ts" />
+/// <reference path="./npm-arweave.d.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import Arweave from "arweave"
+import Arweave from "npm:arweave@1.15.7"
 import { signTransaction } from "./arweave/compatible.ts"
 import { verifyUploadToken } from "./publish/validate-token.ts"
 import { putStatus, postCallback } from "./publish/backend-calls.ts"
@@ -151,8 +152,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 
-// Основной обработчик
-serve(async (req) => {
+/** Обработчик запросов (экспорт для тестов). */
+export async function handler(req: Request): Promise<Response> {
   // Обработка CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -339,4 +340,8 @@ serve(async (req) => {
       }
     )
   }
-}) 
+}
+
+if (!Deno.env.get("SUPABASE_TEST")) {
+  serve(handler)
+}

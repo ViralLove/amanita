@@ -4,7 +4,8 @@
   },
   "tasks": {
     "dev": "deno run --allow-net --allow-env --allow-read index.ts",
-    "test": "deno test --allow-env --allow-read --no-check index.test.ts"
+    "test": "deno test --allow-env --allow-read --no-check index.test.ts",
+    "test:all": "SUPABASE_TEST=1 deno test tests/ --allow-env"
   },
   "compilerOptions": {
     "allowJs": true,
