@@ -119,6 +119,35 @@ supabase secrets set EDGE_TO_BACKEND_SECRET="your-production-secret"
 supabase secrets list
 ```
 
+### 3.4 Уточнения: BACKEND_URL и UPLOAD_TOKEN_JWT_PUBLIC_KEY
+
+**BACKEND_URL — это корень сервера, без пути и без версии.**
+
+В коде Edge к `BACKEND_URL` дописывается путь:  
+`PUT ${BACKEND_URL}/v1/uploads/${uploadId}/status` и `POST ${BACKEND_URL}/v1/uploads/callback`.  
+То есть в переменную задаётся только **схема + хост + порт**:
+
+- Локально (bot слушает на 8000): `BACKEND_URL=http://localhost:8000` или `http://127.0.0.1:8000`
+- Не нужно: `http://localhost:8000/v1` — путь `/v1/uploads/...` добавляется в коде
+
+**UPLOAD_TOKEN_JWT_PUBLIC_KEY — публичный ключ RSA (PEM или JWK) для проверки JWT.**
+
+Edge **только проверяет** подпись токена этим ключом. Токен должен быть **подписан** соответствующим **приватным** ключом (обычно на Backend при выдаче токена). Сейчас в bot есть только моки PUT status и POST callback; эндпоинта «prepare», который выдаёт такой JWT, ещё нет. Чтобы тестировать POST /edge/v1/publish:
+
+1. **Сгенерировать RSA-пару** (например, 2048 bit) и сохранить приватный ключ в безопасном месте.
+2. **Публичный ключ** прописать в Edge: в `supabase/.env` (или в корневом `.env` при `supabase functions serve --env-file .env`) как `UPLOAD_TOKEN_JWT_PUBLIC_KEY` — в формате PEM или одной строкой JWK (см. [arweave-upload-security.md](./arweave-upload-security.md)).
+3. **Тестовый JWT** подписывать **приватным** ключом: payload должен содержать `exp` (unix timestamp), `upload_id` (UUID), `max_bytes` (число). Алгоритм подписи — RS256. Такой токен можно собрать скриптом (Python/Node) или позже получать с Backend, когда появится prepare.
+
+Пример генерации ключа (OpenSSL, публичный ключ в PEM для вставки в .env):
+
+```bash
+openssl genrsa -out private_upload_jwt.pem 2048
+openssl rsa -in private_upload_jwt.pem -pubout -out public_upload_jwt.pem
+# Содержимое public_upload_jwt.pem (включая -----BEGIN/END-----) — в UPLOAD_TOKEN_JWT_PUBLIC_KEY
+```
+
+Приватный ключ не класть в Edge; использовать только для подписи токенов (локально в скрипте или на Backend после реализации prepare).
+
 ---
 
 ## 4. Локальный запуск Edge Function
