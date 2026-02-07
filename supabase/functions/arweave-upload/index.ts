@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import Arweave from "npm:arweave@1.15.7"
 import { signTransaction } from "./arweave/compatible.ts"
 import { verifyUploadToken } from "./publish/validate-token.ts"
-import { putStatus, postCallback } from "./publish/backend-calls.ts"
+import { putStatus, postCallback, normalizeMockStatus } from "./publish/backend-calls.ts"
 import { validateDataItem } from "./publish/validate-data-item.ts"
 import { bundleAndPublish } from "./publish/bundle-publish.ts"
 
@@ -223,10 +223,25 @@ export async function handler(req: Request): Promise<Response> {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      const mockEnabled = (() => {
+        const v = Deno.env.get("BACKEND_USE_MOCK");
+        return v === "true" || v === "1" || (typeof v === "string" && v.toLowerCase() === "true");
+      })();
+      const allowRequestOverride = mockEnabled && (
+        Deno.env.get("BACKEND_MOCK_ALLOW_REQUEST_OVERRIDE") === "true" ||
+        req.headers.get("X-Backend-Mock-Secret") === Deno.env.get("BACKEND_MOCK_TEST_SECRET")
+      );
+      const requestMockOverride: { putStatus?: number; callback?: number } = {};
+      if (allowRequestOverride) {
+        const putHeader = req.headers.get("X-Backend-Mock-Put-Status");
+        const cbHeader = req.headers.get("X-Backend-Mock-Callback");
+        if (putHeader !== null && putHeader !== "") requestMockOverride.putStatus = normalizeMockStatus(putHeader);
+        if (cbHeader !== null && cbHeader !== "") requestMockOverride.callback = normalizeMockStatus(cbHeader);
+      }
       const tokenResult = await verifyUploadToken(uploadToken, uploadId, payloadSize);
       if (!tokenResult.ok) {
         console.log("[publish] token invalid");
-        await putStatus(uploadId, "failed", "token_invalid");
+        await putStatus(uploadId, "failed", "token_invalid", requestMockOverride.putStatus);
         return new Response(
           JSON.stringify({ code: "token_invalid", message: "Invalid or expired token" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -236,14 +251,14 @@ export async function handler(req: Request): Promise<Response> {
       const dataItemResult = await validateDataItem(signedDataItem, uploadId);
       if (!dataItemResult.ok) {
         console.log("[publish] data item invalid");
-        await putStatus(uploadId, "failed", "signature_invalid");
+        await putStatus(uploadId, "failed", "signature_invalid", requestMockOverride.putStatus);
         return new Response(
           JSON.stringify({ code: "signature_invalid", message: "Invalid Data Item or Upload-Id" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       console.log("[publish] data item ok");
-      await putStatus(uploadId, "queued_for_publish");
+      await putStatus(uploadId, "queued_for_publish", undefined, requestMockOverride.putStatus);
       console.log("[publish] status updated");
       const itemId = dataItemResult.ok ? dataItemResult.itemId : undefined;
       const signedBytes = Uint8Array.from(
@@ -255,15 +270,15 @@ export async function handler(req: Request): Promise<Response> {
           const privateKey = await loadArweavePrivateKey();
           const result = await bundleAndPublish(signedBytes, arweave, privateKey);
           if ("bundleTxId" in result) {
-            await postCallback(uploadId, itemId, result.bundleTxId, new Date().toISOString());
+            await postCallback(uploadId, itemId, result.bundleTxId, new Date().toISOString(), requestMockOverride.callback);
             console.log("[publish] publish ok");
             console.log("[publish] callback sent");
           } else {
-            await putStatus(uploadId, "failed", "publish_failed");
+            await putStatus(uploadId, "failed", "publish_failed", requestMockOverride.putStatus);
             console.log("[publish] publish failed");
           }
         } catch (e) {
-          await putStatus(uploadId, "failed", "publish_failed");
+          await putStatus(uploadId, "failed", "publish_failed", requestMockOverride.putStatus);
           console.log("[publish] publish failed");
         }
       })();
@@ -342,6 +357,9 @@ export async function handler(req: Request): Promise<Response> {
   }
 }
 
-if (!Deno.env.get("SUPABASE_TEST")) {
-  serve(handler)
+// Запуск HTTP-сервера только при прямом запуске файла (deno run / supabase functions serve).
+// При импорте из тестов (deno test) index не является entry point — serve не вызывается.
+const isMain = (import.meta as { main?: boolean }).main;
+if (isMain && !Deno.env.get("SUPABASE_TEST")) {
+  serve(handler);
 }
