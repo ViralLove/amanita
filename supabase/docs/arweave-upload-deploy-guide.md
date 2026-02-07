@@ -148,6 +148,45 @@ openssl rsa -in private_upload_jwt.pem -pubout -out public_upload_jwt.pem
 
 Приватный ключ не класть в Edge; использовать только для подписи токенов (локально в скрипте или на Backend после реализации prepare).
 
+### 3.5 Режим мока Backend
+
+Когда Backend недоступен или нужны тесты без реальных вызовов PUT status / POST callback, можно включить **режим мока**:
+
+1. **Включение мока** — в env (локально в `.env`, в облаке — Secrets):
+   - `BACKEND_USE_MOCK=true` — вызовы к Backend не выполняются; симулируется ответ.
+   - `BACKEND_MOCK_PUT_STATUS` и `BACKEND_MOCK_CALLBACK` — коды ответа 200, 404 или 409 (по умолчанию 200).
+
+2. **Переключение на лету** — чтобы в одном деплое проверять разные сценарии (успех / 404 / 409) без смены env, можно задавать симулированный код **заголовками запроса**. Функция учитывает эти заголовки только если «переопределение» разрешено одним из двух способов:
+
+   **Вариант А: разрешить всем запросам**  
+   Задайте в Secrets: `BACKEND_MOCK_ALLOW_REQUEST_OVERRIDE=true`. Тогда любой вызов может передать заголовки `X-Backend-Mock-Put-Status` и/или `X-Backend-Mock-Callback` (значения 200, 404, 409), и они будут применены к этому запросу. Секрет не нужен.
+
+   **Вариант Б: разрешить только тем, кто знает секрет**  
+   Задайте в Secrets строку, которую знаете только вы (или ваш тестовый скрипт), например:  
+   `BACKEND_MOCK_TEST_SECRET=my-staging-secret-xyz`  
+   Эту строку **не генерирует** система — вы её **придумываете** и один раз прописываете в Supabase Secrets (или в `.env` при локальном serve). В каждом запросе, где хотите переопределить мок, добавляйте заголовок:  
+   `X-Backend-Mock-Secret: my-staging-secret-xyz`  
+   (то же значение, что и в `BACKEND_MOCK_TEST_SECRET`). Если значение совпало — заголовки `X-Backend-Mock-Put-Status` и `X-Backend-Mock-Callback` для этого запроса учитываются. Если секрет не передан или не совпал — переопределение по заголовкам игнорируется.
+
+   Итого по секрету: вы **создаёте** его сами (любая строка), **храните** в env/Secrets как `BACKEND_MOCK_TEST_SECRET`, **отправляете** ту же строку в заголовке `X-Backend-Mock-Secret` при вызове функции (curl, Postman, скрипт).
+
+Пример curl к задеплоенной функции (переопределение через секрет):
+
+```bash
+# В Supabase Secrets задано: BACKEND_MOCK_TEST_SECRET=my-test-secret
+# В запросе передаём тот же секрет и нужный код мока:
+curl -X POST "https://YOUR_PROJECT_REF.supabase.co/functions/v1/arweave-upload" \
+  -H "Authorization: Bearer YOUR_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -H "X-Backend-Mock-Secret: my-test-secret" \
+  -H "X-Backend-Mock-Put-Status: 409" \
+  -d '{"upload_token":"…","upload_id":"…","signed_data_item":"…","payload_size":0}'
+```
+
+Если включён `BACKEND_MOCK_ALLOW_REQUEST_OVERRIDE=true`, заголовок `X-Backend-Mock-Secret` не обязателен — достаточно `X-Backend-Mock-Put-Status` и/или `X-Backend-Mock-Callback`.
+
+Подробнее: [arweave-upload-publish-api.md](./arweave-upload-publish-api.md) (раздел 5 и 5.1).
+
 ---
 
 ## 4. Локальный запуск Edge Function

@@ -73,8 +73,33 @@ Edge вызывает Backend с заголовком `Authorization: Bearer ${E
 | BACKEND_URL | URL Backend API (без завершающего слеша) |
 | EDGE_TO_BACKEND_SECRET | Секрет для заголовка Authorization при вызовах Backend |
 | ARWEAVE_PRIVATE_KEY_FILE | Путь к JSON-файлу с JWK приватного ключа Arweave (подпись bundle tx) |
+| BACKEND_USE_MOCK | При `true` или `1` вызовы к Backend (PUT status, POST callback) не выполняются; симулируется ответ по env или per-request заголовкам |
+| BACKEND_MOCK_PUT_STATUS | Код ответа для мока PUT status: 200, 404 или 409 (по умолчанию 200) |
+| BACKEND_MOCK_CALLBACK | Код ответа для мока POST callback: 200, 404 или 409 (по умолчанию 200) |
+| BACKEND_MOCK_ALLOW_REQUEST_OVERRIDE | При `true` разрешает переопределять код мока по запросу через заголовки (см. ниже) |
+| BACKEND_MOCK_TEST_SECRET | Секрет для заголовка X-Backend-Mock-Secret: при совпадении с этим значением заголовки переопределения учитываются даже без BACKEND_MOCK_ALLOW_REQUEST_OVERRIDE |
 
 Локально: env; в Supabase: Secrets.
+
+### 5.1 Переопределение мока по запросу (заголовки)
+
+Если включён режим мока (`BACKEND_USE_MOCK`) и разрешён override (`BACKEND_MOCK_ALLOW_REQUEST_OVERRIDE=true` **или** заголовок запроса `X-Backend-Mock-Secret` совпадает с `BACKEND_MOCK_TEST_SECRET`), клиент может задать симулированный код ответа для текущего запроса:
+
+| Заголовок | Описание | Допустимые значения |
+|-----------|----------|---------------------|
+| X-Backend-Mock-Put-Status | Код ответа для симуляции PUT /v1/uploads/…/status | 200, 404, 409 |
+| X-Backend-Mock-Callback | Код ответа для симуляции POST /v1/uploads/callback | 200, 404, 409 |
+| X-Backend-Mock-Secret | Секрет для включения учёта заголовков переопределения (альтернатива BACKEND_MOCK_ALLOW_REQUEST_OVERRIDE) | значение BACKEND_MOCK_TEST_SECRET |
+
+Пример (curl к задеплоенной функции, тест с симуляцией 409 на putStatus):
+
+```bash
+curl -X POST "https://<project>.supabase.co/functions/v1/arweave-upload" \
+  -H "Authorization: Bearer <anon-key>" \
+  -H "Content-Type: application/json" \
+  -H "X-Backend-Mock-Put-Status: 409" \
+  -d '{"upload_token":"…","upload_id":"…","signed_data_item":"…","payload_size":0}'
+```
 
 ---
 
