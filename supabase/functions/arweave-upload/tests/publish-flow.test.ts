@@ -1,7 +1,7 @@
 /**
  * Сводные тесты потока POST /edge/v1/publish (Phase 4.1).
- * Запуск: SUPABASE_TEST=1 deno test tests/publish-flow.test.ts --allow-env
- * (SUPABASE_TEST=1 отключает serve() при загрузке index.)
+ * Запуск: deno test tests/publish-flow.test.ts --allow-env
+ * (index.ts вызывает serve() только при import.meta.main, при импорте из тестов serve не запускается.)
  */
 
 import { assertEquals } from "https://deno.land/std@0.168.0/testing/asserts.ts";
