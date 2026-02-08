@@ -1,11 +1,14 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
+import asyncio
 import logging
 import sys
 import os
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
 from logging.handlers import RotatingFileHandler
@@ -36,6 +39,38 @@ logger = setup_logging(
 # Глобальное время запуска приложения
 APP_START_TIME = datetime.now()
 
+
+@asynccontextmanager
+async def _upload_finalizer_lifespan(app: FastAPI):
+    """Запуск Finalizer job (published → finalized) в фоне; остановка при shutdown."""
+    interval_sec = int(os.environ.get("UPLOAD_FINALIZER_INTERVAL_SEC", "300"))
+    _executor = ThreadPoolExecutor(max_workers=1)
+
+    async def loop():
+        from services.core.supabase import SupabaseService
+        from services.upload.finalizer import run_finalizer
+        db = SupabaseService()
+        while True:
+            try:
+                loop_obj = asyncio.get_event_loop()
+                await loop_obj.run_in_executor(_executor, lambda: run_finalizer(db))
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning("Upload finalizer run error: %s", e, exc_info=True)
+            await asyncio.sleep(interval_sec)
+
+    task = asyncio.create_task(loop())
+    logger.info("Upload finalizer task started (interval=%ss)", interval_sec)
+    yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    _executor.shutdown(wait=False)
+
+
 def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Optional[str] = None) -> FastAPI:
     """
     Создание FastAPI приложения с базовой конфигурацией
@@ -59,8 +94,8 @@ def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Opti
     fastapi_config = APIConfig.get_fastapi_config()
     cors_config = APIConfig.get_cors_config()
     
-    # Создание FastAPI приложения
-    app = FastAPI(**fastapi_config)
+    # Создание FastAPI приложения (lifespan — Finalizer job для uploads)
+    app = FastAPI(lifespan=_upload_finalizer_lifespan, **fastapi_config)
     
     # Настройка CORS для веб-клиентов
     app.add_middleware(

@@ -1,6 +1,7 @@
 from supabase import create_client, Client
-from typing import Optional, List
+from typing import Any, Dict, List, Optional
 import os
+from datetime import datetime, timezone
 from model.product import Product
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -121,6 +122,86 @@ class SupabaseService:
                     "form": p.form
                 }).execute()
 
+
+    # --- Uploads (Arweave data upload flow, task 3.2) ---
+
+    def insert_upload(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        """Insert a row into uploads table. Returns the inserted row (with upload_id if generated)."""
+        response = self.client.table("uploads").insert(row).execute()
+        return response.data[0] if response.data else {}
+
+    def get_upload_by_id(self, upload_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch one upload by upload_id."""
+        response = self.client.table("uploads").select("*").eq("upload_id", upload_id).limit(1).execute()
+        return response.data[0] if response.data else None
+
+    def update_upload_status(
+        self,
+        upload_id: str,
+        status: str,
+        failure_reason: Optional[str] = None,
+        failure_code: Optional[str] = None,
+    ) -> bool:
+        """Update status (and optional failure_reason, failure_code) for an upload."""
+        payload: Dict[str, Any] = {
+            "status": status,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if failure_reason is not None:
+            payload["failure_reason"] = failure_reason
+        if failure_code is not None:
+            payload["failure_code"] = failure_code
+        response = self.client.table("uploads").update(payload).eq("upload_id", upload_id).execute()
+        return bool(response.data)
+
+    def update_upload_callback(
+        self,
+        upload_id: str,
+        item_id: str,
+        bundle_tx_id: str,
+        owner_address: Optional[str] = None,
+    ) -> bool:
+        """Set published state: status=published, item_id, bundle_tx_id, owner_address."""
+        payload: Dict[str, Any] = {
+            "status": "published",
+            "item_id": item_id,
+            "bundle_tx_id": bundle_tx_id,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if owner_address is not None:
+            payload["owner_address"] = owner_address
+        response = self.client.table("uploads").update(payload).eq("upload_id", upload_id).execute()
+        return bool(response.data)
+
+    def list_uploads_by_status(self, status: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """List uploads with given status (e.g. for finalizer: status=published)."""
+        response = self.client.table("uploads").select("*").eq("status", status).limit(limit).execute()
+        return response.data or []
+
+    def count_uploads_by_user_since(self, user_id: str, since_ts: str) -> int:
+        """Count uploads for user with created_at >= since_ts (for rate limit per minute)."""
+        response = (
+            self.client.table("uploads")
+            .select("upload_id")
+            .eq("user_id", user_id)
+            .gte("created_at", since_ts)
+            .execute()
+        )
+        return len(response.data) if response.data else 0
+
+    def sum_payload_size_by_user_since(self, user_id: str, since_ts: str) -> int:
+        """Sum payload_size for user with created_at >= since_ts (for rate limit bytes per day)."""
+        response = (
+            self.client.table("uploads")
+            .select("payload_size")
+            .eq("user_id", user_id)
+            .gte("created_at", since_ts)
+            .execute()
+        )
+        total = 0
+        for row in response.data or []:
+            total += row.get("payload_size") or 0
+        return total
 
     # TODO:
     # - create_product()

@@ -1,5 +1,5 @@
 """
-Uploads API — мок-эндпоинты для тестирования Edge Function arweave-upload.
+Uploads API — приём статуса и callback от Edge Function arweave-upload (task 3.2).
 
 PUT /v1/uploads/{upload_id}/status — приём статуса от Edge (queued_for_publish / failed).
 POST /v1/uploads/callback — приём callback после публикации в Arweave.
@@ -15,6 +15,9 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, model_validator
+
+from api.dependencies import get_upload_service
+from services.upload.upload_service import UploadConflictError, UploadNotFoundError
 
 router = APIRouter(prefix="/v1", tags=["uploads"])
 
@@ -71,8 +74,19 @@ async def put_upload_status(
     upload_id: str,
     body: PutStatusBody,
     _: None = Depends(verify_edge_bearer),
+    upload_svc=Depends(get_upload_service),
 ):
-    """Мок: приём статуса от Edge (queued_for_publish или failed с failure_code)."""
+    """Приём статуса от Edge (queued_for_publish или failed с failure_code). Обновляет запись в uploads."""
+    try:
+        upload_svc.update_status(
+            upload_id,
+            body.status,
+            failure_code=body.failure_code,
+        )
+    except UploadNotFoundError:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    except UploadConflictError:
+        raise HTTPException(status_code=409, detail="Invalid status transition")
     return JSONResponse(status_code=200, content={"ok": True})
 
 
@@ -80,6 +94,18 @@ async def put_upload_status(
 async def post_upload_callback(
     body: CallbackBody,
     _: None = Depends(verify_edge_bearer),
+    upload_svc=Depends(get_upload_service),
 ):
-    """Мок: приём callback после успешной публикации в Arweave."""
+    """Приём callback после успешной публикации в Arweave. Обновляет upload (published, bundle_tx_id, item_id)."""
+    try:
+        upload_svc.handle_callback(
+            body.upload_id,
+            item_id=body.item_id,
+            bundle_tx_id=body.bundle_tx_id,
+            owner_address=None,
+        )
+    except UploadNotFoundError:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    except UploadConflictError:
+        raise HTTPException(status_code=409, detail="Invalid status for callback")
     return JSONResponse(status_code=200, content={"ok": True})
