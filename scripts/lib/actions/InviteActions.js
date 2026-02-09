@@ -13,9 +13,11 @@
  * Layer 4A: Invite Management - Foundation for spiral social structure
  */
 
+const { ethers } = require('hardhat');
 const logger = require('../utils/Logger');
 const fs = require('fs');
 const path = require('path');
+const { executeWithRateLimitRetry } = require('../utils/RateLimitHelpers');
 
 class InviteActions {
   constructor(contractManager, ethersUtils, config, accessControlActions, catalogActions = null) {
@@ -368,8 +370,18 @@ class InviteActions {
       const spiralEngineAddress = await spiralEngine.getAddress();
       console.log("✅ SpiralEngine загружен:", spiralEngineAddress);
       
-      // Проверка состояния до минтинга
-      const totalInvitesBefore = await spiralEngine.totalInvitesMinted();
+      // Проверка состояния до минтинга (with retry mechanism for RPC rate limits)
+      const totalInvitesBefore = await executeWithRateLimitRetry(
+        () => spiralEngine.totalInvitesMinted(),
+        {
+          maxRetries: 3,
+          initialDelayMs: 10000,
+          rpcManager: this.contractManager?.rpcManager,
+          ethersUtils: this.ethersUtils,
+          contractManager: this.contractManager,
+          operationName: 'totalInvitesMinted (before minting)'
+        }
+      );
       console.log(`📊 Текущее количество инвайтов: ${totalInvitesBefore}`);
       
       // ШАГ 2/4: Проверка прав деплоера (delegation → AccessControlActions)
@@ -381,9 +393,19 @@ class InviteActions {
       console.log("\n🎲 Шаг 3/4: Генерация и минтинг инвайтов...");
       const invites = await this.generateAndMintInvites(spiralEngine);
       
-      // ШАГ 4/4: Финальная проверка
+      // ШАГ 4/4: Финальная проверка (with retry mechanism for RPC rate limits)
       console.log("\n📊 Шаг 4/4: Финальная проверка...");
-      const totalInvitesAfter = await spiralEngine.totalInvitesMinted();
+      const totalInvitesAfter = await executeWithRateLimitRetry(
+        () => spiralEngine.totalInvitesMinted(),
+        {
+          maxRetries: 3,
+          initialDelayMs: 10000,
+          rpcManager: this.contractManager?.rpcManager,
+          ethersUtils: this.ethersUtils,
+          contractManager: this.contractManager,
+          operationName: 'totalInvitesMinted (after minting)'
+        }
+      );
       console.log(`✅ Инвайтов после генерации: ${totalInvitesAfter}`);
       console.log(`✅ Создано новых инвайтов: ${totalInvitesAfter - totalInvitesBefore}`);
       
@@ -605,40 +627,47 @@ class InviteActions {
   async generateAndMintInvites(spiralEngine) {
     const signer = this.ethersUtils.getSigner();
     const deployerAddress = await signer.getAddress();
-    
+
     console.log(`🔷 Минтим инвайты от адреса: ${deployerAddress}`);
-    
+
     // Генерация 12 инвайтов
-    console.log("\n🔷 Генерируем 12 инвайтов для деплоера...");
+    console.log('\n🔷 Генерируем 12 инвайтов для деплоера...');
     const invites = this.generateAmanitaInviteCodes(12);
-    
-    // Минтинг инвайтов
-    console.log("\n🔷 Минтим 1 батчей по 12 инвайтов...");
-    console.log("\nМинтим батч 1/1...");
-    
-    const spiralEngineWithSigner = spiralEngine.connect(signer);
-    
-    // Get initial nonce for manual management (prevents race conditions in automining)
-    let nonce = await signer.getNonce();
-    logger.info(`Starting nonce: ${nonce}`);
-    
-    for (let j = 0; j < invites.length; j++) {
-      const invite = invites[j];
-      const expiry = 0; // Бессрочные инвайты
-      
-      const tx = await spiralEngineWithSigner.mintInvite(invite, expiry, {
-        nonce: nonce++ // Manual nonce increment
-      });
-      await tx.wait();
-      
-      console.log(`✅ Заминчен инвайт ${j + 1}/12: ${invite}`);
+
+    // Один батч: mintInviteBatch(inviteCodes, expiries) — одна tx вместо 12 (RPC-надежность)
+    console.log('\n🔷 Минтим 1 батч по 12 инвайтов (mintInviteBatch)...');
+
+    const chainId = Number(await this.ethersUtils.getNetworkId());
+    const txOverridesPolygon = chainId === 137 ? { gasPrice: ethers.parseUnits('700', 'gwei') } : {};
+
+    const inviteCodes = invites;
+    const expiries = Array(invites.length).fill(0);
+
+    const doBatchMint = () => {
+      const currentSigner = this.ethersUtils.getSigner();
+      const spiralEngineWithSigner = spiralEngine.connect(currentSigner);
+      return spiralEngineWithSigner.mintInviteBatch(inviteCodes, expiries, txOverridesPolygon);
+    };
+
+    const tx = await executeWithRateLimitRetry(doBatchMint, {
+      maxRetries: 3,
+      initialDelayMs: 10000,
+      rpcManager: this.contractManager?.rpcManager,
+      ethersUtils: this.ethersUtils,
+      contractManager: this.contractManager,
+      operationName: 'mintInviteBatch (12 invites)'
+    });
+
+    logger.info(`[TX] Batch transaction sent: ${tx.hash}`);
+    console.log(`[TX] Check on polygonscan: https://polygonscan.com/tx/${tx.hash}`);
+
+    await tx.wait();
+
+    for (let i = 0; i < invites.length; i++) {
+      console.log(`✅ Заминчен инвайт ${i + 1}/12: ${invites[i]}`);
     }
-    
-    console.log("✅ Батч 1 успешно заминчен");
-    
-    // Сохранение в файл
+    console.log('✅ Батч 1 успешно заминчен');
     await this.saveInvitesToFile(invites);
-    
     return invites;
   }
 
@@ -673,13 +702,18 @@ class InviteActions {
     // Get initial nonce for manual management (prevents race conditions in automining)
     let nonce = await sellerSigner.getNonce();
     logger.info(`Starting seller nonce: ${nonce}`);
+
+    // Polygon mainnet (137): fixed 700 gwei above typical base fee to avoid Gas Station API errors
+    const chainId = Number(await this.ethersUtils.getNetworkId());
+    const txOverridesPolygon = chainId === 137 ? { gasPrice: ethers.parseUnits('700', 'gwei') } : {};
     
     for (let i = 0; i < invites.length; i++) {
       const invite = invites[i];
       const expiry = 0; // Perpetual invites
       
       const tx = await spiralEngineWithSigner.mintInvite(invite, expiry, {
-        nonce: nonce++ // Manual nonce increment
+        nonce: nonce++,
+        ...txOverridesPolygon
       });
       await tx.wait();
       
