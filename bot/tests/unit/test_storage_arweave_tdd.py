@@ -284,5 +284,38 @@ class TestArWeaveUploaderValidation:
         assert arweave_uploader.is_valid_identifier("123") == False  # Слишком короткий
 
 
+class TestArWeaveUploaderIsCidAvailable:
+    """Tests for is_cid_available (task 3.3, DP-4): network availability check."""
+
+    @pytest.fixture
+    def arweave_uploader(self):
+        return ArWeaveUploader()
+
+    def test_is_cid_available_200(self, arweave_uploader):
+        with patch("requests.head") as mock_head:
+            mock_head.return_value.status_code = 200
+            assert arweave_uploader.is_cid_available("A" * 43) is True
+            mock_head.assert_called_once()
+
+    def test_is_cid_available_404(self, arweave_uploader):
+        with patch("requests.head") as mock_head:
+            mock_head.return_value.status_code = 404
+            assert arweave_uploader.is_cid_available("A" * 43) is False
+
+    def test_is_cid_available_timeout(self, arweave_uploader):
+        with patch("requests.head") as mock_head:
+            mock_head.side_effect = requests.exceptions.Timeout()
+            assert arweave_uploader.is_cid_available("A" * 43) is False
+
+    def test_is_cid_available_405_fallback_to_get(self, arweave_uploader):
+        with patch("requests.head") as mock_head:
+            with patch("requests.get") as mock_get:
+                mock_head.return_value.status_code = 405
+                mock_get.return_value.status_code = 200
+                mock_get.return_value.close = lambda: None
+                assert arweave_uploader.is_cid_available("A" * 43) is True
+                mock_get.assert_called_once()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
