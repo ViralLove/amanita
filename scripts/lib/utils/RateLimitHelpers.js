@@ -88,16 +88,27 @@ function isEndpointSwitchError(error) {
           nestedMessage.includes('call rate limit exhausted')) {
         nestedRateLimit = true;
       }
+      // 1rpc.io and similar: "Failed to validate quota usage" (-32603) — treat like rate limit, switch endpoint
+      if (nestedCode === -32603 ||
+          nestedMessage.includes('quota') ||
+          nestedMessage.includes('Failed to validate quota usage')) {
+        nestedRateLimit = true;
+      }
     }
   }
   
-  // Check for rate limit patterns
-  const isRateLimit = errorMessage.includes('rate limit') || 
+  // Check for rate limit patterns (including RPC quota, e.g. 1rpc.io "Failed to validate quota usage")
+  // Note: -32603 is also handled in nested block above; here we only need message/string checks
+  const isQuotaError = errorMessage.includes('quota') || errorString.includes('quota') ||
+                      errorMessage.includes('Failed to validate quota usage') ||
+                      errorString.includes('Failed to validate quota usage');
+  const isRateLimit = errorMessage.includes('rate limit') ||
                      errorMessage.includes('Too many requests') ||
                      errorMessage.includes('call rate limit exhausted') ||
                      errorString.includes('rate limit') ||
                      errorString.includes('Too many requests') ||
                      errorString.includes('call rate limit exhausted') ||
+                     isQuotaError ||
                      nestedRateLimit;
   
   // Check for authentication/authorization errors (endpoints requiring API keys)
@@ -136,6 +147,7 @@ function isEndpointSwitchError(error) {
   // Check error code
   const errorCode = error.code || error.error?.code;
   const isRateLimitCode = errorCode === -32090 || errorCode === 'RATE_LIMIT' || errorCode === 'TOO_MANY_REQUESTS';
+  const isQuotaCode = errorCode === -32603; // e.g. 1rpc.io "Failed to validate quota usage"
   const isAuthCode = errorCode === -32000 || errorCode === 'UNAUTHORIZED' || errorCode === 'AUTH_ERROR';
   const isGasStationCode = errorCode === -32062 || errorCode === 'SERVER_ERROR';
   
@@ -199,7 +211,7 @@ function isEndpointSwitchError(error) {
     logger.debug(`  - isRateLimit: ${isRateLimit}, isAuthError: ${isAuthError}, isHttpError: ${isHttpError}, isGasStationError: ${isGasStationError}`);
     logger.debug(`  - isInvalidJsonError: ${isInvalidJsonError}, isNetworkError: ${isNetworkError}, isReplacementFeeError: ${isReplacementFeeError}, isNonceError: ${isNonceErrorResult}`);
     logger.debug(`  - nestedRateLimit: ${nestedRateLimit}, nestedAuthError: ${nestedAuthError}, nestedNonceError: ${nestedNonceError}`);
-    const requiresSwitch = (isRateLimit || isAuthError || isHttpError || isProviderSwitchError || nestedRateLimit || nestedAuthError || isRateLimitCode || isAuthCode || isInvalidJsonError || isNetworkError) && !isReplacementFeeError && !isNonceErrorResult;
+    const requiresSwitch = (isRateLimit || isAuthError || isHttpError || isProviderSwitchError || nestedRateLimit || nestedAuthError || isRateLimitCode || isQuotaCode || isAuthCode || isInvalidJsonError || isNetworkError) && !isReplacementFeeError && !isNonceErrorResult;
     logger.debug(`  - Requires switch: ${requiresSwitch}`);
     logger.debug(`  - Note: Gas Station errors should use fallback gas price, not switch endpoint`);
     logger.debug(`  - Note: Replacement fee and nonce errors are nonce/gas issues, not endpoint problems`);
@@ -208,9 +220,9 @@ function isEndpointSwitchError(error) {
   // Gas Station errors should NOT trigger endpoint switch (they're external API errors)
   // Replacement fee and nonce errors should NOT trigger endpoint switch (caller should refresh nonce / gas and retry)
   
-  // Endpoint switch is required for: rate limits, auth errors, HTTP errors, invalid JSON responses, network errors
+  // Endpoint switch is required for: rate limits, quota, auth errors, HTTP errors, invalid JSON responses, network errors
   return (isRateLimit || isAuthError || isHttpError || infoAuthError || isProviderSwitchError ||
-          nestedRateLimit || nestedAuthError || isRateLimitCode || isAuthCode ||
+          nestedRateLimit || nestedAuthError || isRateLimitCode || isQuotaCode || isAuthCode ||
           isInvalidJsonError || isNetworkError) && !isReplacementFeeError && !isNonceErrorResult;
 }
 
