@@ -259,3 +259,22 @@ class ArWeaveUploader(BaseStorageProvider):
             logger.error(f"[ArWeave] Неожиданная ошибка для CID {cid}: {e}")
             logger.error(f"[ArWeave] Traceback: {traceback.format_exc()}")
             return None
+
+    def is_cid_available(self, cid: str, timeout: int = 10) -> bool:
+        """
+        Проверка доступности контента по CID по сети (HEAD/GET arweave.net).
+        Для сценариев «контент реально доступен» (task 3.3, DP-4).
+        """
+        try:
+            if cid.startswith("ar://"):
+                cid = cid.replace("ar://", "")
+            url = f"https://arweave.net/{cid}"
+            response = requests.head(url, timeout=timeout, allow_redirects=True)
+            if response.status_code == 405:
+                response = requests.get(url, timeout=timeout, stream=True)
+                response.close()
+            return response.status_code == 200
+        except requests.exceptions.RequestException:
+            return False
+        except Exception:
+            return False

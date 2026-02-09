@@ -93,3 +93,20 @@ def get_upload_service() -> "UploadService":
         from services.upload.upload_service import UploadService
         _upload_service = UploadService(SupabaseService())
     return _upload_service
+
+
+_prepare_resolve_service: Optional["PrepareResolveService"] = None
+
+
+def get_prepare_resolve_service() -> "PrepareResolveService":
+    """FastAPI dependency для PrepareResolveService (prepare for wallet, resolve CID; task 3.3). Singleton."""
+    global _prepare_resolve_service
+    if _prepare_resolve_service is None:
+        from services.core.supabase import SupabaseService
+        from services.upload.upload_service import UploadService
+        from services.upload.storage import PrepareResolveService
+        from services.core.storage.ar_weave import ArWeaveUploader
+        upload_svc = UploadService(SupabaseService())
+        storage_provider = ArWeaveUploader()
+        _prepare_resolve_service = PrepareResolveService(upload_svc, storage_provider)
+    return _prepare_resolve_service

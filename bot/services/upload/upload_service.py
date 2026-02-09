@@ -1,7 +1,22 @@
 """
-Upload flow service: prepare, update_status, handle_callback.
+UploadService: инфраструктурный слой таблицы uploads и контракта Edge → Backend.
 
-Uses Supabase for uploads table; JWT RS256 for upload_token (task 3.2).
+Роль (не путать с PrepareResolveService в storage.py):
+- Этот модуль реализует «движок» таблицы uploads: создание записей (prepared), JWT для
+  upload_token, стейт-машина статусов (prepared → queued_for_publish → published → …),
+  приём обновлений от Edge (PUT status, POST callback).
+- Работает с уже готовыми payload_bytes и user_id; не знает про «черновик», «activity»,
+  «wallet» — только опциональный activity_id как строка для связки записи с сущностью.
+- Не возвращает payload в ответе (контракт: payload не хранить и не отдавать обратно).
+- Не занимается чтением/валидацией данных по CID (Arweave gateway) — это в PrepareResolveService.
+
+Кто использует UploadService:
+- PrepareResolveService (storage.py) — вызывает prepare() и handle_callback() для сценария
+  «подготовка к подписи → callback → CID» и добавляет доменный контракт (payload_bytes в ответе).
+- Роуты uploads (PUT status, POST callback) — вызывают update_status() и handle_callback()
+  при запросах от Edge.
+
+Зависимости: Supabase (таблица uploads), JWT RS256 (upload_token). Task 3.2.
 """
 
 from __future__ import annotations
@@ -22,23 +37,30 @@ logger = logging.getLogger(__name__)
 
 
 class UploadNotFoundError(Exception):
-    """Upload record not found."""
+    """Запись upload с указанным upload_id не найдена в БД."""
     pass
 
 
 class UploadConflictError(Exception):
-    """Invalid state transition."""
+    """Недопустимый переход статуса (например prepared → published без queued_for_publish)."""
     pass
 
 
 class RateLimitExceededError(Exception):
-    """User exceeded upload rate or size limit."""
+    """Превышен лимит загрузок в минуту или байт в день по user_id."""
     pass
 
 
 @dataclass
 class PrepareResult:
-    """Result of prepare(): data for client / draft response."""
+    """
+    Результат prepare(): данные для клиента/Edge после создания записи (prepared).
+
+    Важно: payload_bytes здесь нет — по контракту payload не храним и не возвращаем
+    из этого слоя. Если вызывающему коду (например PrepareResolveService) нужны
+    payload_bytes для отдачи в wallet, он передаёт в prepare() те же bytes и сохраняет
+    их у себя в ответе (PrepareForDraftResult в storage.py).
+    """
     upload_id: str
     upload_token: str
     tags_for_item: List[Dict[str, str]]  # [{"name": "Upload-Id", "value": "..."}, ...]
@@ -59,6 +81,26 @@ def _default_int(name: str, default: int) -> int:
 
 
 class UploadService:
+    """
+    Инфраструктурный сервис: таблица uploads, JWT upload_token, стейт-машина записей.
+
+    Отвечает за:
+    - Создание записи в статусе prepared (prepare), выпуск JWT, теги Data Item, rate limits.
+    - Обновление статуса на queued_for_publish или failed (update_status) — вызывается
+      из роута при PUT от Edge.
+    - Приём callback от Edge: переход в published, сохранение item_id, bundle_tx_id,
+      owner_address (handle_callback) — вызывается из роута POST callback или из
+      PrepareResolveService.resolve_cid_from_callback().
+
+    Не отвечает за:
+    - Преобразование «черновик / метаданные» в payload_bytes (это делает PrepareResolveService).
+    - Возврат payload_bytes клиенту для подписи в wallet (это PrepareResolveService).
+    - Чтение или валидацию данных по CID (Arweave) — это PrepareResolveService + провайдер.
+
+    См. также: storage.PrepareResolveService — фасад доменного сценария «prepare for draft →
+    sign in wallet → callback → CID» и работа с метаданными по CID.
+    """
+
     def __init__(
         self,
         supabase_client: Any,
@@ -101,9 +143,14 @@ class UploadService:
         max_bytes: Optional[int] = None,
     ) -> PrepareResult:
         """
-        Create upload record (prepared), issue JWT, return data for client/Edge.
+        Создать запись upload в статусе prepared, выпустить JWT, вернуть данные для клиента/Edge.
 
-        Rate limits and anchor TTL are applied. Payload is not stored; only hash and size.
+        Вход: уже готовые payload_bytes (этот сервис не знает, откуда они — dict, JSON и т.д.).
+        В БД сохраняются только hash и size; сами bytes не хранятся и не возвращаются в
+        PrepareResult. Rate limits и anchor TTL применяются здесь.
+
+        Вызывается из PrepareResolveService.prepare_upload_for_draft() (который передаёт
+        activity_id=draft_id и затем добавляет payload_bytes в свой ответ для wallet).
         """
         payload_size = len(payload_bytes)
         max_bytes = max_bytes or payload_size
@@ -164,7 +211,7 @@ class UploadService:
         )
 
     def get_upload(self, upload_id: str) -> Optional[UploadRecord]:
-        """Fetch upload by id; returns None if not found."""
+        """Получить запись upload по upload_id; None, если не найдена."""
         row = self._db.get_upload_by_id(upload_id)
         if not row:
             return None
@@ -178,7 +225,10 @@ class UploadService:
         failure_code: Optional[str] = None,
     ) -> None:
         """
-        Transition to queued_for_publish or failed. Raises UploadNotFoundError or UploadConflictError.
+        Перевести запись в queued_for_publish или failed.
+
+        Вызывается из роута PUT /v1/uploads/{id}/status при запросе от Edge (после валидации
+        подписи или при ошибке). Raises UploadNotFoundError, UploadConflictError.
         """
         rec = self.get_upload(upload_id)
         if not rec:
@@ -202,7 +252,14 @@ class UploadService:
         bundle_tx_id: str,
         owner_address: Optional[str] = None,
     ) -> None:
-        """Set status to published and store item_id, bundle_tx_id, owner_address. Raises NotFound/Conflict."""
+        """
+        Перевести запись в published и сохранить item_id, bundle_tx_id, owner_address.
+
+        Вызывается из роута POST /v1/uploads/callback при запросе от Edge (после публикации
+        в Arweave), а также из PrepareResolveService.resolve_cid_from_callback() (который
+        затем возвращает bundle_tx_id как CID вызывающему коду). Raises UploadNotFoundError,
+        UploadConflictError.
+        """
         rec = self.get_upload(upload_id)
         if not rec:
             raise UploadNotFoundError(f"Upload not found: {upload_id}")
