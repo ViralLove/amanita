@@ -16,7 +16,8 @@ from .auth import (
 from .errors import (
     ErrorDetail, ErrorResponse,
     ValidationErrorResponse, AuthenticationErrorResponse, AuthorizationErrorResponse,
-    NotFoundErrorResponse, InternalServerErrorResponse, RateLimitErrorResponse
+    NotFoundErrorResponse, InternalServerErrorResponse, RateLimitErrorResponse,
+    InvalidStateTransitionErrorResponse, NotActivatedErrorResponse, DuplicateDetectedErrorResponse,
 )
 from .health import HealthStatus, ServiceInfo, HealthCheckResponse
 
@@ -36,6 +37,7 @@ __all__ = [
     # Error models
     "ErrorDetail", "ErrorResponse", "ValidationErrorResponse", "AuthenticationErrorResponse",
     "AuthorizationErrorResponse", "NotFoundErrorResponse", "InternalServerErrorResponse", "RateLimitErrorResponse",
+    "InvalidStateTransitionErrorResponse", "NotActivatedErrorResponse", "DuplicateDetectedErrorResponse",
     
     # Health models
     "HealthStatus", "ServiceInfo", "HealthCheckResponse"

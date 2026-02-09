@@ -10,13 +10,15 @@ from .common import RequestId, Timestamp
 
 class ErrorDetail(BaseModel):
     """Детали ошибки"""
-    
+
     field: Optional[str] = Field(None, description="Поле, в котором произошла ошибка")
     message: str = Field(..., description="Сообщение об ошибке")
     value: Optional[Any] = Field(None, description="Значение, которое вызвало ошибку")
     error_code: Optional[str] = Field(None, description="Код ошибки для программной обработки")
     suggestions: Optional[List[str]] = Field(None, description="Предложения по исправлению ошибки")
-    
+    current_state: Optional[str] = Field(None, description="Текущее состояние (для invalid_state_transition)")
+    required_state: Optional[str] = Field(None, description="Ожидаемое состояние (для invalid_state_transition)")
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -62,6 +64,33 @@ class NotFoundErrorResponse(ErrorResponse):
     """Ответ с ошибкой 'не найдено'"""
     error: str = Field("not_found", description="Тип ошибки")
     message: str = Field("Запрашиваемый ресурс не найден", description="Сообщение об ошибке")
+
+
+class InvalidStateTransitionErrorResponse(ErrorResponse):
+    """Ответ при недопустимом переходе состояния (400). Activities API."""
+    error: str = Field("invalid_state_transition", description="Тип ошибки")
+    message: str = Field(
+        "Invalid status transition",
+        description="Человекочитаемое сообщение об ошибке",
+    )
+
+
+class NotActivatedErrorResponse(ErrorResponse):
+    """Ответ при попытке publish без активации аккаунта (403). Activities API."""
+    error: str = Field("not_activated", description="Тип ошибки")
+    message: str = Field(
+        "Account not activated. Activation required to publish activities.",
+        description="Человекочитаемое сообщение об ошибке",
+    )
+
+
+class DuplicateDetectedErrorResponse(ErrorResponse):
+    """Ответ при обнаружении дубликата (409). Activities API."""
+    error: str = Field("duplicate_detected", description="Тип ошибки")
+    message: str = Field(
+        "A similar activity already exists",
+        description="Человекочитаемое сообщение об ошибке",
+    )
 
 
 class InternalServerErrorResponse(ErrorResponse):
