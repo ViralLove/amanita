@@ -53,8 +53,34 @@ async function uploadSimpleFields(context, state, onProgress = null) {
       console.log("✅ [USE_EXISTING_CIDS] Найдены существующие CID:");
       console.log(`   → title.cid: ${hasTitleCID}`);
       console.log(`   → dosage_types.cid: ${hasDosageCID}`);
-      console.log("✅ [USE_EXISTING_CIDS] Используем существующие CID, пропускаем загрузку");
-      return existingSimpleFields;
+      
+      // ✅ FIX (2026-01-03): Проверяем контракт даже при USE_EXISTING_CIDS
+      // CID могут быть в state, но отсутствовать в контракте (например, после перезапуска ноды)
+      console.log("🔍 [USE_EXISTING_CIDS] Проверяем наличие CID в контракте...");
+      const verification = await contractVerification.verifyStepCompletion({
+        state: state.arweave,
+        stepName: 'simple_fields_uploaded',
+        contractCheckFn: () => contractVerification.checkSimpleFieldsInContract(context)
+      });
+      
+      if (verification.isComplete && verification.isConsistent) {
+        console.log("✅ [USE_EXISTING_CIDS] CID присутствуют в контракте");
+        return existingSimpleFields;
+      }
+      
+      if (verification.isComplete && !verification.isConsistent) {
+        console.warn(`⚠️ [USE_EXISTING_CIDS] CID есть в state, но отсутствуют в контракте`);
+        console.warn(`   Отсутствующие поля: ${verification.missingItems.join(', ')}`);
+        console.warn(`   🔧 Восстанавливаем из state в контракт...`);
+        
+        await restoreSimpleFieldsToContract(context, state, verification.missingItems);
+        
+        console.log("✅ [USE_EXISTING_CIDS] CID восстановлены в контракте");
+        return existingSimpleFields;
+      }
+      
+      // Если шаг не выполнен в state, продолжаем обычный flow
+      console.warn(`⚠️ [USE_EXISTING_CIDS] Шаг не отмечен как выполненный в state, продолжаем обычную загрузку`);
     } else {
       const missing = [];
       if (!hasTitleCID) missing.push('title');
@@ -257,8 +283,35 @@ async function uploadComplexFields(context, state, onProgress = null) {
         const langCID = existingComplexFields[lang]?.cid || existingComplexFields[lang];
         console.log(`   → ${lang}.cid: ${langCID?.substring(0, 20)}...`);
       }
-      console.log("✅ [USE_EXISTING_CIDS] Используем существующие CID, пропускаем загрузку");
-      return existingComplexFields;
+      
+      // ✅ FIX (2026-01-03): Проверяем контракт даже при USE_EXISTING_CIDS
+      // CID могут быть в state, но отсутствовать в контракте (например, после перезапуска ноды)
+      console.log("🔍 [USE_EXISTING_CIDS] Проверяем наличие CID в контракте...");
+      const verification = await contractVerification.verifyStepCompletion({
+        state: state.arweave,
+        stepName: 'complex_fields_uploaded',
+        contractCheckFn: () => contractVerification.checkComplexFieldsInContract(context)
+      });
+      
+      if (verification.isComplete && verification.isConsistent) {
+        console.log("✅ [USE_EXISTING_CIDS] CID присутствуют в контракте, используем существующие");
+        return existingComplexFields;
+      }
+      
+      if (verification.isComplete && !verification.isConsistent) {
+        console.warn(`⚠️ [USE_EXISTING_CIDS] CID есть в state, но отсутствуют в контракте`);
+        console.warn(`   Отсутствующие языки: ${verification.missingItems.join(', ')}`);
+        console.warn(`   🔧 Восстанавливаем из state в контракт...`);
+        
+        // Восстанавливаем отсутствующие языки из state в контракт
+        await restoreComplexFieldsToContract(context, state, verification.missingItems);
+        
+        console.log("✅ [USE_EXISTING_CIDS] CID восстановлены в контракте");
+        return existingComplexFields;
+      }
+      
+      // Если шаг не выполнен в state, продолжаем обычный flow
+      console.warn(`⚠️ [USE_EXISTING_CIDS] Шаг не отмечен как выполненный в state, продолжаем обычную загрузку`);
     } else {
       console.warn(`⚠️ [USE_EXISTING_CIDS] CID отсутствуют для языков: ${missingLanguages.join(', ')}`);
       console.warn(`   🔄 Fallback: выполняем загрузку в Arweave...`);
