@@ -43,7 +43,8 @@ describe('InviteActions', () => {
     };
 
     mockEthersUtils = {
-      getSigner: sinon.stub().returns(mockSigner)
+      getSigner: sinon.stub().returns(mockSigner),
+      getNetworkId: sinon.stub().resolves(137)
     };
 
     mockConfig = {
@@ -56,15 +57,15 @@ describe('InviteActions', () => {
       grantSellerRole: sinon.stub().resolves()
     };
 
-    // Mock SpiralEngine contract
+    // Mock SpiralEngine contract (Action 777 uses mintInviteBatch for 12 invites in one tx)
+    const mockTx = { hash: '0xBatchTx', wait: sinon.stub().resolves({ status: 1 }) };
     mockSpiralEngine = {
       getAddress: sinon.stub().resolves('0xSpiral'),
       totalInvitesMinted: sinon.stub().resolves(0),
       SELLER_ROLE: sinon.stub().resolves('0x123...seller'),
       hasRole: sinon.stub().resolves(true),
-      mintInvite: sinon.stub().resolves({
-        wait: sinon.stub().resolves({ status: 1 })
-      }),
+      mintInvite: sinon.stub().resolves(mockTx),
+      mintInviteBatch: sinon.stub().resolves(mockTx),
       connect: sinon.stub().returnsThis()
     };
 
@@ -205,45 +206,34 @@ describe('InviteActions', () => {
   // ================================================================
 
   describe('generateAndMintInvites() - Real Tests (TDD Spec)', () => {
-    it('должен сгенерировать и заминтить 12 инвайтов', async () => {
-      // TODO: После создания InviteActions.js
-      // GIVEN: SpiralEngine готов к минтингу
+    it('должен сгенерировать и заминтить 12 инвайтов одним вызовом mintInviteBatch', async () => {
       mockSpiralEngine.connect.returns(mockSpiralEngine);
-      
-      // WHEN: generateAndMintInvites вызывается
-      // const invites = await inviteActions.generateAndMintInvites(mockSpiralEngine);
-      
-      // THEN: 12 инвайтов созданы и заминчены
-      // expect(invites).to.have.length(12);
-      // expect(mockSpiralEngine.mintInvite.callCount).to.equal(12);
-      
-      expect(true).to.be.true; // Placeholder для TDD
+
+      const invites = await inviteActions.generateAndMintInvites(mockSpiralEngine);
+
+      expect(invites).to.have.length(12);
+      expect(mockSpiralEngine.mintInviteBatch.calledOnce).to.be.true;
+      expect(mockSpiralEngine.mintInvite.callCount).to.equal(0);
+      const [inviteCodes, expiries] = mockSpiralEngine.mintInviteBatch.firstCall.args;
+      expect(inviteCodes).to.have.length(12);
+      expect(expiries).to.have.length(12);
+      expiries.forEach(e => expect(e).to.equal(0));
     });
 
-    it('должен вызвать mintInvite для каждого инвайта', async () => {
-      // TODO: После создания InviteActions.js
-      // WHEN: generateAndMintInvites вызывается
-      // await inviteActions.generateAndMintInvites(mockSpiralEngine);
-      
-      // THEN: mintInvite вызван 12 раз с правильными параметрами
-      // expect(mockSpiralEngine.mintInvite.callCount).to.equal(12);
-      // mockSpiralEngine.mintInvite.getCalls().forEach(call => {
-      //   expect(call.args[0]).to.match(/^AMANITA-/); // invite code
-      //   expect(call.args[1]).to.equal(0); // expiry = 0 (бессрочные)
-      // });
-      
-      expect(true).to.be.true; // Placeholder
+    it('должен вызвать mintInviteBatch один раз с массивами длины 12', async () => {
+      await inviteActions.generateAndMintInvites(mockSpiralEngine);
+
+      expect(mockSpiralEngine.mintInviteBatch.callCount).to.equal(1);
+      const [inviteCodes, expiries] = mockSpiralEngine.mintInviteBatch.firstCall.args;
+      expect(inviteCodes).to.have.length(12);
+      inviteCodes.forEach(code => expect(code).to.match(/^AMANITA-/));
+      expect(expiries).to.deep.equal(Array(12).fill(0));
     });
 
     it('должен сохранить инвайты в файл', async () => {
-      // TODO: После создания InviteActions.js
-      // WHEN: generateAndMintInvites вызывается
-      // await inviteActions.generateAndMintInvites(mockSpiralEngine);
-      
-      // THEN: saveInvitesToFile вызван
-      // expect(fs.writeFileSync.calledOnce).to.be.true;
-      
-      expect(true).to.be.true; // Placeholder
+      await inviteActions.generateAndMintInvites(mockSpiralEngine);
+
+      expect(fs.writeFileSync.called).to.be.true;
     });
   });
 

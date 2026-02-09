@@ -58,3 +58,5 @@
 
 - acceptance-verification-action5-uups-upgrade.md
 - Комментарий в deploy_full.js: пример DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine.
+- **node-launch.txt** — секция Action 5 (deploy/upgrade UUPS с DEPLOY_CONTRACT).
+- **Deploy_Full.md** — раздел Action 5 и Upgrade Process (DEPLOY_CONTRACT, upgrade vs deploy).

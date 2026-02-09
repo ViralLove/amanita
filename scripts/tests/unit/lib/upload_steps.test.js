@@ -1865,6 +1865,133 @@ describe('upload_steps.uploadComplexFields', () => {
       Module.prototype.require = originalModuleRequire;
     });
 
+    // ✅ NEW (2026-01-03): Тест проверки контракта при USE_EXISTING_CIDS
+    it('должен проверить контракт и вернуть CID если они есть в контракте', async () => {
+      // GIVEN: Mock contract_verification с успешной проверкой контракта
+      const mockVerifyStepCompletion = sinon.stub().resolves({
+        isComplete: true,
+        isConsistent: true,
+        stateData: mockState.arweave.simple_fields,
+        missingItems: []
+      });
+      const mockCheckSimpleFieldsInContract = sinon.stub().resolves({
+        allPresent: true,
+        missing: [],
+        present: {
+          title: 'existing-title-cid-123',
+          dosage_types: 'existing-dosage-cid-456'
+        }
+      });
+
+      Module.prototype.require = function(request) {
+        if (request === './state_manager' || request === '../state_manager') {
+          return mockStateManager;
+        }
+        if (request === './upload_utils' || request === '../upload_utils') {
+          return mockUtils;
+        }
+        if (request === './contract_verification' || request === '../contract_verification') {
+          return {
+            verifyStepCompletion: mockVerifyStepCompletion,
+            checkSimpleFieldsInContract: mockCheckSimpleFieldsInContract
+          };
+        }
+        return originalModuleRequire.apply(this, arguments);
+      };
+
+      const uploadStepsPath = path.resolve(__dirname, '../../../lib/upload_steps.js');
+      delete require.cache[uploadStepsPath];
+      const testUploadStepsModule = require(uploadStepsPath);
+
+      // WHEN: uploadSimpleFields вызывается с useExistingCids=true
+      const result = await testUploadStepsModule.uploadSimpleFields(mockContext, mockState);
+
+      // THEN: verifyStepCompletion должен быть вызван
+      expect(mockVerifyStepCompletion).to.have.been.calledOnce;
+      expect(mockVerifyStepCompletion).to.have.been.calledWith({
+        state: mockState.arweave,
+        stepName: 'simple_fields_uploaded',
+        contractCheckFn: sinon.match.func
+      });
+
+      // THEN: Возвращаются существующие CID
+      expect(result).to.have.property('title');
+      expect(result.title.cid).to.equal('existing-title-cid-123');
+      expect(result).to.have.property('dosage_types');
+      expect(result.dosage_types.cid).to.equal('existing-dosage-cid-456');
+
+      Module.prototype.require = originalModuleRequire;
+    });
+
+    // ✅ NEW (2026-01-03): Тест восстановления CID в контракт при USE_EXISTING_CIDS
+    it('должен восстановить CID в контракт если они есть в state но отсутствуют в контракте', async () => {
+      // GIVEN: Mock contract_verification с несоответствием (CID есть в state, но нет в контракте)
+      const mockVerifyStepCompletion = sinon.stub().resolves({
+        isComplete: true,
+        isConsistent: false,
+        stateData: mockState.arweave.simple_fields,
+        missingItems: ['title', 'dosage_types']
+      });
+      const mockCheckSimpleFieldsInContract = sinon.stub().resolves({
+        allPresent: false,
+        missing: ['title', 'dosage_types'],
+        present: {}
+      });
+
+      // GIVEN: Mock для restoreSimpleFieldsToContract
+      const mockRestoreSimpleFieldsToContract = sinon.stub().resolves({
+        title: 'existing-title-cid-123',
+        dosage_types: 'existing-dosage-cid-456'
+      });
+
+      // GIVEN: Mock для setSimpleFieldCID
+      const mockAmanitaIntlWithSigner = {
+        setSimpleFieldCID: sinon.stub().resolves({
+          wait: sinon.stub().resolves({ status: 1 })
+        })
+      };
+      mockContext.contracts.amanitaInternational.connect = sinon.stub().returns(mockAmanitaIntlWithSigner);
+
+      Module.prototype.require = function(request) {
+        if (request === './state_manager' || request === '../state_manager') {
+          return mockStateManager;
+        }
+        if (request === './upload_utils' || request === '../upload_utils') {
+          return mockUtils;
+        }
+        if (request === './contract_verification' || request === '../contract_verification') {
+          return {
+            verifyStepCompletion: mockVerifyStepCompletion,
+            checkSimpleFieldsInContract: mockCheckSimpleFieldsInContract
+          };
+        }
+        return originalModuleRequire.apply(this, arguments);
+      };
+
+      const uploadStepsPath = path.resolve(__dirname, '../../../lib/upload_steps.js');
+      delete require.cache[uploadStepsPath];
+      const testUploadStepsModule = require(uploadStepsPath);
+
+      // WHEN: uploadSimpleFields вызывается с useExistingCids=true
+      const result = await testUploadStepsModule.uploadSimpleFields(mockContext, mockState);
+
+      // THEN: verifyStepCompletion должен быть вызван
+      expect(mockVerifyStepCompletion).to.have.been.calledOnce;
+
+      // THEN: setSimpleFieldCID должен быть вызван для восстановления CID
+      expect(mockAmanitaIntlWithSigner.setSimpleFieldCID).to.have.been.calledTwice;
+      expect(mockAmanitaIntlWithSigner.setSimpleFieldCID).to.have.been.calledWith('ComponentDescription.title', 'existing-title-cid-123');
+      expect(mockAmanitaIntlWithSigner.setSimpleFieldCID).to.have.been.calledWith('DosageInstruction.description', 'existing-dosage-cid-456');
+
+      // THEN: Возвращаются существующие CID
+      expect(result).to.have.property('title');
+      expect(result.title.cid).to.equal('existing-title-cid-123');
+      expect(result).to.have.property('dosage_types');
+      expect(result.dosage_types.cid).to.equal('existing-dosage-cid-456');
+
+      Module.prototype.require = originalModuleRequire;
+    });
+
     it('должен выполнить fallback на загрузку если useExistingCids=true но CID отсутствуют', async () => {
       // GIVEN: State без CID
       mockState.arweave.simple_fields = {};
@@ -2332,6 +2459,127 @@ describe('upload_steps.uploadComplexFields', () => {
       const result = await testUploadStepsModule.uploadComplexFields(mockContext, mockState);
 
       // THEN: Возвращаются существующие CID для всех языков
+      expect(result).to.have.property('ru');
+      expect(result.ru.cid).to.equal('existing-ru-cid-123');
+      expect(result).to.have.property('en');
+      expect(result.en.cid).to.equal('existing-en-cid-456');
+
+      Module.prototype.require = originalModuleRequire;
+    });
+
+    // ✅ NEW (2026-01-03): Тест проверки контракта при USE_EXISTING_CIDS
+    it('должен проверить контракт и вернуть CID если они есть в контракте', async () => {
+      // GIVEN: Mock contract_verification с успешной проверкой контракта
+      const mockVerifyStepCompletion = sinon.stub().resolves({
+        isComplete: true,
+        isConsistent: true,
+        stateData: mockState.arweave.complex_fields,
+        missingItems: []
+      });
+      const mockCheckComplexFieldsInContract = sinon.stub().resolves({
+        allPresent: true,
+        missing: [],
+        present: {
+          ru: 'existing-ru-cid-123',
+          en: 'existing-en-cid-456'
+        }
+      });
+
+      Module.prototype.require = function(request) {
+        if (request === './state_manager' || request === '../state_manager') {
+          return mockStateManager;
+        }
+        if (request === './upload_utils' || request === '../upload_utils') {
+          return { ...mockUtils, getSupportedLanguages: () => ['ru', 'en'] };
+        }
+        if (request === './contract_verification' || request === '../contract_verification') {
+          return {
+            verifyStepCompletion: mockVerifyStepCompletion,
+            checkComplexFieldsInContract: mockCheckComplexFieldsInContract
+          };
+        }
+        return originalModuleRequire.apply(this, arguments);
+      };
+
+      const uploadStepsPath = path.resolve(__dirname, '../../../lib/upload_steps.js');
+      delete require.cache[uploadStepsPath];
+      const testUploadStepsModule = require(uploadStepsPath);
+
+      // WHEN: uploadComplexFields вызывается с useExistingCids=true
+      const result = await testUploadStepsModule.uploadComplexFields(mockContext, mockState);
+
+      // THEN: verifyStepCompletion должен быть вызван
+      expect(mockVerifyStepCompletion).to.have.been.calledOnce;
+      expect(mockVerifyStepCompletion).to.have.been.calledWith({
+        state: mockState.arweave,
+        stepName: 'complex_fields_uploaded',
+        contractCheckFn: sinon.match.func
+      });
+
+      // THEN: Возвращаются существующие CID
+      expect(result).to.have.property('ru');
+      expect(result.ru.cid).to.equal('existing-ru-cid-123');
+      expect(result).to.have.property('en');
+      expect(result.en.cid).to.equal('existing-en-cid-456');
+
+      Module.prototype.require = originalModuleRequire;
+    });
+
+    // ✅ NEW (2026-01-03): Тест восстановления CID в контракт при USE_EXISTING_CIDS
+    it('должен восстановить CID в контракт если они есть в state но отсутствуют в контракте', async () => {
+      // GIVEN: Mock contract_verification с несоответствием (CID есть в state, но нет в контракте)
+      const mockVerifyStepCompletion = sinon.stub().resolves({
+        isComplete: true,
+        isConsistent: false,
+        stateData: mockState.arweave.complex_fields,
+        missingItems: ['ru', 'en']
+      });
+      const mockCheckComplexFieldsInContract = sinon.stub().resolves({
+        allPresent: false,
+        missing: ['ru', 'en'],
+        present: {}
+      });
+
+      // GIVEN: Mock для setComplexFieldCID
+      const mockAmanitaIntlWithSigner = {
+        setComplexFieldCID: sinon.stub().resolves({
+          wait: sinon.stub().resolves({ status: 1 })
+        })
+      };
+      mockContext.contracts.amanitaInternational.connect = sinon.stub().returns(mockAmanitaIntlWithSigner);
+
+      Module.prototype.require = function(request) {
+        if (request === './state_manager' || request === '../state_manager') {
+          return mockStateManager;
+        }
+        if (request === './upload_utils' || request === '../upload_utils') {
+          return { ...mockUtils, getSupportedLanguages: () => ['ru', 'en'] };
+        }
+        if (request === './contract_verification' || request === '../contract_verification') {
+          return {
+            verifyStepCompletion: mockVerifyStepCompletion,
+            checkComplexFieldsInContract: mockCheckComplexFieldsInContract
+          };
+        }
+        return originalModuleRequire.apply(this, arguments);
+      };
+
+      const uploadStepsPath = path.resolve(__dirname, '../../../lib/upload_steps.js');
+      delete require.cache[uploadStepsPath];
+      const testUploadStepsModule = require(uploadStepsPath);
+
+      // WHEN: uploadComplexFields вызывается с useExistingCids=true
+      const result = await testUploadStepsModule.uploadComplexFields(mockContext, mockState);
+
+      // THEN: verifyStepCompletion должен быть вызван
+      expect(mockVerifyStepCompletion).to.have.been.calledOnce;
+
+      // THEN: setComplexFieldCID должен быть вызван для восстановления CID
+      expect(mockAmanitaIntlWithSigner.setComplexFieldCID).to.have.been.calledTwice;
+      expect(mockAmanitaIntlWithSigner.setComplexFieldCID).to.have.been.calledWith('ComponentDescription.amanita_muscaria', 'ru', 'existing-ru-cid-123');
+      expect(mockAmanitaIntlWithSigner.setComplexFieldCID).to.have.been.calledWith('ComponentDescription.amanita_muscaria', 'en', 'existing-en-cid-456');
+
+      // THEN: Возвращаются существующие CID
       expect(result).to.have.property('ru');
       expect(result.ru.cid).to.equal('existing-ru-cid-123');
       expect(result).to.have.property('en');
