@@ -338,6 +338,10 @@ class CatalogActions {
     logger.action(444, "Automatic Pipeline");
     
     try {
+      // ✅ FIX (2026-01-03): Import path and fs modules (same pattern as Action 42 and Action 43)
+      const path = require('path');
+      const fs = require('fs');
+      
       // Get parameters from config/env
       const csvPath = this.config.get('catalog.csvPath') || process.env.CSV_FILE;
       const sellerId = this.config.get('catalog.sellerId') || process.env.SELLER_BUSINESS_ID;
