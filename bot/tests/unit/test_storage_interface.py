@@ -1,6 +1,4 @@
 import pytest
-import os
-from unittest.mock import patch, MagicMock
 from bot.services.core.storage.base import BaseStorageProvider
 from bot.services.core.storage.ar_weave import ArWeaveUploader
 
@@ -13,17 +11,15 @@ class TestStorageInterface:
             BaseStorageProvider()
     
     def test_arweave_implements_interface(self):
-        """Тест что ArWeave реализует интерфейс"""
-        with patch.dict(os.environ, {'ARWEAVE_PRIVATE_KEY': 'test'}):
-            arweave = ArWeaveUploader()
-            assert hasattr(arweave, 'get_public_url')
-            assert hasattr(arweave, 'upload_file')
-            assert hasattr(arweave, 'download_json')
+        """Тест что ArWeave реализует интерфейс (ключ не требуется: загрузка через Edge, чтение публичное)"""
+        arweave = ArWeaveUploader()
+        assert hasattr(arweave, 'get_public_url')
+        assert hasattr(arweave, 'upload_file')
+        assert hasattr(arweave, 'download_json')
     
     def test_arweave_public_url(self):
         """Тест формирования публичного URL в ArWeave"""
-        with patch.dict(os.environ, {'ARWEAVE_PRIVATE_KEY': 'test'}):
-            arweave = ArWeaveUploader()
-            tx_id = "TestTransactionID123456789012345678901234567890123"
-            url = arweave.get_public_url(tx_id)
-            assert url == f"https://arweave.net/{tx_id}"
+        arweave = ArWeaveUploader()
+        tx_id = "TestTransactionID123456789012345678901234567890123"
+        url = arweave.get_public_url(tx_id)
+        assert url == f"https://arweave.net/{tx_id}"

@@ -4,11 +4,8 @@ Unit тесты для ArWeaveUploader - только чтение (download)
 """
 
 import pytest
-import os
 import json
-import importlib
-from unittest.mock import patch, Mock, MagicMock
-from bot.services.core.storage import ar_weave
+from unittest.mock import patch, Mock
 from bot.services.core.storage.ar_weave import ArWeaveUploader
 import requests
 
@@ -19,65 +16,18 @@ class TestArWeaveUploaderTDD:
     TDD тесты для ArWeaveUploader - базовый функционал
     """
     
-    def test_arweave_initialization_with_valid_key(self):
-        """✅ Green: Инициализация с валидным ключом (JSON строка)"""
-        # ✅ ИСПРАВЛЕНО: Используем валидный RSA ключ с обязательными полями
-        test_key = '{"kty":"RSA","e":"AQAB","n":"test_n_value","d":"test_d_value","p":"test_p","q":"test_q","dp":"test_dp","dq":"test_dq","qi":"test_qi"}'
-        
-        # ✅ ИСПРАВЛЕНО: Патчим bot.config.ARWEAVE_PRIVATE_KEY и ar_weave.ARWEAVE_PRIVATE_KEY
-        import bot.config as config_module
-        original_key = config_module.ARWEAVE_PRIVATE_KEY
-        
-        try:
-            config_module.ARWEAVE_PRIVATE_KEY = test_key
-            # Также патчим в ar_weave модуле после перезагрузки
-            importlib.reload(ar_weave)
-            ar_weave.ARWEAVE_PRIVATE_KEY = test_key
-            
-            uploader = ArWeaveUploader()
-            assert uploader.private_key == test_key
-        finally:
-            # Восстанавливаем оригинальное значение
-            config_module.ARWEAVE_PRIVATE_KEY = original_key
-            importlib.reload(ar_weave)
-    
     def test_arweave_initialization_without_key(self):
-        """✅ Green: Инициализация без ключа вызывает ошибку"""
-        # ✅ ИСПРАВЛЕНО: Патчим bot.config.ARWEAVE_PRIVATE_KEY = None
-        import bot.config as config_module
-        original_key = config_module.ARWEAVE_PRIVATE_KEY
-        
-        try:
-            config_module.ARWEAVE_PRIVATE_KEY = None
-            importlib.reload(ar_weave)
-            ar_weave.ARWEAVE_PRIVATE_KEY = None
-            
-            with pytest.raises(FileNotFoundError):
-                ArWeaveUploader()
-        finally:
-            # Восстанавливаем оригинальное значение
-            config_module.ARWEAVE_PRIVATE_KEY = original_key
-            importlib.reload(ar_weave)
+        """Инициализация без ключа (ключ в боте не требуется: загрузка через Edge, чтение публичное)"""
+        uploader = ArWeaveUploader()
+        assert uploader.edge_function_url is not None
+        assert "arweave-upload" in uploader.edge_function_url
     
     def test_arweave_public_url_format(self):
-        """✅ Green: Проверка формата публичного URL"""
-        # ✅ ИСПРАВЛЕНО: Используем валидный ключ и правильный патчинг
-        test_key = '{"kty":"RSA","e":"AQAB","n":"test_n_value","d":"test_d_value","p":"test_p","q":"test_q","dp":"test_dp","dq":"test_dq","qi":"test_qi"}'
-        import bot.config as config_module
-        original_key = config_module.ARWEAVE_PRIVATE_KEY
-        
-        try:
-            config_module.ARWEAVE_PRIVATE_KEY = test_key
-            importlib.reload(ar_weave)
-            ar_weave.ARWEAVE_PRIVATE_KEY = test_key
-            uploader = ArWeaveUploader()
-            tx_id = "TestTransactionID123456789012345678901234567890123"
-            url = uploader.get_public_url(tx_id)
-            assert url == f"https://arweave.net/{tx_id}"
-        finally:
-            # Восстанавливаем оригинальное значение
-            config_module.ARWEAVE_PRIVATE_KEY = original_key
-            importlib.reload(ar_weave)
+        """Проверка формата публичного URL"""
+        uploader = ArWeaveUploader()
+        tx_id = "TestTransactionID123456789012345678901234567890123"
+        url = uploader.get_public_url(tx_id)
+        assert url == f"https://arweave.net/{tx_id}"
 
 
 class TestArWeaveUploaderDownloadJSON:
@@ -87,19 +37,8 @@ class TestArWeaveUploaderDownloadJSON:
     
     @pytest.fixture
     def arweave_uploader(self):
-        """Фикстура для создания ArWeaveUploader с моком окружения"""
-        test_key = '{"kty":"RSA","e":"AQAB","n":"test_n_value","d":"test_d_value","p":"test_p","q":"test_q","dp":"test_dp","dq":"test_dq","qi":"test_qi"}'
-        import bot.config as config_module
-        original_key = config_module.ARWEAVE_PRIVATE_KEY
-        
-        try:
-            config_module.ARWEAVE_PRIVATE_KEY = test_key
-            importlib.reload(ar_weave)
-            ar_weave.ARWEAVE_PRIVATE_KEY = test_key
-            yield ArWeaveUploader()
-        finally:
-            config_module.ARWEAVE_PRIVATE_KEY = original_key
-            importlib.reload(ar_weave)
+        """Фикстура для создания ArWeaveUploader (ключ не требуется)"""
+        return ArWeaveUploader()
     
     def test_arweave_download_json_success(self, arweave_uploader):
         """Тест успешного чтения JSON через HTTP API"""
@@ -252,19 +191,8 @@ class TestArWeaveUploaderDownloadFile:
     
     @pytest.fixture
     def arweave_uploader(self):
-        """Фикстура для создания ArWeaveUploader с моком окружения"""
-        test_key = '{"kty":"RSA","e":"AQAB","n":"test_n_value","d":"test_d_value","p":"test_p","q":"test_q","dp":"test_dp","dq":"test_dq","qi":"test_qi"}'
-        import bot.config as config_module
-        original_key = config_module.ARWEAVE_PRIVATE_KEY
-        
-        try:
-            config_module.ARWEAVE_PRIVATE_KEY = test_key
-            importlib.reload(ar_weave)
-            ar_weave.ARWEAVE_PRIVATE_KEY = test_key
-            yield ArWeaveUploader()
-        finally:
-            config_module.ARWEAVE_PRIVATE_KEY = original_key
-            importlib.reload(ar_weave)
+        """Фикстура для создания ArWeaveUploader (ключ не требуется)"""
+        return ArWeaveUploader()
     
     def test_arweave_download_file_success(self, arweave_uploader):
         """Тест успешного чтения файла через HTTP API"""
@@ -321,19 +249,8 @@ class TestArWeaveUploaderValidation:
     
     @pytest.fixture
     def arweave_uploader(self):
-        """Фикстура для создания ArWeaveUploader с моком окружения"""
-        test_key = '{"kty":"RSA","e":"AQAB","n":"test_n_value","d":"test_d_value","p":"test_p","q":"test_q","dp":"test_dp","dq":"test_dq","qi":"test_qi"}'
-        import bot.config as config_module
-        original_key = config_module.ARWEAVE_PRIVATE_KEY
-        
-        try:
-            config_module.ARWEAVE_PRIVATE_KEY = test_key
-            importlib.reload(ar_weave)
-            ar_weave.ARWEAVE_PRIVATE_KEY = test_key
-            yield ArWeaveUploader()
-        finally:
-            config_module.ARWEAVE_PRIVATE_KEY = original_key
-            importlib.reload(ar_weave)
+        """Фикстура для создания ArWeaveUploader (ключ не требуется)"""
+        return ArWeaveUploader()
     
     def test_arweave_timeout_configuration(self, arweave_uploader):
         """Тест что timeout=30 используется в requests.get()"""

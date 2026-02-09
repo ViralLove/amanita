@@ -21,11 +21,15 @@ from services.common.localization_service import LocalizationService
 
 # Stub imports are lazy-loaded in fixtures to avoid import errors (see fixtures below)
 
-# Загружаем .env (паттерн из test_product_registry_integration.py:49)
+# Загружаем .env: сначала tests/.env, затем bot/.env (для SUPABASE_* и др. при upload integration)
 load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 
 # Устанавливаем профиль localhost (паттерн из test_blockchain.py:8)
 os.environ["BLOCKCHAIN_PROFILE"] = "localhost"
+
+# Upload flow integration (Phase 1 harness: fixtures в upload_harness.py)
+pytest_plugins = ["tests.integration.upload_harness"]
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1436,18 +1440,34 @@ def fresh_activator(spiral_engine_contract, web3):
     return fresh_account
 
 
+def _session_only_upload_flow_tests(session) -> bool:
+    """True, если в сессии только тесты из test_upload_flow_integration (upload flow)."""
+    if not session.items:
+        return True
+    return all(
+        "test_upload_flow_integration" in str(getattr(item, "path", ""))
+        for item in session.items
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
-def export_network_after_suite(spiral_engine_contract):
+def export_network_after_suite(request):
     """
     Auto-export network graph после всех integration tests.
     Creates activation_graph.json with full network state.
+    Не загружает блокчейн, если в сессии только тесты upload flow (Supabase, без Web3).
     """
+    if _session_only_upload_flow_tests(request.session):
+        yield
+        return
+
+    spiral_engine_contract = request.getfixturevalue("spiral_engine_contract")
     yield  # Tests run
-    
+
     # After all tests complete
     try:
         from bot.tests.utils.network_exporter import NetworkExporter
-        
+
         exporter = NetworkExporter(spiral_engine_contract)
         output_file = exporter.export_graph()
         

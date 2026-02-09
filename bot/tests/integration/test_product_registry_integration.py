@@ -181,33 +181,15 @@ def test_helper_functions_storage_selection():
         logger.error(f"❌ Ошибка импорта вспомогательных функций: {e}")
         pytest.fail(f"Вспомогательные функции не могут быть импортированы: {e}")
     
-    # Сохраняем оригинальные значения переменных окружения
-    original_arweave_key = os.getenv("ARWEAVE_PRIVATE_KEY")
-    
     try:
-        # Тест 1: Проверка _get_real_arweave_storage при отсутствии ключей
-        logger.info("🔧 Тест 1: Проверка Arweave storage при отсутствии ключей")
-        os.environ.pop("ARWEAVE_PRIVATE_KEY", None)
-        
+        # ArWeave в боте не требует ключа (загрузка через Edge, чтение публичное)
+        logger.info("🔧 Проверка _get_real_arweave_storage (ключ не требуется)")
         arweave_storage = _get_real_arweave_storage()
-        assert arweave_storage is not None, "Arweave storage должен быть создан (mock при отсутствии ключей)"
-        logger.info("✅ Arweave storage корректно возвращает mock при отсутствии ключей")
-        
-        # Тест 2: Проверка _get_real_arweave_storage при наличии ключей
-        logger.info("🔧 Тест 2: Проверка Arweave storage при наличии ключей")
-        os.environ["ARWEAVE_PRIVATE_KEY"] = "test_private_key"
-        
-        # Аналогично - ожидаем попытку создания реального сервиса
-        arweave_storage_with_keys = _get_real_arweave_storage()
-        assert arweave_storage_with_keys is not None, "Arweave storage должен быть создан"
-        logger.info("✅ Arweave storage корректно обрабатывает наличие ключей")
-        
+        assert arweave_storage is not None, "Arweave storage должен быть создан"
+        logger.info("✅ Arweave storage создаётся без ARWEAVE_PRIVATE_KEY")
         logger.info("✅ Все тесты вспомогательных функций пройдены успешно")
-        
     finally:
-        # Восстанавливаем оригинальные значения переменных окружения
-        if original_arweave_key:
-            os.environ["ARWEAVE_PRIVATE_KEY"] = original_arweave_key
+        pass
     
     return True
 

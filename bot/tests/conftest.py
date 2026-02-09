@@ -3176,11 +3176,6 @@ def integration_storage_config():
     storage_type = os.getenv("INTEGRATION_STORAGE", "arweave").lower()
     print(f"🔍 [DEVOPS] INTEGRATION_STORAGE={storage_type}")
     
-    # 📊 Логирование доступности API ключей для диагностики
-    arweave_private_key = os.getenv("ARWEAVE_PRIVATE_KEY")
-    
-    print("🔍 [DEVOPS] ARWEAVE_PRIVATE_KEY: ********")
-    
     configs = {
         "mock": {
             "service": _create_mock_storage(),
@@ -3228,18 +3223,11 @@ def _create_mock_storage():
 
 
 def _get_real_arweave_storage():
-    """Получение реального Arweave storage (с проверкой переменных окружения)"""
+    """Получение реального Arweave storage (ключ в боте не нужен: загрузка через Edge, чтение публичное)"""
     try:
         from bot.services.core.storage.ar_weave import ArWeaveUploader
-        arweave_private_key = os.getenv("ARWEAVE_PRIVATE_KEY")
-        
-        if not arweave_private_key:
-            print("⚠️ [DEVOPS] ARWEAVE_PRIVATE_KEY не установлен, используем mock (fallback)")
-            return _create_mock_storage()
-        
-        print("✅ [DEVOPS] Используется реальный Arweave (приватный ключ валиден)")
+        print("✅ [DEVOPS] Используется реальный ArWeave (Edge + arweave.net)")
         return ArWeaveUploader()
-        
     except Exception as e:
         print(f"❌ [DEVOPS] Ошибка инициализации Arweave: {e}, используем mock (fallback)")
         return _create_mock_storage()
@@ -3290,8 +3278,7 @@ def integration_registry_service_real_full():
     
     Требует:
     - SELLER_PRIVATE_KEY в .env
-    - ARWEAVE_PRIVATE_KEY в .env
-    - Запущенный Hardhat node
+    - Запущенный Hardhat node (ArWeave ключ в боте не требуется: загрузка через Edge, чтение публичное)
     
     Эта фикстура предназначена для интеграционных тестов с реальными данными селлера.
     """
@@ -3303,15 +3290,10 @@ def integration_registry_service_real_full():
     from bot.services.product.storage import ProductStorageService
     import os
     
-    # Проверка обязательных переменных окружения
+    # Проверка обязательных переменных окружения (ArWeave ключ в боте не требуется)
     seller_private_key = os.getenv("SELLER_PRIVATE_KEY")
-    arweave_private_key = os.getenv("ARWEAVE_PRIVATE_KEY")
-    
     if not seller_private_key:
         pytest.skip("⚠️ SELLER_PRIVATE_KEY не установлен в .env (требуется для интеграционных тестов)")
-    
-    if not arweave_private_key:
-        pytest.skip("⚠️ ARWEAVE_PRIVATE_KEY не установлен в .env (требуется для интеграционных тестов)")
     
     try:
         # ✅ Реальный блокчейн
