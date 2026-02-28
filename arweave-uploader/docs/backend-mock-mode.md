@@ -72,7 +72,7 @@ BACKEND_USE_MOCK=true BACKEND_MOCK_PUT_STATUS=404 node dist/server.js
 Сценарий «успех» (без заголовков или 200):
 
 ```bash
-curl -X POST "https://YOUR_SERVICE/edge/v1/publish" \
+curl -X POST "https://YOUR_SERVICE/v1/crystalize" \
   -H "Content-Type: application/json" \
   -d '{"upload_id":"00000000-0000-0000-0000-000000000001"}'
 ```
@@ -80,7 +80,7 @@ curl -X POST "https://YOUR_SERVICE/edge/v1/publish" \
 Сценарий «putStatus 404»:
 
 ```bash
-curl -X POST "https://YOUR_SERVICE/edge/v1/publish" \
+curl -X POST "https://YOUR_SERVICE/v1/crystalize" \
   -H "Content-Type: application/json" \
   -H "X-Backend-Mock-Put-Status: 404" \
   -d '{"upload_id":"00000000-0000-0000-0000-000000000001"}'
@@ -89,7 +89,7 @@ curl -X POST "https://YOUR_SERVICE/edge/v1/publish" \
 Сценарий «callback 409» (при заданном `BACKEND_MOCK_ALLOW_REQUEST_OVERRIDE=true` или валидном `X-Backend-Mock-Secret`):
 
 ```bash
-curl -X POST "https://YOUR_SERVICE/edge/v1/publish" \
+curl -X POST "https://YOUR_SERVICE/v1/crystalize" \
   -H "Content-Type: application/json" \
   -H "X-Backend-Mock-Callback: 409" \
   -d '{"upload_id":"00000000-0000-0000-0000-000000000001"}'

@@ -1,51 +1,43 @@
 # Архитектура микросервиса arweave-uploader
 
-Постоянный документ: архитектура решения, поток данных, обработка canonical issue и все конфигурируемые элементы.
+Постоянный документ: архитектура решения, поток данных, обработка crystall (публикация в Arweave) и все конфигурируемые элементы.
 
-**Версия:** 0.1.0  
-**Статус:** Production (smoke: health 200, POST /upload-canonical-issue 200 с transaction_id и url).
+**Версия:** 0.2.0  
+**Статус:** Production (smoke: health 200, POST /v1/crystalize отвечает 400/401 без полного тела).
 
 ---
 
 ## 1. Назначение и границы
 
-**Микросервис** — HTTP relay для публикации **canonical issue** в Arweave. Принимает JSON payload по контракту, подписывает транзакцию ключом, отправляет в Arweave gateway и возвращает `transaction_id` и URL.
+**Микросервис** — HTTP relay для публикации в Arweave **уже подписанных** Data Item (ANS-104). Принимает подписанный item по контракту, верифицирует подпись и тег Upload-Id, упаковывает в bundle и отправляет в Arweave. Данными владеет отправитель (подпись своим ключом).
 
-- **Вход:** HTTP POST с телом `{ data, contentHash }` и опциональной Bearer-авторизацией.
-- **Выход:** 200 + `{ success, transaction_id, url }` или коды ошибок (400/401/502/500).
-- **Внешняя зависимость:** Arweave (сеть + gateway, например `arweave.net`).
+- **Вход:** HTTP POST `POST /v1/crystalize` с телом `{ upload_id, upload_token, signed_data_item, payload_size }`.
+- **Выход:** 200 + `{ ack: true, status: "queued_for_publish" }` или коды ошибок (400/401/502).
+- **Внешняя зависимость:** Arweave (gateway), опционально Backend (PUT status, POST callback).
 
 ---
 
-## 2. Высокоуровневый поток (canonical issue → Arweave)
+## 2. Высокоуровневый поток (crystalize)
 
 ```
-Клиент (Supabase/issue, curl, скрипт)
+Клиент (backend, скрипт)
     │
-    │  POST /upload-canonical-issue
-    │  Authorization: Bearer <RELAY_AUTH_TOKEN>
-    │  Body: { "data": "<json string>", "contentHash": "<64 hex>" }
+    │  POST /v1/crystalize
+    │  Body: { upload_id, upload_token (JWT), signed_data_item (base64 ANS-104), payload_size }
     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  arweave-uploader (Node, Fastify)                                │
-│  1. Auth (если задан RELAY_AUTH_TOKEN)                           │
-│  2. Validation (Zod: data string, contentHash 64 hex)            │
-│  3. Log (upload.request.received)                                │
-│  4. ArweaveClient.uploadCanonicalIssue(payload)                  │
-│     ├── createTransaction({ data })                              │
-│     ├── addTag(App-Name, Schema, Content-Type, Content-Hash)     │
-│     ├── sign(tx, jwk)                                            │
-│     └── post(tx) → gateway                                       │
-│  5. Ответ: 200 + { transaction_id, url } или 502/500             │
+│  1. Валидация body (обязательные поля)                          │
+│  2. verifyUploadToken (JWT RS256, upload_id, max_bytes, exp)     │
+│  3. validateDataItem (подпись RSA-PSS, тег Upload-Id)             │
+│  4. putStatus(queued_for_publish)                                │
+│  5. bundleAndPublish(signedDataItemBytes) → Arweave              │
+│  6. postCallback(uploadId, itemId, bundleTxId)                   │
+│  7. Ответ 200 { ack: true } или 400/401/502                       │
 └─────────────────────────────────────────────────────────────────┘
-    │
-    │  HTTPS → arweave.net (или ARWEAVE_HOST:ARWEAVE_PORT)
-    ▼
-Arweave gateway → сеть Arweave
 ```
 
-- **Порт приложения** задаётся платформой (например Railway через `PORT`), не зашит в коде.
-- **Ключ подписи** — JWK из `ARWEAVE_PRIVATE_KEY` (строка JSON) или из файла `ARWEAVE_PRIVATE_KEY_FILE`.
+- **Порт** задаётся платформой (`PORT`). Подпись bundle-транзакции — JWK из `ARWEAVE_PRIVATE_KEY` или `ARWEAVE_PRIVATE_KEY_FILE`.
 
 ---
 
@@ -55,23 +47,7 @@ Arweave gateway → сеть Arweave
 
 - **Назначение:** проверка живости сервиса (в т.ч. Railway, smoke).
 - **Авторизация:** не требуется.
-- **Ответ 200:** `{ "ok": true, "service": "arweave-uploader", "version": "0.1.0" }`.
-
-### 3.2 POST /upload-canonical-issue
-
-- **Headers:** `Content-Type: application/json`, при включённой защите — `Authorization: Bearer <RELAY_AUTH_TOKEN>`.
-- **Body (JSON):**
-  - `data` (string) — содержимое транзакции (например JSON canonical issue), минимум 1 символ.
-  - `contentHash` (string) — SHA-256 хеш содержимого в hex, ровно 64 символа `[a-f0-9]`.
-- **Успех 200:**  
-  `{ "success": true, "transaction_id": "<txid>", "url": "https://arweave.net/<txid>" }`.
-- **Ошибки:**
-  - 400 — не прошла валидация тела (`VALIDATION_ERROR`).
-  - 401 — нет/неверный Bearer (`UNAUTHORIZED`).
-  - 502 — Arweave вернул status >= 400 (`ARWEAVE_POST_FAILED`).
-  - 500 — исключение при обработке (`INTERNAL_ERROR`).
-
-Теги транзакции в Arweave: `App-Name: DOGEESTONIA`, `Schema: canonical-issue-v1`, `Content-Type: application/json`, `Content-Hash: <payload.contentHash>`.
+- **Ответ 200:** `{ "ok": true, "service": "arweave-uploader", "version": "0.2.0" }`.
 
 ---
 
@@ -79,13 +55,15 @@ Arweave gateway → сеть Arweave
 
 | Модуль | Файл | Ответственность |
 |--------|------|-----------------|
-| **Конфиг** | `config.ts` | PORT, RELAY_AUTH_TOKEN, ARWEAVE_*; загрузка JWK из env или файла. |
-| **Авторизация** | `auth.ts` | Проверка `Authorization: Bearer` против `relayAuthToken`; при отсутствии токена — пропуск. |
-| **Валидация** | `validation.ts` | Zod-схема для тела запроса: `data`, `contentHash` (64 hex). |
-| **Arweave-клиент** | `arweave-client.ts` | createTransaction → теги → sign → post; возврат tx id и status. |
-| **Логирование** | `logging.ts` | JSON в stdout: logInfo/logWarn/logError, sha256Hex, errorToMessage. |
-| **Типы** | `types.ts` | UploadCanonicalIssueRequest, UploadSuccessResponse, UploadErrorResponse. |
-| **Сервер** | `server.ts` | Fastify, маршруты /health и /upload-canonical-issue, сборка конфига и ArweaveClient, обработка ошибок. |
+| **Конфиг** | `config.js` | PORT, ARWEAVE_*; загрузка JWK из env или файла. |
+| **Авторизация** | `auth.js` | Проверка `Authorization: Bearer` против `relayAuthToken` (опционально). |
+| **Arweave-клиент** | `arweave-client.js` | Инициализация arweave и jwk для bundleAndPublish (подпись bundle-транзакции). |
+| **Логирование** | `logging.js` | JSON в stdout: logInfo/logWarn/logError, sha256Hex, errorToMessage. |
+| **Сервер** | `server.js` | Fastify, маршруты GET /health и POST /v1/crystalize, обработка ошибок. |
+| **verifyUploadToken** | `publish/validate-token.js` | Проверка JWT RS256 (upload_id, max_bytes, exp); ключ из UPLOAD_TOKEN_JWT_PUBLIC_KEY. |
+| **validateDataItem** | `publish/validate-data-item.js` | Парсинг ANS-104 Data Item, проверка подписи RSA-PSS и тега Upload-Id. |
+| **deepHash** | `publish/deep-hash.js` | Arweave deep-hash для верификации Data Item (внутри validateDataItem). |
+| **bundleAndPublish** | `publish/bundle-publish.js` | Сборка bundle из одного Data Item, подпись и отправка в Arweave. |
 
 ---
 
@@ -116,24 +94,19 @@ Arweave gateway → сеть Arweave
 | **BACKEND_MOCK_CALLBACK** | Симулированный код для POST …/callback: `200` \| `404` \| `409` (по умолчанию 200). |
 | **BACKEND_MOCK_ALLOW_REQUEST_OVERRIDE** | `true`/`1` — разрешить переопределение симулированного ответа по заголовкам запроса (X-Backend-Mock-Put-Status, X-Backend-Mock-Callback). |
 | **BACKEND_MOCK_TEST_SECRET** | Секрет для заголовка X-Backend-Mock-Secret (учёт override только при совпадении). |
+| **UPLOAD_TOKEN_JWT_PUBLIC_KEY** | Публичный ключ (PEM или JWK) для проверки JWT RS256 в теле запроса POST /v1/crystalize. Обязателен для приёма crystalize. |
 
 ---
 
-## 6. Поток данных (canonical issue)
+### 5.2 POST /v1/crystalize (Data Item → bundle → Arweave)
 
-1. **Клиент** формирует canonical issue (JSON), считает SHA-256 от строки `data` в hex — это `contentHash`.
-2. **Клиент** шлёт `POST /upload-canonical-issue` с `{ data, contentHash }`.
-3. **Сервер** проверяет Bearer (если задан `RELAY_AUTH_TOKEN`).
-4. **Сервер** валидирует тело (Zod); при ошибке — 400.
-5. **ArweaveClient** создаёт транзакцию с `data` (как bytes), добавляет теги (в т.ч. `Content-Hash`), подписывает JWK, шлёт в gateway.
-6. **Сервер** по status ответа gateway: 2xx → 200 и `{ transaction_id, url }`; иначе 502 с `ARWEAVE_POST_FAILED`.
-7. Любое исключение в цепочке (сеть, парсинг, ключ) → лог `upload.failed`, ответ 500 `INTERNAL_ERROR`.
+Маршрут принимает тело с полями: `upload_token` (JWT RS256), `upload_id`, `signed_data_item` (base64 Data Item ANS-104), `payload_size` (число). Порядок: проверка body → `verifyUploadToken` → `validateDataItem` (подпись RSA-PSS, тег Upload-Id) → `putStatus(queued_for_publish)` → `bundleAndPublish` → при успехе `postCallback`, иначе `putStatus(failed, publish_failed)`. Коды: 400 (missing/signature_invalid), 401 (token_invalid), 502 (publish_failed). Логи: `publish.request.received`, `publish.token_invalid`, `publish.data_item_invalid`, `publish.bundle_failed`, `publish.bundle_success` (без тела токена и signed_data_item).
 
-Ссылка на контент после успеха: `https://arweave.net/<transaction_id>`.
+**Версионность API:** префикс `/v1/` — версия контракта; имя действия — `crystalize`. При несовместимых изменениях в будущем вводится `/v2/crystalize`.
 
 ---
 
-## 7. Сборка и запуск
+## 6. Сборка и запуск
 
 - **Сборка:** `npm run build` → `dist/` (Node ESM).
 - **Запуск:** `node dist/server.js` (или `npm start`); в Docker — тот же CMD, порт из `PORT`.
@@ -142,11 +115,11 @@ Arweave gateway → сеть Arweave
 
 ---
 
-## 8. Связанные документы
+## 7. Связанные документы
 
 - **Режим мока Backend:** `docs/backend-mock-mode.md` — переменные, заголовки, переключение на лету.
 - **Деплой и проверка:** `docs/deploy/railway-docker.md`, `docs/deploy/deploy-options.md`
-- **Тесты:** `docs/testing/run-tests.md`
+- **Тесты:** Unit: `npm run test:unit` (см. `docs/testing-unit.md`). Сводные publish: `node tests/publish-flow.test.js` (требуют ARWEAVE_PRIVATE_KEY, BACKEND_USE_MOCK=true).
 - **Авторизация:** `docs/analysis/audit-bearer-auth.md`
 - **Интеграция (Supabase/issue):** `docs/analysis/tasks/.../integration-contract-supabase.md`
 - **Мерж Edge → uploader и polling vs callback:** `docs/analysis/gap-analysis-merge-edge-to-uploader.md`, `docs/analysis/analysis-polling-vs-callback.md`
