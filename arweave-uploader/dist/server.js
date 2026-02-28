@@ -6,8 +6,9 @@ import { isAuthorized } from "./auth.js";
 import { loadConfig } from "./config.js";
 import { errorToMessage, logError, logInfo, logWarn, sha256Hex } from "./logging.js";
 import { putStatus, postCallback, normalizeMockStatus } from "./publish/backend-calls.js";
-import { validateUploadBody } from "./validation.js";
-
+import { bundleAndPublish } from "./publish/bundle-publish.js";
+import { validateDataItem } from "./publish/validate-data-item.js";
+import { verifyUploadToken } from "./publish/validate-token.js";
 function isBackendMockEnabled() {
   const v = process.env.BACKEND_USE_MOCK;
   return v === "true" || v === "1" || (typeof v === "string" && v.toLowerCase() === "true");
@@ -38,65 +39,10 @@ export function buildApp({ config, arweaveClient }) {
         return {
             ok: true,
             service: "arweave-uploader",
-            version: "0.1.0",
+            version: "0.2.0",
         };
     });
-    app.post("/upload-canonical-issue", async (request, reply) => {
-        const requestId = randomUUID();
-        const started = Date.now();
-        if (!isAuthorized(request, reply, config.relayAuthToken)) {
-            return;
-        }
-        try {
-            const payload = validateUploadBody(request.body);
-            const payloadLength = payload.data.length;
-            const payloadSha256 = sha256Hex(payload.data);
-            logInfo("upload.request.received", {
-                requestId,
-                path: "/upload-canonical-issue",
-                payloadLength,
-                payloadSha256,
-            });
-            const result = await arweaveClient.uploadCanonicalIssue(payload);
-            const durationMs = Date.now() - started;
-            logInfo("upload.arweave.response", {
-                requestId,
-                txId: result.transactionId,
-                arweaveStatus: result.status,
-                arweaveStatusText: result.statusText,
-                durationMs,
-            });
-            if (result.status >= 400) {
-                const response = {
-                    success: false,
-                    code: "ARWEAVE_POST_FAILED",
-                    message: "Arweave rejected transaction",
-                };
-                reply.code(502).send(response);
-                return;
-            }
-            const success = {
-                success: true,
-                transaction_id: result.transactionId,
-                url: `https://arweave.net/${result.transactionId}`,
-            };
-            reply.code(200).send(success);
-        }
-        catch (error) {
-            const message = errorToMessage(error);
-            logError("upload.failed", {
-                requestId,
-                error: message,
-            });
-            const isValidationError = message.startsWith("Invalid request body");
-            reply.code(isValidationError ? 400 : 500).send({
-                success: false,
-                code: isValidationError ? "VALIDATION_ERROR" : "INTERNAL_ERROR",
-                message: isValidationError ? message : "Internal server error",
-            });
-        }
-    });
-    app.post("/edge/v1/publish", async (request, reply) => {
+    app.post("/v1/crystalize", async (request, reply) => {
         const requestMockOverride = computeRequestMockOverride(request);
         let body;
         try {
@@ -106,13 +52,63 @@ export function buildApp({ config, arweaveClient }) {
             return;
         }
         const uploadId = body.upload_id;
+        const uploadToken = body.upload_token;
+        const signedDataItem = body.signed_data_item;
+        const payloadSize = body.payload_size;
+
+        logInfo("publish.request.received", { uploadId });
+
         if (!uploadId || typeof uploadId !== "string") {
-            reply.code(400).send({ code: "missing_upload_id", message: "upload_id is required" });
+            reply.code(400).send({ code: "missing_field", message: "upload_id is required" });
             return;
         }
+        if (!uploadToken || typeof uploadToken !== "string") {
+            reply.code(400).send({ code: "missing_field", message: "upload_token is required" });
+            return;
+        }
+        if (!signedDataItem || typeof signedDataItem !== "string") {
+            reply.code(400).send({ code: "missing_field", message: "signed_data_item is required" });
+            return;
+        }
+        if (payloadSize === undefined || payloadSize === null || typeof payloadSize !== "number" || payloadSize < 0) {
+            reply.code(400).send({ code: "missing_field", message: "payload_size is required and must be a non-negative number" });
+            return;
+        }
+
+        const tokenResult = await verifyUploadToken(uploadToken, uploadId, payloadSize);
+        if (!tokenResult.ok) {
+            logInfo("publish.token_invalid", { uploadId });
+            await putStatus(uploadId, "failed", "token_invalid", requestMockOverride?.putStatus);
+            reply.code(401).send({ code: "token_invalid", message: "Invalid or expired upload token" });
+            return;
+        }
+
+        const dataItemResult = await validateDataItem(signedDataItem, uploadId);
+        if (!dataItemResult.ok) {
+            logInfo("publish.data_item_invalid", { uploadId });
+            await putStatus(uploadId, "failed", "signature_invalid", requestMockOverride?.putStatus);
+            reply.code(400).send({ code: "signature_invalid", message: "Data item signature or Upload-Id tag invalid" });
+            return;
+        }
+
+        const itemId = dataItemResult.itemId;
         await putStatus(uploadId, "queued_for_publish", undefined, requestMockOverride?.putStatus);
+
+        const signedDataItemBytes = Buffer.from(
+            signedDataItem.replace(/-/g, "+").replace(/_/g, "/"),
+            "base64"
+        );
+        const bundleResult = await bundleAndPublish(signedDataItemBytes, arweaveClient);
+        if (bundleResult.error) {
+            logWarn("publish.bundle_failed", { uploadId, error: bundleResult.error });
+            await putStatus(uploadId, "failed", "publish_failed", requestMockOverride?.putStatus);
+            reply.code(502).send({ code: "publish_failed", message: "Bundle publish to Arweave failed" });
+            return;
+        }
+
+        logInfo("publish.bundle_success", { uploadId, bundleTxId: bundleResult.bundleTxId });
         const publishedAt = new Date().toISOString();
-        await postCallback(uploadId, body.item_id, body.bundle_tx_id ?? "dummy-tx-id", publishedAt, requestMockOverride?.callback);
+        await postCallback(uploadId, itemId, bundleResult.bundleTxId, publishedAt, requestMockOverride?.callback);
         reply.code(200).send({ ack: true, status: "queued_for_publish" });
     });
     return app;
