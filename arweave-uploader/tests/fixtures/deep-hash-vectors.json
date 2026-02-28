@@ -1,0 +1,35 @@
+{
+  "_source": "Arweave deep-hash structure (blob: tag='blob'+len, list: tag='list'+len, recursive). This implementation uses SHA-256 (32-byte). Reference implementations (arweave-js, Bundlr-Network/arbundles) use SHA-384 (48-byte).",
+  "_references": [
+    "https://github.com/ArweaveTeam/arweave-js/blob/master/src/common/lib/deepHash.ts",
+    "https://github.com/Bundlr-Network/arbundles/blob/master/src/deepHash.ts"
+  ],
+  "sha256": {
+    "algorithm": "SHA-256",
+    "note": "Used by dist/publish/deep-hash.js (this project).",
+    "blob": {
+      "input": "aGVsbG8=",
+      "inputNote": "base64 of 'hello'",
+      "expectedHex": "9af9e3db51baa074ef83d32c1652d670738232c9fe29b998586b484b44652bce"
+    },
+    "list": {
+      "input": ["YQ==", "Yg=="],
+      "inputNote": "base64 of ['a', 'b']",
+      "expectedHex": "783c380233b7ac4c157eeb09cd7cd6c20ac707f298aa78c8f0c12bfe5ec6d215"
+    }
+  },
+  "referenceSha384": {
+    "algorithm": "SHA-384",
+    "note": "Arweave reference (arweave-js, Bundlr arbundles). Same structure, 48-byte output. For documentation and future compatibility.",
+    "blob": {
+      "input": "aGVsbG8=",
+      "inputNote": "base64 of 'hello'",
+      "expectedHex": "33ab2407a6c328c0bc1bbe5971f49af5c1908985f83c3d2bd89a9e221dd8b068dc61ce968ba3f9ab12d5361ba3944382"
+    },
+    "list": {
+      "input": ["YQ==", "Yg=="],
+      "inputNote": "base64 of ['a', 'b']",
+      "expectedHex": "961ca0d6e9a426f29b6e1f3c8d690175ee8b92d162004341430323d3e0350ffc8a6233159d07e4e7ac81f23d67733e51"
+    }
+  }
+}
