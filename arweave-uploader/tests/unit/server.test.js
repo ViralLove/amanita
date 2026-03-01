@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 import { getPublicKeyPem, createSignedToken } from "../fixtures/jwt-upload-token.js";
+import { createValidDataItem } from "../fixtures/valid-data-item.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtureJwk = JSON.parse(
@@ -118,6 +119,44 @@ describe("server", () => {
       assert.strictEqual(res.statusCode, 400);
       const body = JSON.parse(res.body);
       assert.strictEqual(body.code, "signature_invalid");
+    });
+
+    it("POST /v1/crystalize success (mocked publish) returns 200 with bundle_tx_id and arweave_url", async () => {
+      process.env.UPLOAD_TOKEN_JWT_PUBLIC_KEY = getPublicKeyPem();
+      const uploadId = "server-200-upload";
+      const token = createSignedToken({ uploadId, maxBytes: 1024 });
+      const signedDataItem = await createValidDataItem(uploadId);
+      const mockTxId = "test-tx-123";
+      const mockPublish = () => Promise.resolve({ bundleTxId: mockTxId });
+      const { loadConfig } = await import("../../dist/config.js");
+      const { ArweaveClient } = await import("../../dist/arweave-client.js");
+      const config = loadConfig();
+      const app = buildApp({
+        config,
+        arweaveClient: new ArweaveClient(config),
+        bundleAndPublish: mockPublish,
+      });
+      const res = await app.inject({
+        method: "POST",
+        url: "/v1/crystalize",
+        payload: {
+          upload_id: uploadId,
+          upload_token: token,
+          signed_data_item: signedDataItem,
+          payload_size: 0,
+        },
+      });
+      assert.strictEqual(res.statusCode, 200, res.body);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.ack, true);
+      assert.strictEqual(body.status, "queued_for_publish");
+      assert.strictEqual(body.bundle_tx_id, mockTxId);
+      assert.strictEqual(typeof body.arweave_url, "string");
+      assert.ok(body.arweave_url.endsWith(mockTxId), "arweave_url must end with bundle_tx_id");
+      assert.ok(
+        body.arweave_url.startsWith(`${config.arweaveProtocol}://${config.arweaveHost}/`),
+        "arweave_url must be built from config protocol and host"
+      );
     });
   });
 });
