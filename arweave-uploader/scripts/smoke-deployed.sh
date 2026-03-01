@@ -72,4 +72,21 @@ if [ "$crystalize_code" != "400" ] && [ "$crystalize_code" != "401" ]; then
 fi
 echo "OK: /v1/crystalize endpoint отвечает"
 echo ""
+
+# Step 3: real crystalize (optional)
+if [ -n "$SMOKE_REAL" ] && { [ -n "$SMOKE_JWT_PRIVATE_KEY_PEM" ] || [ -n "$SMOKE_JWT_PRIVATE_KEY_FILE" ]; }; then
+  echo "--- 3) POST /v1/crystalize (real payload, expect 200 + bundle_tx_id + arweave_url) ---"
+  export DEPLOYED_URL="$BASE_URL"
+  if node scripts/smoke-real-crystalize.js; then
+    echo "OK: real crystalize"
+  else
+    echo "FAIL: real crystalize (see above)"
+    exit 1
+  fi
+  echo ""
+else
+  echo "Real smoke skipped (set SMOKE_REAL=1 and SMOKE_JWT_PRIVATE_KEY_PEM or SMOKE_JWT_PRIVATE_KEY_FILE to enable)."
+  echo ""
+fi
+
 echo "Smoke passed."

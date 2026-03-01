@@ -46,12 +46,27 @@ export function getPublicKeyJwk() {
  */
 export function createSignedToken({ uploadId, maxBytes = 1024, exp }) {
   const pair = getKeyPair();
+  return signJwtWithKey(pair.privateKey, { uploadId, maxBytes, exp });
+}
+
+/**
+ * Создаёт подписанный JWT с заданным приватным ключом (PEM). Для smoke/скриптов.
+ * @param {string} privateKeyPem — PEM строка приватного ключа RSA
+ * @param {object} opts — uploadId, maxBytes (default 1024), exp (optional)
+ * @returns {string} JWT
+ */
+export function createSignedTokenWithPrivateKey(privateKeyPem, { uploadId, maxBytes = 1024, exp }) {
+  const key = crypto.createPrivateKey(privateKeyPem);
+  return signJwtWithKey(key, { uploadId, maxBytes, exp });
+}
+
+function signJwtWithKey(privateKey, { uploadId, maxBytes, exp }) {
   const header = { alg: "RS256", typ: "JWT" };
   const expSec = exp ?? Math.floor(Date.now() / 1000) + 3600;
   const payload = { upload_id: uploadId, max_bytes: maxBytes, exp: expSec };
   const headerB64 = base64UrlEncode(Buffer.from(JSON.stringify(header)));
   const payloadB64 = base64UrlEncode(Buffer.from(JSON.stringify(payload)));
   const signedData = `${headerB64}.${payloadB64}`;
-  const signature = crypto.createSign("RSA-SHA256").update(signedData).sign(pair.privateKey);
+  const signature = crypto.createSign("RSA-SHA256").update(signedData).sign(privateKey);
   return `${signedData}.${base64UrlEncode(signature)}`;
 }
