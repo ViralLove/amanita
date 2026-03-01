@@ -28,7 +28,8 @@ function computeRequestMockOverride(request) {
     callback: callbackRaw !== undefined ? normalizeMockStatus(callbackRaw) : undefined,
   };
 }
-export function buildApp({ config, arweaveClient }) {
+export function buildApp({ config, arweaveClient, bundleAndPublish: bundleAndPublishOverride }) {
+    const doPublish = bundleAndPublishOverride ?? bundleAndPublish;
     const app = Fastify({ logger: false });
     if (!config.relayAuthToken) {
         logWarn("relay.auth.disabled", {
@@ -98,7 +99,7 @@ export function buildApp({ config, arweaveClient }) {
             signedDataItem.replace(/-/g, "+").replace(/_/g, "/"),
             "base64"
         );
-        const bundleResult = await bundleAndPublish(signedDataItemBytes, arweaveClient);
+        const bundleResult = await doPublish(signedDataItemBytes, arweaveClient);
         if (bundleResult.error) {
             logWarn("publish.bundle_failed", { uploadId, error: bundleResult.error });
             await putStatus(uploadId, "failed", "publish_failed", requestMockOverride?.putStatus);
@@ -106,10 +107,17 @@ export function buildApp({ config, arweaveClient }) {
             return;
         }
 
-        logInfo("publish.bundle_success", { uploadId, bundleTxId: bundleResult.bundleTxId });
+        const bundleTxId = bundleResult.bundleTxId;
+        const arweaveUrl = `${config.arweaveProtocol}://${config.arweaveHost}/${bundleTxId}`;
+        logInfo("publish.bundle_success", { uploadId, bundleTxId });
         const publishedAt = new Date().toISOString();
-        await postCallback(uploadId, itemId, bundleResult.bundleTxId, publishedAt, requestMockOverride?.callback);
-        reply.code(200).send({ ack: true, status: "queued_for_publish" });
+        await postCallback(uploadId, itemId, bundleTxId, publishedAt, requestMockOverride?.callback);
+        reply.code(200).send({
+            ack: true,
+            status: "queued_for_publish",
+            bundle_tx_id: bundleTxId,
+            arweave_url: arweaveUrl,
+        });
     });
     return app;
 }
