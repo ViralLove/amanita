@@ -12,7 +12,7 @@
 **Микросервис** — HTTP relay для публикации в Arweave **уже подписанных** Data Item (ANS-104). Принимает подписанный item по контракту, верифицирует подпись и тег Upload-Id, упаковывает в bundle и отправляет в Arweave. Данными владеет отправитель (подпись своим ключом).
 
 - **Вход:** HTTP POST `POST /v1/crystalize` с телом `{ upload_id, upload_token, signed_data_item, payload_size }`.
-- **Выход:** 200 + `{ ack: true, status: "queued_for_publish" }` или коды ошибок (400/401/502).
+- **Выход:** 200 + тело с `ack`, `status`, `bundle_tx_id`, `arweave_url` или коды ошибок (400/401/502).
 - **Внешняя зависимость:** Arweave (gateway), опционально Backend (PUT status, POST callback).
 
 ---
@@ -33,7 +33,7 @@
 │  4. putStatus(queued_for_publish)                                │
 │  5. bundleAndPublish(signedDataItemBytes) → Arweave              │
 │  6. postCallback(uploadId, itemId, bundleTxId)                   │
-│  7. Ответ 200 { ack: true } или 400/401/502                       │
+│  7. Ответ 200 { ack, status, bundle_tx_id, arweave_url } или 400/401/502 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -102,6 +102,8 @@
 
 Маршрут принимает тело с полями: `upload_token` (JWT RS256), `upload_id`, `signed_data_item` (base64 Data Item ANS-104), `payload_size` (число). Порядок: проверка body → `verifyUploadToken` → `validateDataItem` (подпись RSA-PSS, тег Upload-Id) → `putStatus(queued_for_publish)` → `bundleAndPublish` → при успехе `postCallback`, иначе `putStatus(failed, publish_failed)`. Коды: 400 (missing/signature_invalid), 401 (token_invalid), 502 (publish_failed). Логи: `publish.request.received`, `publish.token_invalid`, `publish.data_item_invalid`, `publish.bundle_failed`, `publish.bundle_success` (без тела токена и signed_data_item).
 
+**Ответ 200 при успехе:** `{ "ack": true, "status": "queued_for_publish", "bundle_tx_id": "<id транзакции бандла в Arweave>", "arweave_url": "<protocol>://<host>/<bundle_tx_id>" }`. Поле `arweave_url` формируется из конфига (`ARWEAVE_PROTOCOL`, `ARWEAVE_HOST`).
+
 **Версионность API:** префикс `/v1/` — версия контракта; имя действия — `crystalize`. При несовместимых изменениях в будущем вводится `/v2/crystalize`.
 
 ---
@@ -111,7 +113,7 @@
 - **Сборка:** `npm run build` → `dist/` (Node ESM).
 - **Запуск:** `node dist/server.js` (или `npm start`); в Docker — тот же CMD, порт из `PORT`.
 - **Деплой:** см. `docs/deploy/railway-docker.md`, `docs/deploy/deploy-options.md`.
-- **Проверка после деплоя:** `docs/deploy/railway-docker.md` (curl, smoke `scripts/smoke-deployed.sh`).
+- **Проверка после деплоя:** `docs/deploy/railway-docker.md` (curl, smoke `scripts/smoke-deployed.sh`). Опционально: реальная загрузка в Arweave (шаг 3 smoke) — см. переменные `SMOKE_REAL`, `SMOKE_JWT_PRIVATE_KEY_*` в `.env.example`; на деплое задать соответствующий `UPLOAD_TOKEN_JWT_PUBLIC_KEY`.
 
 ---
 
