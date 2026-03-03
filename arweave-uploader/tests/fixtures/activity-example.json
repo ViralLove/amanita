@@ -1,0 +1,17 @@
+{
+  "activity_type": "event",
+  "title": "Floou Ceremony",
+  "short_summary": "We gather today to celebrate the blooming of the Floou inside Amanita Economy",
+  "full_description": "We gather today to celebrate the blooming of the Floou inside the Amanita Economy. We will be using the Floou to connect with the energy of the Amanita micelium and to celebrate the blooming of the Floou in our hearts.",
+  "format": "ceremony",
+  "delivery_mode": "in_person",
+  "location_info": {"city": "Tallinn", "venue": "Floou Space (ex. Ela Tervena)"},
+  "event_timing": {
+    "schedule_model": "fixed_dates",
+    "fixed_dates": [{"start": "2026-03-03T11:44:22Z", "end": "2026-03-03T17:17:33Z", "timezone": "Europe/Tallinn"}]
+  },
+  "event_capacity": {"group_capacity": 24, "max_participants": 24},
+  "event_duration": {"duration_type": "fixed", "fixed": "approx. 8.88 hours"},
+  "event_pricing": {"pricing_type": "ticket_price", "ticket_price": {"amount": 44.4, "currency": "DOGE"}},
+  "event_cta": {"event_page_link": "https://amanita.world/floou-ceremony"}
+}

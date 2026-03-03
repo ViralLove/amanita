@@ -1,6 +1,15 @@
 /**
  * Фикстура: минимальный валидный Data Item (ANS-104) с одной меткой Upload-Id и подписью RSA-PSS.
  * Для P0/P1 тестов validateDataItem.
+ *
+ * Что за контент и почему в байтах:
+ * - ANS-104 Data Item — это бинарный формат (спека Arweave/Bundlr): не JSON, а последовательность
+ *   полей (signature type, signature 256b, owner 294b, target, anchor, num_tags, tag_bytes, tags, data).
+ * - Поле "data" — произвольный payload в байтах. По умолчанию пустой Buffer; можно передать
+ *   любой контент, например Buffer.from(JSON.stringify(activity), "utf8") для реального JSON Activity.
+ * - Кристаллизатор не шифрует и не расшифровывает: он проверяет подпись Data Item и тег Upload-Id,
+ *   затем упаковывает item в bundle и отправляет в Arweave. Кто подписывает — владелец ключа (в фикстуре
+ *   своя RSA-пара); в проде — ключ кошелька пользователя.
  */
 
 import crypto from "node:crypto";
@@ -57,7 +66,7 @@ function buildTagBlock(name, value) {
   const nameLenZ = zigzagEncode(nameBuf.length);
   const valueLenZ = zigzagEncode(valueBuf.length);
   const countZ = zigzagEncode(1);
-  const size = 32;
+  const size = 16 + nameBuf.length + valueBuf.length;
   const buf = Buffer.alloc(size);
   let off = 0;
   off += writeVInt(buf, off, countZ);

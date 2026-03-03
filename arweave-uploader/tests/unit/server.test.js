@@ -157,6 +157,7 @@ describe("server", () => {
         body.arweave_url.startsWith(`${config.arweaveProtocol}://${config.arweaveHost}/`),
         "arweave_url must be built from config protocol and host"
       );
+      console.log("  → arweave_url:", body.arweave_url);
     });
   });
 });
