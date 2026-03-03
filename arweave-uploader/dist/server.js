@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { ArweaveClient } from "./arweave-client.js";
 import { isAuthorized } from "./auth.js";
@@ -9,6 +9,18 @@ import { putStatus, postCallback, normalizeMockStatus } from "./publish/backend-
 import { bundleAndPublish } from "./publish/bundle-publish.js";
 import { validateDataItem } from "./publish/validate-data-item.js";
 import { verifyUploadToken } from "./publish/validate-token.js";
+
+/** Returns a 43-char base64url string (same format as Arweave tx id). For mock publish when USE_REAL_ARWEAVE=false. */
+export function generateMockTxId() {
+    const raw = randomBytes(32).toString("base64");
+    return raw.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** Returns a doPublish-compatible function that does not call Arweave; returns { bundleTxId, mock: true }. */
+export function createMockPublish() {
+    return async () => ({ bundleTxId: generateMockTxId(), mock: true });
+}
+
 function isBackendMockEnabled() {
   const v = process.env.BACKEND_USE_MOCK;
   return v === "true" || v === "1" || (typeof v === "string" && v.toLowerCase() === "true");
@@ -109,7 +121,7 @@ export function buildApp({ config, arweaveClient, bundleAndPublish: bundleAndPub
 
         const bundleTxId = bundleResult.bundleTxId;
         const arweaveUrl = `${config.arweaveProtocol}://${config.arweaveHost}/${bundleTxId}`;
-        logInfo("publish.bundle_success", { uploadId, bundleTxId, arweave_url: arweaveUrl });
+        logInfo("publish.bundle_success", { uploadId, bundleTxId, arweave_url: arweaveUrl, mock: bundleResult.mock ?? false });
         const publishedAt = new Date().toISOString();
         await postCallback(uploadId, itemId, bundleTxId, publishedAt, requestMockOverride?.callback);
         reply.code(200).send({
@@ -122,15 +134,18 @@ export function buildApp({ config, arweaveClient, bundleAndPublish: bundleAndPub
     return app;
 }
 export async function startServer() {
+    const useRealArweave = process.env.USE_REAL_ARWEAVE === "true" || process.env.USE_REAL_ARWEAVE === "1";
     const config = loadConfig();
     const arweaveClient = new ArweaveClient(config);
-    const app = buildApp({ config, arweaveClient });
+    const doPublish = useRealArweave ? bundleAndPublish : createMockPublish();
+    const app = buildApp({ config, arweaveClient, bundleAndPublish: doPublish });
     await app.listen({ host: "0.0.0.0", port: config.port });
     logInfo("server.started", {
         port: config.port,
         arweaveHost: config.arweaveHost,
         arweaveProtocol: config.arweaveProtocol,
         arweavePort: config.arweavePort,
+        useRealArweave,
     });
 }
 const isEntrypoint = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
