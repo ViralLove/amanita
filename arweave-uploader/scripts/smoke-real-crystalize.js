@@ -69,6 +69,25 @@ async function main() {
   }
 
   console.log("OK: 200, bundle_tx_id:", txId, "arweave_url:", arweaveUrl);
+
+  // Проверка, что tx реально появился в Arweave (нет фальшивого 200 при неудачной загрузке)
+  const verifyUrl = process.env.SMOKE_VERIFY_ARWEAVE_URL || arweaveUrl;
+  const verifyDelayMs = parseInt(process.env.SMOKE_VERIFY_DELAY_MS || "3000", 10);
+  await new Promise((r) => setTimeout(r, verifyDelayMs));
+  let verifyRes;
+  try {
+    verifyRes = await fetch(verifyUrl, { method: "GET" });
+  } catch (err) {
+    console.error("Verify tx on Arweave failed (fetch):", err.message);
+    process.exit(1);
+  }
+  if (!verifyRes.ok) {
+    console.error(
+      "FAIL: tx not found on Arweave (HTTP " + verifyRes.status + "). URL: " + arweaveUrl
+    );
+    process.exit(1);
+  }
+  console.log("OK: tx verified on Arweave:", arweaveUrl);
 }
 
 main().catch((err) => {
