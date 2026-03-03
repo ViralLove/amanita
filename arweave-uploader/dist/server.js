@@ -109,7 +109,7 @@ export function buildApp({ config, arweaveClient, bundleAndPublish: bundleAndPub
 
         const bundleTxId = bundleResult.bundleTxId;
         const arweaveUrl = `${config.arweaveProtocol}://${config.arweaveHost}/${bundleTxId}`;
-        logInfo("publish.bundle_success", { uploadId, bundleTxId });
+        logInfo("publish.bundle_success", { uploadId, bundleTxId, arweave_url: arweaveUrl });
         const publishedAt = new Date().toISOString();
         await postCallback(uploadId, itemId, bundleTxId, publishedAt, requestMockOverride?.callback);
         reply.code(200).send({
