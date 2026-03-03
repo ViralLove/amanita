@@ -4,7 +4,7 @@
 
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
-import { buildApp } from "../../dist/server.js";
+import { buildApp, createMockPublish } from "../../dist/server.js";
 import { setTestEnv, restoreEnv } from "../helpers/env.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -158,6 +158,44 @@ describe("server", () => {
         "arweave_url must be built from config protocol and host"
       );
       console.log("  → arweave_url:", body.arweave_url);
+    });
+
+    it("POST /v1/crystalize with createMockPublish (USE_REAL_ARWEAVE=false style) returns 200, bundle_tx_id 43 chars base64url", async () => {
+      process.env.UPLOAD_TOKEN_JWT_PUBLIC_KEY = getPublicKeyPem();
+      const uploadId = "server-mock-format-upload";
+      const token = createSignedToken({ uploadId, maxBytes: 1024 });
+      const signedDataItem = await createValidDataItem(uploadId);
+      const { loadConfig } = await import("../../dist/config.js");
+      const { ArweaveClient } = await import("../../dist/arweave-client.js");
+      const config = loadConfig();
+      const app = buildApp({
+        config,
+        arweaveClient: new ArweaveClient(config),
+        bundleAndPublish: createMockPublish(),
+      });
+      const res = await app.inject({
+        method: "POST",
+        url: "/v1/crystalize",
+        payload: {
+          upload_id: uploadId,
+          upload_token: token,
+          signed_data_item: signedDataItem,
+          payload_size: 0,
+        },
+      });
+      assert.strictEqual(res.statusCode, 200, res.body);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.ack, true);
+      assert.strictEqual(body.status, "queued_for_publish");
+      assert.strictEqual(typeof body.bundle_tx_id, "string");
+      assert.strictEqual(body.bundle_tx_id.length, 43, "bundle_tx_id must be 43 chars (Arweave tx id format)");
+      assert.match(body.bundle_tx_id, /^[A-Za-z0-9_-]{43}$/, "bundle_tx_id must be base64url");
+      assert.strictEqual(typeof body.arweave_url, "string");
+      assert.ok(body.arweave_url.endsWith(body.bundle_tx_id), "arweave_url must end with bundle_tx_id");
+      assert.ok(
+        body.arweave_url.startsWith(`${config.arweaveProtocol}://${config.arweaveHost}/`),
+        "arweave_url must be built from config"
+      );
     });
   });
 });
