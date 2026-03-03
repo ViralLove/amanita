@@ -15,9 +15,11 @@ async function getPublicKey(): Promise<CryptoKey | null> {
   const raw = Deno.env.get("UPLOAD_TOKEN_JWT_PUBLIC_KEY");
   if (!raw || !raw.trim()) return null;
   const trimmed = raw.trim();
+  // В .env/Secrets ключ часто вставляют одной строкой с литеральными \n — приводим к переносам
+  const normalized = trimmed.startsWith("{") ? trimmed : trimmed.replace(/\\n/g, "\n");
   try {
-    if (trimmed.startsWith("{")) {
-      const jwk = JSON.parse(trimmed) as JsonWebKey;
+    if (normalized.startsWith("{")) {
+      const jwk = JSON.parse(normalized) as JsonWebKey;
       cachedPublicKey = await crypto.subtle.importKey(
         "jwk",
         jwk,
@@ -26,7 +28,7 @@ async function getPublicKey(): Promise<CryptoKey | null> {
         ["verify"]
       );
     } else {
-      const pem = trimmed
+      const pem = normalized
         .replace(/-----BEGIN PUBLIC KEY-----/g, "")
         .replace(/-----END PUBLIC KEY-----/g, "")
         .replace(/\s/g, "");
@@ -97,8 +99,8 @@ export async function verifyUploadToken(
   const valid = await crypto.subtle.verify(
     { name: "RSASSA-PKCS1-v1_5" },
     key,
-    signature,
-    dataToVerify
+    new Uint8Array(signature),
+    new Uint8Array(dataToVerify)
   );
   if (!valid) return { ok: false, code: "token_invalid" };
   return { ok: true };
