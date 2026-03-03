@@ -12,17 +12,29 @@ function base64UrlDecode(str) {
   return Buffer.from(base64, "base64");
 }
 
+function normalizePem(pem) {
+  if (typeof pem !== "string") return pem;
+  return pem.replace(/\\n/g, "\n").trim();
+}
+
 function getPublicKey(keyFromEnv) {
   if (!keyFromEnv || typeof keyFromEnv !== "string") return null;
   const trimmed = keyFromEnv.trim();
   if (trimmed.startsWith("-----BEGIN")) {
-    return crypto.createPublicKey({ key: trimmed, format: "pem" });
+    const normalized = normalizePem(trimmed);
+    try {
+      return crypto.createPublicKey({ key: normalized, format: "pem" });
+    } catch (err) {
+      console.error("UPLOAD_TOKEN_JWT_PUBLIC_KEY PEM decode failed:", err?.message || err);
+      return null;
+    }
   }
   if (trimmed.startsWith("{")) {
     try {
       const jwk = JSON.parse(trimmed);
       return crypto.createPublicKey({ key: jwk, format: "jwk" });
-    } catch {
+    } catch (err) {
+      console.error("UPLOAD_TOKEN_JWT_PUBLIC_KEY JWK decode failed:", err?.message || err);
       return null;
     }
   }
