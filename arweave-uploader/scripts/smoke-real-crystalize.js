@@ -7,6 +7,7 @@
  *   SMOKE_JWT_PRIVATE_KEY_FILE или SMOKE_JWT_PRIVATE_KEY_PEM — приватный ключ (RSA PEM) для подписи JWT.
  *     Должен быть из той же пары, что и UPLOAD_TOKEN_JWT_PUBLIC_KEY на деплое (иначе сервер вернёт 401).
  *     Пример: SMOKE_JWT_PRIVATE_KEY_FILE=../keys/amanita_111444555888555444111_private.pem (или ../bot/keys/...)
+ *   SMOKE_SKIP_ARWEAVE_VERIFY=1 — пропустить проверку tx в Arweave (для USE_REAL_ARWEAVE=false, tx фейковый).
  */
 
 import { readFileSync, existsSync } from "node:fs";
@@ -147,6 +148,14 @@ async function main() {
   }
 
   console.log("OK: 200, bundle_tx_id:", txId, "arweave_url:", arweaveUrl);
+
+  const skipVerify =
+    process.env.SMOKE_SKIP_ARWEAVE_VERIFY === "true" ||
+    process.env.SMOKE_SKIP_ARWEAVE_VERIFY === "1";
+  if (skipVerify) {
+    console.log("OK: skip Arweave verify (SMOKE_SKIP_ARWEAVE_VERIFY); подходит для USE_REAL_ARWEAVE=false");
+    return;
+  }
 
   // Проверка, что tx реально появился в Arweave (нет фальшивого 200 при неудачной загрузке)
   const verifyUrl = process.env.SMOKE_VERIFY_ARWEAVE_URL || arweaveUrl;

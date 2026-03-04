@@ -62,3 +62,5 @@ npm start
 - **В smoke** в консоль выводится: `url`, `uploadId`, `tokenLength`, `keySource`. При 401 — текст ответа и подсказка про пару ключей и `DEPLOYED_URL=http://localhost:3000`.
 
 Сначала проверяйте локально с `DEPLOYED_URL=http://localhost:3000` и одной парой ключей в `.env` (публичный на сервере, приватный в smoke), затем переносите тест на деплой.
+
+Если сервер с **USE_REAL_ARWEAVE=false** (мок), tx в Arweave не загружается — проверка GET даст 404. Задайте **SMOKE_SKIP_ARWEAVE_VERIFY=1** в `.env` smoke, чтобы пропустить шаг проверки и не падать по ожидаемой 404.
