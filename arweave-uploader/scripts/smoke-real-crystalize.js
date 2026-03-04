@@ -1,13 +1,36 @@
 #!/usr/bin/env node
 /**
  * Real smoke: POST /v1/crystalize с валидным JWT и Data Item, проверка 200 и полей bundle_tx_id, arweave_url.
- * Запуск: из корня arweave-uploader, после загрузки .env с DEPLOYED_URL и SMOKE_JWT_PRIVATE_KEY_*.
- * На деплое должен быть UPLOAD_TOKEN_JWT_PUBLIC_KEY (публичный ключ от пары с этим приватным).
+ *
+ * Запуск: из корня arweave-uploader. Скрипт сам подхватывает .env из текущей директории.
+ *   DEPLOYED_URL — URL задеплоенного uploader (по умолчанию Railway production).
+ *   SMOKE_JWT_PRIVATE_KEY_FILE или SMOKE_JWT_PRIVATE_KEY_PEM — приватный ключ (RSA PEM) для подписи JWT.
+ *     Должен быть из той же пары, что и UPLOAD_TOKEN_JWT_PUBLIC_KEY на деплое (иначе сервер вернёт 401).
+ *     Пример: SMOKE_JWT_PRIVATE_KEY_FILE=../keys/amanita_111444555888555444111_private.pem (или ../bot/keys/...)
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { createSignedTokenWithPrivateKey } from "../tests/fixtures/jwt-upload-token.js";
 import { createValidDataItem } from "../tests/fixtures/valid-data-item.js";
+
+function loadEnvIfPresent() {
+  const path = join(process.cwd(), ".env");
+  if (!existsSync(path)) return;
+  const raw = readFileSync(path, "utf8");
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    if (!key || process.env[key] !== undefined) continue;
+    let value = trimmed.slice(eq + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
+      value = value.slice(1, -1).replace(/\\n/g, "\n");
+    process.env[key] = value;
+  }
+}
 
 function getBaseUrl() {
   const raw = process.env.DEPLOYED_URL;
@@ -19,13 +42,22 @@ function getBaseUrl() {
 function loadPrivateKey() {
   const pem = process.env.SMOKE_JWT_PRIVATE_KEY_PEM;
   if (pem) return pem;
-  const path = process.env.SMOKE_JWT_PRIVATE_KEY_FILE;
-  if (path) return readFileSync(path, "utf8");
-  console.error("SMOKE_JWT_PRIVATE_KEY_PEM or SMOKE_JWT_PRIVATE_KEY_FILE required");
-  process.exit(1);
+  const pathRaw = process.env.SMOKE_JWT_PRIVATE_KEY_FILE;
+  if (!pathRaw) {
+    console.error("SMOKE_JWT_PRIVATE_KEY_PEM or SMOKE_JWT_PRIVATE_KEY_FILE required");
+    process.exit(1);
+  }
+  const pathResolved = pathRaw.startsWith("/") ? pathRaw : resolve(process.cwd(), pathRaw);
+  if (!existsSync(pathResolved)) {
+    console.error("SMOKE_JWT_PRIVATE_KEY_FILE: file not found:", pathResolved);
+    console.error("  (resolved from cwd:", process.cwd() + ", path from env:", pathRaw + ")");
+    process.exit(1);
+  }
+  return readFileSync(pathResolved, "utf8");
 }
 
 async function main() {
+  loadEnvIfPresent();
   const baseUrl = getBaseUrl();
   const privateKeyPem = loadPrivateKey();
   const uploadId = `smoke-${Date.now()}`;
@@ -37,6 +69,9 @@ async function main() {
     signed_data_item: signedDataItem,
     payload_size: 0,
   };
+
+  const keySource = process.env.SMOKE_JWT_PRIVATE_KEY_PEM ? "SMOKE_JWT_PRIVATE_KEY_PEM" : (process.env.SMOKE_JWT_PRIVATE_KEY_FILE || "");
+  console.log("[smoke] POST", `${baseUrl}/v1/crystalize`, "uploadId:", uploadId, "token prefix:", token.slice(0, 30) + "...", "key:", keySource || "(none)");
 
   const url = `${baseUrl}/v1/crystalize`;
   let res;
@@ -54,6 +89,9 @@ async function main() {
   const body = await res.json().catch(() => ({}));
   if (res.status !== 200) {
     console.error("HTTP", res.status, body);
+    if (res.status === 401 && body.code === "token_invalid") {
+      console.error("[smoke] 401 token_invalid — check: key pair (SMOKE private vs UPLOAD_TOKEN_JWT_PUBLIC_KEY on server), token exp, upload_id in body.");
+    }
     process.exit(1);
   }
 

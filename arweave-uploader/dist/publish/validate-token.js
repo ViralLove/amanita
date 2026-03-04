@@ -45,22 +45,22 @@ function getPublicKey(keyFromEnv) {
  * @param {string} token - JWT string
  * @param {string} uploadId - ожидаемый upload_id из тела запроса
  * @param {number} payloadSize - размер payload в байтах
- * @returns {Promise<{ ok: true } | { ok: false, code: 'token_invalid' }>}
+ * @returns {Promise<{ ok: true } | { ok: false, code: 'token_invalid', reason: string }>}
  */
 async function verifyUploadToken(token, uploadId, payloadSize) {
   const publicKeyPemOrJwk = process.env.UPLOAD_TOKEN_JWT_PUBLIC_KEY;
   const publicKey = getPublicKey(publicKeyPemOrJwk);
   if (!publicKey) {
-    return { ok: false, code: "token_invalid" };
+    return { ok: false, code: "token_invalid", reason: "no_public_key" };
   }
 
   if (!token || typeof token !== "string") {
-    return { ok: false, code: "token_invalid" };
+    return { ok: false, code: "token_invalid", reason: "token_empty" };
   }
 
   const parts = token.split(".");
   if (parts.length !== 3) {
-    return { ok: false, code: "token_invalid" };
+    return { ok: false, code: "token_invalid", reason: "parts_count" };
   }
 
   let payload;
@@ -68,25 +68,25 @@ async function verifyUploadToken(token, uploadId, payloadSize) {
     const payloadBuf = base64UrlDecode(parts[1]);
     payload = JSON.parse(payloadBuf.toString("utf8"));
   } catch {
-    return { ok: false, code: "token_invalid" };
+    return { ok: false, code: "token_invalid", reason: "payload_parse" };
   }
 
   if (payload.exp != null) {
     const expSec = typeof payload.exp === "number" ? payload.exp : parseInt(payload.exp, 10);
     if (Number.isNaN(expSec) || expSec * 1000 < Date.now()) {
-      return { ok: false, code: "token_invalid" };
+      return { ok: false, code: "token_invalid", reason: "exp_expired" };
     }
   }
 
   if (payload.upload_id !== uploadId) {
-    return { ok: false, code: "token_invalid" };
+    return { ok: false, code: "token_invalid", reason: "upload_id_mismatch" };
   }
 
   const maxBytes = payload.max_bytes;
   if (maxBytes != null) {
     const max = typeof maxBytes === "number" ? maxBytes : parseInt(maxBytes, 10);
     if (Number.isNaN(max) || payloadSize > max) {
-      return { ok: false, code: "token_invalid" };
+      return { ok: false, code: "token_invalid", reason: "max_bytes_exceeded" };
     }
   }
 
@@ -101,7 +101,7 @@ async function verifyUploadToken(token, uploadId, payloadSize) {
   );
 
   if (!ok) {
-    return { ok: false, code: "token_invalid" };
+    return { ok: false, code: "token_invalid", reason: "signature_invalid" };
   }
 
   return { ok: true };

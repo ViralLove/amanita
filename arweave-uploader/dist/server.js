@@ -90,7 +90,8 @@ export function buildApp({ config, arweaveClient, bundleAndPublish: bundleAndPub
 
         const tokenResult = await verifyUploadToken(uploadToken, uploadId, payloadSize);
         if (!tokenResult.ok) {
-            logInfo("publish.token_invalid", { uploadId });
+            const reason = tokenResult.reason || "unknown";
+            logInfo("publish.token_invalid", { uploadId, reason });
             await putStatus(uploadId, "failed", "token_invalid", requestMockOverride?.putStatus);
             reply.code(401).send({ code: "token_invalid", message: "Invalid or expired upload token" });
             return;
