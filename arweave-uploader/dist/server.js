@@ -1,4 +1,6 @@
 import Fastify from "fastify";
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { ArweaveClient } from "./arweave-client.js";
@@ -9,6 +11,44 @@ import { putStatus, postCallback, normalizeMockStatus } from "./publish/backend-
 import { bundleAndPublish } from "./publish/bundle-publish.js";
 import { validateDataItem } from "./publish/validate-data-item.js";
 import { verifyUploadToken } from "./publish/validate-token.js";
+
+function loadEnvFromFile() {
+  const path = join(process.cwd(), ".env");
+  if (!existsSync(path)) return;
+  const raw = readFileSync(path, "utf8");
+  const lines = raw.split("\n");
+  let i = 0;
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+    i += 1;
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    if (!key || process.env[key] !== undefined) continue;
+    let value = trimmed.slice(eq + 1).trim();
+    const quote = value.startsWith('"') ? '"' : value.startsWith("'") ? "'" : null;
+    if (quote) {
+      if (!value.endsWith(quote) || value.length === 1) {
+        const acc = [value.slice(1)];
+        while (i < lines.length) {
+          const next = lines[i];
+          i += 1;
+          acc.push(next);
+          if (next.endsWith(quote)) {
+            acc[acc.length - 1] = next.slice(0, -1);
+            break;
+          }
+        }
+        value = acc.join("\n").replace(/\\n/g, "\n");
+      } else {
+        value = value.slice(1, -1).replace(/\\n/g, "\n");
+      }
+    }
+    process.env[key] = value;
+  }
+}
+loadEnvFromFile();
 
 /** Returns a 43-char base64url string (same format as Arweave tx id). For mock publish when USE_REAL_ARWEAVE=false. */
 export function generateMockTxId() {
@@ -90,8 +130,7 @@ export function buildApp({ config, arweaveClient, bundleAndPublish: bundleAndPub
 
         const tokenResult = await verifyUploadToken(uploadToken, uploadId, payloadSize);
         if (!tokenResult.ok) {
-            const reason = tokenResult.reason || "unknown";
-            logInfo("publish.token_invalid", { uploadId, reason });
+            logInfo("publish.token_invalid", { uploadId, reason: tokenResult.reason ?? "unknown" });
             await putStatus(uploadId, "failed", "token_invalid", requestMockOverride?.putStatus);
             reply.code(401).send({ code: "token_invalid", message: "Invalid or expired upload token" });
             return;

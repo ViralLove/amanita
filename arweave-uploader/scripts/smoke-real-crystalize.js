@@ -17,17 +17,41 @@ import { createValidDataItem } from "../tests/fixtures/valid-data-item.js";
 function loadEnvIfPresent() {
   const path = join(process.cwd(), ".env");
   if (!existsSync(path)) return;
-  const raw = readFileSync(path, "utf8");
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
+  let raw;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch {
+    return;
+  }
+  const lines = raw.split("\n");
+  let i = 0;
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+    i += 1;
     if (!trimmed || trimmed.startsWith("#")) continue;
     const eq = trimmed.indexOf("=");
     if (eq <= 0) continue;
     const key = trimmed.slice(0, eq).trim();
     if (!key || process.env[key] !== undefined) continue;
     let value = trimmed.slice(eq + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
-      value = value.slice(1, -1).replace(/\\n/g, "\n");
+    const quote = value.startsWith('"') ? '"' : value.startsWith("'") ? "'" : null;
+    if (quote) {
+      if (!value.endsWith(quote) || value.length === 1) {
+        const acc = [value.slice(1)];
+        while (i < lines.length) {
+          const next = lines[i];
+          i += 1;
+          acc.push(next);
+          if (next.endsWith(quote)) {
+            acc[acc.length - 1] = next.slice(0, -1);
+            break;
+          }
+        }
+        value = acc.join("\n").replace(/\\n/g, "\n");
+      } else {
+        value = value.slice(1, -1).replace(/\\n/g, "\n");
+      }
+    }
     process.env[key] = value;
   }
 }
@@ -56,6 +80,16 @@ function loadPrivateKey() {
   return readFileSync(pathResolved, "utf8");
 }
 
+function getKeySource() {
+  if (process.env.SMOKE_JWT_PRIVATE_KEY_PEM) return "SMOKE_JWT_PRIVATE_KEY_PEM (inline)";
+  const pathRaw = process.env.SMOKE_JWT_PRIVATE_KEY_FILE;
+  if (pathRaw) {
+    const resolved = pathRaw.startsWith("/") ? pathRaw : resolve(process.cwd(), pathRaw);
+    return `SMOKE_JWT_PRIVATE_KEY_FILE=${resolved}`;
+  }
+  return "none";
+}
+
 async function main() {
   loadEnvIfPresent();
   const baseUrl = getBaseUrl();
@@ -70,8 +104,12 @@ async function main() {
     payload_size: 0,
   };
 
-  const keySource = process.env.SMOKE_JWT_PRIVATE_KEY_PEM ? "SMOKE_JWT_PRIVATE_KEY_PEM" : (process.env.SMOKE_JWT_PRIVATE_KEY_FILE || "");
-  console.log("[smoke] POST", `${baseUrl}/v1/crystalize`, "uploadId:", uploadId, "token prefix:", token.slice(0, 30) + "...", "key:", keySource || "(none)");
+  console.log("smoke crystalize:", {
+    url: `${baseUrl}/v1/crystalize`,
+    uploadId,
+    tokenLength: token?.length ?? 0,
+    keySource: getKeySource(),
+  });
 
   const url = `${baseUrl}/v1/crystalize`;
   let res;
@@ -90,7 +128,9 @@ async function main() {
   if (res.status !== 200) {
     console.error("HTTP", res.status, body);
     if (res.status === 401 && body.code === "token_invalid") {
-      console.error("[smoke] 401 token_invalid — check: key pair (SMOKE private vs UPLOAD_TOKEN_JWT_PUBLIC_KEY on server), token exp, upload_id in body.");
+      console.error(
+        "Hint: 401 token_invalid — проверьте пару ключей: приватный (SMOKE_JWT_*) и публичный на сервере (UPLOAD_TOKEN_JWT_PUBLIC_KEY). Для локального теста задайте DEPLOYED_URL=http://localhost:3000 и запустите сервер с той же парой ключей (см. docs/local-run-and-smoke.md)."
+      );
     }
     process.exit(1);
   }

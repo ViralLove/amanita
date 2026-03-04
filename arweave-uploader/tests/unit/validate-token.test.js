@@ -43,6 +43,15 @@ describe("publish/validate-token", () => {
       const result = await verifyUploadToken(token, uploadId, 100);
       assert.strictEqual(result.ok, true);
     });
+    it("PEM с пустыми строками между base64 нормализуется и верификация ok", async () => {
+      const uploadId = "test-empty-lines";
+      const token = createSignedToken({ uploadId, maxBytes: 1024 });
+      const normalPem = getPublicKeyPem();
+      const pemWithEmptyLines = normalPem.split("\n").join("\n\n");
+      savedEnv = setTestEnv({ UPLOAD_TOKEN_JWT_PUBLIC_KEY: pemWithEmptyLines });
+      const result = await verifyUploadToken(token, uploadId, 100);
+      assert.strictEqual(result.ok, true);
+    });
     it("P1: истёкший exp → ok: false", async () => {
       const token = createSignedToken({ uploadId: "x", exp: 1 });
       savedEnv = setTestEnv({ UPLOAD_TOKEN_JWT_PUBLIC_KEY: getPublicKeyPem() });
