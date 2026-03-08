@@ -65,10 +65,16 @@ Bridge.md
 **/bridge-prompt.md
 # Note: bot/docs/bridge.md is permanent documentation, not temporary
 
+# Analysis docs (task/working docs; permanent docs live in */docs/* outside analysis)
+**/docs/analysis/
+**/docs/tasks
+
 # Data и каталоги (не в Git)
 /data
+/bot/artifacts/contracts
 /bot/catalog
 /bot/catalog_data
+/bot/*/__pycache__/*
 /scripts/organic_components
 /metrics
 /venv
@@ -92,14 +98,26 @@ pinata_cache.json
 test_results.log
 *.log
 
+# Изолированные тесты (не коммитить в git)
+.test_isolated/
+
 # Security incident response files (local only)
 SECURITY_INCIDENT_*.sh
 SECURITY_INCIDENT_*.md
 sensitive-files.txt
 .env.new.*
 
+# Other codebases (not part of this repo)
+wp_plugin/eventify-me/
+
 # Deprecated/Legacy files
 deploy.json
 
 # Scripts archive (legacy code for reference)
 scripts/archive/
+/bot/artifacts
+/supabase/.temp
+/bot/utility
+/bot/artifacts/contracts
+/bot/handlers/__pycache__
+/bot/handlers/catalog/__pycache__
