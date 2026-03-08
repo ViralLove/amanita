@@ -110,3 +110,27 @@ def get_prepare_resolve_service() -> "PrepareResolveService":
         storage_provider = ArWeaveUploader()
         _prepare_resolve_service = PrepareResolveService(upload_svc, storage_provider)
     return _prepare_resolve_service
+
+
+_push_sender: Optional["PushSender"] = None
+
+
+def get_push_sender() -> "PushSender":
+    """FastAPI dependency для PushSender (W1). Singleton StubPushSender для тестов и wallet-mock runner."""
+    global _push_sender
+    if _push_sender is None:
+        from services.wallet_push import StubPushSender
+        _push_sender = StubPushSender()
+    return _push_sender
+
+
+_payload_cache: Optional["PayloadCache"] = None
+
+
+def get_payload_cache() -> "PayloadCache":
+    """FastAPI dependency для кэша payload по upload_id (W2). Singleton."""
+    global _payload_cache
+    if _payload_cache is None:
+        from services.wallet_push import PayloadCache
+        _payload_cache = PayloadCache()
+    return _payload_cache

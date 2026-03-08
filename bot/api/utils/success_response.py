@@ -31,11 +31,15 @@ def build_success_response(
     taxonomy: Optional[dict[str, Any]] = None,
     age_groups: Optional[list[dict[str, Any]]] = None,
     languages: Optional[list[dict[str, Any]]] = None,
+    upload_id: Optional[str] = None,
+    upload_token: Optional[str] = None,
+    expires_at: Optional[str] = None,
 ) -> dict[str, Any]:
     """
     Собирает success-ответ по контракту API Reference.
 
     activity/activities/pagination — для activities; formats/taxonomy/age_groups/languages — для reference.
+    upload_id/upload_token/expires_at — для draft (W2, поток подписи в wallet).
     """
     out: dict[str, Any] = {
         "success": True,
@@ -56,4 +60,10 @@ def build_success_response(
         out["age_groups"] = age_groups
     if languages is not None:
         out["languages"] = languages
+    if upload_id is not None:
+        out["upload_id"] = upload_id
+    if upload_token is not None:
+        out["upload_token"] = upload_token
+    if expires_at is not None:
+        out["expires_at"] = expires_at
     return out

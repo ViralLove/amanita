@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from api.dependencies import get_activity_storage
+from api.dependencies import get_activity_storage, get_payload_cache, get_prepare_resolve_service, get_push_sender
 from api.models.activity import ActivityCreateRequest, ActivitySearchRequest
 from api.services import ActivityStorage
 from api.utils.error_simulation import invalid_state_transition_response, simulate_error_response
@@ -51,18 +51,37 @@ async def create_draft(
     request: Request,
     body: ActivityCreateRequest,
     simulate_error: Optional[str] = Query(None, description="Simulate error (Error Codes Matrix); 401, 422, 403"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="User ID for wallet push (mock: X-User-Id)"),
     storage: ActivityStorage = Depends(get_activity_storage),
+    prepare_svc=Depends(get_prepare_resolve_service),
+    push_sender=Depends(get_push_sender),
+    payload_cache=Depends(get_payload_cache),
 ):
-    """Создать Draft Activity. ?simulate_error=401|422|403 → simulate_error_response()."""
+    """Создать Draft Activity; prepare для wallet, кэш payload, пуш sign_arweave. ?simulate_error=401|422|403 → simulate_error_response()."""
     r = _ensure_simulate(simulate_error, request, _ALLOWED_DRAFT)
     if r is not None:
         return r
+    user_id = x_user_id or "mock_user"
     payload = body.model_dump(exclude_none=True)
     activity = storage.create(payload)
-    return JSONResponse(
-        status_code=201,
-        content=build_success_response(activity=activity),
+    draft_id = activity["activity_id"]
+    prepare_result = prepare_svc.prepare_upload_for_draft(draft_id, user_id, payload)
+    payload_cache.put(
+        prepare_result.upload_id,
+        prepare_result.payload_bytes,
+        prepare_result.upload_token,
+        prepare_result.tags_for_item,
+        prepare_result.anchor,
+        prepare_result.expires_at,
     )
+    push_sender.send_sign_request(user_id, "sign_arweave", prepare_result.upload_id)
+    response_data = build_success_response(
+        activity=activity,
+        upload_id=prepare_result.upload_id,
+        upload_token=prepare_result.upload_token,
+        expires_at=prepare_result.expires_at.isoformat() if prepare_result.expires_at else None,
+    )
+    return JSONResponse(status_code=201, content=response_data)
 
 
 # ---- Retrieval (5.1) ----
