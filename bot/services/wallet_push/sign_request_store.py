@@ -28,6 +28,7 @@ class SignRequestRecord:
     signature: Optional[str] = None
     message: Optional[str] = None
     submitted_at: Optional[datetime] = None
+    tx_hash: Optional[str] = None  # W8: после успешного broadcast
 
 
 class SignRequestStore:
@@ -83,3 +84,10 @@ class SignRequestStore:
         rec.message = message
         rec.submitted_at = datetime.now(timezone.utc)
         rec.status = "submitted"
+
+    def set_tx_hash(self, sign_request_id: str, tx_hash: str) -> None:
+        """W8: сохранить tx_hash после успешного broadcast."""
+        rec = self._store.get(sign_request_id)
+        if not rec:
+            raise KeyError(f"SignRequest not found: {sign_request_id}")
+        rec.tx_hash = tx_hash

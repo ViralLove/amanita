@@ -1,9 +1,10 @@
 """
-Unit tests for sign-requests API (W5): GET /v1/sign-requests/{id}, POST /v1/sign-requests/{id}/submit.
+Unit tests for sign-requests API (W5, W8): GET /v1/sign-requests/{id}, POST /v1/sign-requests/{id}/submit.
+W8: при signedTransaction — broadcast, возврат tx_hash, store.set_tx_hash.
 """
 
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -35,10 +36,19 @@ def env_chain():
 
 
 @pytest.fixture
-def app(store):
+def mock_blockchain():
+    """W8: мок BlockchainService для submit broadcast."""
+    m = MagicMock()
+    m.send_raw_transaction_hex.return_value = "0xbroadcast_tx_hash_abc"
+    return m
+
+
+@pytest.fixture
+def app(store, mock_blockchain):
     app = FastAPI()
     app.include_router(sign_requests.router)
     app.dependency_overrides[get_sign_request_store] = lambda: store
+    app.dependency_overrides[sign_requests._get_blockchain_service_for_broadcast] = lambda: mock_blockchain
     return app
 
 
@@ -80,19 +90,23 @@ class TestGetSignRequest:
 
 @pytest.mark.unit
 class TestSubmitSignRequest:
-    def test_submit_200_and_store_updated(self, client, store, sign_request_id):
+    def test_submit_200_and_store_updated(self, client, store, sign_request_id, mock_blockchain):
         r = client.post(
             f"/v1/sign-requests/{sign_request_id}/submit",
             json={"signedTransaction": "0xabc"},
             headers=headers("user-1"),
         )
         assert r.status_code == 200
-        assert r.json() == {"ok": True}
+        data = r.json()
+        assert data["ok"] is True
+        assert data.get("tx_hash") == "0xbroadcast_tx_hash_abc"
         rec = store.get(sign_request_id)
         assert rec is not None
         assert rec.submitted_at is not None
         assert rec.status == "submitted"
         assert rec.signed_tx == "0xabc"
+        assert rec.tx_hash == "0xbroadcast_tx_hash_abc"
+        mock_blockchain.send_raw_transaction_hex.assert_called_once_with("0xabc")
 
     def test_submit_200_signature_message(self, client, store, sign_request_id):
         r = client.post(

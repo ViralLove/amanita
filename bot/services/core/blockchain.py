@@ -245,6 +245,18 @@ class BlockchainService:
             print(f"[Web3] Тип ошибки: {type(e).__name__}")
             raise
 
+    def send_raw_transaction_hex(self, signed_tx_hex: str) -> str:
+        """W8: отправить подписанную tx (hex) в сеть, вернуть tx_hash hex."""
+        raw = signed_tx_hex.strip()
+        if raw.startswith("0x"):
+            raw = raw[2:]
+        try:
+            tx_bytes = bytes.fromhex(raw)
+        except ValueError as e:
+            raise ValueError(f"Invalid signed transaction hex: {e}") from e
+        tx_hash = self.web3.eth.send_raw_transaction(tx_bytes)
+        return tx_hash.hex()
+
     def _log(self, msg, error=False):
         prefix = "[Web3][ERROR]" if error else "[Web3]"
         print(f"{prefix} {msg}")
