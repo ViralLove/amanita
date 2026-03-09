@@ -2,12 +2,15 @@
 
 from services.wallet_push.interface import PushSender, SignRequestType
 from services.wallet_push.payload_cache import CachedPayload, PayloadCache
+from services.wallet_push.sign_request_store import SignRequestRecord, SignRequestStore
 from services.wallet_push.stub import StubPushSender
 
 __all__ = [
     "CachedPayload",
     "PayloadCache",
     "PushSender",
+    "SignRequestRecord",
+    "SignRequestStore",
     "SignRequestType",
     "StubPushSender",
 ]

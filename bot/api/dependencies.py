@@ -134,3 +134,15 @@ def get_payload_cache() -> "PayloadCache":
         from services.wallet_push import PayloadCache
         _payload_cache = PayloadCache()
     return _payload_cache
+
+
+_sign_request_store: Optional["SignRequestStore"] = None
+
+
+def get_sign_request_store() -> "SignRequestStore":
+    """FastAPI dependency для хранилища sign_request (W4). Singleton in-memory."""
+    global _sign_request_store
+    if _sign_request_store is None:
+        from services.wallet_push import SignRequestStore
+        _sign_request_store = SignRequestStore()
+    return _sign_request_store

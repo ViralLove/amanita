@@ -10,6 +10,7 @@ GET /v1/uploads/{upload_id}/sign-payload — данные для подписи 
 from __future__ import annotations
 
 import base64
+import logging
 import os
 import secrets as secmod
 from typing import Literal, Optional
@@ -18,8 +19,10 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, model_validator
 
-from api.dependencies import get_payload_cache, get_upload_service
+from api.dependencies import get_payload_cache, get_push_sender, get_sign_request_store, get_upload_service
 from services.upload.upload_service import UploadConflictError, UploadNotFoundError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["uploads"])
 
@@ -97,8 +100,10 @@ async def post_upload_callback(
     body: CallbackBody,
     _: None = Depends(verify_edge_bearer),
     upload_svc=Depends(get_upload_service),
+    push_sender=Depends(get_push_sender),
+    sign_request_store=Depends(get_sign_request_store),
 ):
-    """Приём callback после успешной публикации в Arweave. Обновляет upload (published, bundle_tx_id, item_id)."""
+    """Приём callback после успешной публикации в Arweave. Обновляет upload; создаёт sign_request и пуш sign_contract (W4)."""
     try:
         upload_svc.handle_callback(
             body.upload_id,
@@ -110,6 +115,18 @@ async def post_upload_callback(
         raise HTTPException(status_code=404, detail="Upload not found")
     except UploadConflictError:
         raise HTTPException(status_code=409, detail="Invalid status for callback")
+    try:
+        rec = upload_svc.get_upload(body.upload_id)
+        if rec:
+            sign_request_id = sign_request_store.create(
+                rec.user_id,
+                "create_activity",
+                body.upload_id,
+                body.bundle_tx_id,
+            )
+            push_sender.send_sign_request(rec.user_id, "sign_contract", sign_request_id)
+    except Exception as e:
+        logger.warning("Callback sign_request/push failed (response unchanged): %s", e, exc_info=True)
     return JSONResponse(status_code=200, content={"ok": True})
 
 
