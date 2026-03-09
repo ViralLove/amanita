@@ -3,20 +3,22 @@ Uploads API — приём статуса и callback от Edge Function arweave
 
 PUT /v1/uploads/{upload_id}/status — приём статуса от Edge (queued_for_publish / failed).
 POST /v1/uploads/callback — приём callback после публикации в Arweave.
-Авторизация: Authorization: Bearer EDGE_TO_BACKEND_SECRET (из env или fallback для dev).
+GET /v1/uploads/{upload_id}/sign-payload — данные для подписи по upload_id (W3; X-User-Id).
+Авторизация: status/callback — Bearer EDGE_TO_BACKEND_SECRET; sign-payload — X-User-Id.
 """
 
 from __future__ import annotations
 
+import base64
 import os
 import secrets as secmod
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, model_validator
 
-from api.dependencies import get_upload_service
+from api.dependencies import get_payload_cache, get_upload_service
 from services.upload.upload_service import UploadConflictError, UploadNotFoundError
 
 router = APIRouter(prefix="/v1", tags=["uploads"])
@@ -109,3 +111,42 @@ async def post_upload_callback(
     except UploadConflictError:
         raise HTTPException(status_code=409, detail="Invalid status for callback")
     return JSONResponse(status_code=200, content={"ok": True})
+
+
+@router.get("/uploads/{upload_id}/sign-payload")
+async def get_upload_sign_payload(
+    upload_id: str,
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="User ID (required for sign-payload)"),
+    upload_svc=Depends(get_upload_service),
+    payload_cache=Depends(get_payload_cache),
+):
+    """
+    Данные для подписи Data Item по upload_id (W3).
+
+    Требуется X-User-Id. Проверяется совпадение с upload.user_id; данные берутся из кэша (W2).
+    """
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="X-User-Id header required")
+    user_id = x_user_id
+    rec = upload_svc.get_upload(upload_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    if rec.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Upload does not belong to this user")
+    cached = payload_cache.get(upload_id)
+    if not cached:
+        raise HTTPException(status_code=410, detail="Sign payload not available or expired")
+    payload_base64 = base64.b64encode(cached.payload_bytes).decode("ascii")
+    arweave_uploader_url = os.environ.get("ARWEAVE_SERVICE_URL", "")
+    return JSONResponse(
+        status_code=200,
+        content={
+            "upload_id": upload_id,
+            "upload_token": cached.upload_token,
+            "payload_base64": payload_base64,
+            "tags": cached.tags_for_item,
+            "anchor": cached.anchor,
+            "expires_at": cached.expires_at.isoformat() if cached.expires_at else None,
+            "arweave_uploader_url": arweave_uploader_url,
+        },
+    )
