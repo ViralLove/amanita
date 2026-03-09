@@ -50,6 +50,12 @@ class StubPushSender:
         """Вернуть копию списка накопленных событий (не очищает список)."""
         return list(self._events)
 
+    def get_and_claim_events(self, user_id: str) -> list[dict[str, Any]]:
+        """Вернуть события для user_id и удалить их из очереди (для GET /v1/pending-sign-requests)."""
+        matching = [e for e in self._events if e.get("user_id") == user_id]
+        self._events = [e for e in self._events if e.get("user_id") != user_id]
+        return matching
+
     def clear_pending(self) -> None:
         """Очистить список событий (для runner между сценариями)."""
         self._events.clear()

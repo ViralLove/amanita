@@ -46,3 +46,15 @@ class TestStubPushSender:
         stub.send_sign_request("u", "sign_arweave", "r1")
         stub.clear_pending()
         assert len(stub.get_pending_events()) == 0
+
+    def test_get_and_claim_events_returns_and_removes_for_user(self):
+        stub = StubPushSender()
+        stub.send_sign_request("user-a", "sign_arweave", "up-1")
+        stub.send_sign_request("user-b", "sign_contract", "sr-2")
+        stub.send_sign_request("user-a", "sign_contract", "sr-3")
+        claimed = stub.get_and_claim_events("user-a")
+        assert len(claimed) == 2
+        assert claimed[0]["request_id"] == "up-1" and claimed[1]["request_id"] == "sr-3"
+        remaining = stub.get_pending_events()
+        assert len(remaining) == 1
+        assert remaining[0]["user_id"] == "user-b"
