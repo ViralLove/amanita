@@ -5,3 +5,4 @@ from .description import router as description_router
 from .activities import router as activities_router
 from .reference import router as reference_router
 from . import uploads
+from . import sign_requests

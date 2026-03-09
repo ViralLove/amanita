@@ -301,7 +301,7 @@ def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Opti
         }
     
     # Подключаем роутеры (8.1: activities, reference — Activities API mocks + Reference Data)
-    from api.routes import api_keys, products, media, description, activities, reference, uploads
+    from api.routes import api_keys, products, media, description, activities, reference, uploads, sign_requests
     app.include_router(api_keys.router)
     app.include_router(products.router)
     app.include_router(media.router)
@@ -309,6 +309,7 @@ def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Opti
     app.include_router(activities.router)
     app.include_router(reference.router)
     app.include_router(uploads.router)
+    app.include_router(sign_requests.router)
     
     logger.info("FastAPI приложение создано с базовой конфигурацией", extra={
         "docs_url": "/docs",
