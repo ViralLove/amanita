@@ -1,6 +1,22 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 
+/** Проверка revert с custom error без зависимости от hardhat-chai-matchers */
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
 /**
  * Тесты для upgradeable SpiralEngine UUPS контракта
  * 
@@ -62,8 +78,8 @@ describe("SpiralEngine UUPS Upgrade Tests", function () {
             expect(name).to.equal("SpiralInvite");
             expect(symbol).to.equal("SPIRAL");
             
-            // Проверяем LOGIC_VERSION
-            expect(await spiralEngine.LOGIC_VERSION()).to.equal(1);
+            // Проверяем LOGIC_VERSION (ethers v6 возвращает uint256 как bigint)
+            expect(await spiralEngine.LOGIC_VERSION()).to.equal(1n);
             
             console.log("✅ UUPS Proxy контракт работает корректно");
         });
@@ -382,8 +398,8 @@ describe("SpiralEngine UUPS Upgrade Tests", function () {
             const currentProxyAddress = await spiralEngine.getAddress();
             expect(currentProxyAddress).to.equal(proxyAddress);
             
-            // Проверяем UUPS-специфичные функции
-            expect(await spiralEngine.LOGIC_VERSION()).to.equal(1);
+            // Проверяем UUPS-специфичные функции (LOGIC_VERSION как bigint)
+            expect(await spiralEngine.LOGIC_VERSION()).to.equal(1n);
             
             console.log("✅ UUPS Proxy структура валидна");
         });
@@ -435,18 +451,19 @@ describe("SpiralEngine UUPS Upgrade Tests", function () {
             const logicV2 = await LogicV2.connect(deployer).deploy();
             await logicV2.waitForDeployment();
             
-            // Попытка upgrade без UPGRADER_ROLE должна провалиться
+            // Попытка upgrade без UPGRADER_ROLE должна провалиться (expectCustomError — без hardhat-chai-matchers)
             const unauthorizedEngine = await ethers.getContractAt(
                 "SpiralEngineLogic",
                 proxyAddress
             );
-            
-            await expect(
+            await expectCustomError(
                 unauthorizedEngine.connect(unauthorized).upgradeToAndCall(
                     await logicV2.getAddress(),
                     "0x"
-                )
-            ).to.be.reverted;
+                ),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             // Admin с UPGRADER_ROLE может выполнить upgrade
             await spiralEngine.connect(deployer).upgradeToAndCall(
