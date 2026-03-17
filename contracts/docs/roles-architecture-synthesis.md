@@ -16,10 +16,10 @@
 
 | № | Точка решения | Выбор |
 |---|----------------|-------|
-| 1 | Идентичность создателя Activity | SpiralEngine + роль **ACTIVITY_CREATOR_ROLE** (отдельно от продавцов). |
+| 1 | Идентичность создателя Activity | SpiralEngine + **ACTIVATOR_ROLE** + активация (`usedInviteByUser != 0`). |
 | 2 | Поле состояния на контракте | Только **active** (черновик / опубликовано). Публикация через авторизованный UI, проверяющий кодекс. |
 | 3 | «Свой UI» и качество контента | Авторизация приложений в API (secret key / app auth); валидация по гайду в UI (GPT инструкции). |
-| 4 | Роль создателя в SpiralEngine | Отдельная **ACTIVITY_CREATOR_ROLE**. SELLER выдаётся по отдельному алгоритму (см. раздел 2). |
+| 4 | Роль создателя в SpiralEngine | **ACTIVATOR_ROLE** (единая роль для создателей активностей; SELLER выдаётся по отдельному алгоритму, см. раздел 2). |
 | 5 | Зависимость от SpiralEngine | Обязательна; без инвайта нельзя стать activity provider. |
 | 6 | События | С инициатором (indexed address), как у Products и Components. |
 
@@ -38,8 +38,7 @@
 
 | Роль | Выдаётся при активации? | Кто выдаёт | Назначение |
 |------|-------------------------|------------|------------|
-| **ACTIVATOR_ROLE** | **Да** | Активатор (тот, кто вызвал activateUser) или контракт по правилам SpiralEngine | Активировать тех, кто пришёл по инвайтам этого пользователя (минтить инвайты, вызывать activateUser для своих приглашённых). |
-| **ACTIVITY_CREATOR_ROLE** | **Да** | Активатор или контракт по правилам SpiralEngine | Создавать и публиковать активности (ActivityRegistry): создание, activate/deactivate своей активности. |
+| **ACTIVATOR_ROLE** | **Да** | Активатор (тот, кто вызвал activateUser) или контракт по правилам SpiralEngine | Активировать тех, кто пришёл по инвайтам этого пользователя (минтить инвайты, вызывать activateUser для своих приглашённых) и выступать создателем активностей (ActivityRegistry) при наличии инвайта. |
 | **SELLER_ROLE** | **Нет** | Не выдаётся при активации | Продажи (ProductRegistry), создание компонентов (OrganicComponentRegistry). Доступ к SELLER — только по одному из путей ниже. |
 
 Итог: **каждый активированный пользователь** получает возможность быть активатором (растить круг) и создателем активностей, но **не продавцом**. Роль продавца выдаётся отдельно и жёстко контролируется.
@@ -74,8 +73,7 @@ SELLER можно получить **только одним из двух пу�
 | Роль в SpiralEngine | Кто выдаёт | Когда / условие | Используется в |
 |---------------------|------------|----------------|----------------|
 | **DEFAULT_ADMIN_ROLE** | При деплое (constructor) | — | Управление SpiralEngine, рутовые инвайты, suspendUser, setSoulIdentity, при необходимости выдача SELLER напрямую. |
-| **ACTIVATOR_ROLE** | Активатор при activateUser (или по правилам контракта) | При активации пользователя по инвайту | Активация новых пользователей (activateUser), выдача им ACTIVATOR_ROLE и ACTIVITY_CREATOR_ROLE. |
-| **ACTIVITY_CREATOR_ROLE** | Активатор при activateUser (или по правилам контракта) | При активации пользователя по инвайту | ActivityRegistry: createActivity, activate/deactivate своей активности. |
+| **ACTIVATOR_ROLE** | Активатор при activateUser (или по правилам контракта) | При активации пользователя по инвайту | Активация новых пользователей (activateUser), рост сети и создание активностей (ActivityRegistry) при наличии инвайта. |
 | **SELLER_ROLE** | Только по одному из двух путей (см. п. 2.3) | (1) Напрямую от админа; (2) через ≥3 рекомендации от активаторов с наработками | ProductRegistry, OrganicComponentRegistry: создание продуктов и компонентов. |
 
 **Инвайт обязателен** для всех ролей контента: без `usedInviteByUser(user) != 0` пользователь не считается «в экосистеме», и проверки в регистрах (hasRole + usedInviteByUser) не пройдут.
@@ -86,7 +84,7 @@ SELLER можно получить **только одним из двух пу�
 |----------|--------------------------------|-----------------------------------|
 | **ProductRegistry** | SELLER_ROLE + usedInviteByUser != 0 (onlyActivatedSeller). | onlyOwnSellerProduct(productId). |
 | **OrganicComponentRegistry** | SELLER_ROLE + активация (аналог onlyActivatedSeller). | onlyOwnCreatorComponent(componentId). |
-| **ActivityRegistry** | ACTIVITY_CREATOR_ROLE + usedInviteByUser != 0 (onlyActivatedActivityCreator). | onlyOwnActivity(activityId): creator == msg.sender. |
+| **ActivityRegistry** | ACTIVATOR_ROLE + usedInviteByUser != 0 (onlyActivatedActivityCreator / только активированный Activator). | onlyOwnActivity(activityId): creator == msg.sender. |
 
 ### 3.3 Локальные роли в регистрах (не в SpiralEngine)
 
@@ -138,8 +136,7 @@ SELLER можно получить **только одним из двух пу�
 └── Создаёт рутовые инвайты, активирует первых пользователей (activateUser).
 
 При активации (activateUser) пользователь получает:
-├── ACTIVATOR_ROLE       →  активировать пришедших по своим инвайтам, выдавать им ACTIVATOR + ACTIVITY_CREATOR (но не SELLER)
-└── ACTIVITY_CREATOR_ROLE →  ActivityRegistry: создание и публикация активностей (active = true/false)
+└── ACTIVATOR_ROLE       →  активировать пришедших по своим инвайтам, создавать активности (ActivityRegistry) и расти дальше (потенциально к SELLER), но не становится SELLER автоматически.
 
 SELLER_ROLE — только два пути:
 ├── Путь 1: напрямую от админа (высший уровень допуска)
@@ -147,8 +144,7 @@ SELLER_ROLE — только два пути:
 
 SpiralEngine
 ├── usedInviteByUser != 0  →  пользователь «в экосистеме»
-├── ACTIVATOR_ROLE         →  активация новых, выдача ACTIVATOR + ACTIVITY_CREATOR при активации
-├── ACTIVITY_CREATOR_ROLE  →  ActivityRegistry (create, activate/deactivate)
+├── ACTIVATOR_ROLE         →  активация новых, создание активностей (ActivityRegistry) при наличии инвайта
 └── SELLER_ROLE            →  ProductRegistry, OrganicComponentRegistry (только по путям 1 или 2)
 
 Регистры (ProductRegistry, OrganicComponentRegistry, ActivityRegistry)

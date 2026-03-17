@@ -58,7 +58,7 @@
 #### Токеномическая активность:
 - `loveAccrued` - накопленные Lovecoin
 - `lgovAccrued` - накопленные LGOV
-- `lgovClaimed` - статус клейма
+- `lgovClaimed` - статус клейма (текущее on-chain поведение на 2026-03-12: одноразовый `claimLGOV`, описание целевой модели см. таск `task-fix-loveemission-lgov-continuous-governance`)
 
 ---
 

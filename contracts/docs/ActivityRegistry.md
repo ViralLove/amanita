@@ -42,7 +42,7 @@
 
 **Revert:**
 - `EmptyCID` — пустой `metadataCID`
-- `NotActivatedActivityCreator` — у `msg.sender` нет роли ACTIVITY_CREATOR_ROLE в SpiralEngine или `usedInviteByUser == 0`
+- `NotActivatedActivityCreator` — у `msg.sender` нет роли `ACTIVATOR_ROLE` в SpiralEngine или `usedInviteByUser == 0`
 - `EnforcedPause` — контракт на паузе
 
 **Событие:** `ActivityCreated(creator, activityId, activity_type, metadataCID, false)`
@@ -130,8 +130,8 @@
 | **UPGRADER_ROLE** | `keccak256("UPGRADER_ROLE")` | вызов `upgradeToAndCall` (UUPS) |
 
 Проверка «создатель активности»:
-- **SpiralEngine:** при `createActivity` требуется, чтобы у `msg.sender` в SpiralEngine были роль `ACTIVITY_CREATOR_ROLE` и `usedInviteByUser(msg.sender) != 0` (модификатор `onlyActivatedActivityCreator`).
-- **Владелец активности:** при `activateActivity` и `deactivateActivity` требуется `activities[activityId].creator == msg.sender` (модификатор `onlyOwnActivity`). Роль CREATOR в самом контракте не заведена.
+- **SpiralEngine:** при `createActivity` требуется, чтобы у `msg.sender` в SpiralEngine были роль `ACTIVATOR_ROLE` и `usedInviteByUser(msg.sender) != 0` (модификатор `onlyActivatedActivityCreator`).
+- **Владелец активности:** при `activateActivity` и `deactivateActivity` требуется `activities[activityId].creator == msg.sender` (модификатор `onlyOwnActivity`). Роль CREATOR в самом контракте не заведена; права создателя приходят из SpiralEngine через `ACTIVATOR_ROLE` + инвайт.
 
 Подробнее о ролях: [roles-architecture-synthesis.md](roles-architecture-synthesis.md).
 
