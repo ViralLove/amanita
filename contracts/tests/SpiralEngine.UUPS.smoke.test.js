@@ -1,6 +1,21 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
 /**
  * 🧪 SpiralEngine UUPS - Smoke Test
  * 
@@ -83,16 +98,16 @@ describe("🔥 SpiralEngine UUPS - Smoke Test", function () {
                 admin.address
             )).to.be.true;
             
-            // Проверяем версию
-            expect(await spiralEngine.LOGIC_VERSION()).to.equal(1);
+            // Проверяем версию (ethers v6 → bigint)
+            expect(await spiralEngine.LOGIC_VERSION()).to.equal(1n);
             
             // Проверяем ERC721 данные
             expect(await spiralEngine.name()).to.equal("SpiralInvite");
             expect(await spiralEngine.symbol()).to.equal("SPIRAL");
             
-            // Проверяем начальное состояние
-            expect(await spiralEngine.totalInvitesMinted()).to.equal(0);
-            expect(await spiralEngine.totalInvitesUsed()).to.equal(0);
+            // Проверяем начальное состояние (uint256 → bigint)
+            expect(await spiralEngine.totalInvitesMinted()).to.equal(0n);
+            expect(await spiralEngine.totalInvitesUsed()).to.equal(0n);
             
             console.log("   ✅ Architecture validated");
         });
@@ -115,7 +130,7 @@ describe("🔥 SpiralEngine UUPS - Smoke Test", function () {
             
             // Проверяем данные
             expect(await spiralEngine.inviteCodeExists(inviteCode)).to.be.true;
-            expect(await spiralEngine.totalInvitesMinted()).to.equal(1);
+            expect(await spiralEngine.totalInvitesMinted()).to.equal(1n);
             
             const tokenId = await spiralEngine.inviteCodeToTokenId(inviteCode);
             expect(await spiralEngine.inviteMinter(tokenId)).to.equal(seller.address);
@@ -150,14 +165,15 @@ describe("🔥 SpiralEngine UUPS - Smoke Test", function () {
             });
             expect(userActivatedEvent).to.not.be.undefined;
             
-            // Проверяем что user активирован
-            expect(await spiralEngine.usedInviteByUser(user1.address)).to.be.greaterThan(0);
+            // Проверяем что user активирован (uint256 → bigint)
+            const usedInvite = await spiralEngine.usedInviteByUser(user1.address);
+            expect(usedInvite > 0n).to.be.true;
             
-            // Проверяем что создано 12 инвайтов
-            expect(await spiralEngine.userInviteCount(user1.address)).to.equal(12);
+            // Проверяем что создано 12 инвайтов (счётчик → bigint)
+            expect(await spiralEngine.userInviteCount(user1.address)).to.equal(12n);
             
-            // Проверяем круг
-            expect(await spiralEngine.getCircleSize(activator.address)).to.equal(1);
+            // Проверяем круг (uint256 → bigint)
+            expect(await spiralEngine.getCircleSize(activator.address)).to.equal(1n);
             
             console.log("   ✅ activateUser works");
         });
@@ -166,25 +182,31 @@ describe("🔥 SpiralEngine UUPS - Smoke Test", function () {
     describe("🛡️ Security Validation", function () {
         it("Should enforce custom errors", async function () {
             // EmptyInviteCode
-            await expect(
-                spiralEngine.connect(seller).mintInvite("", 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "EmptyInviteCode");
+            await expectCustomError(
+                spiralEngine.connect(seller).mintInvite("", 0),
+                spiralEngine,
+                "EmptyInviteCode"
+            );
             
             // InviteCodeAlreadyExists
             await spiralEngine.connect(seller).mintInvite("DUPLICATE", 0);
-            await expect(
-                spiralEngine.connect(seller).mintInvite("DUPLICATE", 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "InviteCodeAlreadyExists");
+            await expectCustomError(
+                spiralEngine.connect(seller).mintInvite("DUPLICATE", 0),
+                spiralEngine,
+                "InviteCodeAlreadyExists"
+            );
             
             // InvalidUserAddress
-            await expect(
+            await expectCustomError(
                 spiralEngine.connect(activator).activateUser(
                     "CODE",
                     ethers.ZeroAddress,
                     Array(12).fill("CODE"),
                     0
-                )
-            ).to.be.revertedWithCustomError(spiralEngine, "InvalidUserAddress");
+                ),
+                spiralEngine,
+                "InvalidUserAddress"
+            );
             
             console.log("   ✅ Custom errors work");
         });
@@ -194,9 +216,11 @@ describe("🔥 SpiralEngine UUPS - Smoke Test", function () {
             await spiralEngine.connect(admin).pause();
             
             // Попытка mintInvite должна провалиться
-            await expect(
-                spiralEngine.connect(seller).mintInvite("PAUSED_TEST", 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "EnforcedPause");
+            await expectCustomError(
+                spiralEngine.connect(seller).mintInvite("PAUSED_TEST", 0),
+                spiralEngine,
+                "EnforcedPause"
+            );
             
             // Снятие паузы
             await spiralEngine.connect(admin).unpause();
@@ -213,7 +237,7 @@ describe("🔥 SpiralEngine UUPS - Smoke Test", function () {
             await spiralEngine.connect(seller).mintInvite("REENTRANCY_1", 0);
             await spiralEngine.connect(seller).mintInvite("REENTRANCY_2", 0);
             
-            expect(await spiralEngine.totalInvitesMinted()).to.equal(2);
+            expect(await spiralEngine.totalInvitesMinted()).to.equal(2n);
             
             console.log("   ✅ ReentrancyGuard works");
         });
@@ -224,18 +248,22 @@ describe("🔥 SpiralEngine UUPS - Smoke Test", function () {
             const tokenId = await spiralEngine.inviteCodeToTokenId("SBT_TEST");
             
             // Попытка approve должна провалиться
-            await expect(
-                spiralEngine.connect(seller).approve(user1.address, tokenId)
-            ).to.be.revertedWithCustomError(spiralEngine, "ApprovalsNotAllowed");
+            await expectCustomError(
+                spiralEngine.connect(seller).approve(user1.address, tokenId),
+                spiralEngine,
+                "ApprovalsNotAllowed"
+            );
             
             // Попытка transferFrom должна провалиться
-            await expect(
+            await expectCustomError(
                 spiralEngine.connect(seller).transferFrom(
                     seller.address,
                     user1.address,
                     tokenId
-                )
-            ).to.be.revertedWithCustomError(spiralEngine, "TransfersNotAllowed");
+                ),
+                spiralEngine,
+                "TransfersNotAllowed"
+            );
             
             // locked() должен возвращать true (SBT)
             expect(await spiralEngine.locked(tokenId)).to.be.true;
@@ -248,7 +276,7 @@ describe("🔥 SpiralEngine UUPS - Smoke Test", function () {
         it("Should upgrade logic contract", async function () {
             // Создаём данные перед upgrade
             await spiralEngine.connect(seller).mintInvite("PRE_UPGRADE", 0);
-            expect(await spiralEngine.totalInvitesMinted()).to.equal(1);
+            expect(await spiralEngine.totalInvitesMinted()).to.equal(1n);
             
             // Деплоим новую Logic
             const NewLogic = await ethers.getContractFactory("SpiralEngineLogic");
@@ -262,12 +290,12 @@ describe("🔥 SpiralEngine UUPS - Smoke Test", function () {
             );
             
             // Проверяем что данные сохранились
-            expect(await spiralEngine.totalInvitesMinted()).to.equal(1);
+            expect(await spiralEngine.totalInvitesMinted()).to.equal(1n);
             expect(await spiralEngine.inviteCodeExists("PRE_UPGRADE")).to.be.true;
             
             // Проверяем что новые операции работают
             await spiralEngine.connect(seller).mintInvite("POST_UPGRADE", 0);
-            expect(await spiralEngine.totalInvitesMinted()).to.equal(2);
+            expect(await spiralEngine.totalInvitesMinted()).to.equal(2n);
             
             console.log("   ✅ Upgrade works, data preserved");
         });
@@ -278,12 +306,14 @@ describe("🔥 SpiralEngine UUPS - Smoke Test", function () {
             await newLogicImpl.waitForDeployment();
             
             // seller НЕ может апгрейдить (нет UPGRADER_ROLE)
-            await expect(
+            await expectCustomError(
                 spiralEngine.connect(seller).upgradeToAndCall(
                     await newLogicImpl.getAddress(),
                     "0x"
-                )
-            ).to.be.reverted;
+                ),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             // admin МОЖЕТ апгрейдить
             await spiralEngine.connect(admin).upgradeToAndCall(
@@ -303,7 +333,9 @@ describe("🔥 SpiralEngine UUPS - Smoke Test", function () {
             console.log(`\n   ⛽ mintInvite gas used: ${receipt.gasUsed.toString()}`);
             
             // Проверяем что gas разумный (первый минт с инициализацией storage < 300k)
-            expect(receipt.gasUsed).to.be.lessThan(300000n);
+            const gasUsed = receipt.gasUsed;
+            expect(typeof gasUsed).to.equal("bigint");
+            expect(gasUsed < 300000n).to.be.true;
             
             console.log("   ✅ Gas efficiency validated");
         });

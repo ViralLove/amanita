@@ -17,8 +17,8 @@ describe("ActivityRegistry UUPS - Smoke Test", function () {
         spiralEngine = await MockSpiralEngine.deploy();
         await spiralEngine.waitForDeployment();
 
-        const ACTIVITY_CREATOR_ROLE = await spiralEngine.ACTIVITY_CREATOR_ROLE();
-        await spiralEngine.grantRole(ACTIVITY_CREATOR_ROLE, creator.address);
+        const ACTIVATOR_ROLE = await spiralEngine.ACTIVATOR_ROLE();
+        await spiralEngine.grantRole(ACTIVATOR_ROLE, creator.address);
         await spiralEngine.setUserActivated(creator.address, true);
 
         const Logic = await ethers.getContractFactory("ActivityRegistryLogic");

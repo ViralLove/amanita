@@ -1,6 +1,21 @@
 const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
 describe("SpiralEngine - Circle Management", function () {
     let spiralEngine;
     let soulIdentity;
@@ -178,7 +193,7 @@ describe("SpiralEngine - Circle Management", function () {
             
             // Проверяем размер круга
             const circleSize = await spiralEngine.getCircleSize(activator1.address);
-            expect(circleSize).to.equal(1);
+            expect(circleSize).to.equal(1n);
             console.log(`✅ Circle size: ${circleSize}`);
             
             // Проверяем членов круга
@@ -214,7 +229,7 @@ describe("SpiralEngine - Circle Management", function () {
             
             // Проверяем размер круга
             const circleSize = await spiralEngine.getCircleSize(activator1.address);
-            expect(circleSize).to.equal(3);
+            expect(circleSize).to.equal(3n);
             console.log(`✅ Circle size: ${circleSize}`);
             
             // Проверяем членов круга
@@ -251,8 +266,8 @@ describe("SpiralEngine - Circle Management", function () {
             const circle1Size = await spiralEngine.getCircleSize(activator1.address);
             const circle2Size = await spiralEngine.getCircleSize(activator2.address);
             
-            expect(circle1Size).to.equal(2);
-            expect(circle2Size).to.equal(1);
+            expect(circle1Size).to.equal(2n);
+            expect(circle2Size).to.equal(1n);
             console.log(`✅ Circle1 size: ${circle1Size}, Circle2 size: ${circle2Size}`);
             
             // Проверяем членов кругов
@@ -300,7 +315,7 @@ describe("SpiralEngine - Circle Management", function () {
             
             // Проверяем размер круга
             const circleSize = await spiralEngine.getCircleSize(activator1.address);
-            expect(circleSize).to.equal(12);
+            expect(circleSize).to.equal(12n);
             console.log(`✅ Circle size: ${circleSize}`);
             
             // Попытка активировать 13-го пользователя (должна провалиться)
@@ -312,9 +327,11 @@ describe("SpiralEngine - Circle Management", function () {
             
             const newCodes13 = Array.from({length: 12}, (_, i) => `NEW-13-${i + 1}`);
             
-            await expect(
-                spiralEngine.connect(activator1).activateUser("LIMIT-TEST-INVITE-13", user13.address, newCodes13, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "CircleLimitReached");
+            await expectCustomError(
+                spiralEngine.connect(activator1).activateUser("LIMIT-TEST-INVITE-13", user13.address, newCodes13, 0),
+                spiralEngine,
+                "CircleLimitReached"
+            );
             
             console.log("✅ 13th user activation correctly rejected");
         });
@@ -340,7 +357,7 @@ describe("SpiralEngine - Circle Management", function () {
             
             // Проверяем, что лимит действительно достигнут
             const circleSize = await spiralEngine.getCircleSize(activator1.address);
-            expect(circleSize).to.equal(12);
+            expect(circleSize).to.equal(12n);
             console.log(`✅ Circle size confirmed: ${circleSize}`);
             
             // Попытка активировать 13-го пользователя должна провалиться
@@ -351,9 +368,11 @@ describe("SpiralEngine - Circle Management", function () {
             });
             
             const newCodes13 = Array.from({length: 12}, (_, i) => `NEW-13-${i + 1}`);
-            await expect(
-                spiralEngine.connect(activator1).activateUser("ENFORCEMENT-TEST-INVITE-13", user13.address, newCodes13, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "CircleLimitReached");
+            await expectCustomError(
+                spiralEngine.connect(activator1).activateUser("ENFORCEMENT-TEST-INVITE-13", user13.address, newCodes13, 0),
+                spiralEngine,
+                "CircleLimitReached"
+            );
             
             console.log("✅ Circle limit enforcement working correctly");
         });
@@ -397,8 +416,8 @@ describe("SpiralEngine - Circle Management", function () {
             const circle1Size = await spiralEngine.getCircleSize(activator1.address);
             const circle2Size = await spiralEngine.getCircleSize(activator2.address);
             
-            expect(circle1Size).to.equal(12);
-            expect(circle2Size).to.equal(12);
+            expect(circle1Size).to.equal(12n);
+            expect(circle2Size).to.equal(12n);
             console.log(`✅ Circle1 size: ${circle1Size}, Circle2 size: ${circle2Size}`);
         });
     });
@@ -456,9 +475,11 @@ describe("SpiralEngine - Circle Management", function () {
             // Попытка активировать того же пользователя вторым активатором
             const newCodes2 = Array.from({length: 12}, (_, i) => `NEW-2-${i + 1}`);
             
-            await expect(
-                spiralEngine.connect(activator2).activateUser("CROSS-CIRCLE-INVITE", user1.address, newCodes2, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "UserAlreadyActivated");
+            await expectCustomError(
+                spiralEngine.connect(activator2).activateUser("CROSS-CIRCLE-INVITE", user1.address, newCodes2, 0),
+                spiralEngine,
+                "UserAlreadyActivated"
+            );
             
             console.log("✅ Cross-circle activation correctly prevented");
         });
@@ -488,8 +509,8 @@ describe("SpiralEngine - Circle Management", function () {
             const circle1Size = await spiralEngine.getCircleSize(activator1.address);
             const circle2Size = await spiralEngine.getCircleSize(activator2.address);
             
-            expect(circle1Size).to.equal(2);
-            expect(circle2Size).to.equal(1);
+            expect(circle1Size).to.equal(2n);
+            expect(circle2Size).to.equal(1n);
             console.log(`✅ Circle1 size: ${circle1Size}`);
             console.log(`✅ Circle2 size: ${circle2Size}`);
             
@@ -510,8 +531,8 @@ describe("SpiralEngine - Circle Management", function () {
             const emptyCircle1Size = await spiralEngine.getCircleSize(activator1.address);
             const emptyCircle2Size = await spiralEngine.getCircleSize(activator2.address);
             
-            expect(emptyCircle1Size).to.equal(0);
-            expect(emptyCircle2Size).to.equal(0);
+            expect(emptyCircle1Size).to.equal(0n);
+            expect(emptyCircle2Size).to.equal(0n);
             console.log(`✅ Empty circle1 size: ${emptyCircle1Size}`);
             console.log(`✅ Empty circle2 size: ${emptyCircle2Size}`);
             
@@ -534,7 +555,7 @@ describe("SpiralEngine - Circle Management", function () {
             
             // Проверяем размер несуществующего круга
             const circleSize = await spiralEngine.getCircleSize(nonExistentActivator.address);
-            expect(circleSize).to.equal(0);
+            expect(circleSize).to.equal(0n);
             console.log(`✅ Non-existent circle size: ${circleSize}`);
             
             // Проверяем членов несуществующего круга

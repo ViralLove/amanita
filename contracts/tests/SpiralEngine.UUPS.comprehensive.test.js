@@ -1,6 +1,21 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
 /**
  * 🧪 SpiralEngine UUPS - Comprehensive Tests
  * 
@@ -129,9 +144,11 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             console.log("   ⏸️  Contract paused");
             
             // Попытка mintInvite должна провалиться
-            await expect(
-                spiralEngine.connect(seller).mintInvite("PAUSED_MINT", 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "EnforcedPause");
+            await expectCustomError(
+                spiralEngine.connect(seller).mintInvite("PAUSED_MINT", 0),
+                spiralEngine,
+                "EnforcedPause"
+            );
             console.log("   ✅ mintInvite blocked during pause");
             
             // Снятие паузы
@@ -164,14 +181,16 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             const newCodes = Array.from({length: 12}, (_, i) => `PAUSE_ACT_${i}`);
             
             // Попытка активировать должна провалиться
-            await expect(
+            await expectCustomError(
                 spiralEngine.connect(activator).activateUser(
                     "PAUSE_ACTIVATE_TEST",
                     newUser.address,
                     newCodes,
                     0
-                )
-            ).to.be.revertedWithCustomError(spiralEngine, "EnforcedPause");
+                ),
+                spiralEngine,
+                "EnforcedPause"
+            );
             console.log("   ✅ activateUser blocked during pause");
             
             // Снятие паузы
@@ -185,7 +204,8 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
                 newCodes,
                 0
             );
-            expect(await spiralEngine.usedInviteByUser(newUser.address)).to.be.gt(0);
+            const usedInvite = await spiralEngine.usedInviteByUser(newUser.address);
+            expect(usedInvite > 0n).to.be.true;
             console.log("   ✅ activateUser works after unpause");
         });
 
@@ -197,9 +217,11 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             console.log("   ⏸️  Contract paused");
             
             // Попытка назначить роль должна провалиться
-            await expect(
-                spiralEngine.connect(activator).grantSellerRole(user1.address)
-            ).to.be.revertedWithCustomError(spiralEngine, "EnforcedPause");
+            await expectCustomError(
+                spiralEngine.connect(activator).grantSellerRole(user1.address),
+                spiralEngine,
+                "EnforcedPause"
+            );
             console.log("   ✅ grantSellerRole blocked during pause");
             
             // Снятие паузы
@@ -223,9 +245,11 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             console.log("   ⏸️  Contract paused");
             
             // Попытка suspend должна провалиться
-            await expect(
-                spiralEngine.connect(admin).suspendUser(user1.address, 3600, "Test")
-            ).to.be.revertedWithCustomError(spiralEngine, "EnforcedPause");
+            await expectCustomError(
+                spiralEngine.connect(admin).suspendUser(user1.address, 3600, "Test"),
+                spiralEngine,
+                "EnforcedPause"
+            );
             console.log("   ✅ suspendUser blocked during pause");
             
             // Снятие паузы
@@ -234,7 +258,8 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             
             // Теперь должно работать
             await spiralEngine.connect(admin).suspendUser(user1.address, 3600, "Test");
-            expect(await spiralEngine.suspensionUntil(user1.address)).to.be.gt(0);
+            const suspensionUntil = await spiralEngine.suspensionUntil(user1.address);
+            expect(suspensionUntil > 0n).to.be.true;
             console.log("   ✅ suspendUser works after unpause");
         });
 
@@ -255,9 +280,11 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             console.log("   ⏸️  Contract paused");
             
             // Попытка установить SoulIdentity должна провалиться
-            await expect(
-                spiralEngine.connect(admin).setSoulIdentity(await newSoulIdentity.getAddress())
-            ).to.be.revertedWithCustomError(spiralEngine, "EnforcedPause");
+            await expectCustomError(
+                spiralEngine.connect(admin).setSoulIdentity(await newSoulIdentity.getAddress()),
+                spiralEngine,
+                "EnforcedPause"
+            );
             console.log("   ✅ setSoulIdentity blocked during pause");
             
             // Снятие паузы
@@ -280,10 +307,19 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             
             const invalidAddress = "0x0000000000000000000000000000000000000001";
             
-            // Попытка upgrade к некорректному адресу должна провалиться
-            await expect(
-                spiralEngine.connect(admin).upgradeToAndCall(invalidAddress, "0x")
-            ).to.be.reverted;
+            // Попытка upgrade к некорректному адресу должна провалиться (generic revert)
+            await (async () => {
+                let reverted = false;
+                try {
+                    const tx = await spiralEngine.connect(admin).upgradeToAndCall(invalidAddress, "0x");
+                    if (tx && typeof tx.wait === "function") {
+                        await tx.wait();
+                    }
+                } catch (e) {
+                    reverted = true;
+                }
+                expect(reverted, "expected upgrade to invalid address to revert").to.be.true;
+            })();
             
             console.log("   ✅ Invalid address upgrade rejected");
         });
@@ -291,10 +327,19 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
         it("Should reject upgrade to zero address", async function () {
             console.log("   🔍 Testing upgrade to zero address...");
             
-            // Попытка upgrade к нулевому адресу должна провалиться
-            await expect(
-                spiralEngine.connect(admin).upgradeToAndCall(ethers.ZeroAddress, "0x")
-            ).to.be.reverted;
+            // Попытка upgrade к нулевому адресу должна провалиться (generic revert)
+            await (async () => {
+                let reverted = false;
+                try {
+                    const tx = await spiralEngine.connect(admin).upgradeToAndCall(ethers.ZeroAddress, "0x");
+                    if (tx && typeof tx.wait === "function") {
+                        await tx.wait();
+                    }
+                } catch (e) {
+                    reverted = true;
+                }
+                expect(reverted, "expected upgrade to zero address to revert").to.be.true;
+            })();
             
             console.log("   ✅ Zero address upgrade rejected");
         });
@@ -305,10 +350,19 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             const nonContract = ethers.Wallet.createRandom().address;
             console.log(`   📍 EOA address: ${nonContract}`);
             
-            // Попытка upgrade к EOA должна провалиться
-            await expect(
-                spiralEngine.connect(admin).upgradeToAndCall(nonContract, "0x")
-            ).to.be.reverted;
+            // Попытка upgrade к EOA должна провалиться (generic revert)
+            await (async () => {
+                let reverted = false;
+                try {
+                    const tx = await spiralEngine.connect(admin).upgradeToAndCall(nonContract, "0x");
+                    if (tx && typeof tx.wait === "function") {
+                        await tx.wait();
+                    }
+                } catch (e) {
+                    reverted = true;
+                }
+                expect(reverted, "expected upgrade to non-contract address to revert").to.be.true;
+            })();
             
             console.log("   ✅ Non-contract address upgrade rejected");
         });
@@ -318,7 +372,7 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             
             // ===== PHASE 1: Создаём данные перед первым upgrade =====
             await spiralEngine.connect(seller).mintInvite("MULTI_UPGRADE_1", 0);
-            expect(await spiralEngine.totalInvitesMinted()).to.equal(1);
+            expect(await spiralEngine.totalInvitesMinted()).to.equal(1n);
             console.log("   ✅ Data created before first upgrade");
             
             // ===== PHASE 2: Первый upgrade =====
@@ -335,7 +389,7 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             
             // ===== PHASE 3: Добавляем данные после первого upgrade =====
             await spiralEngine.connect(seller).mintInvite("MULTI_UPGRADE_2", 0);
-            expect(await spiralEngine.totalInvitesMinted()).to.equal(2);
+            expect(await spiralEngine.totalInvitesMinted()).to.equal(2n);
             console.log("   ✅ Data created after first upgrade");
             
             // ===== PHASE 4: Второй upgrade =====
@@ -351,14 +405,14 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             console.log(`   ✅ Second upgrade to: ${await logicV3.getAddress()}`);
             
             // ===== PHASE 5: Проверяем что все данные сохранились =====
-            expect(await spiralEngine.totalInvitesMinted()).to.equal(2);
+            expect(await spiralEngine.totalInvitesMinted()).to.equal(2n);
             expect(await spiralEngine.inviteCodeExists("MULTI_UPGRADE_1")).to.be.true;
             expect(await spiralEngine.inviteCodeExists("MULTI_UPGRADE_2")).to.be.true;
             console.log("   ✅ All data preserved after 2 upgrades");
             
             // ===== PHASE 6: Добавляем данные после второго upgrade =====
             await spiralEngine.connect(seller).mintInvite("MULTI_UPGRADE_3", 0);
-            expect(await spiralEngine.totalInvitesMinted()).to.equal(3);
+            expect(await spiralEngine.totalInvitesMinted()).to.equal(3n);
             console.log("   ✅ Data created after second upgrade");
             
             console.log("   🎉 Multiple upgrades test passed");
@@ -432,9 +486,11 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             await spiralEngine.connect(admin).suspendUser(user1.address, 3600, "Test");
             console.log("   ✅ suspendUser - sequential call works");
             
-            // ===== PHASE 5: Проверяем счетчики =====
-            expect(await spiralEngine.totalInvitesMinted()).to.be.gte(2);
-            expect(await spiralEngine.totalInvitesUsed()).to.be.gte(1);
+            // ===== PHASE 5: Проверяем счетчики (uint256 → bigint)
+            const totalMinted = await spiralEngine.totalInvitesMinted();
+            const totalUsed = await spiralEngine.totalInvitesUsed();
+            expect(totalMinted >= 2n).to.be.true;
+            expect(totalUsed >= 1n).to.be.true;
             console.log("   ✅ Counters updated correctly");
             
             // Если мы дошли сюда без ревертов, то nonReentrant работает корректно

@@ -1,6 +1,19 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectRevertWithMessage(txPromise, messageSubstring) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const msg = (err?.reason || err?.shortMessage || err?.message || err?.error?.message || String(err)) || "";
+    expect(msg.includes(messageSubstring), `expected revert message to contain "${messageSubstring}"`).to.be.true;
+}
+
 /**
  * 🧪 MagicRegistry Comprehensive Test Suite
  * 
@@ -201,10 +214,10 @@ describe("🔍 MagicRegistry - Comprehensive Test Suite", function () {
             const testName = "UnauthorizedContract";
             const testAddress = "0x1234567890123456789012345678901234567890";
             
-            // P0: Проверяем, что НЕ-owner не может вызвать set
-            await expect(
-                magicRegistry.connect(user1).set(testName, testAddress)
-            ).to.be.revertedWith("MagicRegistry: not owner");
+            await expectRevertWithMessage(
+                magicRegistry.connect(user1).set(testName, testAddress),
+                "MagicRegistry: not owner"
+            );
             
             // Проверяем, что адрес не изменился
             const address = await magicRegistry.get(testName);
@@ -249,11 +262,11 @@ describe("🔍 MagicRegistry - Comprehensive Test Suite", function () {
             expect(updatedOwner).to.equal(newOwner);
             console.log(`✅ Новый владелец: ${updatedOwner}`);
             
-            // Проверяем, что старый владелец не может вызывать set
             console.log("🔍 Проверяем, что старый владелец не может вызывать set...");
-            await expect(
-                magicRegistry.connect(deployer).set("Test", "0x1234567890123456789012345678901234567890")
-            ).to.be.revertedWith("MagicRegistry: not owner");
+            await expectRevertWithMessage(
+                magicRegistry.connect(deployer).set("Test", "0x1234567890123456789012345678901234567890"),
+                "MagicRegistry: not owner"
+            );
             console.log("✅ Старый владелец корректно заблокирован");
             
             // Проверяем, что новый владелец может вызывать set
@@ -278,10 +291,10 @@ describe("🔍 MagicRegistry - Comprehensive Test Suite", function () {
         it("Should reject zero address for changeOwner - NO_FALSE_SUCCESSES", async function () {
             console.log("\n🧪 Тест: Отклонение нулевого адреса для changeOwner");
             
-            // P0: Проверяем, что нулевой адрес отклоняется
-            await expect(
-                magicRegistry.connect(deployer).changeOwner(ethers.ZeroAddress)
-            ).to.be.revertedWith("MagicRegistry: zero address");
+            await expectRevertWithMessage(
+                magicRegistry.connect(deployer).changeOwner(ethers.ZeroAddress),
+                "MagicRegistry: zero address"
+            );
             
             // Проверяем, что владелец не изменился
             const owner = await magicRegistry.owner();
@@ -295,10 +308,10 @@ describe("🔍 MagicRegistry - Comprehensive Test Suite", function () {
             
             const newOwner = user2.address;
             
-            // P0: Проверяем, что НЕ-owner не может вызвать changeOwner
-            await expect(
-                magicRegistry.connect(user1).changeOwner(newOwner)
-            ).to.be.revertedWith("MagicRegistry: not owner");
+            await expectRevertWithMessage(
+                magicRegistry.connect(user1).changeOwner(newOwner),
+                "MagicRegistry: not owner"
+            );
             
             // Проверяем, что владелец не изменился
             const owner = await magicRegistry.owner();
@@ -315,10 +328,10 @@ describe("🔍 MagicRegistry - Comprehensive Test Suite", function () {
             
             const testName = "ZeroAddressContract";
             
-            // P0: Проверяем, что нулевой адрес отклоняется
-            await expect(
-                magicRegistry.connect(deployer).set(testName, ethers.ZeroAddress)
-            ).to.be.revertedWith("MagicRegistry: zero address");
+            await expectRevertWithMessage(
+                magicRegistry.connect(deployer).set(testName, ethers.ZeroAddress),
+                "MagicRegistry: zero address"
+            );
             
             // Проверяем, что адрес не изменился
             const address = await magicRegistry.get(testName);

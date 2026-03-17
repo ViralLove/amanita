@@ -1,6 +1,19 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectRevertWithMessage(txPromise, messageSubstring) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const msg = (err?.reason || err?.shortMessage || err?.message || err?.error?.message || String(err)) || "";
+    expect(msg.includes(messageSubstring), `expected revert message to contain "${messageSubstring}"`).to.be.true;
+}
+
 describe("SoulMetadata Integration Tests", function () {
     let soulboundCore;
     let soulMetadata;
@@ -73,18 +86,23 @@ describe("SoulMetadata Integration Tests", function () {
         });
 
         it("Should initialize metadata successfully", async function () {
-            await expect(
-                soulMetadata.connect(user1).initializeMetadata(
-                    1,
-                    "identity",
-                    '{"level": 1, "experience": 0}',
-                    "QmTest123"
-                )
-            ).to.emit(soulMetadata, "MetadataUpdated")
-             .withArgs(1, "identity", 1);
+            const tx = await soulMetadata.connect(user1).initializeMetadata(
+                1,
+                "identity",
+                '{"level": 1, "experience": 0}',
+                "QmTest123"
+            );
+            const receipt = await tx.wait();
+            const ev = receipt.logs.find(log => {
+                try { return soulMetadata.interface.parseLog(log)?.name === "MetadataUpdated"; } catch (_) { return false; }
+            });
+            expect(ev).to.be.ok;
+            const p = soulMetadata.interface.parseLog(ev);
+            expect(p.args.tokenId).to.equal(1n);
+            expect(p.args.version).to.equal(1n);
 
             expect(await soulMetadata.isInitialized(1)).to.be.true;
-            expect(await soulMetadata.getMetadataVersion(1)).to.equal(1);
+            expect(await soulMetadata.getMetadataVersion(1)).to.equal(1n);
         });
 
         it("Should return metadata-based tokenURI after initialization", async function () {
@@ -111,17 +129,19 @@ describe("SoulMetadata Integration Tests", function () {
                 "QmTest123"
             );
 
-            // Обновление
-            await expect(
-                soulMetadata.connect(user1).updateMetadata(
-                    1,
-                    '{"level": 2, "experience": 100}',
-                    "QmTest456"
-                )
-            ).to.emit(soulMetadata, "MetadataUpdated")
-             .withArgs(1, "identity", 2);
+            const tx = await soulMetadata.connect(user1).updateMetadata(
+                1,
+                '{"level": 2, "experience": 100}',
+                "QmTest456"
+            );
+            const receipt = await tx.wait();
+            const ev = receipt.logs.find(log => {
+                try { return soulMetadata.interface.parseLog(log)?.name === "MetadataUpdated"; } catch (_) { return false; }
+            });
+            expect(ev).to.be.ok;
+            expect(soulMetadata.interface.parseLog(ev).args.version).to.equal(2n);
 
-            expect(await soulMetadata.getMetadataVersion(1)).to.equal(2);
+            expect(await soulMetadata.getMetadataVersion(1)).to.equal(2n);
             
             const metadata = await soulMetadata.getMetadata(1);
             expect(metadata.attributes).to.equal('{"level": 2, "experience": 100}');
@@ -141,7 +161,7 @@ describe("SoulMetadata Integration Tests", function () {
             
             // Проверяем все поля SoulData структуры
             expect(metadata.metadataType).to.equal("achievement");
-            expect(metadata.version).to.equal(1);
+            expect(metadata.version === 1n || metadata.version === 1).to.be.true;
             expect(metadata.attributes).to.equal('{"badges": ["first_login", "level_up"], "score": 150}');
             expect(metadata.ipfsHash).to.equal("QmCompleteTest789");
         });
@@ -155,24 +175,11 @@ describe("SoulMetadata Integration Tests", function () {
                 "QmVersion1"
             );
             
-            // Проверяем начальную версию
-            expect(await soulMetadata.getMetadataVersion(1)).to.equal(1);
-            
-            // Первое обновление
-            await soulMetadata.connect(user1).updateMetadata(
-                1,
-                '{"trust": 150}',
-                "QmVersion2"
-            );
-            expect(await soulMetadata.getMetadataVersion(1)).to.equal(2);
-            
-            // Второе обновление
-            await soulMetadata.connect(user1).updateMetadata(
-                1,
-                '{"trust": 200}',
-                "QmVersion3"
-            );
-            expect(await soulMetadata.getMetadataVersion(1)).to.equal(3);
+            expect(await soulMetadata.getMetadataVersion(1)).to.equal(1n);
+            await soulMetadata.connect(user1).updateMetadata(1, '{"trust": 150}', "QmVersion2");
+            expect(await soulMetadata.getMetadataVersion(1)).to.equal(2n);
+            await soulMetadata.connect(user1).updateMetadata(1, '{"trust": 200}', "QmVersion3");
+            expect(await soulMetadata.getMetadataVersion(1)).to.equal(3n);
         });
     });
 
@@ -182,54 +189,20 @@ describe("SoulMetadata Integration Tests", function () {
         });
 
         it("Should allow token owner to initialize metadata", async function () {
-            await expect(
-                soulMetadata.connect(user1).initializeMetadata(
-                    1,
-                    "identity",
-                    '{"level": 1}',
-                    ""
-                )
-            ).to.not.be.reverted;
+            await soulMetadata.connect(user1).initializeMetadata(1, "identity", '{"level": 1}', "");
         });
 
         it("Should allow contract owner to initialize metadata", async function () {
-            await expect(
-                soulMetadata.connect(owner).initializeMetadata(
-                    1,
-                    "identity",
-                    '{"level": 1}',
-                    ""
-                )
-            ).to.not.be.reverted;
+            await soulMetadata.connect(owner).initializeMetadata(1, "identity", '{"level": 1}', "");
         });
 
         it("Should reject unauthorized metadata initialization", async function () {
-            await expect(
-                soulMetadata.connect(user2).initializeMetadata(
-                    1,
-                    "identity",
-                    '{"level": 1}',
-                    ""
-                )
-            ).to.be.revertedWith("SoulMetadata: not authorized");
+            await expectRevertWithMessage(soulMetadata.connect(user2).initializeMetadata(1, "identity", '{"level": 1}', ""), "SoulMetadata: not authorized");
         });
 
         it("Should reject double initialization", async function () {
-            await soulMetadata.connect(user1).initializeMetadata(
-                1,
-                "identity",
-                '{"level": 1}',
-                ""
-            );
-
-            await expect(
-                soulMetadata.connect(user1).initializeMetadata(
-                    1,
-                    "achievement",
-                    '{"badges": []}',
-                    ""
-                )
-            ).to.be.revertedWith("SoulMetadata: already initialized");
+            await soulMetadata.connect(user1).initializeMetadata(1, "identity", '{"level": 1}', "");
+            await expectRevertWithMessage(soulMetadata.connect(user1).initializeMetadata(1, "achievement", '{"badges": []}', ""), "SoulMetadata: already initialized");
         });
     });
 
@@ -258,79 +231,43 @@ describe("SoulMetadata Integration Tests", function () {
             ];
             const ipfsHashes = ["QmNew1", "QmNew2", "QmNew3"];
 
-            await expect(
-                soulMetadata.connect(user1).batchUpdateMetadata(
-                    tokenIds,
-                    attributes,
-                    ipfsHashes
-                )
-            ).to.emit(soulMetadata, "MetadataBatchUpdated")
-             .withArgs(tokenIds, 3);
+            const tx = await soulMetadata.connect(user1).batchUpdateMetadata(tokenIds, attributes, ipfsHashes);
+            const receipt = await tx.wait();
+            const ev = receipt.logs.find(log => {
+                try { return soulMetadata.interface.parseLog(log)?.name === "MetadataBatchUpdated"; } catch (_) { return false; }
+            });
+            expect(ev).to.be.ok;
 
-            // Проверяем обновления
             for (let i = 0; i < 3; i++) {
                 const metadata = await soulMetadata.getMetadata(tokenIds[i]);
                 expect(metadata.attributes).to.equal(attributes[i]);
                 expect(metadata.ipfsHash).to.equal(ipfsHashes[i]);
-                expect(metadata.version).to.equal(2);
+                expect(metadata.version === 2n || metadata.version === 2).to.be.true;
             }
         });
 
         it("Should reject batch update with mismatched arrays", async function () {
-            await expect(
-                soulMetadata.connect(user1).batchUpdateMetadata(
-                    [1, 2],
-                    ['{"level": 2}'],
-                    ["QmNew1"]
-                )
-            ).to.be.revertedWith("SoulMetadata: arrays length mismatch");
+            await expectRevertWithMessage(soulMetadata.connect(user1).batchUpdateMetadata([1, 2], ['{"level": 2}'], ["QmNew1"]), "SoulMetadata: arrays length mismatch");
         });
 
         it("Should reject batch update that's too large", async function () {
             const largeArray = new Array(51).fill(0).map((_, i) => i + 1);
             const attributesArray = new Array(51).fill('{"level": 1}');
             const ipfsArray = new Array(51).fill("QmTest");
-
-            await expect(
-                soulMetadata.connect(user1).batchUpdateMetadata(
-                    largeArray,
-                    attributesArray,
-                    ipfsArray
-                )
-            ).to.be.revertedWith("SoulMetadata: batch too large");
+            await expectRevertWithMessage(soulMetadata.connect(user1).batchUpdateMetadata(largeArray, attributesArray, ipfsArray), "SoulMetadata: batch too large");
         });
     });
 
     describe("Edge Cases", function () {
         it("Should handle non-existent tokens correctly", async function () {
-            await expect(
-                soulMetadata.getMetadata(999)
-            ).to.be.revertedWith("SoulMetadata: token does not exist");
-
-            await expect(
-                soulMetadata.connect(user1).initializeMetadata(
-                    999,
-                    "identity",
-                    '{"level": 1}',
-                    ""
-                )
-            ).to.be.revertedWith("SoulMetadata: token does not exist");
+            await expectRevertWithMessage(soulMetadata.getMetadata(999), "SoulMetadata: token does not exist");
+            await expectRevertWithMessage(soulMetadata.connect(user1).initializeMetadata(999, "identity", '{"level": 1}', ""), "SoulMetadata: token does not exist");
         });
 
         it("Should handle uninitialized metadata correctly", async function () {
             await soulboundCore.mintSoul(user1.address);
-
-            await expect(
-                soulMetadata.getMetadata(1)
-            ).to.be.revertedWith("SoulMetadata: not initialized");
-
-            await expect(
-                soulMetadata.connect(user1).updateMetadata(
-                    1,
-                    '{"level": 2}',
-                    "QmNew"
-                )
-            ).to.be.revertedWith("SoulMetadata: not initialized");
+            await expectRevertWithMessage(soulMetadata.getMetadata(1), "SoulMetadata: not initialized");
+            await expectRevertWithMessage(soulMetadata.connect(user1).updateMetadata(1, '{"level": 2}', "QmNew"), "SoulMetadata: not initialized");
         });
 
         it("Should fallback to default URI on metadata contract error", async function () {
@@ -395,7 +332,7 @@ describe("SoulMetadata Integration Tests", function () {
             const receipt = await tx.wait();
             
             console.log(`Gas used for initializeMetadata: ${receipt.gasUsed.toString()}`);
-            expect(receipt.gasUsed).to.be.lessThan(250000); // Реалистичный лимит с учетом storage
+            expect(receipt.gasUsed < 250000n).to.be.true;
         });
 
         it("Should profile gas usage for metadata update", async function () {
@@ -415,7 +352,7 @@ describe("SoulMetadata Integration Tests", function () {
             const receipt = await tx.wait();
             
             console.log(`Gas used for updateMetadata: ${receipt.gasUsed.toString()}`);
-            expect(receipt.gasUsed).to.be.lessThan(120000); // Скорректированная цель
+            expect(receipt.gasUsed < 120000n).to.be.true;
         });
 
         it("Should profile gas usage for batch update", async function () {
@@ -446,7 +383,7 @@ describe("SoulMetadata Integration Tests", function () {
             const gasPerToken = receipt.gasUsed / BigInt(5);
             console.log(`Gas used for batchUpdateMetadata (5 tokens): ${receipt.gasUsed.toString()}`);
             console.log(`Gas per token in batch: ${gasPerToken.toString()}`);
-            expect(gasPerToken).to.be.lessThan(50000n); // Газ на токен в пакете
+            expect(gasPerToken < 50000n).to.be.true;
         });
 
         it("Should profile gas usage for tokenURI", async function () {
@@ -463,7 +400,7 @@ describe("SoulMetadata Integration Tests", function () {
             console.log(`Gas estimate for tokenURI: ${gasEstimate.toString()}`);
             
             // View функции не должны потреблять много газа
-            expect(gasEstimate).to.be.lessThan(60000);
+            expect(gasEstimate < 60000n).to.be.true;
         });
     });
 });

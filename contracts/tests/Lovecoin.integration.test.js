@@ -1,6 +1,30 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectRevertWithMessage(txPromise, messageSubstring) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const msg = (err?.message || err?.error?.message || String(err)) || "";
+    expect(msg.includes(messageSubstring), `expected revert message to contain "${messageSubstring}"`).to.be.true;
+}
+
+async function expectRevert(txPromise) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+}
+
 describe("Lovecoin Integration Tests", function () {
     let lovecoin;
     let deployer, user1, user2, minter;
@@ -109,10 +133,7 @@ describe("Lovecoin Integration Tests", function () {
             await lovecoin.connect(deployer).revokeRole(MINTER_ROLE, user1.address);
             expect(await lovecoin.hasRole(MINTER_ROLE, user1.address)).to.be.false;
             
-            // User1 can no longer mint
-            await expect(
-                lovecoin.connect(user1).mint(user2.address, ethers.parseEther("100"))
-            ).to.be.reverted;
+            await expectRevert(lovecoin.connect(user1).mint(user2.address, ethers.parseEther("100")));
         });
     });
 
@@ -151,37 +172,22 @@ describe("Lovecoin Integration Tests", function () {
 
     describe("P3: Edge Cases and Error Handling", function () {
         it("Should handle zero amount minting", async function () {
-            await expect(
-                lovecoin.connect(minter).mint(user1.address, 0)
-            ).to.be.revertedWith("Lovecoin: mint amount must be positive");
+            await expectRevertWithMessage(lovecoin.connect(minter).mint(user1.address, 0), "Lovecoin: mint amount must be positive");
         });
 
         it("Should handle minting to zero address", async function () {
-            await expect(
-                lovecoin.connect(minter).mint(ethers.ZeroAddress, ethers.parseEther("100"))
-            ).to.be.revertedWith("Lovecoin: mint to zero address");
+            await expectRevertWithMessage(lovecoin.connect(minter).mint(ethers.ZeroAddress, ethers.parseEther("100")), "Lovecoin: mint to zero address");
         });
 
         it("Should handle burning more than balance", async function () {
-            const burnAmount = ethers.parseEther("999999999"); // More than total supply
-            
-            await expect(
-                lovecoin.connect(minter).burn(deployer.address, burnAmount)
-            ).to.be.revertedWith("Lovecoin: burn amount exceeds balance");
+            const burnAmount = ethers.parseEther("999999999");
+            await expectRevertWithMessage(lovecoin.connect(minter).burn(deployer.address, burnAmount), "Lovecoin: burn amount exceeds balance");
         });
 
         it("Should handle role management edge cases", async function () {
             const MINTER_ROLE = await lovecoin.MINTER_ROLE();
-            
-            // Non-admin cannot grant roles
-            await expect(
-                lovecoin.connect(user1).grantRole(MINTER_ROLE, user2.address)
-            ).to.be.reverted;
-            
-            // Non-admin cannot revoke roles
-            await expect(
-                lovecoin.connect(user1).revokeRole(MINTER_ROLE, minter.address)
-            ).to.be.reverted;
+            await expectRevert(lovecoin.connect(user1).grantRole(MINTER_ROLE, user2.address));
+            await expectRevert(lovecoin.connect(user1).revokeRole(MINTER_ROLE, minter.address));
         });
     });
 
@@ -189,19 +195,14 @@ describe("Lovecoin Integration Tests", function () {
         it("Should have reasonable gas costs for minting", async function () {
             const tx = await lovecoin.connect(minter).mint(user1.address, ethers.parseEther("100"));
             const receipt = await tx.wait();
-            
-            // Gas cost should be reasonable (less than 100k gas)
-            expect(receipt.gasUsed).to.be.lessThan(100000);
+            expect(receipt.gasUsed < 100000n).to.be.true;
         });
 
         it("Should have reasonable gas costs for role management", async function () {
             const MINTER_ROLE = await lovecoin.MINTER_ROLE();
-            
             const tx = await lovecoin.connect(deployer).grantRole(MINTER_ROLE, user1.address);
             const receipt = await tx.wait();
-            
-            // Gas cost should be reasonable
-            expect(receipt.gasUsed).to.be.lessThan(150000);
+            expect(receipt.gasUsed < 150000n).to.be.true;
         });
     });
 });

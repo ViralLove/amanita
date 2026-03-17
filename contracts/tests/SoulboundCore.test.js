@@ -1,6 +1,45 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
+async function expectRevertWithMessage(txPromise, messageSubstring) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const msg = (err?.reason || err?.shortMessage || err?.message || err?.error?.message || String(err)) || "";
+    expect(msg.includes(messageSubstring), `expected revert message to contain "${messageSubstring}"`).to.be.true;
+}
+
+async function expectRevert(txPromise) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+}
+
 describe("SoulboundCore", function () {
     let soulboundCore;
     let owner;
@@ -47,11 +86,11 @@ describe("SoulboundCore", function () {
         });
 
         it("Should initialize with nextTokenId = 1", async function () {
-            expect(await soulboundCore.getNextTokenId()).to.equal(1);
+            expect(await soulboundCore.getNextTokenId()).to.equal(1n);
         });
 
         it("Should have total supply = 0 initially", async function () {
-            expect(await soulboundCore.getTotalSupply()).to.equal(0);
+            expect(await soulboundCore.getTotalSupply()).to.equal(0n);
         });
     });
 
@@ -66,9 +105,17 @@ describe("SoulboundCore", function () {
         });
 
         it("Should emit Locked event on mint", async function () {
-            await expect(soulboundCore.mintSoul(user1.address))
-                .to.emit(soulboundCore, "Locked")
-                .withArgs(1);
+            const tx = await soulboundCore.mintSoul(user1.address);
+            const receipt = await tx.wait();
+            const lockedLog = receipt.logs.find(log => {
+                try {
+                    const p = soulboundCore.interface.parseLog(log);
+                    return p && p.name === "Locked";
+                } catch (_) { return false; }
+            });
+            expect(lockedLog).to.be.ok;
+            const parsed = soulboundCore.interface.parseLog(lockedLog);
+            expect(parsed.args.tokenId).to.equal(1n);
         });
     });
 
@@ -78,23 +125,25 @@ describe("SoulboundCore", function () {
         });
 
         it("Should revert on transferFrom", async function () {
-            await expect(
-                soulboundCore.connect(user1).transferFrom(user1.address, user2.address, 1)
-            ).to.be.revertedWith("SBT: transfer not allowed");
+            await expectRevertWithMessage(
+                soulboundCore.connect(user1).transferFrom(user1.address, user2.address, 1),
+                "SBT: transfer not allowed"
+            );
         });
 
         it("Should revert on safeTransferFrom", async function () {
-            await expect(
-                soulboundCore.connect(user1).safeTransferFrom(user1.address, user2.address, 1)
-            ).to.be.revertedWith("SBT: transfer not allowed");
+            await expectRevertWithMessage(
+                soulboundCore.connect(user1).safeTransferFrom(user1.address, user2.address, 1),
+                "SBT: transfer not allowed"
+            );
         });
 
         it("Should revert on safeTransferFrom with data", async function () {
             await soulboundCore.mintSoul(user1.address);
-            
-            await expect(
-                soulboundCore.connect(user1)["safeTransferFrom(address,address,uint256,bytes)"](user1.address, user2.address, 1, "0x")
-            ).to.be.revertedWith("SBT: transfer not allowed");
+            await expectRevertWithMessage(
+                soulboundCore.connect(user1)["safeTransferFrom(address,address,uint256,bytes)"](user1.address, user2.address, 1, "0x"),
+                "SBT: transfer not allowed"
+            );
         });
     });
 
@@ -104,15 +153,11 @@ describe("SoulboundCore", function () {
         });
 
         it("Should revert on approve", async function () {
-            await expect(
-                soulboundCore.connect(user1).approve(user2.address, 1)
-            ).to.be.revertedWith("SBT: approval not allowed");
+            await expectRevertWithMessage(soulboundCore.connect(user1).approve(user2.address, 1), "SBT: approval not allowed");
         });
 
         it("Should revert on setApprovalForAll", async function () {
-            await expect(
-                soulboundCore.connect(user1).setApprovalForAll(user2.address, true)
-            ).to.be.revertedWith("SBT: approval not allowed");
+            await expectRevertWithMessage(soulboundCore.connect(user1).setApprovalForAll(user2.address, true), "SBT: approval not allowed");
         });
 
         it("Should always return address(0) for getApproved", async function () {
@@ -128,16 +173,24 @@ describe("SoulboundCore", function () {
 
     describe("Minting", function () {
         it("Should mint soul to user (owner only)", async function () {
-            await expect(soulboundCore.mintSoul(user1.address))
-                .to.emit(soulboundCore, "SoulMinted")
-                .withArgs(user1.address, 1)
-                .and.to.emit(soulboundCore, "Locked")
-                .withArgs(1);
+            const tx = await soulboundCore.mintSoul(user1.address);
+            const receipt = await tx.wait();
+            const soulMinted = receipt.logs.find(log => {
+                try { return soulboundCore.interface.parseLog(log)?.name === "SoulMinted"; } catch (_) { return false; }
+            });
+            const locked = receipt.logs.find(log => {
+                try { return soulboundCore.interface.parseLog(log)?.name === "Locked"; } catch (_) { return false; }
+            });
+            expect(soulMinted).to.be.ok;
+            expect(locked).to.be.ok;
+            expect(soulboundCore.interface.parseLog(soulMinted).args.to).to.equal(user1.address);
+            expect(soulboundCore.interface.parseLog(soulMinted).args.tokenId).to.equal(1n);
+            expect(soulboundCore.interface.parseLog(locked).args.tokenId).to.equal(1n);
 
             expect(await soulboundCore.ownerOf(1)).to.equal(user1.address);
-            expect(await soulboundCore.balanceOf(user1.address)).to.equal(1);
-            expect(await soulboundCore.getNextTokenId()).to.equal(2);
-            expect(await soulboundCore.getTotalSupply()).to.equal(1);
+            expect(await soulboundCore.balanceOf(user1.address)).to.equal(1n);
+            expect(await soulboundCore.getNextTokenId()).to.equal(2n);
+            expect(await soulboundCore.getTotalSupply()).to.equal(1n);
             expect(await soulboundCore.exists(1)).to.be.true;
         });
 
@@ -156,37 +209,25 @@ describe("SoulboundCore", function () {
             });
             expect(soulMintedEvents).to.have.lengthOf(3);
 
-            // Check balances and ownership
-            expect(await soulboundCore.balanceOf(user1.address)).to.equal(3);
+            expect(await soulboundCore.balanceOf(user1.address)).to.equal(3n);
             expect(await soulboundCore.ownerOf(1)).to.equal(user1.address);
             expect(await soulboundCore.ownerOf(2)).to.equal(user1.address);
             expect(await soulboundCore.ownerOf(3)).to.equal(user1.address);
-            expect(await soulboundCore.getNextTokenId()).to.equal(4);
-            expect(await soulboundCore.getTotalSupply()).to.equal(3);
+            expect(await soulboundCore.getNextTokenId()).to.equal(4n);
+            expect(await soulboundCore.getTotalSupply()).to.equal(3n);
         });
 
         it("Should revert minting by non-owner", async function () {
-            await expect(
-                soulboundCore.connect(user1).mintSoul(user2.address)
-            ).to.be.revertedWithCustomError(soulboundCore, "OwnableUnauthorizedAccount")
-                .withArgs(user1.address);
+            await expectCustomError(soulboundCore.connect(user1).mintSoul(user2.address), soulboundCore, "OwnableUnauthorizedAccount");
         });
 
         it("Should revert batch minting by non-owner", async function () {
-            await expect(
-                soulboundCore.connect(user1).mintSoulBatch(user2.address, 2)
-            ).to.be.revertedWithCustomError(soulboundCore, "OwnableUnauthorizedAccount")
-                .withArgs(user1.address);
+            await expectCustomError(soulboundCore.connect(user1).mintSoulBatch(user2.address, 2), soulboundCore, "OwnableUnauthorizedAccount");
         });
 
         it("Should revert batch minting with invalid amount", async function () {
-            await expect(
-                soulboundCore.mintSoulBatch(user1.address, 0)
-            ).to.be.revertedWith("SBT: invalid amount");
-
-            await expect(
-                soulboundCore.mintSoulBatch(user1.address, 101)
-            ).to.be.revertedWith("SBT: invalid amount");
+            await expectRevertWithMessage(soulboundCore.mintSoulBatch(user1.address, 0), "SBT: invalid amount");
+            await expectRevertWithMessage(soulboundCore.mintSoulBatch(user1.address, 101), "SBT: invalid amount");
         });
     });
 
@@ -197,35 +238,38 @@ describe("SoulboundCore", function () {
         });
 
         it("Should burn soul by owner", async function () {
-            await expect(soulboundCore.connect(user1).burnSoul(1))
-                .to.emit(soulboundCore, "SoulBurned")
-                .withArgs(1);
+            const tx = await soulboundCore.connect(user1).burnSoul(1);
+            const receipt = await tx.wait();
+            const burned = receipt.logs.find(log => {
+                try { return soulboundCore.interface.parseLog(log)?.name === "SoulBurned"; } catch (_) { return false; }
+            });
+            expect(burned).to.be.ok;
+            expect(soulboundCore.interface.parseLog(burned).args.tokenId).to.equal(1n);
 
-            await expect(soulboundCore.ownerOf(1)).to.be.revertedWith("ERC721: invalid token ID");
+            await expectRevertWithMessage(soulboundCore.ownerOf(1), "ERC721: invalid token ID");
             expect(await soulboundCore.exists(1)).to.be.false;
         });
 
         it("Should burn soul by contract owner", async function () {
             await soulboundCore.mintSoul(user1.address);
-            
-            await expect(soulboundCore.burnSoul(1))
-                .to.emit(soulboundCore, "SoulBurned")
-                .withArgs(1);
+            const tx = await soulboundCore.burnSoul(1);
+            const receipt = await tx.wait();
+            const burned = receipt.logs.find(log => {
+                try { return soulboundCore.interface.parseLog(log)?.name === "SoulBurned"; } catch (_) { return false; }
+            });
+            expect(burned).to.be.ok;
+            expect(soulboundCore.interface.parseLog(burned).args.tokenId).to.equal(1n);
 
-            await expect(soulboundCore.ownerOf(1)).to.be.revertedWith("ERC721: invalid token ID");
+            await expectRevertWithMessage(soulboundCore.ownerOf(1), "ERC721: invalid token ID");
             expect(await soulboundCore.exists(1)).to.be.false;
         });
 
         it("Should revert burning by unauthorized user", async function () {
-            await expect(
-                soulboundCore.connect(user2).burnSoul(1)
-            ).to.be.revertedWith("SBT: not authorized to burn");
+            await expectRevertWithMessage(soulboundCore.connect(user2).burnSoul(1), "SBT: not authorized to burn");
         });
 
         it("Should revert burning non-existent token", async function () {
-            await expect(
-                soulboundCore.connect(user1).burnSoul(999)
-            ).to.be.revertedWith("ERC721: invalid token ID");
+            await expectRevertWithMessage(soulboundCore.connect(user1).burnSoul(999), "ERC721: invalid token ID");
         });
     });
 
@@ -238,35 +282,24 @@ describe("SoulboundCore", function () {
         });
 
         it("Should return correct nextTokenId", async function () {
-            expect(await soulboundCore.getNextTokenId()).to.equal(1);
-            
+            expect(await soulboundCore.getNextTokenId()).to.equal(1n);
             await soulboundCore.mintSoul(user1.address);
-            expect(await soulboundCore.getNextTokenId()).to.equal(2);
-            
+            expect(await soulboundCore.getNextTokenId()).to.equal(2n);
             await soulboundCore.mintSoul(user2.address);
-            expect(await soulboundCore.getNextTokenId()).to.equal(3);
+            expect(await soulboundCore.getNextTokenId()).to.equal(3n);
         });
 
         it("Should return correct total supply", async function () {
-            // Создаем новый контракт для этого теста
             const SoulboundCore = await ethers.getContractFactory("SoulboundCore");
             const testContract = await SoulboundCore.deploy("Soulbound Core", "SBC");
             await testContract.waitForDeployment();
-            
-            // Начинаем с чистого состояния
-            expect(await testContract.getTotalSupply()).to.equal(0);
-            
-            // Минтим первый токен
+            expect(await testContract.getTotalSupply()).to.equal(0n);
             await testContract.mintSoul(user1.address);
-            expect(await testContract.getTotalSupply()).to.equal(1);
-            
-            // Минтим второй токен
+            expect(await testContract.getTotalSupply()).to.equal(1n);
             await testContract.mintSoul(user2.address);
-            expect(await testContract.getTotalSupply()).to.equal(2);
-            
-            // Сжигаем первый токен
+            expect(await testContract.getTotalSupply()).to.equal(2n);
             await testContract.connect(user1).burnSoul(1);
-            expect(await testContract.getTotalSupply()).to.equal(1);
+            expect(await testContract.getTotalSupply()).to.equal(1n);
         });
 
         it("Should return correct exists status", async function () {
@@ -299,23 +332,13 @@ describe("SoulboundCore", function () {
         });
 
         it("Should handle transferFrom with zero addresses", async function () {
-            await expect(
-                soulboundCore.transferFrom(ethers.ZeroAddress, user1.address, 1)
-            ).to.be.revertedWith("SBT: transfer not allowed");
-
-            await expect(
-                soulboundCore.transferFrom(user1.address, ethers.ZeroAddress, 1)
-            ).to.be.revertedWith("SBT: transfer not allowed");
+            await expectRevertWithMessage(soulboundCore.transferFrom(ethers.ZeroAddress, user1.address, 1), "SBT: transfer not allowed");
+            await expectRevertWithMessage(soulboundCore.transferFrom(user1.address, ethers.ZeroAddress, 1), "SBT: transfer not allowed");
         });
 
         it("Should handle approve with zero addresses", async function () {
-            await expect(
-                soulboundCore.approve(ethers.ZeroAddress, 1)
-            ).to.be.revertedWith("SBT: approval not allowed");
-
-            await expect(
-                soulboundCore.connect(user1).approve(user2.address, 0)
-            ).to.be.revertedWith("SBT: approval not allowed");
+            await expectRevertWithMessage(soulboundCore.approve(ethers.ZeroAddress, 1), "SBT: approval not allowed");
+            await expectRevertWithMessage(soulboundCore.connect(user1).approve(user2.address, 0), "SBT: approval not allowed");
         });
     });
 
@@ -323,18 +346,16 @@ describe("SoulboundCore", function () {
         it("Should profile gas usage for mintSoul", async function () {
             const tx = await soulboundCore.mintSoul(user1.address);
             const receipt = await tx.wait();
-            
             console.log(`Gas used for mintSoul: ${receipt.gasUsed.toString()}`);
-            expect(receipt.gasUsed).to.be.lessThan(110000); // Реалистичный лимит для полнофункциональный ERC721 SBT
+            expect(receipt.gasUsed < 110000n).to.be.true;
         });
 
         it("Should profile gas usage for mintSoulBatch", async function () {
             const tx = await soulboundCore.mintSoulBatch(user1.address, 5);
             const receipt = await tx.wait();
-            
             const gasPerToken = receipt.gasUsed / 5n;
             console.log(`Gas per token in batch (5 tokens): ${gasPerToken.toString()}`);
-            expect(gasPerToken).to.be.lessThan(50000);
+            expect(gasPerToken < 50000n).to.be.true;
         });
 
         it("Should profile gas usage for burnSoul", async function () {

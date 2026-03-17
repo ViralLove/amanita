@@ -1,6 +1,21 @@
 const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
 describe("SpiralEngine - Basic Functionality", function () {
     let spiralEngine;
     let soulIdentity;
@@ -210,8 +225,8 @@ describe("SpiralEngine - Basic Functionality", function () {
             console.log(`   Total minted: ${totalMinted}`);
             console.log(`   Total used: ${totalUsed}`);
             
-            expect(totalMinted).to.equal(0);
-            expect(totalUsed).to.equal(0);
+            expect(totalMinted).to.equal(0n);
+            expect(totalUsed).to.equal(0n);
             
             console.log("✅ Counters initialized to zero");
         });
@@ -272,11 +287,11 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             // Проверяем состояние
             const tokenId = await spiralEngine.inviteCodeToTokenId(inviteCode);
-            expect(tokenId).to.equal(0);
+            expect(tokenId).to.equal(0n);
             expect(await spiralEngine.tokenIdToInviteCode(tokenId)).to.equal(inviteCode);
             expect(await spiralEngine.inviteMinter(tokenId)).to.equal(seller.address);
             expect(await spiralEngine.inviteFirstOwner(tokenId)).to.equal(seller.address);
-            expect(await spiralEngine.inviteExpiry(tokenId)).to.equal(expiry);
+            expect(await spiralEngine.inviteExpiry(tokenId)).to.equal(BigInt(expiry));
             expect(await spiralEngine.isInviteUsed(tokenId)).to.be.false;
             
             // Логируем состояние после операции
@@ -288,9 +303,11 @@ describe("SpiralEngine - Basic Functionality", function () {
         it("Should reject empty invite code", async function () {
             console.log("Testing rejection of empty invite code...");
             
-            await expect(
-                spiralEngine.connect(seller).mintInvite("", 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "EmptyInviteCode");
+            await expectCustomError(
+                spiralEngine.connect(seller).mintInvite("", 0),
+                spiralEngine,
+                "EmptyInviteCode"
+            );
             
             console.log("✅ Empty invite code correctly rejected");
         });
@@ -301,9 +318,11 @@ describe("SpiralEngine - Basic Functionality", function () {
             const inviteCode = "DUPLICATE_INVITE";
             await spiralEngine.connect(seller).mintInvite(inviteCode, 0);
             
-            await expect(
-                spiralEngine.connect(seller).mintInvite(inviteCode, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "InviteCodeAlreadyExists");
+            await expectCustomError(
+                spiralEngine.connect(seller).mintInvite(inviteCode, 0),
+                spiralEngine,
+                "InviteCodeAlreadyExists"
+            );
             
             console.log("✅ Duplicate invite code correctly rejected");
         });
@@ -311,9 +330,11 @@ describe("SpiralEngine - Basic Functionality", function () {
         it("Should only allow SELLER_ROLE to mint invites", async function () {
             console.log("Testing SELLER_ROLE requirement for minting...");
             
-            await expect(
-                spiralEngine.connect(user).mintInvite("UNAUTHORIZED_INVITE", 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(user).mintInvite("UNAUTHORIZED_INVITE", 0),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Non-SELLER_ROLE correctly prevented from minting");
         });
@@ -376,7 +397,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             }
             
             // Проверяем состояние
-            expect(await spiralEngine.usedInviteByUser(user.address)).to.equal(1); // tokenId + 1 (0 + 1 = 1)
+            expect(await spiralEngine.usedInviteByUser(user.address)).to.equal(1n); // tokenId + 1 (0 + 1 = 1)
             expect(await spiralEngine.userActivator(user.address)).to.equal(activator.address);
             expect(await spiralEngine.isInviteUsed(0)).to.be.true;
             
@@ -384,7 +405,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             console.log(`\n🔍 Verifying New Invites:`);
             for (let i = 0; i < newInviteCodes.length; i++) {
                 const tokenId = await spiralEngine.inviteCodeToTokenId(newInviteCodes[i]);
-                expect(tokenId).to.equal(i + 1); // Первый токен (0) уже занят, новые начинаются с 1
+                expect(tokenId).to.equal(BigInt(i + 1)); // Первый токен (0) уже занят, новые начинаются с 1
                 expect(await spiralEngine.inviteMinter(tokenId)).to.equal(user.address);
                 console.log(`   Invite ${i + 1}: ${newInviteCodes[i]} -> Token ID ${tokenId}`);
             }
@@ -404,14 +425,16 @@ describe("SpiralEngine - Basic Functionality", function () {
             console.log(`   Invite code: ${inviteCode}`);
             console.log(`   Wrong codes count: ${wrongInviteCodes.length} (should be 12)`);
             
-            await expect(
+            await expectCustomError(
                 spiralEngine.connect(activator).activateUser(
                     inviteCode,
                     user.address,
                     wrongInviteCodes,
                     0
-                )
-            ).to.be.revertedWithCustomError(spiralEngine, "InvalidInviteCount");
+                ),
+                spiralEngine,
+                "InvalidInviteCount"
+            );
             
             console.log("✅ Wrong number of codes correctly rejected");
         });
@@ -440,14 +463,16 @@ describe("SpiralEngine - Basic Functionality", function () {
             console.log("✅ Second invite created for double activation test");
             
             // Попытка повторной активации с новым invite
-            await expect(
+            await expectCustomError(
                 spiralEngine.connect(activator).activateUser(
                     secondInviteCode,
                     user.address,
                     secondNewInviteCodes,
                     0
-                )
-            ).to.be.revertedWithCustomError(spiralEngine, "UserAlreadyActivated");
+                ),
+                spiralEngine,
+                "UserAlreadyActivated"
+            );
             
             console.log("✅ Double activation prevented");
         });
@@ -458,14 +483,16 @@ describe("SpiralEngine - Basic Functionality", function () {
             const inviteCode = "ACTIVATION_INVITE";
             const newInviteCodes = Array.from({length: 12}, (_, i) => `NEW_INVITE_${i + 1}`);
             
-            await expect(
+            await expectCustomError(
                 spiralEngine.connect(user).activateUser(
                     inviteCode,
                     user.address,
                     newInviteCodes,
                     0
-                )
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+                ),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Non-ACTIVATOR_ROLE correctly prevented from activating");
         });
@@ -521,9 +548,11 @@ describe("SpiralEngine - Basic Functionality", function () {
                 value: ethers.parseEther("1.0")
             });
             
-            await expect(
-                spiralEngine.connect(activator).grantSellerRole(newUser.address)
-            ).to.be.revertedWithCustomError(spiralEngine, "UserNotActivated");
+            await expectCustomError(
+                spiralEngine.connect(activator).grantSellerRole(newUser.address),
+                spiralEngine,
+                "UserNotActivated"
+            );
             
             console.log("✅ Non-activated user correctly rejected");
         });
@@ -531,9 +560,11 @@ describe("SpiralEngine - Basic Functionality", function () {
         it("Should only allow ACTIVATOR_ROLE to grant seller role", async function () {
             console.log("Testing ACTIVATOR_ROLE requirement for granting seller role...");
             
-            await expect(
-                spiralEngine.connect(user).grantSellerRole(user.address)
-            ).to.be.revertedWithCustomError(spiralEngine, 'AccessControlUnauthorizedAccount');
+            await expectCustomError(
+                spiralEngine.connect(user).grantSellerRole(user.address),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Non-ACTIVATOR_ROLE correctly prevented from granting seller role");
         });
@@ -546,7 +577,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             // Тестируем базовую функциональность - что функция getSoulLevel существует
             // Для пользователя без SBT токена должен возвращаться уровень 0
             const soulLevel = await spiralEngine.getSoulLevel(user.address);
-            expect(soulLevel).to.equal(0);
+            expect(soulLevel).to.equal(0n);
             
             console.log("✅ Soul level delegation working - returns 0 for user without SBT");
         });
@@ -570,9 +601,11 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             const newSpiralEngine = Logic.attach(await proxy.getAddress());
             
-            await expect(
-                newSpiralEngine.getSoulLevel(user.address)
-            ).to.be.revertedWithCustomError(newSpiralEngine, "SoulIdentityNotSet");
+            await expectCustomError(
+                newSpiralEngine.getSoulLevel(user.address),
+                newSpiralEngine,
+                "SoulIdentityNotSet"
+            );
             
             console.log("✅ SoulIdentity not set correctly handled");
         });
@@ -589,9 +622,11 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             const tokenId = await spiralEngine.inviteCodeToTokenId("TRANSFER_TEST_INVITE");
             
-            await expect(
-                spiralEngine.connect(seller).transferFrom(seller.address, user.address, tokenId)
-            ).to.be.revertedWithCustomError(spiralEngine, "TransfersNotAllowed");
+            await expectCustomError(
+                spiralEngine.connect(seller).transferFrom(seller.address, user.address, tokenId),
+                spiralEngine,
+                "TransfersNotAllowed"
+            );
             
             console.log("✅ Token transfers correctly prevented");
         });
@@ -612,7 +647,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             await tx.wait();
             
             const tokenId = await spiralEngine.inviteCodeToTokenId(inviteCode);
-            expect(await spiralEngine.inviteExpiry(tokenId)).to.equal(maxExpiry);
+            expect(await spiralEngine.inviteExpiry(tokenId)).to.equal(BigInt(maxExpiry));
             
             console.log("✅ Maximum expiry timestamp handled correctly");
         });
@@ -629,7 +664,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             await tx.wait();
             
             const tokenId = await spiralEngine.inviteCodeToTokenId(longInviteCode);
-            expect(tokenId).to.equal(0);
+            expect(tokenId).to.equal(0n);
             expect(await spiralEngine.tokenIdToInviteCode(tokenId)).to.equal(longInviteCode);
             
             console.log("✅ Very long invite codes handled correctly");
@@ -647,7 +682,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             await tx.wait();
             
             const tokenId = await spiralEngine.inviteCodeToTokenId(specialInviteCode);
-            expect(tokenId).to.equal(0);
+            expect(tokenId).to.equal(0n);
             expect(await spiralEngine.tokenIdToInviteCode(tokenId)).to.equal(specialInviteCode);
             
             console.log("✅ Special characters in invite codes handled correctly");
@@ -665,14 +700,16 @@ describe("SpiralEngine - Basic Functionality", function () {
             // Пытаемся активировать с нулевым адресом
             const newInviteCodes = Array.from({length: 12}, (_, i) => `ZERO_TEST_${i + 1}`);
             
-            await expect(
+            await expectCustomError(
                 spiralEngine.connect(activator).activateUser(
                     inviteCode,
                     ethers.ZeroAddress, // Нулевой адрес
                     newInviteCodes,
                     expiry
-                )
-            ).to.be.revertedWithCustomError(spiralEngine, "InvalidUserAddress");
+                ),
+                spiralEngine,
+                "InvalidUserAddress"
+            );
             
             console.log("✅ Zero address edge cases handled correctly");
         });
@@ -694,14 +731,16 @@ describe("SpiralEngine - Basic Functionality", function () {
             const newInviteCodes = Array.from({length: 12}, (_, i) => `EXPIRED_TEST_${i + 1}`);
             
             // Пытаемся использовать истекший инвайт
-            await expect(
+            await expectCustomError(
                 spiralEngine.connect(activator).activateUser(
                     inviteCode,
                     user.address,
                     newInviteCodes,
                     0
-                )
-            ).to.be.revertedWithCustomError(spiralEngine, "InviteExpired");
+                ),
+                spiralEngine,
+                "InviteExpired"
+            );
             
             console.log("✅ Expired invite edge cases handled correctly");
         });
@@ -719,21 +758,25 @@ describe("SpiralEngine - Basic Functionality", function () {
             console.log(`   Testing user without roles: ${noRoleUser.address}`);
             
             // Пытаемся минтить без роли
-            await expect(
-                spiralEngine.connect(noRoleUser).mintInvite("NO_ROLE_INVITE", 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(noRoleUser).mintInvite("NO_ROLE_INVITE", 0),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             // Пытаемся активировать без роли
             const newInviteCodes = Array.from({length: 12}, (_, i) => `NO_ROLE_TEST_${i + 1}`);
             
-            await expect(
+            await expectCustomError(
                 spiralEngine.connect(noRoleUser).activateUser(
                     "SOME_INVITE",
                     user.address,
                     newInviteCodes,
                     0
-                )
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+                ),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Role edge cases handled correctly");
         });
@@ -767,7 +810,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             // Проверяем, что все инвайты созданы
             for (let i = 0; i < manyInviteCodes.length; i++) {
                 const tokenId = await spiralEngine.inviteCodeToTokenId(manyInviteCodes[i]);
-                expect(tokenId).to.equal(i + 1);
+                expect(tokenId).to.equal(BigInt(i + 1));
             }
             
             console.log("✅ Gas limit edge cases handled correctly");
@@ -819,11 +862,11 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             // Проверяем результаты
             expect(diagnostics.isActivated).to.be.true;
-            expect(diagnostics.usedInviteTokenId).to.equal(0); // tokenId = 0, поэтому usedInviteTokenId = 0
+            expect(diagnostics.usedInviteTokenId).to.equal(0n); // tokenId = 0, поэтому usedInviteTokenId = 0
             expect(diagnostics.hasSellerRole).to.be.true;
             expect(diagnostics.hasActivatorRole).to.be.false;
             expect(diagnostics.userInvites.length).to.equal(12);
-            expect(diagnostics.totalInvitesMinted).to.equal(12); // 12 новых инвайтов для пользователя
+            expect(diagnostics.totalInvitesMinted).to.equal(12n); // 12 новых инвайтов для пользователя
             
             console.log("✅ Seller diagnostics returned correctly");
         });
@@ -836,11 +879,11 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             // Проверяем результаты
             expect(diagnostics.isActivated).to.be.false;
-            expect(diagnostics.usedInviteTokenId).to.equal(0);
+            expect(diagnostics.usedInviteTokenId).to.equal(0n);
             expect(diagnostics.hasSellerRole).to.be.false;
             expect(diagnostics.hasActivatorRole).to.be.false;
             expect(diagnostics.userInvites.length).to.equal(0);
-            expect(diagnostics.totalInvitesMinted).to.equal(0);
+            expect(diagnostics.totalInvitesMinted).to.equal(0n);
             
             console.log("✅ Non-activated user diagnostics returned correctly");
         });
@@ -871,11 +914,11 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             // Проверяем первый инвайт
             expect(diagnostics.userInvites[0].inviteCode).to.equal("USER_INVITES_NEW_1");
-            expect(diagnostics.userInvites[0].tokenId).to.equal(1);
+            expect(diagnostics.userInvites[0].tokenId).to.equal(1n);
             expect(diagnostics.userInvites[0].isUsed).to.be.false;
             expect(diagnostics.userInvites[0].activatedBy).to.equal(ethers.ZeroAddress);
-            expect(diagnostics.userInvites[0].activationTime).to.equal(0);
-            expect(diagnostics.userInvites[0].expiry).to.equal(0);
+            expect(diagnostics.userInvites[0].activationTime).to.equal(0n);
+            expect(diagnostics.userInvites[0].expiry).to.equal(0n);
             
             console.log("✅ User invites returned correctly");
         });

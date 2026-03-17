@@ -1,5 +1,44 @@
 const { expect } = require("chai");
-const { ethers } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
+
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
+async function expectRevertWithMessage(txPromise, messageSubstring) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const msg = (err?.message || err?.error?.message || String(err)) || "";
+    expect(msg.includes(messageSubstring), `expected revert message to contain "${messageSubstring}"`).to.be.true;
+}
+
+async function expectRevert(txPromise) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+}
 
 describe("OrganicComponentRegistry UUPS Architecture", function () {
     let admin, user1, user2, user3;
@@ -85,15 +124,15 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
 
             // Проверяем данные через ABI-translator
             const component = await ocr.getComponent(1);
-            expect(component.blockchain_id).to.equal(1);
+            expect(component.blockchain_id).to.equal(1n);
             expect(component.creator).to.equal(user1.address);
-            expect(component.status).to.equal(0); // ACTIVE
+            expect(component.status).to.equal(0n); // ACTIVE
             expect(component.is_shared).to.be.true;
 
             // Проверяем строковые данные
             expect(await ocr.componentBusinessIds(1)).to.equal(businessId);
             expect(await ocr.componentRootMetadataCIDs(1)).to.equal(rootMetadataCID);
-            expect(await ocr.businessIdToComponentId(businessId)).to.equal(1);
+            expect(await ocr.businessIdToComponentId(businessId)).to.equal(1n);
         });
 
         it("Should update component through ABI-translator", async function () {
@@ -116,38 +155,48 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             expect(await ocr.componentRootMetadataCIDs(1)).to.equal(newCID);
             
             const component = await ocr.getComponent(1);
-            expect(component.last_updated).to.be.greaterThan(component.created_at);
+            expect(component.last_updated > component.created_at).to.be.true;
         });
 
         it("Should increment usage count", async function () {
             // Создаем компонент от user1
             await ocr.connect(user1).createComponent("test_component", "QmTestCID123");
 
-            // Увеличиваем счетчик использования
-            await expect(ocr.incrementUsageCount("test_component"))
-                .to.emit(ocr, "ComponentUsageIncremented")
-                .withArgs(1, "test_component", 1);
+            const tx = await ocr.incrementUsageCount("test_component");
+            const receipt = await tx.wait();
+            const decoded = receipt.logs.map(log => {
+                try { return ocr.interface.parseLog(log); } catch { return null; }
+            }).filter(e => e && e.name === "ComponentUsageIncremented");
+            expect(decoded.length).to.be.gte(1);
+            expect(decoded[0].args.componentId).to.equal(1n);
+            expect(decoded[0].args.businessId).to.equal("test_component");
+            expect(decoded[0].args.newUsageCount).to.equal(1n);
 
-            expect(await ocr.componentUsageCount(1)).to.equal(1);
+            expect(await ocr.componentUsageCount(1)).to.equal(1n);
 
             // Увеличиваем еще раз
             await ocr.incrementUsageCount("test_component");
-            expect(await ocr.componentUsageCount(1)).to.equal(2);
+            expect(await ocr.componentUsageCount(1)).to.equal(2n);
         });
 
         it("Should add component user", async function () {
             // Создаем компонент от user1
             await ocr.connect(user1).createComponent("test_component", "QmTestCID123");
 
-            // Добавляем пользователя
-            await expect(ocr.addComponentUser("test_component", user2.address))
-                .to.emit(ocr, "ComponentUserAdded")
-                .withArgs(1, "test_component", user2.address);
+            const tx = await ocr.addComponentUser("test_component", user2.address);
+            const receipt = await tx.wait();
+            const decoded = receipt.logs.map(log => {
+                try { return ocr.interface.parseLog(log); } catch { return null; }
+            }).filter(e => e && e.name === "ComponentUserAdded");
+            expect(decoded.length).to.be.gte(1);
+            expect(decoded[0].args.componentId).to.equal(1n);
+            expect(decoded[0].args.businessId).to.equal("test_component");
+            expect(decoded[0].args.user).to.equal(user2.address);
 
             // Проверяем, что пользователь добавлен
             const userComponents = await ocr.getComponentsByUser(user2.address);
             expect(userComponents.length).to.equal(1);
-            expect(userComponents[0]).to.equal(1);
+            expect(userComponents[0]).to.equal(1n);
         });
 
         it("Should get component by business ID", async function () {
@@ -156,9 +205,9 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
 
             // Получаем компонент по business ID
             const component = await ocr.getComponentByBusinessId("test_component");
-            expect(component.blockchain_id).to.equal(1);
+            expect(component.blockchain_id).to.equal(1n);
             expect(component.creator).to.equal(user1.address);
-            expect(component.status).to.equal(0); // ACTIVE
+            expect(component.status).to.equal(0n); // ACTIVE
         });
 
         it("Should check component existence", async function () {
@@ -179,8 +228,10 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             }
 
             // Попытка создать еще один компонент должна провалиться
-            await expect(ocr.connect(user1).createComponent("test_component_101", "QmTestCID101"))
-                .to.be.revertedWith("OrganicComponentRegistryLogic: component limit exceeded");
+            await expectRevertWithMessage(
+                ocr.connect(user1).createComponent("test_component_101", "QmTestCID101"),
+                "OrganicComponentRegistryLogic: component limit exceeded"
+            );
         });
 
         it("Should prevent duplicate business IDs", async function () {
@@ -188,39 +239,44 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             await ocr.connect(user1).createComponent("test_component", "QmTestCID123");
 
             // Попытка создать компонент с тем же business ID должна провалиться
-            await expect(ocr.connect(user1).createComponent("test_component", "QmTestCID456"))
-                .to.be.revertedWith("OrganicComponentRegistryLogic: component with this business ID already exists");
+            await expectRevertWithMessage(
+                ocr.connect(user1).createComponent("test_component", "QmTestCID456"),
+                "OrganicComponentRegistryLogic: component with this business ID already exists"
+            );
         });
 
         it("Should validate business ID format", async function () {
-            // Пустой business ID
-            await expect(ocr.connect(user1).createComponent("", "QmTestCID123"))
-                .to.be.revertedWith("OrganicComponentRegistryLogic: business ID cannot be empty");
-
-            // Слишком длинный business ID
+            await expectRevertWithMessage(
+                ocr.connect(user1).createComponent("", "QmTestCID123"),
+                "OrganicComponentRegistryLogic: business ID cannot be empty"
+            );
             const longBusinessId = "a".repeat(65);
-            await expect(ocr.connect(user1).createComponent(longBusinessId, "QmTestCID123"))
-                .to.be.revertedWith("OrganicComponentRegistryLogic: business ID too long");
+            await expectRevertWithMessage(
+                ocr.connect(user1).createComponent(longBusinessId, "QmTestCID123"),
+                "OrganicComponentRegistryLogic: business ID too long"
+            );
         });
 
         it("Should validate CID format", async function () {
-            // Пустой CID
-            await expect(ocr.connect(user1).createComponent("test_component", ""))
-                .to.be.revertedWith("OrganicComponentRegistryLogic: CID cannot be empty");
-
-            // Слишком длинный CID
+            await expectRevertWithMessage(
+                ocr.connect(user1).createComponent("test_component", ""),
+                "OrganicComponentRegistryLogic: CID cannot be empty"
+            );
             const longCID = "a".repeat(65);
-            await expect(ocr.connect(user1).createComponent("test_component", longCID))
-                .to.be.revertedWith("OrganicComponentRegistryLogic: CID too long");
+            await expectRevertWithMessage(
+                ocr.connect(user1).createComponent("test_component", longCID),
+                "OrganicComponentRegistryLogic: CID too long"
+            );
         });
 
         it("Should only allow component creator to update", async function () {
             // Создаем компонент от user1
             await ocr.connect(user1).createComponent("test_component", "QmTestCID123");
 
-            // user2 пытается обновить компонент user1
-            await expect(ocr.connect(user2).updateComponent(1, "QmNewCID456"))
-                .to.be.revertedWith("OrganicComponentRegistryLogic: not component creator");
+            await expectRevertWithMessage(
+                ocr.connect(user2).updateComponent(1, "QmNewCID456"),
+                "OrganicComponentRegistryLogic: not component creator"
+            );
         });
 
         it("Should handle multiple components correctly", async function () {
@@ -229,13 +285,10 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             await ocr.connect(user1).createComponent("component2", "QmCID2");
             await ocr.connect(user1).createComponent("component3", "QmCID3");
 
-            // Проверяем счетчики
-            expect(await ocr.totalComponents()).to.equal(3);
-
-            // Проверяем компоненты
-            expect(await ocr.businessIdToComponentId("component1")).to.equal(1);
-            expect(await ocr.businessIdToComponentId("component2")).to.equal(2);
-            expect(await ocr.businessIdToComponentId("component3")).to.equal(3);
+            expect(await ocr.totalComponents()).to.equal(3n);
+            expect(await ocr.businessIdToComponentId("component1")).to.equal(1n);
+            expect(await ocr.businessIdToComponentId("component2")).to.equal(2n);
+            expect(await ocr.businessIdToComponentId("component3")).to.equal(3n);
 
             // Проверяем компоненты создателя
             const creatorComponents = await ocr.getComponentsByCreator(user1.address);
@@ -245,9 +298,8 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
 
     describe("Proxy Management", function () {
         it("Should upgrade logic contract", async function () {
-            // Создаем компонент перед upgrade
             await ocr.connect(user1).createComponent("test_component", "QmTestCID123");
-            expect(await ocr.totalComponents()).to.equal(1);
+            expect(await ocr.totalComponents()).to.equal(1n);
 
             // Деплоим новую имплементацию
             const NewLogic = await ethers.getContractFactory("OrganicComponentRegistryLogic");
@@ -257,13 +309,10 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             // Апгрейд через Logic ABI на proxy address (используем upgradeToAndCall)
             await ocr.connect(admin).upgradeToAndCall(await newLogicImpl.getAddress(), "0x");
 
-            // Проверяем, что данные сохранились после апгрейда
-            expect(await ocr.totalComponents()).to.equal(1);
+            expect(await ocr.totalComponents()).to.equal(1n);
             expect(await ocr.componentExists("test_component")).to.be.true;
-            
-            // Проверяем, что компонент доступен
             const component = await ocr.getComponent(1);
-            expect(component.blockchain_id).to.equal(1);
+            expect(component.blockchain_id).to.equal(1n);
             expect(await ocr.componentBusinessIds(1)).to.equal("test_component");
         });
 
@@ -274,43 +323,28 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             // Останавливаем контракт через Logic (admin роль)
             await ocr.connect(admin).pause();
 
-            // Попытка создать компонент должна провалиться (OZ v5 custom error)
-            await expect(ocr.connect(user1).createComponent("test_component2", "QmTestCID456"))
-                .to.be.revertedWithCustomError(ocr, "EnforcedPause");
-
-            // Возобновляем работу через Logic
+            await expectCustomError(
+                ocr.connect(user1).createComponent("test_component2", "QmTestCID456"),
+                ocr,
+                "EnforcedPause"
+            );
             await ocr.connect(admin).unpause();
-
-            // Теперь создание должно работать
             await ocr.connect(user1).createComponent("test_component2", "QmTestCID456");
-            expect(await ocr.totalComponents()).to.equal(2);
+            expect(await ocr.totalComponents()).to.equal(2n);
         });
 
         it("Should restrict pause/unpause to ADMIN_ROLE only", async function () {
-            // user1 НЕ может ставить на паузу (нет ADMIN_ROLE)
-            await expect(
-                ocr.connect(user1).pause()
-            ).to.be.reverted;
-            
-            // admin МОЖЕТ ставить на паузу
+            await expectRevert(ocr.connect(user1).pause());
             await ocr.connect(admin).pause();
-            
-            // Проверяем, что контракт на паузе
-            await expect(
-                ocr.connect(user1).createComponent("test", "QmTest")
-            ).to.be.revertedWithCustomError(ocr, "EnforcedPause");
-            
-            // user1 НЕ может снимать с паузы
-            await expect(
-                ocr.connect(user1).unpause()
-            ).to.be.reverted;
-            
-            // admin МОЖЕТ снимать с паузы
+            await expectCustomError(
+                ocr.connect(user1).createComponent("test", "QmTest"),
+                ocr,
+                "EnforcedPause"
+            );
+            await expectRevert(ocr.connect(user1).unpause());
             await ocr.connect(admin).unpause();
-            
-            // Проверяем, что контракт работает
             await ocr.connect(user1).createComponent("test", "QmTest");
-            expect(await ocr.totalComponents()).to.equal(1);
+            expect(await ocr.totalComponents()).to.equal(1n);
         });
 
         it("Should restrict upgrades to UPGRADER_ROLE only", async function () {
@@ -319,22 +353,11 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             const newLogicImpl = await NewLogic.deploy();
             await newLogicImpl.waitForDeployment();
             
-            // user1 НЕ может апгрейдить (нет UPGRADER_ROLE)
-            await expect(
-                ocr.connect(user1).upgradeToAndCall(await newLogicImpl.getAddress(), "0x")
-            ).to.be.reverted;
-            
-            // user2 НЕ может апгрейдить (нет UPGRADER_ROLE)
-            await expect(
-                ocr.connect(user2).upgradeToAndCall(await newLogicImpl.getAddress(), "0x")
-            ).to.be.reverted;
-            
-            // admin МОЖЕТ апгрейдить (имеет UPGRADER_ROLE)
+            await expectRevert(ocr.connect(user1).upgradeToAndCall(await newLogicImpl.getAddress(), "0x"));
+            await expectRevert(ocr.connect(user2).upgradeToAndCall(await newLogicImpl.getAddress(), "0x"));
             await ocr.connect(admin).upgradeToAndCall(await newLogicImpl.getAddress(), "0x");
-            
-            // Проверяем, что апгрейд выполнен (контракт работает)
             await ocr.connect(user1).createComponent("test_after_upgrade", "QmTestAfterUpgrade");
-            expect(await ocr.totalComponents()).to.equal(1);
+            expect(await ocr.totalComponents()).to.equal(1n);
         });
     });
 
@@ -360,20 +383,9 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             const newSpiralEngine = await NewSpiralEngine.deploy();
             await newSpiralEngine.waitForDeployment();
             
-            // user1 НЕ может устанавливать SpiralEngine (нет ADMIN_ROLE)
-            await expect(
-                ocr.connect(user1).setSpiralEngine(await newSpiralEngine.getAddress())
-            ).to.be.reverted;
-            
-            // user1 НЕ может устанавливать AmanitaInternational
-            await expect(
-                ocr.connect(user1).setAmanitaInternational(await newSpiralEngine.getAddress())
-            ).to.be.reverted;
-            
-            // user1 НЕ может устанавливать ProductRegistry
-            await expect(
-                ocr.connect(user1).setProductRegistry(await newSpiralEngine.getAddress())
-            ).to.be.reverted;
+            await expectRevert(ocr.connect(user1).setSpiralEngine(await newSpiralEngine.getAddress()));
+            await expectRevert(ocr.connect(user1).setAmanitaInternational(await newSpiralEngine.getAddress()));
+            await expectRevert(ocr.connect(user1).setProductRegistry(await newSpiralEngine.getAddress()));
             
             // admin МОЖЕТ устанавливать (имеет ADMIN_ROLE)
             await ocr.connect(admin).setSpiralEngine(await newSpiralEngine.getAddress());
@@ -384,18 +396,9 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
         });
 
         it("Should reject zero addresses for integrations", async function () {
-            // Попытка установить нулевой адрес должна провалиться с custom error
-            await expect(
-                ocr.connect(admin).setSpiralEngine(ethers.ZeroAddress)
-            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
-            
-            await expect(
-                ocr.connect(admin).setAmanitaInternational(ethers.ZeroAddress)
-            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
-            
-            await expect(
-                ocr.connect(admin).setProductRegistry(ethers.ZeroAddress)
-            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
+            await expectCustomError(ocr.connect(admin).setSpiralEngine(ethers.ZeroAddress), ocr, "ZeroAddress");
+            await expectCustomError(ocr.connect(admin).setAmanitaInternational(ethers.ZeroAddress), ocr, "ZeroAddress");
+            await expectCustomError(ocr.connect(admin).setProductRegistry(ethers.ZeroAddress), ocr, "ZeroAddress");
         });
     });
 
@@ -422,25 +425,14 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             });
             expect(event).to.not.be.undefined;
 
-            // Проверяем обновленные данные
             expect(await ocr.getFeaturesCID()).to.equal(featuresCID);
             expect(await ocr.getComponentFormsCID()).to.equal(formsCID);
-            expect(await ocr.getFeaturesVersion()).to.equal(featuresVersion);
-            expect(await ocr.getComponentFormsVersion()).to.equal(formsVersion);
+            expect(await ocr.getFeaturesVersion()).to.equal(BigInt(featuresVersion));
+            expect(await ocr.getComponentFormsVersion()).to.equal(BigInt(formsVersion));
         });
 
         it("Should restrict updateShareableData to ADMIN_ROLE only", async function () {
-            // user1 НЕ может обновлять shareable данные (нет ADMIN_ROLE)
-            await expect(
-                ocr.connect(user1).updateShareableData(
-                    "QmFeatures",
-                    "QmForms",
-                    1,
-                    1
-                )
-            ).to.be.reverted;
-            
-            // admin МОЖЕТ обновлять shareable данные
+            await expectRevert(ocr.connect(user1).updateShareableData("QmFeatures", "QmForms", 1, 1));
             await ocr.connect(admin).updateShareableData(
                 "QmFeatures",
                 "QmForms",
@@ -452,36 +444,19 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
         });
 
         it("Should validate CIDs in shareable data", async function () {
-            // Пустой features CID должен быть отклонен
-            await expect(
-                ocr.connect(admin).updateShareableData(
-                    "",
-                    "QmForms",
-                    1,
-                    1
-                )
-            ).to.be.revertedWith("OrganicComponentRegistryLogic: CID cannot be empty");
-            
-            // Пустой forms CID должен быть отклонен
-            await expect(
-                ocr.connect(admin).updateShareableData(
-                    "QmFeatures",
-                    "",
-                    1,
-                    1
-                )
-            ).to.be.revertedWith("OrganicComponentRegistryLogic: CID cannot be empty");
-            
-            // Слишком длинный features CID должен быть отклонен
+            await expectRevertWithMessage(
+                ocr.connect(admin).updateShareableData("", "QmForms", 1, 1),
+                "OrganicComponentRegistryLogic: CID cannot be empty"
+            );
+            await expectRevertWithMessage(
+                ocr.connect(admin).updateShareableData("QmFeatures", "", 1, 1),
+                "OrganicComponentRegistryLogic: CID cannot be empty"
+            );
             const longCID = "a".repeat(65);
-            await expect(
-                ocr.connect(admin).updateShareableData(
-                    longCID,
-                    "QmForms",
-                    1,
-                    1
-                )
-            ).to.be.revertedWith("OrganicComponentRegistryLogic: CID too long");
+            await expectRevertWithMessage(
+                ocr.connect(admin).updateShareableData(longCID, "QmForms", 1, 1),
+                "OrganicComponentRegistryLogic: CID too long"
+            );
         });
     });
 
@@ -507,10 +482,7 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
         });
 
         it("Should only allow DEFAULT_ADMIN_ROLE to manage roles", async function () {
-            // user1 НЕ может выдавать роли (нет DEFAULT_ADMIN_ROLE)
-            await expect(
-                ocr.connect(user1).grantRole(await ocr.CONTRIBUTOR_ROLE(), user3.address)
-            ).to.be.reverted;
+            await expectRevert(ocr.connect(user1).grantRole(await ocr.CONTRIBUTOR_ROLE(), user3.address));
             
             // admin МОЖЕТ выдавать роли
             await ocr.connect(admin).grantRole(await ocr.CONTRIBUTOR_ROLE(), user3.address);
@@ -520,36 +492,15 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
 
     describe("Custom Errors Tests", function () {
         it("Should revert with ZeroAddress error for integration setters", async function () {
-            // setSpiralEngine должен отклонять нулевой адрес
-            await expect(
-                ocr.connect(admin).setSpiralEngine(ethers.ZeroAddress)
-            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
-            
-            // setAmanitaInternational должен отклонять нулевой адрес
-            await expect(
-                ocr.connect(admin).setAmanitaInternational(ethers.ZeroAddress)
-            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
-            
-            // setProductRegistry должен отклонять нулевой адрес
-            await expect(
-                ocr.connect(admin).setProductRegistry(ethers.ZeroAddress)
-            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
+            await expectCustomError(ocr.connect(admin).setSpiralEngine(ethers.ZeroAddress), ocr, "ZeroAddress");
+            await expectCustomError(ocr.connect(admin).setAmanitaInternational(ethers.ZeroAddress), ocr, "ZeroAddress");
+            await expectCustomError(ocr.connect(admin).setProductRegistry(ethers.ZeroAddress), ocr, "ZeroAddress");
         });
         
         it("Should support both custom errors and legacy string reverts", async function () {
-            // Custom error для новых путей (integration setters)
-            await expect(
-                ocr.connect(admin).setSpiralEngine(ethers.ZeroAddress)
-            ).to.be.revertedWithCustomError(ocr, "ZeroAddress");
-            
-            // Legacy string для существующих путей (где тесты проверяют)
-            await expect(
-                ocr.connect(user1).createComponent("", "QmTest")
-            ).to.be.revertedWith("OrganicComponentRegistryLogic: business ID cannot be empty");
-            
-            await expect(
-                ocr.connect(user1).createComponent("test", "")
-            ).to.be.revertedWith("OrganicComponentRegistryLogic: CID cannot be empty");
+            await expectCustomError(ocr.connect(admin).setSpiralEngine(ethers.ZeroAddress), ocr, "ZeroAddress");
+            await expectRevertWithMessage(ocr.connect(user1).createComponent("", "QmTest"), "OrganicComponentRegistryLogic: business ID cannot be empty");
+            await expectRevertWithMessage(ocr.connect(user1).createComponent("test", ""), "OrganicComponentRegistryLogic: CID cannot be empty");
         });
     });
 
@@ -679,12 +630,8 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             // А у proxy через ocr - реальное значение
             const proxyTotalComponents = await ocr.totalComponents();
             
-            // Проверяем что данные различаются (proxy имеет state, имплементация - нет)
-            // Либо оба 0 если тесты только начались, либо proxy > 0
-            expect(proxyTotalComponents).to.be.gte(totalComponents);
-            
-            // Проверяем что через proxy данные доступны корректно
-            expect(await ocr.LOGIC_VERSION()).to.equal(2);
+            expect(proxyTotalComponents >= totalComponents).to.be.true;
+            expect(await ocr.LOGIC_VERSION()).to.equal(2n);
         });
         
         it("Should have UUPS upgrade protection via UPGRADER_ROLE", async function () {
@@ -696,24 +643,9 @@ describe("OrganicComponentRegistry UUPS Architecture", function () {
             const newImplementation = await LogicV2.deploy();
             await newImplementation.waitForDeployment();
             
-            // Попытка апгрейда от user1 должна провалиться
-            await expect(
-                ocr.connect(user1).upgradeToAndCall(
-                    await newImplementation.getAddress(),
-                    "0x"
-                )
-            ).to.be.reverted; // AccessControl revert
-            
-            // admin ИМЕЕТ UPGRADER_ROLE и может апгрейдить
-            await expect(
-                ocr.connect(admin).upgradeToAndCall(
-                    await newImplementation.getAddress(),
-                    "0x"
-                )
-            ).to.not.be.reverted;
-            
-            // Проверяем что апгрейд прошел успешно
-            expect(await ocr.LOGIC_VERSION()).to.equal(2);
+            await expectRevert(ocr.connect(user1).upgradeToAndCall(await newImplementation.getAddress(), "0x"));
+            await ocr.connect(admin).upgradeToAndCall(await newImplementation.getAddress(), "0x");
+            expect(await ocr.LOGIC_VERSION()).to.equal(2n);
         });
         
         it("Should document that onlyProxy will be added if migration functions appear", async function () {

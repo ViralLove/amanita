@@ -1,6 +1,34 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
+async function expectRevertWithMessage(txPromise, messageSubstring) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const msg = (err?.reason || err?.shortMessage || err?.message || err?.error?.message || String(err)) || "";
+    expect(msg.includes(messageSubstring), `expected revert message to contain "${messageSubstring}"`).to.be.true;
+}
+
 describe("SoulIdentity Bridge Contract", function () {
     let soulIdentity;
     let soulboundCore;
@@ -81,7 +109,7 @@ describe("SoulIdentity Bridge Contract", function () {
             
             // Проверяем что SoulIdentity видит токен
             const balance = await soulboundCore.balanceOf(user1.address);
-            expect(balance).to.equal(1);
+            expect(balance).to.equal(1n);
             
             // Проверяем что SoulIdentity может найти токен пользователя
             const tokenId = 1; // Первый токен
@@ -165,7 +193,7 @@ describe("SoulIdentity Bridge Contract", function () {
             );
             
             const allIdentities = await soulIdentity.getAllIdentities(user1.address);
-            expect(allIdentities.length).to.equal(2);
+            expect(allIdentities.length).to.equal(2); // array length
             expect(allIdentities[0].identityType).to.equal("did:spiral");
             expect(allIdentities[1].identityType).to.equal("did:polygon");
             expect(allIdentities[1].verified).to.equal(true);
@@ -233,7 +261,7 @@ describe("SoulIdentity Bridge Contract", function () {
             expect(profile.level).to.be.a('bigint');
             expect(profile.reputation).to.be.a('bigint');
             expect(profile.identity).to.include("did:spiral:");
-            expect(profile.verificationLevel).to.equal(0);
+            expect(profile.verificationLevel === 0n || profile.verificationLevel === 0).to.be.true;
             expect(profile.guardians.length).to.equal(0);
             
             console.log(`✅ Soul profile works: level=${profile.level}, reputation=${profile.reputation}`);
@@ -248,25 +276,12 @@ describe("SoulIdentity Bridge Contract", function () {
         it("Should only allow SPIRAL_ENGINE_ROLE to link external identities", async function () {
             console.log("Testing access control for linkExternalIdentity...");
             
-            // Пользователь без роли не может добавлять external identities
-            await expect(
-                soulIdentity.connect(user1).linkExternalIdentity(
-                    user1.address,
-                    "did:spiral",
-                    `did:spiral:${user1.address.toLowerCase()}`,
-                    false
-                )
-            ).to.be.revertedWithCustomError(soulIdentity, "AccessControlUnauthorizedAccount");
-            
-            // SpiralEngine может
-            await expect(
-                soulIdentity.connect(spiralEngine).linkExternalIdentity(
-                    user1.address,
-                    "did:spiral",
-                    `did:spiral:${user1.address.toLowerCase()}`,
-                    false
-                )
-            ).to.not.be.reverted;
+            await expectCustomError(
+                soulIdentity.connect(user1).linkExternalIdentity(user1.address, "did:spiral", `did:spiral:${user1.address.toLowerCase()}`, false),
+                soulIdentity,
+                "AccessControlUnauthorizedAccount"
+            );
+            await soulIdentity.connect(spiralEngine).linkExternalIdentity(user1.address, "did:spiral", `did:spiral:${user1.address.toLowerCase()}`, false);
             
             console.log("✅ Access control works correctly");
         });
@@ -274,10 +289,7 @@ describe("SoulIdentity Bridge Contract", function () {
         it("Should allow users to link their own soul identity (backward compatibility)", async function () {
             console.log("Testing user self-linking...");
             
-            // Пользователь может использовать старый метод для себя
-            await expect(
-                soulIdentity.connect(user1).linkSoulIdentity(`did:spiral:${user1.address.toLowerCase()}`)
-            ).to.not.be.reverted;
+            await soulIdentity.connect(user1).linkSoulIdentity(`did:spiral:${user1.address.toLowerCase()}`);
             
             const identity = await soulIdentity.getSoulIdentity(user1.address);
             expect(identity).to.include("did:spiral:");
@@ -294,18 +306,13 @@ describe("SoulIdentity Bridge Contract", function () {
             const level = await soulIdentity.getSoulLevel(user1.address);
             const reputation = await soulIdentity.getSoulReputation(user1.address);
             
-            expect(level).to.equal(0);
-            expect(reputation).to.equal(0);
-            
-            // Попытка добавить DID без SBT токена должна падать
-            await expect(
-                soulIdentity.connect(spiralEngine).linkExternalIdentity(
-                    user1.address,
-                    "did:spiral",
-                    `did:spiral:${user1.address.toLowerCase()}`,
-                    false
-                )
-            ).to.be.revertedWith("SoulIdentity: user has no SBT token");
+            expect(level === 0n || level === 0).to.be.true;
+            expect(reputation === 0n || reputation === 0).to.be.true;
+
+            await expectRevertWithMessage(
+                soulIdentity.connect(spiralEngine).linkExternalIdentity(user1.address, "did:spiral", `did:spiral:${user1.address.toLowerCase()}`, false),
+                "SoulIdentity: user has no SBT token"
+            );
             
             console.log("✅ Edge case handled: users without SBT tokens");
         });
@@ -315,25 +322,14 @@ describe("SoulIdentity Bridge Contract", function () {
             
             await soulboundCore.connect(deployer).mintSoul(user1.address);
             
-            // Пустой тип идентичности
-            await expect(
-                soulIdentity.connect(spiralEngine).linkExternalIdentity(
-                    user1.address,
-                    "",
-                    `did:spiral:${user1.address.toLowerCase()}`,
-                    false
-                )
-            ).to.be.revertedWith("SoulIdentity: empty identity type");
-            
-            // Пустое значение идентичности
-            await expect(
-                soulIdentity.connect(spiralEngine).linkExternalIdentity(
-                    user1.address,
-                    "did:spiral",
-                    "",
-                    false
-                )
-            ).to.be.revertedWith("SoulIdentity: empty identity value");
+            await expectRevertWithMessage(
+                soulIdentity.connect(spiralEngine).linkExternalIdentity(user1.address, "", `did:spiral:${user1.address.toLowerCase()}`, false),
+                "SoulIdentity: empty identity type"
+            );
+            await expectRevertWithMessage(
+                soulIdentity.connect(spiralEngine).linkExternalIdentity(user1.address, "did:spiral", "", false),
+                "SoulIdentity: empty identity value"
+            );
             
             console.log("✅ Edge case handled: empty identity data");
         });
@@ -348,10 +344,7 @@ describe("SoulIdentity Bridge Contract", function () {
             const allIdentities = await soulIdentity.getAllIdentities(user1.address);
             expect(allIdentities.length).to.equal(0);
             
-            // getPrimaryIdentity должна падать
-            await expect(
-                soulIdentity.getPrimaryIdentity(user1.address)
-            ).to.be.revertedWith("SoulIdentity: no identities found");
+            await expectRevertWithMessage(soulIdentity.getPrimaryIdentity(user1.address), "SoulIdentity: no identities found");
             
             console.log("✅ Edge case handled: users with no identities");
         });
@@ -388,10 +381,10 @@ describe("SoulIdentity Bridge Contract", function () {
             console.log(`💰 getSoulLevel: ${gasEstimate3} газа`);
             
             // Проверяем что газ в разумных пределах
-            expect(receipt1.gasUsed).to.be.below(300000);
-            expect(gasEstimate1).to.be.below(100000);
-            expect(gasEstimate2).to.be.below(100000);
-            expect(gasEstimate3).to.be.below(100000);
+            expect(receipt1.gasUsed < 300000n).to.be.true;
+            expect(gasEstimate1 < 100000n).to.be.true;
+            expect(gasEstimate2 < 100000n).to.be.true;
+            expect(gasEstimate3 < 100000n).to.be.true;
             
             console.log("✅ Gas consumption within reasonable limits");
         });
@@ -440,7 +433,7 @@ describe("SoulIdentity Bridge Contract", function () {
             // Получаем метаданные через SoulIdentity
             const metadata = await soulIdentity.getSBTMetadata(1);
             expect(metadata.tokenSbtType).to.equal("identity");
-            expect(metadata.version).to.equal(1);
+            expect(metadata.version === 1n || metadata.version === 1).to.be.true;
             expect(metadata.attributes).to.include("level");
             expect(metadata.isLocked).to.equal(true);
             
@@ -502,7 +495,7 @@ describe("SoulIdentity Bridge Contract", function () {
             );
             
             const allIdentities = await soulIdentity.getAllIdentities(user1.address);
-            expect(allIdentities.length).to.equal(3);
+            expect(allIdentities.length).to.equal(3); // array length
             
             const types = allIdentities.map(id => id.identityType);
             expect(types).to.include("did:spiral");

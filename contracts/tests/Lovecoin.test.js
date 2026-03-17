@@ -1,6 +1,30 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectRevertWithMessage(txPromise, messageSubstring) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const msg = (err?.message || err?.error?.message || String(err)) || "";
+    expect(msg.includes(messageSubstring), `expected revert message to contain "${messageSubstring}"`).to.be.true;
+}
+
+async function expectRevert(txPromise) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+}
+
 describe("Lovecoin", function () {
     let lovecoin;
     let deployer, user1, user2;
@@ -44,7 +68,7 @@ describe("Lovecoin", function () {
         });
 
         it("Should have 18 decimals", async function () {
-            expect(await lovecoin.decimals()).to.equal(18);
+            expect(await lovecoin.decimals()).to.equal(18n);
         });
 
         it("Should have correct initial supply", async function () {
@@ -72,7 +96,6 @@ describe("Lovecoin", function () {
             // Деплоер аппрувит user1
             await lovecoin.connect(deployer).approve(user1.address, approveAmount);
             
-            // Проверяем allowance
             const allowance = await lovecoin.allowance(deployer.address, user1.address);
             expect(allowance).to.equal(approveAmount);
             
@@ -89,22 +112,16 @@ describe("Lovecoin", function () {
                 await lovecoin.INITIAL_SUPPLY() - approveAmount
             );
             
-            // Allowance должен обнулиться
-            expect(await lovecoin.allowance(deployer.address, user1.address)).to.equal(0);
+            expect(await lovecoin.allowance(deployer.address, user1.address)).to.equal(0n);
         });
 
         it("Should revert on insufficient balance", async function () {
-            const transferAmount = ethers.parseEther("999999999"); // Больше чем есть
-            
-            await expect(
-                lovecoin.connect(deployer).transfer(user1.address, transferAmount)
-            ).to.be.reverted;
+            const transferAmount = ethers.parseEther("999999999");
+            await expectRevert(lovecoin.connect(deployer).transfer(user1.address, transferAmount));
         });
 
         it("Should revert on transfer to zero address", async function () {
-            await expect(
-                lovecoin.connect(deployer).transfer(ethers.ZeroAddress, ethers.parseEther("1000"))
-            ).to.be.reverted;
+            await expectRevert(lovecoin.connect(deployer).transfer(ethers.ZeroAddress, ethers.parseEther("1000")));
         });
     });
 
@@ -133,9 +150,7 @@ describe("Lovecoin", function () {
         });
 
         it("Should revert when non-admin tries to grant role", async function () {
-            await expect(
-                lovecoin.connect(user1).grantRole(MINTER_ROLE, user2.address)
-            ).to.be.reverted;
+            await expectRevert(lovecoin.connect(user1).grantRole(MINTER_ROLE, user2.address));
         });
     });
 
@@ -169,47 +184,32 @@ describe("Lovecoin", function () {
         });
 
         it("Should revert when non-minter tries to mint", async function () {
-            await expect(
-                lovecoin.connect(user1).mint(user2.address, ethers.parseEther("1000"))
-            ).to.be.reverted;
+            await expectRevert(lovecoin.connect(user1).mint(user2.address, ethers.parseEther("1000")));
         });
 
         it("Should revert when non-minter tries to burn", async function () {
-            await expect(
-                lovecoin.connect(user1).burn(user1.address, ethers.parseEther("1000"))
-            ).to.be.reverted;
+            await expectRevert(lovecoin.connect(user1).burn(user1.address, ethers.parseEther("1000")));
         });
 
         it("Should revert when minting to zero address", async function () {
-            await expect(
-                lovecoin.connect(deployer).mint(ethers.ZeroAddress, ethers.parseEther("1000"))
-            ).to.be.revertedWith("Lovecoin: mint to zero address");
+            await expectRevertWithMessage(lovecoin.connect(deployer).mint(ethers.ZeroAddress, ethers.parseEther("1000")), "Lovecoin: mint to zero address");
         });
 
         it("Should revert when minting zero amount", async function () {
-            await expect(
-                lovecoin.connect(deployer).mint(user1.address, 0)
-            ).to.be.revertedWith("Lovecoin: mint amount must be positive");
+            await expectRevertWithMessage(lovecoin.connect(deployer).mint(user1.address, 0), "Lovecoin: mint amount must be positive");
         });
 
         it("Should revert when burning from zero address", async function () {
-            await expect(
-                lovecoin.connect(deployer).burn(ethers.ZeroAddress, ethers.parseEther("1000"))
-            ).to.be.revertedWith("Lovecoin: burn from zero address");
+            await expectRevertWithMessage(lovecoin.connect(deployer).burn(ethers.ZeroAddress, ethers.parseEther("1000")), "Lovecoin: burn from zero address");
         });
 
         it("Should revert when burning zero amount", async function () {
-            await expect(
-                lovecoin.connect(deployer).burn(deployer.address, 0)
-            ).to.be.revertedWith("Lovecoin: burn amount must be positive");
+            await expectRevertWithMessage(lovecoin.connect(deployer).burn(deployer.address, 0), "Lovecoin: burn amount must be positive");
         });
 
         it("Should revert when burning more than balance", async function () {
             const burnAmount = await lovecoin.INITIAL_SUPPLY() + ethers.parseEther("1");
-            
-            await expect(
-                lovecoin.connect(deployer).burn(deployer.address, burnAmount)
-            ).to.be.revertedWith("Lovecoin: burn amount exceeds balance");
+            await expectRevertWithMessage(lovecoin.connect(deployer).burn(deployer.address, burnAmount), "Lovecoin: burn amount exceeds balance");
         });
     });
 
@@ -231,7 +231,7 @@ describe("Lovecoin", function () {
             
             await lovecoin.connect(user1).transfer(user2.address, largeAmount);
             expect(await lovecoin.balanceOf(user2.address)).to.equal(largeAmount);
-            expect(await lovecoin.balanceOf(user1.address)).to.equal(0);
+            expect(await lovecoin.balanceOf(user1.address)).to.equal(0n);
         });
 
         it("Should handle role management correctly", async function () {
@@ -245,18 +245,12 @@ describe("Lovecoin", function () {
             // Revoke role
             await lovecoin.connect(deployer).revokeRole(MINTER_ROLE, user1.address);
             
-            // User1 can no longer mint
-            await expect(
-                lovecoin.connect(user1).mint(user2.address, ethers.parseEther("1000"))
-            ).to.be.reverted;
+            await expectRevert(lovecoin.connect(user1).mint(user2.address, ethers.parseEther("1000")));
         });
 
         it("Should revert when deploying with zero address owner", async function () {
             const Lovecoin = await ethers.getContractFactory("Lovecoin");
-            
-            await expect(
-                Lovecoin.deploy(ethers.ZeroAddress)
-            ).to.be.revertedWith("Lovecoin: owner cannot be zero address");
+            await expectRevertWithMessage(Lovecoin.deploy(ethers.ZeroAddress), "Lovecoin: owner cannot be zero address");
         });
 
         it("Should maintain correct total supply after operations", async function () {

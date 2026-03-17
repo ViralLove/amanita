@@ -1,6 +1,34 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
+async function expectRevertWithMessage(txPromise, messageSubstring) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const msg = (err?.reason || err?.shortMessage || err?.message || err?.error?.message || String(err)) || "";
+    expect(msg.includes(messageSubstring), `expected revert message to contain "${messageSubstring}"`).to.be.true;
+}
+
 describe("SoulIntegration", function () {
     let soulboundCore, soulIntegration, mockSpiralEngine;
     let owner, user1, user2, user3;
@@ -76,9 +104,9 @@ describe("SoulIntegration", function () {
         user2 = randomWallet2;
         user3 = randomWallet3;
         
-        // Деплой Mock SpiralEngine
-        const MockSpiralEngine = await ethers.getContractFactory("MockSpiralEngine");
-        mockSpiralEngine = await MockSpiralEngine.deploy();
+        // Деплой мока с интерфейсом уведомлений Soul (SoulNotificationMock)
+        const SoulNotificationMock = await ethers.getContractFactory("SoulNotificationMock");
+        mockSpiralEngine = await SoulNotificationMock.deploy();
         await mockSpiralEngine.waitForDeployment();
         
         // Деплой SoulboundCore
@@ -114,14 +142,14 @@ describe("SoulIntegration", function () {
         
         it("Should revert deployment with invalid addresses", async function () {
             const SoulIntegration = await ethers.getContractFactory("SoulIntegration");
-            
-            await expect(
-                SoulIntegration.deploy(ethers.ZeroAddress, await soulboundCore.getAddress())
-            ).to.be.revertedWith("SoulIntegration: invalid SpiralEngine address");
-            
-            await expect(
-                SoulIntegration.deploy(await mockSpiralEngine.getAddress(), ethers.ZeroAddress)
-            ).to.be.revertedWith("SoulIntegration: invalid SoulboundCore address");
+            await expectRevertWithMessage(
+                SoulIntegration.deploy(ethers.ZeroAddress, await soulboundCore.getAddress()),
+                "SoulIntegration: invalid SpiralEngine address"
+            );
+            await expectRevertWithMessage(
+                SoulIntegration.deploy(await mockSpiralEngine.getAddress(), ethers.ZeroAddress),
+                "SoulIntegration: invalid SoulboundCore address"
+            );
         });
     });
     
@@ -130,12 +158,10 @@ describe("SoulIntegration", function () {
             const tx = await soulboundCore.mintSoul(user1.address);
             await logTransactionDetails(tx, "mintSoul with notification");
             
-            // Проверяем, что SpiralEngine был уведомлен
-            expect(await mockSpiralEngine.getLastNotifiedTokenId()).to.equal(1);
-            expect(await mockSpiralEngine.getLastNotifiedOwner()).to.equal(user1.address);
-            expect(await mockSpiralEngine.getNotificationCount()).to.equal(1);
+            expect(await mockSpiralEngine.getLastNotifiedTokenId()).to.equal(1n);
+            expect(await mockSpiralEngine.lastNotifiedOwner()).to.equal(user1.address);
+            expect(await mockSpiralEngine.getNotificationCount()).to.equal(1n);
             
-            // Проверяем событие SoulNotified
             const receipt = await tx.wait();
             const soulNotifiedEvent = receipt.logs.find(log => {
                 try {
@@ -145,10 +171,9 @@ describe("SoulIntegration", function () {
                     return false;
                 }
             });
-            
             expect(soulNotifiedEvent).to.not.be.undefined;
             const parsedEvent = soulIntegration.interface.parseLog(soulNotifiedEvent);
-            expect(parsedEvent.args.tokenId).to.equal(1);
+            expect(parsedEvent.args.tokenId).to.equal(1n);
             expect(parsedEvent.args.owner).to.equal(user1.address);
             expect(parsedEvent.args.eventType).to.equal("created");
         });
@@ -157,12 +182,9 @@ describe("SoulIntegration", function () {
             const tx = await soulboundCore.mintSoulBatch(user1.address, 3);
             await logTransactionDetails(tx, "mintSoulBatch with notifications");
             
-            // Проверяем, что все токены были уведомлены
-            expect(await mockSpiralEngine.getNotificationCount()).to.equal(3);
-            
-            // Проверяем последнее уведомление
-            expect(await mockSpiralEngine.getLastNotifiedTokenId()).to.equal(3);
-            expect(await mockSpiralEngine.getLastNotifiedOwner()).to.equal(user1.address);
+            expect(await mockSpiralEngine.getNotificationCount()).to.equal(3n);
+            expect(await mockSpiralEngine.getLastNotifiedTokenId()).to.equal(3n);
+            expect(await mockSpiralEngine.lastNotifiedOwner()).to.equal(user1.address);
         });
         
         it("Should handle direct notification calls", async function () {
@@ -173,38 +195,21 @@ describe("SoulIntegration", function () {
             const tx = await soulIntegration.notifySoulCreated(1, user1.address);
             await logTransactionDetails(tx, "Direct notifySoulCreated");
             
-            // Проверяем уведомление (должно быть 2, так как одно уже было при минтинге)
-            expect(await mockSpiralEngine.getNotificationCount()).to.equal(2);
+            expect(await mockSpiralEngine.getNotificationCount()).to.equal(2n);
         });
         
         it("Should validate token existence and ownership", async function () {
-            // Попытка уведомления о несуществующем токене
-            await expect(
-                soulIntegration.notifySoulCreated(999, user1.address)
-            ).to.be.revertedWith("SoulIntegration: token does not exist");
-            
-            // Создаем токен
+            await expectRevertWithMessage(soulIntegration.notifySoulCreated(999, user1.address), "SoulIntegration: token does not exist");
             await soulboundCore.mintSoul(user1.address);
-            
-            // Попытка уведомления с неправильным владельцем
-            await expect(
-                soulIntegration.notifySoulCreated(1, user2.address)
-            ).to.be.revertedWith("SoulIntegration: owner mismatch");
+            await expectRevertWithMessage(soulIntegration.notifySoulCreated(1, user2.address), "SoulIntegration: owner mismatch");
         });
         
         it("Should work when notifications are disabled", async function () {
-            // Отключаем уведомления
             await soulIntegration.setNotificationsEnabled(false);
-            
-            // Попытка уведомления должна провалиться
             await soulboundCore.mintSoul(user1.address);
-            await expect(
-                soulIntegration.notifySoulCreated(1, user1.address)
-            ).to.be.revertedWith("SoulIntegration: notifications disabled");
-            
-            // Но создание токена должно работать без ошибок
+            await expectRevertWithMessage(soulIntegration.notifySoulCreated(1, user1.address), "SoulIntegration: notifications disabled");
             expect(await soulboundCore.exists(1)).to.be.true;
-            expect(await mockSpiralEngine.getNotificationCount()).to.equal(0);
+            expect(await mockSpiralEngine.getNotificationCount()).to.equal(0n);
         });
     });
     
@@ -243,11 +248,10 @@ describe("SoulIntegration", function () {
             const tx = await soulRecovery.connect(user2).confirmRecovery(1);
             await logTransactionDetails(tx, "confirmRecovery with notification");
             
-            // Проверяем уведомление о восстановлении
-            expect(await mockSpiralEngine.getLastRecoveryTokenId()).to.equal(1);
-            expect(await mockSpiralEngine.getLastRecoveryOldOwner()).to.equal(user1.address);
-            expect(await mockSpiralEngine.getLastRecoveryNewOwner()).to.equal(user3.address);
-            expect(await mockSpiralEngine.getRecoveryNotificationCount()).to.equal(1);
+            expect(await mockSpiralEngine.getLastRecoveryTokenId()).to.equal(1n);
+            expect(await mockSpiralEngine.lastRecoveryOldOwner()).to.equal(user1.address);
+            expect(await mockSpiralEngine.lastRecoveryNewOwner()).to.equal(user3.address);
+            expect(await mockSpiralEngine.getRecoveryNotificationCount()).to.equal(1n);
         });
         
         it("Should handle direct recovery notification calls", async function () {
@@ -267,27 +271,17 @@ describe("SoulIntegration", function () {
             const tx = await soulIntegration.notifySoulRecovered(1, user1.address, user3.address);
             await logTransactionDetails(tx, "Direct notifySoulRecovered");
             
-            expect(await mockSpiralEngine.getRecoveryNotificationCount()).to.equal(2); // Одно от executeRecovery, одно прямое
+            expect(await mockSpiralEngine.getRecoveryNotificationCount()).to.equal(2n);
         });
         
         it("Should validate recovery notification parameters", async function () {
-            await expect(
-                soulIntegration.notifySoulRecovered(1, ethers.ZeroAddress, user2.address)
-            ).to.be.revertedWith("SoulIntegration: invalid old owner address");
-            
-            await expect(
-                soulIntegration.notifySoulRecovered(1, user1.address, ethers.ZeroAddress)
-            ).to.be.revertedWith("SoulIntegration: invalid new owner address");
-            
-            await expect(
-                soulIntegration.notifySoulRecovered(1, user1.address, user1.address)
-            ).to.be.revertedWith("SoulIntegration: owners cannot be the same");
+            await expectRevertWithMessage(soulIntegration.notifySoulRecovered(1, ethers.ZeroAddress, user2.address), "SoulIntegration: invalid old owner address");
+            await expectRevertWithMessage(soulIntegration.notifySoulRecovered(1, user1.address, ethers.ZeroAddress), "SoulIntegration: invalid new owner address");
+            await expectRevertWithMessage(soulIntegration.notifySoulRecovered(1, user1.address, user1.address), "SoulIntegration: owners cannot be the same");
         });
         
         it("Should validate new owner matches current owner", async function () {
-            await expect(
-                soulIntegration.notifySoulRecovered(1, user2.address, user3.address)
-            ).to.be.revertedWith("SoulIntegration: new owner mismatch");
+            await expectRevertWithMessage(soulIntegration.notifySoulRecovered(1, user2.address, user3.address), "SoulIntegration: new owner mismatch");
         });
     });
     
@@ -346,7 +340,7 @@ describe("SoulIntegration", function () {
             
             expect(failedEvent).to.not.be.undefined;
             const parsedEvent = soulIntegration.interface.parseLog(failedEvent);
-            expect(parsedEvent.args.tokenId).to.equal(1);
+            expect(parsedEvent.args.tokenId).to.equal(1n);
             expect(parsedEvent.args.eventType).to.equal("created");
         });
         
@@ -359,7 +353,7 @@ describe("SoulIntegration", function () {
             await logTransactionDetails(tx, "mintSoul without integration");
             
             expect(await soulboundCore.exists(1)).to.be.true;
-            expect(await mockSpiralEngine.getNotificationCount()).to.equal(0);
+            expect(await mockSpiralEngine.getNotificationCount()).to.equal(0n);
         });
         
         it("Should handle invalid SpiralEngine address gracefully", async function () {
@@ -411,31 +405,19 @@ describe("SoulIntegration", function () {
     
     describe("Access Control", function () {
         it("Should allow only owner to change SpiralEngine address", async function () {
-            await expect(
-                soulIntegration.connect(user1).setSpiralEngine(user2.address)
-            ).to.be.revertedWithCustomError(soulIntegration, "OwnableUnauthorizedAccount");
-            
-            // Owner может менять
+            await expectCustomError(soulIntegration.connect(user1).setSpiralEngine(user2.address), soulIntegration, "OwnableUnauthorizedAccount");
             await soulIntegration.setSpiralEngine(user2.address);
             expect(await soulIntegration.getSpiralEngine()).to.equal(user2.address);
         });
         
         it("Should allow only owner to change SoulboundCore address", async function () {
-            await expect(
-                soulIntegration.connect(user1).setSoulboundCore(user2.address)
-            ).to.be.revertedWithCustomError(soulIntegration, "OwnableUnauthorizedAccount");
-            
-            // Owner может менять
+            await expectCustomError(soulIntegration.connect(user1).setSoulboundCore(user2.address), soulIntegration, "OwnableUnauthorizedAccount");
             await soulIntegration.setSoulboundCore(user2.address);
             expect(await soulIntegration.getSoulboundCore()).to.equal(user2.address);
         });
         
         it("Should allow only owner to toggle notifications", async function () {
-            await expect(
-                soulIntegration.connect(user1).setNotificationsEnabled(false)
-            ).to.be.revertedWithCustomError(soulIntegration, "OwnableUnauthorizedAccount");
-            
-            // Owner может менять
+            await expectCustomError(soulIntegration.connect(user1).setNotificationsEnabled(false), soulIntegration, "OwnableUnauthorizedAccount");
             await soulIntegration.setNotificationsEnabled(false);
             expect(await soulIntegration.areNotificationsEnabled()).to.be.false;
         });
@@ -451,8 +433,7 @@ describe("SoulIntegration", function () {
             console.log(`\n=== Gas Profiling: notifySoulCreated ===`);
             console.log(`Gas Used: ${receipt.gasUsed}`);
             
-            // Проверяем, что газ в разумных пределах (< 75,000)
-            expect(receipt.gasUsed).to.be.below(75000);
+            expect(receipt.gasUsed < 75000n).to.be.true;
         });
         
         it("Should measure gas for notifySoulRecovered", async function () {
@@ -484,8 +465,7 @@ describe("SoulIntegration", function () {
             console.log(`\n=== Gas Profiling: notifySoulRecovered ===`);
             console.log(`Gas Used: ${receipt.gasUsed}`);
             
-            // Проверяем, что газ в разумных пределах (< 80,000)
-            expect(receipt.gasUsed).to.be.below(80000);
+            expect(receipt.gasUsed < 80000n).to.be.true;
         });
         
         it("Should measure gas overhead for mintSoul with integration", async function () {
@@ -495,8 +475,7 @@ describe("SoulIntegration", function () {
             console.log(`\n=== Gas Profiling: mintSoul with integration ===`);
             console.log(`Gas Used: ${receipt.gasUsed}`);
             
-            // Проверяем, что газ не превышает 200,000 (реальные измерения: ~190,000)
-            expect(receipt.gasUsed).to.be.below(200000);
+            expect(receipt.gasUsed < 200000n).to.be.true;
         });
         
         it("Should measure gas for view functions", async function () {
@@ -525,7 +504,7 @@ describe("SoulIntegration", function () {
             console.log(`\n=== Gas Profiling: View Functions ===`);
             gasEstimates.forEach(estimate => {
                 console.log(`${estimate.function}: ${estimate.gas} gas`);
-                expect(estimate.gas).to.be.below(30000);
+                expect(estimate.gas < 30000n).to.be.true;
             });
         });
     });

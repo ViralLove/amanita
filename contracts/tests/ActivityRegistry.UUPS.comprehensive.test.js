@@ -20,11 +20,11 @@ describe("ActivityRegistry UUPS - Comprehensive Tests", function () {
         spiralEngine = await MockSpiralEngine.deploy();
         await spiralEngine.waitForDeployment();
 
-        // ACTIVITY_CREATOR_ROLE и setUserActivated для creator и otherCreator
-        const ACTIVITY_CREATOR_ROLE = await spiralEngine.ACTIVITY_CREATOR_ROLE();
-        await spiralEngine.grantRole(ACTIVITY_CREATOR_ROLE, creator.address);
+        // ACTIVATOR_ROLE и setUserActivated для creator и otherCreator
+        const ACTIVATOR_ROLE = await spiralEngine.ACTIVATOR_ROLE();
+        await spiralEngine.grantRole(ACTIVATOR_ROLE, creator.address);
         await spiralEngine.setUserActivated(creator.address, true);
-        await spiralEngine.grantRole(ACTIVITY_CREATOR_ROLE, otherCreator.address);
+        await spiralEngine.grantRole(ACTIVATOR_ROLE, otherCreator.address);
         await spiralEngine.setUserActivated(otherCreator.address, true);
 
         // Деплой ActivityRegistryLogic
@@ -259,7 +259,7 @@ describe("ActivityRegistry UUPS - Comprehensive Tests", function () {
 
     // ========== P0: Access control ==========
     describe("Access control", function () {
-        it("createActivity без роли ACTIVITY_CREATOR_ROLE ревертит с NotActivatedActivityCreator", async function () {
+        it("createActivity без роли ACTIVATOR_ROLE ревертит с NotActivatedActivityCreator", async function () {
             await expectRevertCustom(
                 activityRegistry.connect(user1).createActivity(0, "QmNoRole"),
                 "NotActivatedActivityCreator",
@@ -268,8 +268,8 @@ describe("ActivityRegistry UUPS - Comprehensive Tests", function () {
         });
 
         it("createActivity при наличии роли но без активации (usedInviteByUser == 0) ревертит с NotActivatedActivityCreator", async function () {
-            const ACTIVITY_CREATOR_ROLE = await spiralEngine.ACTIVITY_CREATOR_ROLE();
-            await spiralEngine.grantRole(ACTIVITY_CREATOR_ROLE, user1.address);
+            const ACTIVATOR_ROLE = await spiralEngine.ACTIVATOR_ROLE();
+            await spiralEngine.grantRole(ACTIVATOR_ROLE, user1.address);
             expect(await spiralEngine.usedInviteByUser(user1.address)).to.equal(0n);
             await expectRevertCustom(
                 activityRegistry.connect(user1).createActivity(0, "QmNoAct"),
@@ -399,7 +399,7 @@ describe("ActivityRegistry UUPS - Comprehensive Tests", function () {
             const MockSpiralEngine2 = await ethers.getContractFactory("contracts/mocks/MockSpiralEngine.sol:MockSpiralEngine");
             const spiral2 = await MockSpiralEngine2.deploy();
             await spiral2.waitForDeployment();
-            // На spiral2 для creator не выдаём ACTIVITY_CREATOR_ROLE и не вызываем setUserActivated — контракт должен использовать новый engine
+            // На spiral2 для creator не выдаём ACTIVATOR_ROLE и не вызываем setUserActivated — контракт должен использовать новый engine
             await activityRegistry.connect(admin).setSpiralEngine(await spiral2.getAddress());
             await expectRevertCustom(
                 activityRegistry.connect(creator).createActivity(0, "QmAfterSetSpiral"),

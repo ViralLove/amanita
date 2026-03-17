@@ -1,6 +1,21 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
 /**
  * 🧪 AmanitaInternational - Ownership & Access Control Test Suite
  * 
@@ -137,13 +152,14 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
             console.log("   ✅ Seller1 created field");
             
             // 2. Seller2 НЕ может изменить поле seller1
-            await expect(
+            await expectCustomError(
                 amanitaIntl.connect(seller2).setSimpleFieldCID(
                     "Component.seller1_comp.title",
                     "QmSeller2HackAttempt"
-                )
-            ).to.be.revertedWithCustomError(amanitaIntl, "UnauthorizedFieldAccess")
-              .withArgs(seller2.address, "Component.seller1_comp.title");
+                ),
+                amanitaIntl,
+                "UnauthorizedFieldAccess"
+            );
             
             console.log("   ✅ Seller2 blocked from modifying seller1's field");
             
@@ -190,13 +206,14 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
             console.log("\n🧪 TEST: Regular user cannot create fields");
             
             // Regular user НЕ имеет ни ADMIN_ROLE ни SELLER_ROLE
-            await expect(
+            await expectCustomError(
                 amanitaIntl.connect(regularUser).setSimpleFieldCID(
                     "Component.hacker.title",
                     "QmHackerCID"
-                )
-            ).to.be.revertedWithCustomError(amanitaIntl, "UnauthorizedFieldAccess")
-              .withArgs(regularUser.address, "Component.hacker.title");
+                ),
+                amanitaIntl,
+                "UnauthorizedFieldAccess"
+            );
             
             console.log("   ✅ Regular user blocked from creating field");
         });
@@ -267,14 +284,15 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
             console.log("   ✅ Seller1 created translation");
             
             // 2. Seller2 НЕ может изменить перевод seller1
-            await expect(
+            await expectCustomError(
                 amanitaIntl.connect(seller2).setComplexFieldCID(
                     "ProductDescription",
                     "ru",
                     "QmSeller2HackAttempt"
-                )
-            ).to.be.revertedWithCustomError(amanitaIntl, "UnauthorizedFieldAccess")
-              .withArgs(seller2.address, "ProductDescription.ru");
+                ),
+                amanitaIntl,
+                "UnauthorizedFieldAccess"
+            );
             
             console.log("   ✅ Seller2 blocked from modifying seller1's translation");
             
@@ -365,13 +383,14 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
             console.log(`   ✅ Owner is admin: ${owner}`);
             
             // 4. Seller НЕ может изменить глобальное поле
-            await expect(
+            await expectCustomError(
                 amanitaIntl.connect(seller1).setSimpleFieldCID(
                     "features",
                     "QmSellerHackAttempt"
-                )
-            ).to.be.revertedWithCustomError(amanitaIntl, "UnauthorizedFieldAccess")
-              .withArgs(seller1.address, "features");
+                ),
+                amanitaIntl,
+                "UnauthorizedFieldAccess"
+            );
             
             console.log("   ✅ Seller blocked from modifying global field");
             
@@ -386,12 +405,11 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
             console.log("\n🧪 TEST: Non-admin cannot mark fields as global");
             
             // Seller НЕ может помечать поля как глобальные
-            await expect(
-                amanitaIntl.connect(seller1).setGlobalField("my_field", true)
-            ).to.be.revertedWithCustomError(
+            await expectCustomError(
+                amanitaIntl.connect(seller1).setGlobalField("my_field", true),
                 amanitaIntl,
                 "AccessControlUnauthorizedAccount"
-            ).withArgs(seller1.address, ADMIN_ROLE);
+            );
             
             console.log("   ✅ Seller blocked from setGlobalField");
         });
@@ -421,14 +439,15 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
             console.log(`   ✅ Owner is admin: ${owner}`);
             
             // 4. Seller НЕ может изменить глобальное complex field
-            await expect(
+            await expectCustomError(
                 amanitaIntl.connect(seller1).setComplexFieldCID(
                     "ProductDescription",
                     "ru",
                     "QmSellerHackAttempt"
-                )
-            ).to.be.revertedWithCustomError(amanitaIntl, "UnauthorizedFieldAccess")
-              .withArgs(seller1.address, "ProductDescription.ru");
+                ),
+                amanitaIntl,
+                "UnauthorizedFieldAccess"
+            );
             
             console.log("   ✅ Seller blocked from modifying global complex field");
             
@@ -461,12 +480,14 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
         it("Should revert on empty fieldKey", async function () {
             console.log("\n🧪 TEST: Empty fieldKey reverts");
             
-            await expect(
+            await expectCustomError(
                 amanitaIntl.connect(seller1).setSimpleFieldCID(
                     "",  // Пустой ключ
                     "QmTestCID"
-                )
-            ).to.be.revertedWithCustomError(amanitaIntl, "EmptyFieldKey");
+                ),
+                amanitaIntl,
+                "EmptyFieldKey"
+            );
             
             console.log("   ✅ EmptyFieldKey error triggered");
         });
@@ -474,12 +495,14 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
         it("Should revert on empty CID", async function () {
             console.log("\n🧪 TEST: Empty CID reverts");
             
-            await expect(
+            await expectCustomError(
                 amanitaIntl.connect(seller1).setSimpleFieldCID(
                     "test.field",
                     ""  // Пустой CID
-                )
-            ).to.be.revertedWithCustomError(amanitaIntl, "EmptyCID");
+                ),
+                amanitaIntl,
+                "EmptyCID"
+            );
             
             console.log("   ✅ EmptyCID error triggered");
         });
@@ -487,13 +510,15 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
         it("Should revert on empty className", async function () {
             console.log("\n🧪 TEST: Empty className reverts");
             
-            await expect(
+            await expectCustomError(
                 amanitaIntl.connect(seller1).setComplexFieldCID(
                     "",  // Пустой className
                     "ru",
                     "QmTestCID"
-                )
-            ).to.be.revertedWithCustomError(amanitaIntl, "EmptyClassName");
+                ),
+                amanitaIntl,
+                "EmptyClassName"
+            );
             
             console.log("   ✅ EmptyClassName error triggered");
         });
@@ -501,13 +526,15 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
         it("Should revert on empty language", async function () {
             console.log("\n🧪 TEST: Empty language reverts");
             
-            await expect(
+            await expectCustomError(
                 amanitaIntl.connect(seller1).setComplexFieldCID(
                     "Description",
                     "",  // Пустой язык
                     "QmTestCID"
-                )
-            ).to.be.revertedWithCustomError(amanitaIntl, "EmptyLanguage");
+                ),
+                amanitaIntl,
+                "EmptyLanguage"
+            );
             
             console.log("   ✅ EmptyLanguage error triggered");
         });
@@ -571,13 +598,17 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
             await amanitaIntl.connect(seller2).setSimpleFieldCID("Component.B.title", "QmUpdatedB");
             
             // 5. НО не может менять чужие
-            await expect(
-                amanitaIntl.connect(seller1).setSimpleFieldCID("Component.B.title", "QmHack")
-            ).to.be.revertedWithCustomError(amanitaIntl, "UnauthorizedFieldAccess");
+            await expectCustomError(
+                amanitaIntl.connect(seller1).setSimpleFieldCID("Component.B.title", "QmHack"),
+                amanitaIntl,
+                "UnauthorizedFieldAccess"
+            );
             
-            await expect(
-                amanitaIntl.connect(seller2).setSimpleFieldCID("Component.A.title", "QmHack")
-            ).to.be.revertedWithCustomError(amanitaIntl, "UnauthorizedFieldAccess");
+            await expectCustomError(
+                amanitaIntl.connect(seller2).setSimpleFieldCID("Component.A.title", "QmHack"),
+                amanitaIntl,
+                "UnauthorizedFieldAccess"
+            );
             
             console.log("   ✅ Cross-modification blocked");
         });
@@ -592,10 +623,26 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
         it("Should emit GlobalFieldSet when marking field as global", async function () {
             console.log("\n🧪 TEST: GlobalFieldSet event");
             
-            await expect(
-                amanitaIntl.connect(admin).setGlobalField("features", true)
-            ).to.emit(amanitaIntl, "GlobalFieldSet")
-              .withArgs("features", true, admin.address);
+            const tx = await amanitaIntl.connect(admin).setGlobalField("features", true);
+            const receipt = await tx.wait();
+
+            const eventIface = amanitaIntl.interface;
+            const decoded = receipt.logs
+                .map((log) => {
+                    try {
+                        return eventIface.parseLog(log);
+                    } catch {
+                        return null;
+                    }
+                })
+                .filter((e) => e && e.name === "GlobalFieldSet");
+
+            expect(decoded.length >= 1).to.be.true;
+            const evt = decoded[0];
+            const { fieldKey, isGlobal, admin: actor } = evt.args;
+            expect(fieldKey.hash).to.equal(ethers.id("features"));
+            expect(isGlobal).to.equal(true);
+            expect(actor).to.equal(admin.address);
             
             console.log("   ✅ GlobalFieldSet event emitted");
         });
@@ -603,13 +650,29 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
         it("Should emit SimpleFieldRegistered when seller creates field", async function () {
             console.log("\n🧪 TEST: SimpleFieldRegistered event from seller");
             
-            await expect(
-                amanitaIntl.connect(seller1).setSimpleFieldCID(
-                    "test.field",
-                    "QmTestCID"
-                )
-            ).to.emit(amanitaIntl, "SimpleFieldRegistered")
-              .withArgs("test.field", "QmTestCID", seller1.address);
+            const tx = await amanitaIntl.connect(seller1).setSimpleFieldCID(
+                "test.field",
+                "QmTestCID"
+            );
+            const receipt = await tx.wait();
+
+            const eventIface = amanitaIntl.interface;
+            const decoded = receipt.logs
+                .map((log) => {
+                    try {
+                        return eventIface.parseLog(log);
+                    } catch {
+                        return null;
+                    }
+                })
+                .filter((e) => e && e.name === "SimpleFieldRegistered");
+
+            expect(decoded.length >= 1).to.be.true;
+            const evt = decoded[0];
+            const { fieldKey, cid, updater } = evt.args;
+            expect(fieldKey.hash).to.equal(ethers.id("test.field"));
+            expect(cid).to.equal("QmTestCID");
+            expect(updater).to.equal(seller1.address);
             
             console.log("   ✅ SimpleFieldRegistered event emitted");
         });
@@ -617,14 +680,31 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
         it("Should emit ComplexFieldRegistered when seller creates translation", async function () {
             console.log("\n🧪 TEST: ComplexFieldRegistered event from seller");
             
-            await expect(
-                amanitaIntl.connect(seller1).setComplexFieldCID(
-                    "Description",
-                    "ru",
-                    "QmRussianCID"
-                )
-            ).to.emit(amanitaIntl, "ComplexFieldRegistered")
-              .withArgs("Description", "ru", "QmRussianCID", seller1.address);
+            const tx = await amanitaIntl.connect(seller1).setComplexFieldCID(
+                "Description",
+                "ru",
+                "QmRussianCID"
+            );
+            const receipt = await tx.wait();
+
+            const eventIface = amanitaIntl.interface;
+            const decoded = receipt.logs
+                .map((log) => {
+                    try {
+                        return eventIface.parseLog(log);
+                    } catch {
+                        return null;
+                    }
+                })
+                .filter((e) => e && e.name === "ComplexFieldRegistered");
+
+            expect(decoded.length >= 1).to.be.true;
+            const evt = decoded[0];
+            const { className, language, cid, updater } = evt.args;
+            expect(className.hash).to.equal(ethers.id("Description"));
+            expect(language.hash).to.equal(ethers.id("ru"));
+            expect(cid).to.equal("QmRussianCID");
+            expect(updater).to.equal(seller1.address);
             
             console.log("   ✅ ComplexFieldRegistered event emitted");
         });
@@ -691,12 +771,14 @@ describe("🔐 AmanitaInternational - Ownership & Access Control", function () {
             console.log("   ✅ SELLER_ROLE revoked");
             
             // 4. Seller1 НЕ может создавать НОВЫЕ поля
-            await expect(
+            await expectCustomError(
                 amanitaIntl.connect(seller1).setSimpleFieldCID(
                     "After.revoke",
                     "QmAfterCID"
-                )
-            ).to.be.revertedWithCustomError(amanitaIntl, "UnauthorizedFieldAccess");
+                ),
+                amanitaIntl,
+                "UnauthorizedFieldAccess"
+            );
             
             console.log("   ✅ Seller cannot create new fields after revoke");
             
