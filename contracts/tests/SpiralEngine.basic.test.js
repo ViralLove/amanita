@@ -559,13 +559,14 @@ describe("SpiralEngine - Basic Functionality", function () {
 
         it("Should only allow ACTIVATOR_ROLE to grant seller role", async function () {
             console.log("Testing ACTIVATOR_ROLE requirement for granting seller role...");
-            
+            // user is activated so now has ACTIVATOR_ROLE (SEC-AC-1); use a non-role account to test restriction
+            const noRoleUser = ethers.Wallet.createRandom().connect(ethers.provider);
+            await deployer.sendTransaction({ to: noRoleUser.address, value: ethers.parseEther("0.1") });
             await expectCustomError(
-                spiralEngine.connect(user).grantSellerRole(user.address),
+                spiralEngine.connect(noRoleUser).grantSellerRole(user.address),
                 spiralEngine,
                 "AccessControlUnauthorizedAccount"
             );
-            
             console.log("✅ Non-ACTIVATOR_ROLE correctly prevented from granting seller role");
         });
     });
@@ -864,7 +865,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             expect(diagnostics.isActivated).to.be.true;
             expect(diagnostics.usedInviteTokenId).to.equal(0n); // tokenId = 0, поэтому usedInviteTokenId = 0
             expect(diagnostics.hasSellerRole).to.be.true;
-            expect(diagnostics.hasActivatorRole).to.be.false;
+            expect(diagnostics.hasActivatorRole).to.be.true; // SEC-AC-1: activated user gets ACTIVATOR_ROLE
             expect(diagnostics.userInvites.length).to.equal(12);
             expect(diagnostics.totalInvitesMinted).to.equal(12n); // 12 новых инвайтов для пользователя
             

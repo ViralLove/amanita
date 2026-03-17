@@ -691,33 +691,29 @@ describe("SpiralEngine - Integration Tests", function () {
             const newCodes = Array.from({length: 12}, (_, i) => `ROLE-EDGE-NEW-${i + 1}`);
             const activateTx = await spiralEngine.connect(activator1).activateUser("ROLE-EDGE-INVITE", user1.address, newCodes, 0);
             await logTransactionDetails(activateTx, "Activate User for Role Edge Test");
-            
-            // Назначаем только SELLER_ROLE без ACTIVATOR_ROLE
+            // user1 now has ACTIVATOR_ROLE (SEC-AC-1 auto-grant); grant SELLER_ROLE for next steps
             const roleTx = await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, user1.address);
             await logTransactionDetails(roleTx, "Grant SELLER_ROLE to User1");
-            
-            // Пользователь с SELLER_ROLE может создавать инвайты
+
+            // SELLER without ACTIVATOR: use an account that has SELLER_ROLE but was never activated (no auto ACTIVATOR_ROLE)
+            const sellerOnly = ethers.Wallet.createRandom().connect(ethers.provider);
+            await deployer.sendTransaction({ to: sellerOnly.address, value: ethers.parseEther("0.1") });
+            await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, sellerOnly.address);
             const sellerMintTx = await spiralEngine.connect(seller).mintInvite("SELLER-ONLY-INVITE", 0);
             await logTransactionDetails(sellerMintTx, "Mint Invite by Seller");
             console.log("✅ SELLER_ROLE can create invites");
-            
-            // Но не может активировать пользователей без ACTIVATOR_ROLE
+
             const testUser = ethers.Wallet.createRandom().connect(ethers.provider);
-            await deployer.sendTransaction({
-                to: testUser.address,
-                value: ethers.parseEther("0.1")
-            });
-            
+            await deployer.sendTransaction({ to: testUser.address, value: ethers.parseEther("0.1") });
             const testCodes = Array.from({length: 12}, (_, i) => `TEST-${i + 1}`);
             await expectCustomError(
-                spiralEngine.connect(user1).activateUser("SELLER-ONLY-INVITE", testUser.address, testCodes, 0),
+                spiralEngine.connect(sellerOnly).activateUser("SELLER-ONLY-INVITE", testUser.address, testCodes, 0),
                 spiralEngine,
                 "AccessControlUnauthorizedAccount"
             );
             console.log("✅ SELLER_ROLE without ACTIVATOR_ROLE cannot activate users");
-            
-            // Назначаем ACTIVATOR_ROLE
-            await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, user1.address);
+
+            // user1 already has ACTIVATOR_ROLE (auto-grant); no need to grant again
             
             // user1 создает свой собственный инвайт для активации
             await spiralEngine.connect(user1).mintInvite("USER1-ACTIVATOR-INVITE", 0);

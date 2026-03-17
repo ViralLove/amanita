@@ -290,7 +290,9 @@ describe("SpiralEngine - Roles and Access Control", function () {
             // Проверяем активацию
             const usedInvite = await spiralEngine.usedInviteByUser(user.address);
             expect(usedInvite > 0n).to.be.true;
-            console.log("✅ User activated successfully");
+            // SEC-AC-1: после activateUser у user должна быть ACTIVATOR_ROLE (auto-grant)
+            expect(await spiralEngine.hasRole(ACTIVATOR_ROLE, user.address)).to.be.true;
+            console.log("✅ User activated successfully and has ACTIVATOR_ROLE");
         });
 
         it("Should prevent non-ACTIVATOR_ROLE from activating users", async function () {
@@ -334,6 +336,43 @@ describe("SpiralEngine - Roles and Access Control", function () {
             await spiralEngine.connect(activator).activateUser("ENFORCEMENT-TEST-INVITE-ACTIVATOR", otherUser.address, newCodes2, 0);
             // Должен пройти без ошибок
             console.log("✅ ACTIVATOR_ROLE enforcement working correctly");
+        });
+
+        describe("Auto-grant ACTIVATOR_ROLE on activation (SEC-AC-1)", function () {
+            it("Should grant ACTIVATOR_ROLE to user after successful activateUser", async function () {
+                await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, activator.address);
+                await spiralEngine.connect(activator).mintInvite("AUTO-GRANT-INVITE", 0);
+                const newCodes = Array.from({ length: 12 }, (_, i) => `AUTO-GRANT-NEW-${i + 1}`);
+
+                expect(await spiralEngine.hasRole(ACTIVATOR_ROLE, user.address)).to.be.false;
+                expect(await spiralEngine.usedInviteByUser(user.address)).to.equal(0n);
+
+                await spiralEngine.connect(activator).activateUser("AUTO-GRANT-INVITE", user.address, newCodes, 0);
+
+                expect(await spiralEngine.usedInviteByUser(user.address)).to.not.equal(0n);
+                expect(await spiralEngine.hasRole(ACTIVATOR_ROLE, user.address)).to.be.true;
+            });
+
+            it("Should revert UserAlreadyActivated on second activation and preserve user ACTIVATOR_ROLE", async function () {
+                await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, activator.address);
+                await spiralEngine.connect(activator).mintInvite("DOUBLE-ACTIVATE-INVITE-1", 0);
+                const newCodes1 = Array.from({ length: 12 }, (_, i) => `DOUBLE-NEW-1-${i + 1}`);
+
+                await spiralEngine.connect(activator).activateUser("DOUBLE-ACTIVATE-INVITE-1", user.address, newCodes1, 0);
+                expect(await spiralEngine.hasRole(ACTIVATOR_ROLE, user.address)).to.be.true;
+
+                await spiralEngine.connect(activator).mintInvite("DOUBLE-ACTIVATE-INVITE-2", 0);
+                const newCodes2 = Array.from({ length: 12 }, (_, i) => `DOUBLE-NEW-2-${i + 1}`);
+
+                await expectCustomError(
+                    spiralEngine.connect(activator).activateUser("DOUBLE-ACTIVATE-INVITE-2", user.address, newCodes2, 0),
+                    spiralEngine,
+                    "UserAlreadyActivated"
+                );
+
+                expect(await spiralEngine.hasRole(ACTIVATOR_ROLE, user.address)).to.be.true;
+                expect(await spiralEngine.usedInviteByUser(user.address)).to.not.equal(0n);
+            });
         });
 
         it("Should allow DEFAULT_ADMIN_ROLE to suspend users", async function () {
