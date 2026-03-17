@@ -1,6 +1,21 @@
 const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
 describe("SpiralEngine - Integration Tests", function () {
     let spiralEngine;
     let soulIdentity;
@@ -207,17 +222,17 @@ describe("SpiralEngine - Integration Tests", function () {
 
             // 3. Проверка активации
             console.log("Step 3: Verifying activation...");
-            expect(await spiralEngine.usedInviteByUser(user1.address)).to.be.gt(0);
-            expect(await spiralEngine.usedInviteByUser(user2.address)).to.be.gt(0);
-            expect(await spiralEngine.usedInviteByUser(user3.address)).to.be.gt(0);
+            expect((await spiralEngine.usedInviteByUser(user1.address)) > 0n).to.be.true;
+            expect((await spiralEngine.usedInviteByUser(user2.address)) > 0n).to.be.true;
+            expect((await spiralEngine.usedInviteByUser(user3.address)) > 0n).to.be.true;
             console.log("✅ Activation verified");
 
             // 4. Проверка кругов
             console.log("Step 4: Verifying circles...");
             const circle1Size = await spiralEngine.getCircleSize(activator1.address);
             const circle2Size = await spiralEngine.getCircleSize(activator2.address);
-            expect(circle1Size).to.equal(2);
-            expect(circle2Size).to.equal(1);
+            expect(circle1Size).to.equal(2n);
+            expect(circle2Size).to.equal(1n);
             console.log(`✅ Circles verified: Activator1=${circle1Size}, Activator2=${circle2Size}`);
 
             // 5. Назначение ролей
@@ -277,16 +292,16 @@ describe("SpiralEngine - Integration Tests", function () {
             const user2CircleSize = await spiralEngine.getCircleSize(user2.address);
             const user1CircleSize = await spiralEngine.getCircleSize(user1.address);
             const updatedActivator1CircleSize = await spiralEngine.getCircleSize(activator1.address);
-            expect(user2CircleSize).to.equal(1); // newUser1 активирован user2
-            expect(user1CircleSize).to.equal(1); // newUser2 активирован user1
-            expect(updatedActivator1CircleSize).to.equal(2); // user1 и user2 (исходные пользователи)
+            expect(user2CircleSize).to.equal(1n); // newUser1 активирован user2
+            expect(user1CircleSize).to.equal(1n); // newUser2 активирован user1
+            expect(updatedActivator1CircleSize).to.equal(2n); // user1 и user2 (исходные пользователи)
             console.log(`✅ New circles verified: User2=${user2CircleSize}, User1=${user1CircleSize}, Activator1=${updatedActivator1CircleSize}`);
 
             // 10. Приостановка пользователя
             console.log("Step 10: Suspending user...");
             await spiralEngine.connect(deployer).suspendUser(user1.address, 3600, "Test suspension");
             const suspensionUntil = await spiralEngine.suspensionUntil(user1.address);
-            expect(suspensionUntil).to.be.gt(0);
+            expect(suspensionUntil > 0n).to.be.true;
             console.log("✅ User suspended");
 
             // 11. Проверка последствий приостановки
@@ -294,7 +309,7 @@ describe("SpiralEngine - Integration Tests", function () {
             
             // Проверяем, что пользователь действительно приостановлен
             const suspensionTime = await spiralEngine.suspensionUntil(user1.address);
-            expect(suspensionTime).to.be.gt(0);
+            expect(suspensionTime > 0n).to.be.true;
             console.log(`✅ User suspended until: ${suspensionTime}`);
             
             // Приостановленный пользователь не может создавать инвайты
@@ -314,9 +329,11 @@ describe("SpiralEngine - Integration Tests", function () {
             await spiralEngine.connect(seller).mintInvite("PRE-SUSPENSION-INVITE", 0);
             const suspendedCodes = Array.from({length: 12}, (_, i) => `SUSPENDED-${i + 1}`);
             
-            await expect(
-                spiralEngine.connect(user1).activateUser("PRE-SUSPENSION-INVITE", suspendedUser.address, suspendedCodes, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "InviteNotFromActivator");
+            await expectCustomError(
+                spiralEngine.connect(user1).activateUser("PRE-SUSPENSION-INVITE", suspendedUser.address, suspendedCodes, 0),
+                spiralEngine,
+                "InviteNotFromActivator"
+            );
             
             console.log("✅ Suspension effects verified");
 
@@ -360,14 +377,14 @@ describe("SpiralEngine - Integration Tests", function () {
                 }
                 
                 const circleSize = await spiralEngine.getCircleSize(activator.address);
-                expect(circleSize).to.equal(12);
+                expect(circleSize).to.equal(12n);
                 console.log(`✅ Activator ${i} circle filled: ${circleSize} members`);
             }
 
             // Проверяем, что все круги полные
             for (let i = 0; i < activators.length; i++) {
                 const circleSize = await spiralEngine.getCircleSize(activators[i].address);
-                expect(circleSize).to.equal(12);
+                expect(circleSize).to.equal(12n);
             }
 
             // Попытка активировать в полный круг должна провалиться
@@ -380,9 +397,11 @@ describe("SpiralEngine - Integration Tests", function () {
             await spiralEngine.connect(seller).mintInvite("EXTRA-INVITE", 0);
             const extraCodes = Array.from({length: 12}, (_, i) => `EXTRA-${i + 1}`);
             
-            await expect(
-                spiralEngine.connect(activators[0]).activateUser("EXTRA-INVITE", extraUser.address, extraCodes, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "CircleLimitReached");
+            await expectCustomError(
+                spiralEngine.connect(activators[0]).activateUser("EXTRA-INVITE", extraUser.address, extraCodes, 0),
+                spiralEngine,
+                "CircleLimitReached"
+            );
 
             console.log("✅ Complex multi-activator scenario test passed");
         });
@@ -412,7 +431,7 @@ describe("SpiralEngine - Integration Tests", function () {
             console.log("✅ Rapid sequential operations completed");
             
             const circleSize = await spiralEngine.getCircleSize(activator1.address);
-            expect(circleSize).to.equal(5);
+            expect(circleSize).to.equal(5n);
             console.log(`✅ Circle size after rapid operations: ${circleSize}`);
         });
 
@@ -484,7 +503,7 @@ describe("SpiralEngine - Integration Tests", function () {
             // Проверяем результаты
             for (let i = 0; i < activators.length; i++) {
                 const circleSize = await spiralEngine.getCircleSize(activators[i].address);
-                expect(circleSize).to.equal(10);
+                expect(circleSize).to.equal(10n);
             }
             console.log("✅ System stress test verified");
         });
@@ -516,9 +535,9 @@ describe("SpiralEngine - Integration Tests", function () {
             console.log(`✅ Suspend user gas cost: ${receipt4.gasUsed.toString()}`);
             
             // Проверяем, что все операции прошли успешно
-            expect(await spiralEngine.usedInviteByUser(user1.address)).to.be.gt(0);
+            expect((await spiralEngine.usedInviteByUser(user1.address)) > 0n).to.be.true;
             expect(await spiralEngine.hasRole(SELLER_ROLE, user1.address)).to.be.true;
-            expect(await spiralEngine.suspensionUntil(user1.address)).to.be.gt(0);
+            expect((await spiralEngine.suspensionUntil(user1.address)) > 0n).to.be.true;
             
             console.log("✅ Gas cost measurement completed");
         });
@@ -553,7 +572,7 @@ describe("SpiralEngine - Integration Tests", function () {
             
             // Проверяем результаты
             const circleSize = await spiralEngine.getCircleSize(activator1.address);
-            expect(circleSize).to.equal(10);
+            expect(circleSize).to.equal(10n);
             
             console.log("✅ Batch operations efficiency verified");
         });
@@ -592,7 +611,7 @@ describe("SpiralEngine - Integration Tests", function () {
             
             // Проверяем, что новый пользователь в круге user1
             const user1CircleSize = await spiralEngine.getCircleSize(user1.address);
-            expect(user1CircleSize).to.equal(1);
+            expect(user1CircleSize).to.equal(1n);
             console.log("✅ User1 circle created with 1 member");
             
             // Деэскалация ролей
@@ -605,9 +624,11 @@ describe("SpiralEngine - Integration Tests", function () {
             console.log("✅ Role de-escalation completed");
             
             // Пользователь больше не может создавать инвайты
-            await expect(
-                spiralEngine.connect(user1).mintInvite("FAILED-INVITE", 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(user1).mintInvite("FAILED-INVITE", 0),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Role escalation and de-escalation test passed");
         });
@@ -646,9 +667,11 @@ describe("SpiralEngine - Integration Tests", function () {
             // Проверяем, что user1 не может активировать новых пользователей
             await spiralEngine.connect(seller).mintInvite("FAILED-HIERARCHY-INVITE", 0);
             const failedCodes = Array.from({length: 12}, (_, i) => `FAILED-${i + 1}`);
-            await expect(
-                spiralEngine.connect(user1).activateUser("FAILED-HIERARCHY-INVITE", user1.address, failedCodes, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "UserAlreadyActivated");
+            await expectCustomError(
+                spiralEngine.connect(user1).activateUser("FAILED-HIERARCHY-INVITE", user1.address, failedCodes, 0),
+                spiralEngine,
+                "UserAlreadyActivated"
+            );
             
             // user2 все еще может работать
             const finalMintTx = await spiralEngine.connect(seller).mintInvite("USER2-HIERARCHY-INVITE", 0);
@@ -686,9 +709,11 @@ describe("SpiralEngine - Integration Tests", function () {
             });
             
             const testCodes = Array.from({length: 12}, (_, i) => `TEST-${i + 1}`);
-            await expect(
-                spiralEngine.connect(user1).activateUser("SELLER-ONLY-INVITE", testUser.address, testCodes, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(user1).activateUser("SELLER-ONLY-INVITE", testUser.address, testCodes, 0),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             console.log("✅ SELLER_ROLE without ACTIVATOR_ROLE cannot activate users");
             
             // Назначаем ACTIVATOR_ROLE
@@ -703,7 +728,7 @@ describe("SpiralEngine - Integration Tests", function () {
             
             // Проверяем, что пользователь в круге user1
             const user1CircleSize = await spiralEngine.getCircleSize(user1.address);
-            expect(user1CircleSize).to.equal(1);
+            expect(user1CircleSize).to.equal(1n);
             console.log("✅ User added to circle correctly");
             
             // Отзываем ACTIVATOR_ROLE во время выполнения операции
@@ -719,9 +744,11 @@ describe("SpiralEngine - Integration Tests", function () {
             await spiralEngine.connect(seller).mintInvite("ANOTHER-INVITE", 0);
             const anotherCodes = Array.from({length: 12}, (_, i) => `ANOTHER-${i + 1}`);
             
-            await expect(
-                spiralEngine.connect(user1).activateUser("ANOTHER-INVITE", anotherUser.address, anotherCodes, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(user1).activateUser("ANOTHER-INVITE", anotherUser.address, anotherCodes, 0),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             console.log("✅ Revoked ACTIVATOR_ROLE prevents user activation");
             
             console.log("✅ Role edge cases test passed");
@@ -759,7 +786,7 @@ describe("SpiralEngine - Integration Tests", function () {
             
             // Проверяем, что круг полный
             const circleSize = await spiralEngine.getCircleSize(activator.address);
-            expect(circleSize).to.equal(12);
+            expect(circleSize).to.equal(12n);
             console.log("✅ Circle filled to limit (12 members)");
             
             // Создаем дополнительный инвайт
@@ -773,14 +800,16 @@ describe("SpiralEngine - Integration Tests", function () {
             });
             
             const extraCodes = Array.from({length: 12}, (_, i) => `EXTRA-${i + 1}`);
-            await expect(
-                spiralEngine.connect(activator).activateUser("EXTRA-INVITE", extraUser.address, extraCodes, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "CircleLimitReached");
+            await expectCustomError(
+                spiralEngine.connect(activator).activateUser("EXTRA-INVITE", extraUser.address, extraCodes, 0),
+                spiralEngine,
+                "CircleLimitReached"
+            );
             console.log("✅ Circle limit enforced correctly");
             
             // Проверяем, что размер круга не изменился
             const finalCircleSize = await spiralEngine.getCircleSize(activator.address);
-            expect(finalCircleSize).to.equal(12);
+            expect(finalCircleSize).to.equal(12n);
             console.log("✅ Circle size unchanged after failed activation");
             
             // Проверяем, что инвайт остался неиспользованным

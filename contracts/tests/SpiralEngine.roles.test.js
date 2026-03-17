@@ -1,6 +1,21 @@
 const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
 
+async function expectCustomError(txPromise, contract, errorName) {
+    let err;
+    try {
+        const tx = await txPromise;
+        if (tx && typeof tx.wait === "function") await tx.wait();
+    } catch (e) {
+        err = e;
+    }
+    expect(err, "expected transaction to revert").to.be.ok;
+    const selector = contract.interface.getError(errorName).selector;
+    const data = err?.data || err?.error?.data || err?.receipt || "";
+    const hex = typeof data === "string" ? data : (data && data.toString ? data.toString() : "");
+    expect(hex.toLowerCase().includes(selector.toLowerCase()), `expected error ${errorName}`).to.be.true;
+}
+
 describe("SpiralEngine - Roles and Access Control", function () {
     let spiralEngine;
     let deployer;
@@ -164,9 +179,11 @@ describe("SpiralEngine - Roles and Access Control", function () {
             console.log("Testing role grant restrictions...");
             
             // Попытка назначить роль без прав администратора
-            await expect(
-                spiralEngine.connect(seller).grantRole(SELLER_ROLE, otherUser.address)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(seller).grantRole(SELLER_ROLE, otherUser.address),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Non-admin cannot grant roles");
         });
@@ -178,9 +195,11 @@ describe("SpiralEngine - Roles and Access Control", function () {
             await spiralEngine.connect(deployer).grantRole(SELLER_ROLE, seller.address);
             
             // Попытка отозвать роль без прав администратора
-            await expect(
-                spiralEngine.connect(activator).revokeRole(SELLER_ROLE, seller.address)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(activator).revokeRole(SELLER_ROLE, seller.address),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Non-admin cannot revoke roles");
         });
@@ -206,8 +225,8 @@ describe("SpiralEngine - Roles and Access Control", function () {
             const tokenId1 = await spiralEngine.inviteCodeToTokenId("SELLER-INVITE-1");
             const tokenId2 = await spiralEngine.inviteCodeToTokenId("SELLER-INVITE-2");
             
-            expect(tokenId1).to.be.gte(0);
-            expect(tokenId2).to.be.gte(0);
+            expect(tokenId1 >= 0n).to.be.true;
+            expect(tokenId2 >= 0n).to.be.true;
             console.log("✅ Invites created successfully");
         });
 
@@ -215,9 +234,11 @@ describe("SpiralEngine - Roles and Access Control", function () {
             console.log("Testing non-SELLER_ROLE invite minting restriction...");
             
             // Попытка вызвать mintInvite без SELLER_ROLE должна провалиться
-            await expect(
-                spiralEngine.connect(user).mintInvite("UNAUTHORIZED-INVITE", 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(user).mintInvite("UNAUTHORIZED-INVITE", 0),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Non-SELLER_ROLE correctly prevented from minting invites");
         });
@@ -226,9 +247,11 @@ describe("SpiralEngine - Roles and Access Control", function () {
             console.log("Testing SELLER_ROLE enforcement in mintInvite...");
             
             // Проверяем, что только SELLER_ROLE может вызывать mintInvite
-            await expect(
-                spiralEngine.connect(user).mintInvite("TEST", 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(user).mintInvite("TEST", 0),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             // Проверяем, что SELLER_ROLE может вызывать mintInvite
             await spiralEngine.connect(seller).mintInvite("TEST", 0);
@@ -240,9 +263,11 @@ describe("SpiralEngine - Roles and Access Control", function () {
             console.log("Testing mintInvite access restrictions...");
             
             // Попытка создать инвайт без SELLER_ROLE
-            await expect(
-                spiralEngine.connect(activator).mintInvite("UNAUTHORIZED-INVITE", 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(activator).mintInvite("UNAUTHORIZED-INVITE", 0),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Non-SELLER_ROLE cannot mint invites");
         });
@@ -264,7 +289,7 @@ describe("SpiralEngine - Roles and Access Control", function () {
             
             // Проверяем активацию
             const usedInvite = await spiralEngine.usedInviteByUser(user.address);
-            expect(usedInvite).to.be.gt(0);
+            expect(usedInvite > 0n).to.be.true;
             console.log("✅ User activated successfully");
         });
 
@@ -277,9 +302,11 @@ describe("SpiralEngine - Roles and Access Control", function () {
             const newCodes = Array.from({length: 12}, (_, i) => `NEW-${i + 1}`);
             
             // Попытка активировать без ACTIVATOR_ROLE
-            await expect(
-                spiralEngine.connect(seller).activateUser("UNAUTHORIZED-INVITE", user.address, newCodes, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(seller).activateUser("UNAUTHORIZED-INVITE", user.address, newCodes, 0),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Non-ACTIVATOR_ROLE cannot activate users");
         });
@@ -293,9 +320,11 @@ describe("SpiralEngine - Roles and Access Control", function () {
             const newCodes = Array.from({length: 12}, (_, i) => `NEW-${i + 1}`);
             
             // Проверяем, что только ACTIVATOR_ROLE может вызывать activateUser
-            await expect(
-                spiralEngine.connect(user).activateUser("ENFORCEMENT-TEST-INVITE", otherUser.address, newCodes, 0)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(user).activateUser("ENFORCEMENT-TEST-INVITE", otherUser.address, newCodes, 0),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             // Проверяем, что ACTIVATOR_ROLE может вызывать activateUser
             // Но сначала нужно создать инвайт для активатора (активатору нужна SELLER_ROLE)
@@ -324,7 +353,7 @@ describe("SpiralEngine - Roles and Access Control", function () {
             
             // Проверяем приостановку
             const suspensionUntil = await spiralEngine.suspensionUntil(user.address);
-            expect(suspensionUntil).to.be.gt(0);
+            expect(suspensionUntil > 0n).to.be.true;
             console.log("✅ User suspended successfully");
         });
 
@@ -332,9 +361,11 @@ describe("SpiralEngine - Roles and Access Control", function () {
             console.log("Testing suspendUser access restrictions...");
             
             // Попытка приостановить без DEFAULT_ADMIN_ROLE
-            await expect(
-                spiralEngine.connect(activator).suspendUser(user.address, 3600, "Unauthorized suspension")
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(activator).suspendUser(user.address, 3600, "Unauthorized suspension"),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Non-ADMIN cannot suspend users");
         });
@@ -351,9 +382,11 @@ describe("SpiralEngine - Roles and Access Control", function () {
             await spiralEngine.connect(activator).activateUser("ENFORCEMENT-SUSPEND-TEST-INVITE-ACTIVATOR", user.address, newCodes, 0);
             
             // Проверяем, что только DEFAULT_ADMIN_ROLE может вызывать suspendUser
-            await expect(
-                spiralEngine.connect(activator).suspendUser(user.address, 3600, "Unauthorized suspension")
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(activator).suspendUser(user.address, 3600, "Unauthorized suspension"),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             // Проверяем, что DEFAULT_ADMIN_ROLE может вызывать suspendUser
             await spiralEngine.connect(deployer).suspendUser(user.address, 3600, "Authorized suspension");
@@ -384,7 +417,7 @@ describe("SpiralEngine - Roles and Access Control", function () {
             
             // Проверяем активацию
             const usedInvite = await spiralEngine.usedInviteByUser(user.address);
-            expect(usedInvite).to.be.gt(0);
+            expect(usedInvite > 0n).to.be.true;
             console.log("✅ User activated by admin");
         });
 
@@ -414,13 +447,17 @@ describe("SpiralEngine - Roles and Access Control", function () {
             await spiralEngine.connect(deployer).grantRole(ACTIVATOR_ROLE, activator.address);
             
             // Попытка изменить роли без прав
-            await expect(
-                spiralEngine.connect(seller).grantRole(ACTIVATOR_ROLE, otherUser.address)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(seller).grantRole(ACTIVATOR_ROLE, otherUser.address),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
-            await expect(
-                spiralEngine.connect(activator).revokeRole(SELLER_ROLE, seller.address)
-            ).to.be.revertedWithCustomError(spiralEngine, "AccessControlUnauthorizedAccount");
+            await expectCustomError(
+                spiralEngine.connect(activator).revokeRole(SELLER_ROLE, seller.address),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
             
             console.log("✅ Unauthorized role modifications prevented");
         });
