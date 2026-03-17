@@ -19,7 +19,7 @@ bytes32 public constant SELLER_ROLE = keccak256("SELLER_ROLE");
 bytes32 public constant ACTIVATOR_ROLE = keccak256("ACTIVATOR_ROLE");
 ```
 - **SELLER_ROLE** - создание инвайтов
-- **ACTIVATOR_ROLE** - активация пользователей и назначение ролей
+- **ACTIVATOR_ROLE** - активация пользователей и назначение ролей. При успешном вызове `activateUser` **активированному пользователю автоматически выдаётся** `ACTIVATOR_ROLE` (каждый активированный = базовый Activator; см. Roles Security Policy, MVP Scope). Отзыв — через `revokeRole(ACTIVATOR_ROLE, user)`; возврат — через `grantRole` админом или пост-MVP `restoreActivatorRole` с проверкой eligibility.
 - **DEFAULT_ADMIN_ROLE** - управление ролями, санкции и система
 
 ### Интеграция с SoulIdentity
@@ -99,7 +99,8 @@ bytes32 public constant ACTIVATOR_ROLE = keccak256("ACTIVATOR_ROLE");
 6. ✅ Добавление пользователя в активированные
 7. ✅ Создание 12 новых инвайтов для пользователя
 8. ✅ Запись активатора и обновление статистики
-9. ✅ Эмиссия событий
+9. ✅ **Автовыдача ACTIVATOR_ROLE** активированному пользователю (`_grantRole(ACTIVATOR_ROLE, user)`)
+10. ✅ Эмиссия событий
 
 **События:**
 ```solidity
@@ -338,7 +339,7 @@ function locked(uint256 tokenId) external view override returns (bool) {
 
 ### Контроль доступа
 - **SELLER_ROLE** - создание инвайтов
-- **ACTIVATOR_ROLE** - активация пользователей и назначение ролей
+- **ACTIVATOR_ROLE** - активация пользователей и назначение ролей; при успешном `activateUser` активированному пользователю автоматически выдаётся `ACTIVATOR_ROLE`. Право на роль (eligibility) инкапсулировано во internal view `_isEligibleForActivatorRole(user)` (usedInviteByUser != 0); отзыв — `revokeRole`, возврат — админ `grantRole` или пост-MVP restore.
 - **DEFAULT_ADMIN_ROLE** - управление ролями, санкции и система
 - Проверка уникальности кодов инвайтов
 - Защита от повторной активации пользователей
