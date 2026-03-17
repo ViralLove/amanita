@@ -6,7 +6,7 @@ pragma solidity ^0.8.22;
  * @author Zeya888 (https://zeya888.me)
  * @notice Интерфейс контракта реестра активностей (events/services)
  * @dev Определяет публичный API для ActivityRegistry: создание, активация/деактивация,
- *      получение активностей и списков. Интеграция с SpiralEngine для проверки ACTIVITY_CREATOR_ROLE.
+ *      получение активностей и списков. Интеграция с SpiralEngine для проверки ACTIVATOR_ROLE и usedInviteByUser.
  * @custom:security-contact security@amanita.com
  */
 interface IActivityRegistry {

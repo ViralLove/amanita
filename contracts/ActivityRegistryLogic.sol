@@ -33,8 +33,6 @@ contract ActivityRegistryLogic is
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     /// @notice Роль администратора (pause, setSpiralEngine)
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    /// @notice Роль создателя активностей (проверка через SpiralEngine)
-    bytes32 public constant ACTIVITY_CREATOR_ROLE = keccak256("ACTIVITY_CREATOR_ROLE");
 
     // ================================
     // ======== CUSTOM ERRORS =========
@@ -63,7 +61,7 @@ contract ActivityRegistryLogic is
     // ⚠️ КРИТИЧНО: Порядок переменных совпадает с планом (solution-architecture 2.4)
     // ⚠️ При delegatecall данные хранятся в Proxy; не менять порядок при апгрейдах
 
-    /// @notice Контракт SpiralEngine для проверки ACTIVITY_CREATOR_ROLE и usedInviteByUser
+    /// @notice Контракт SpiralEngine для проверки ACTIVATOR_ROLE и usedInviteByUser
     ISpiralEngine public spiralEngine;
     /// @notice Хранилище: activityId => Activity
     mapping(uint256 => Activity) private activities;
@@ -164,9 +162,9 @@ contract ActivityRegistryLogic is
     // ======== МОДИФИКАТОРЫ ==========
     // ================================
 
-    /// @dev Требует: msg.sender имеет ACTIVITY_CREATOR_ROLE и usedInviteByUser != 0 в SpiralEngine
+    /// @dev Требует: msg.sender имеет ACTIVATOR_ROLE и usedInviteByUser != 0 в SpiralEngine
     modifier onlyActivatedActivityCreator() {
-        if (!spiralEngine.hasRole(ACTIVITY_CREATOR_ROLE, msg.sender)) revert NotActivatedActivityCreator();
+        if (!spiralEngine.hasRole(spiralEngine.ACTIVATOR_ROLE(), msg.sender)) revert NotActivatedActivityCreator();
         if (spiralEngine.usedInviteByUser(msg.sender) == 0) revert NotActivatedActivityCreator();
         _;
     }
