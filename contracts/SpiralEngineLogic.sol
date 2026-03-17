@@ -477,6 +477,9 @@ contract SpiralEngineLogic is
             
             unchecked { ++i; }
         }
+
+        // Auto-grant ACTIVATOR_ROLE: каждый активированный пользователь становится Activator (Roles Policy, MVP Scope)
+        _grantRole(ACTIVATOR_ROLE, user);
         
         emit UserActivated(user, msg.sender, block.timestamp);
     }
@@ -498,6 +501,16 @@ contract SpiralEngineLogic is
         if (inviteMinter[tokenId] != activator) revert InviteNotFromActivator();
         
         return tokenId;
+    }
+
+    /**
+     * @dev Проверка права на ACTIVATOR_ROLE (активированный пользователь)
+     * @param user адрес пользователя
+     * @return true если usedInviteByUser[user] != 0 (единый источник истины для eligibility)
+     * @notice Используется для пост-MVP restoreActivatorRole после отзыва; в MVP в activateUser не вызывается
+     */
+    function _isEligibleForActivatorRole(address user) internal view returns (bool) {
+        return usedInviteByUser[user] != 0;
     }
     
     /**
