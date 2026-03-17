@@ -290,11 +290,10 @@ class ContractManager {
         // Try .env first
         const envVarName = `${contractName.toUpperCase()}_PROXY_ADDRESS`;
         proxyAddress = process.env[envVarName] || process.env[`${contractName.toUpperCase()}_CONTRACT_ADDRESS`];
-        
+
         // If not in .env, try MagicRegistry
         if (!proxyAddress || proxyAddress === 'undefined') {
           let magicRegistry = this.contracts.get('MagicRegistry');
-          
           // If MagicRegistry not in cache, try to load from .env
           if (!magicRegistry) {
             const magicRegistryAddress = process.env.MAGIC_REGISTRY_CONTRACT_ADDRESS;
@@ -303,7 +302,7 @@ class ContractManager {
               magicRegistry = await this.loadContract('MagicRegistry', magicRegistryAddress);
             }
           }
-          
+
           if (magicRegistry) {
             try {
               proxyAddress = await magicRegistry.get(contractName);
@@ -758,6 +757,14 @@ class ContractManager {
     try {
       const address = this.config.getContractAddress(contractName);
       if (address) {
+        // Если по адресу из .env нет кода (нода перезапущена), не считать контракт существующим — иначе
+        // регистрация set() уйдёт в пустоту, а при 777 get() упадёт с "не найден в MagicRegistry"
+        const code = await this.provider.getCode(address);
+        const hasCode = code && code !== '0x' && code !== '0x0';
+        if (!hasCode) {
+          logger.info(`Contract ${contractName} address from .env has no code on chain (e.g. node restarted), will deploy new`);
+          return null;
+        }
         return await this.loadContract(contractName, address);
       }
       return null;
@@ -777,12 +784,10 @@ class ContractManager {
     try {
       const signer = this.ethersUtils.getSigner();
       const registryWithSigner = registryContract.connect(signer);
-      
       // MagicRegistry uses set(key, value) not registerContract()
       const tx = await registryWithSigner.set(contractName, contractAddress, {
         gasLimit: 500000
       });
-      
       const receipt = await tx.wait();
       logger.contract(contractName, 'registered in registry', { address: contractAddress, txHash: receipt.hash });
       return receipt;
@@ -871,6 +876,29 @@ class ContractManager {
       }
 
       logger.success(`Contract ${contractName} deployed successfully`);
+      // Чтобы следующий запуск (например Action 777) подхватил актуальный реестр: обновляем .env при деплое MagicRegistry
+      if (contractName === 'MagicRegistry') {
+        const newAddress = await deployedContract.getAddress();
+        process.env.MAGIC_REGISTRY_CONTRACT_ADDRESS = newAddress;
+        const envPath = path.join(process.cwd(), '.env');
+        try {
+          let content = '';
+          if (fs.existsSync(envPath)) {
+            content = fs.readFileSync(envPath, 'utf8');
+          }
+          const key = 'MAGIC_REGISTRY_CONTRACT_ADDRESS';
+          const line = `${key}=${newAddress}`;
+          if (content.includes(key + '=')) {
+            content = content.replace(new RegExp(`${key}=[^\r\n]*`, 'g'), line);
+          } else {
+            content = content.trimEnd() + (content ? '\n' : '') + line + '\n';
+          }
+          fs.writeFileSync(envPath, content, 'utf8');
+          logger.info(`Updated .env: MAGIC_REGISTRY_CONTRACT_ADDRESS=${newAddress}`);
+        } catch (envErr) {
+          logger.warn(`Could not update .env with new MagicRegistry address: ${envErr.message}`);
+        }
+      }
       return deployedContract;
     } catch (error) {
       logger.error(`Failed to deploy single contract ${contractName}:`, error.message);
