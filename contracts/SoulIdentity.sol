@@ -53,6 +53,13 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
     mapping(address => ExternalIdentity[]) private userIdentities;
     mapping(address => uint256) private primaryIdentityIndex;
     mapping(address => mapping(string => uint256)) private identityTypeToIndex;
+
+    // === PASSPORT MVP: displayName и handle (SBT-PAS-1) ===
+    uint256 public constant MAX_DISPLAY_NAME_LENGTH = 64;
+    uint256 public constant MAX_HANDLE_LENGTH = 32;
+    string public constant DEFAULT_COMMUNITY_ID = "spiral";
+    mapping(address => string) private _displayNameByUser;
+    mapping(address => string) private _handleByUser;
     
     // === СОБЫТИЯ ===
     event SoulIdentityContractsUpdated(address soulboundCore, address soulMetadata);
@@ -408,13 +415,52 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
         uint256 reputation,
         string memory identity,
         uint8 verificationLevel,
-        address[] memory guardians
+        address[] memory guardians,
+        string memory displayName,
+        string memory handle
     ) {
         level = this.getSoulLevel(user);
         reputation = this.getSoulReputation(user);
         identity = this.getSoulIdentity(user);
         verificationLevel = 0;
         guardians = new address[](0);
+        displayName = _displayNameByUser[user];
+        handle = _handleByUser[user];
+    }
+
+    function getDisplayName(address user) external view override returns (string memory) {
+        return _displayNameByUser[user];
+    }
+
+    function getHandle(address user) external view override returns (string memory) {
+        return _handleByUser[user];
+    }
+
+    function setDisplayName(string calldata displayName) external override {
+        uint256 tokenId = _getUserTokenId(msg.sender);
+        require(tokenId > 0, "SoulIdentity: no SBT");
+        require(soulboundCore.ownerOf(tokenId) == msg.sender, "SoulIdentity: not soul owner");
+        require(bytes(displayName).length <= MAX_DISPLAY_NAME_LENGTH, "SoulIdentity: displayName too long");
+        _displayNameByUser[msg.sender] = displayName;
+    }
+
+    function setHandle(string calldata handle) external override {
+        uint256 tokenId = _getUserTokenId(msg.sender);
+        require(tokenId > 0, "SoulIdentity: no SBT");
+        require(soulboundCore.ownerOf(tokenId) == msg.sender, "SoulIdentity: not soul owner");
+        require(bytes(handle).length <= MAX_HANDLE_LENGTH, "SoulIdentity: handle too long");
+        require(_isValidHandleFormat(handle), "SoulIdentity: handle must be @communityId:localHandle");
+        _handleByUser[msg.sender] = handle;
+    }
+
+    function _isValidHandleFormat(string calldata handle) private pure returns (bool) {
+        bytes memory b = bytes(handle);
+        if (b.length < 4) return false; // at least "@a:b"
+        if (b[0] != 0x40) return false; // '@'
+        for (uint256 i = 1; i < b.length; i++) {
+            if (b[i] == 0x3a) return true; // found ':'
+        }
+        return false;
     }
     
     function updateSoulVerificationLevel(address user, uint8 level) external override {

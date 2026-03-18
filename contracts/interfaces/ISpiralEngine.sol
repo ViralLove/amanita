@@ -350,13 +350,17 @@ interface ISpiralEngine {
      * @return identity идентичность души
      * @return verificationLevel уровень верификации
      * @return guardians список доверенных лиц
+     * @return displayName отображаемое имя (Passport MVP)
+     * @return handle community-prefixed handle, напр. @spiral:handle (Passport MVP)
      */
     function getSoulProfile(address user) external view returns (
         uint256 level,
         uint256 reputation,
         string memory identity,
         uint8 verificationLevel,
-        address[] memory guardians
+        address[] memory guardians,
+        string memory displayName,
+        string memory handle
     );
     
     // === ДИАГНОСТИЧЕСКИЕ ФУНКЦИИ ===

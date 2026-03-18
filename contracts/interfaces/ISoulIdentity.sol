@@ -311,14 +311,38 @@ interface ISoulIdentity is IERC5192 {
      * @return identity идентичность души (DID)
      * @return verificationLevel уровень верификации
      * @return guardians список доверенных лиц
+     * @return displayName отображаемое имя (Passport MVP)
+     * @return handle community-prefixed handle, напр. @spiral:handle (Passport MVP)
      */
     function getSoulProfile(address user) external view returns (
         uint256 level,
         uint256 reputation,
         string memory identity,
         uint8 verificationLevel,
-        address[] memory guardians
+        address[] memory guardians,
+        string memory displayName,
+        string memory handle
     );
+
+    /**
+     * @dev Получить displayName пользователя (Passport MVP)
+     */
+    function getDisplayName(address user) external view returns (string memory);
+
+    /**
+     * @dev Получить handle пользователя, формат @communityId:handle (Passport MVP)
+     */
+    function getHandle(address user) external view returns (string memory);
+
+    /**
+     * @dev Установить/обновить displayName (только владелец души). Макс. 64 байт.
+     */
+    function setDisplayName(string calldata displayName) external;
+
+    /**
+     * @dev Установить/обновить handle, формат @communityId:localHandle (только владелец души). Макс. 32 байт.
+     */
+    function setHandle(string calldata handle) external;
 
     // === EXTERNAL IDENTITY MANAGEMENT ===
     
