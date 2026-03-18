@@ -25,7 +25,7 @@
 |-----------|------------|------------------------|
 | **SoulboundCore** | Владение SBT (душа), EIP-5192, единственный способ смены владельца — recovery. | Без изменений. |
 | **SoulMetadata** | Хранение типа, версии, атрибутов (level, reputation в JSON). | Без изменений. Заглушки парсинга level/reputation в SoulIdentity для MVP допустимы (значения 1 и 100), если ончейн-логика не использует их в правилах. |
-| **SoulIdentity** | Условие «есть SBT» для DID; привязка одной основной идентичности и при необходимости external identity (X). Профиль: getSoulProfile (level, reputation, identity). | Guardians / recovery в SoulIdentity — заглушки; реальная логика в SoulRecovery. Для MVP допустимо: восстановление доступа только через вызовы SoulRecovery; единая точка входа в SoulIdentity — желательна, но может быть Phase 2. |
+| **SoulIdentity** | Условие «есть SBT» для DID; привязка одной основной идентичности и при необходимости external identity (X). Профиль: getSoulProfile (level, reputation, identity, displayName, handle). **displayName** и **handle** хранятся ончейн в SoulIdentity (маппинги по адресу); установка — setDisplayName/setHandle только владельцем души; чтение — getSoulProfile или getDisplayName/getHandle. Формат handle: @communityId:localHandle (напр. @spiral:user), макс. 32 байт; displayName макс. 64 байт. | Guardians / recovery в SoulIdentity — заглушки; реальная логика в SoulRecovery. |
 | **SoulRecovery** | Восстановление доступа: guardian → initiateRecovery(newOwner) → confirmRecovery; смена владельца SBT на новый адрес. | Модель «перенос на newOwner» входит в MVP; модель «доверенные лица хранят ключи» — вне MVP. |
 | **SpiralEngine** | Инвайты, активация, роли, номинация, санкции. Не минтит души; при необходимости читает SoulIdentity (getSoulLevel, getSoulReputation и т.д.). | В MVP бизнес-правила движка **не обязаны** использовать level/reputation; связь «после активации должна появиться душа» обеспечивается процессом/оркестрацией (см. п. 2.2). |
 
@@ -45,7 +45,7 @@
 - **DID:** одна основная идентичность (linkSoulIdentity / linkExternalIdentity), возвращаемая getSoulIdentity.
 - **Внешние идентичности (опционально):** X — xHandle, profileUrl; только как external identity link, не как trust root (док. 08, 09).
 
-Источник данных: ончейн (SoulboundCore, SoulMetadata, SoulIdentity, SpiralEngine для ролей/активации) + при необходимости оффчейн (displayName, handle, если не хранятся ончейн). Для MVP допустимо хранить displayName/handle оффчейн и привязывать к адресу/soulTokenId.
+Источник данных: ончейн (SoulboundCore, SoulMetadata, SoulIdentity, SpiralEngine). **displayName** и **handle** — ончейн в SoulIdentity (маппинги по адресу владельца души); чтение через getSoulProfile(user) или getDisplayName(user)/getHandle(user); установка владельцем души через setDisplayName/setHandle (таск SBT-PAS-1).
 
 ### 2.4 Интеграции в границах MVP
 
@@ -60,7 +60,7 @@
 ## 3. Точки решений внутри MVP (где нужны явные решения)
 
 - **Когда и кто минтит душу:** оркестратор по событию активации vs контракт/колбэк при activateUser (см. таск invites-log-soul-on-activation).
-- **Где хранить displayName и handle:** ончейн (SoulMetadata атрибуты / расширение SoulIdentity) vs оффчейн (Passport backend с привязкой к адресу/soulTokenId). Для MVP достаточно одного выбранного варианта и консистентного отображения в Passport UI.
+- **Где хранить displayName и handle:** решение принято (SBT-PAS-1): ончейн в SoulIdentity (маппинги displayNameByUser, handleByUser по адресу); setDisplayName/setHandle — только владелец души; формат handle @communityId:localHandle, лимиты 64/32 байт.
 - **Единая точка входа recovery:** оставить только SoulRecovery для MVP или к MVP завершить делегирование из SoulIdentity в SoulRecovery (addTrustedGuardian, getTrustedGuardians, initiateRecovery, completeRecovery).
 - **Индекс user → tokenId:** SoulIdentity._getUserTokenId перебором до 1000 (аудит 06). Для маленького сообщества достаточно для MVP; при росте — таск на индекс (user → tokenId при минте) или увеличение лимита и документирование риска.
 
