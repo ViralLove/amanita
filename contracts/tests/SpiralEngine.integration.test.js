@@ -19,6 +19,7 @@ async function expectCustomError(txPromise, contract, errorName) {
 describe("SpiralEngine - Integration Tests", function () {
     let spiralEngine;
     let soulIdentity;
+    let soulboundCore;
     let deployer;
     let seller;
     let activator1;
@@ -109,7 +110,7 @@ describe("SpiralEngine - Integration Tests", function () {
         
         // 1. SoulboundCore
         const SoulboundCore = await ethers.getContractFactory("SoulboundCore");
-        const soulboundCore = await SoulboundCore.connect(deployer).deploy("Amanita Soul", "ASOUL");
+        soulboundCore = await SoulboundCore.connect(deployer).deploy("Amanita Soul", "ASOUL");
         await soulboundCore.waitForDeployment();
         console.log(`   SoulboundCore: ${await soulboundCore.getAddress()}`);
         
@@ -152,6 +153,9 @@ describe("SpiralEngine - Integration Tests", function () {
 
         // Устанавливаем ссылку на SoulIdentity
         await spiralEngine.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
+        // SBT-INV-1.3: привязка SoulboundCore и выдача MINTER_ROLE SpiralEngine для минтинга души при активации
+        await soulboundCore.connect(deployer).grantRole(await soulboundCore.MINTER_ROLE(), await spiralEngine.getAddress());
+        await spiralEngine.connect(deployer).setSoulboundCore(await soulboundCore.getAddress());
         
         // Назначаем роль SPIRAL_ENGINE_ROLE для SoulIdentity
         const SPIRAL_ENGINE_ROLE = await soulIdentity.SPIRAL_ENGINE_ROLE();
@@ -225,7 +229,14 @@ describe("SpiralEngine - Integration Tests", function () {
             expect((await spiralEngine.usedInviteByUser(user1.address)) > 0n).to.be.true;
             expect((await spiralEngine.usedInviteByUser(user2.address)) > 0n).to.be.true;
             expect((await spiralEngine.usedInviteByUser(user3.address)) > 0n).to.be.true;
-            console.log("✅ Activation verified");
+            // SBT-INV-1.3 / SBT-INV-1.5: после активации у каждого user ровно одна душа в SoulboundCore
+            expect(await soulboundCore.balanceOf(user1.address)).to.equal(1n);
+            expect(await soulboundCore.balanceOf(user2.address)).to.equal(1n);
+            expect(await soulboundCore.balanceOf(user3.address)).to.equal(1n);
+            expect(await soulboundCore.ownerOf(1n)).to.equal(user1.address);
+            expect(await soulboundCore.ownerOf(2n)).to.equal(user2.address);
+            expect(await soulboundCore.ownerOf(3n)).to.equal(user3.address);
+            console.log("✅ Activation verified (including soul mint on activation, ownerOf(soulTokenId)==user)");
 
             // 4. Проверка кругов
             console.log("Step 4: Verifying circles...");
@@ -340,6 +351,29 @@ describe("SpiralEngine - Integration Tests", function () {
             console.log("✅ Complete lifecycle test passed");
         });
 
+        it("SBT-INV-1.5: Should create invite as log only (inviteId mappings, no NFT)", async function () {
+            const inviteCode = "LOG-ONLY-INVITE";
+            const countBefore = await spiralEngine.userInviteCount(seller.address);
+            const inviteId = await spiralEngine.connect(seller).mintInvite.staticCall(inviteCode, 0);
+            await spiralEngine.connect(seller).mintInvite(inviteCode, 0);
+            expect(await spiralEngine.inviteCodeToTokenId(inviteCode)).to.equal(inviteId);
+            expect(await spiralEngine.tokenIdToInviteCode(inviteId)).to.equal(inviteCode);
+            expect(await spiralEngine.inviteFirstOwner(inviteId)).to.equal(seller.address);
+            expect(await spiralEngine.inviteMinter(inviteId)).to.equal(seller.address);
+            expect(await spiralEngine.userInviteCount(seller.address)).to.equal(countBefore + 1n);
+            expect(await spiralEngine.balanceOf(seller.address)).to.equal(countBefore + 1n);
+        });
+
+        it("SBT-INV-1.5: Should not mint second soul when user already has soul", async function () {
+            await spiralEngine.connect(seller).mintInvite("PRE-SOUL-INVITE", 0);
+            const userWithSoul = ethers.Wallet.createRandom().connect(ethers.provider);
+            await deployer.sendTransaction({ to: userWithSoul.address, value: ethers.parseEther("0.1") });
+            await soulboundCore.connect(deployer).mintSoul(userWithSoul.address);
+            expect(await soulboundCore.balanceOf(userWithSoul.address)).to.equal(1n);
+            const newCodes = Array.from({ length: 12 }, (_, i) => `PRE-SOUL-NEW-${i + 1}`);
+            await spiralEngine.connect(seller).activateUser("PRE-SOUL-INVITE", userWithSoul.address, newCodes, 0);
+            expect(await soulboundCore.balanceOf(userWithSoul.address)).to.equal(1n);
+        });
 
         it("Should handle complex multi-activator scenario", async function () {
             console.log("Testing complex multi-activator scenario...");

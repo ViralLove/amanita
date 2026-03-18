@@ -217,12 +217,23 @@ describe("SoulboundCore", function () {
             expect(await soulboundCore.getTotalSupply()).to.equal(3n);
         });
 
-        it("Should revert minting by non-owner", async function () {
-            await expectCustomError(soulboundCore.connect(user1).mintSoul(user2.address), soulboundCore, "OwnableUnauthorizedAccount");
+        it("Should revert minting by non-owner and non-minter", async function () {
+            await expectRevertWithMessage(soulboundCore.connect(user1).mintSoul(user2.address), "SBT: not owner or minter");
         });
 
-        it("Should revert batch minting by non-owner", async function () {
-            await expectCustomError(soulboundCore.connect(user1).mintSoulBatch(user2.address, 2), soulboundCore, "OwnableUnauthorizedAccount");
+        it("Should revert batch minting by non-owner and non-minter", async function () {
+            await expectRevertWithMessage(soulboundCore.connect(user1).mintSoulBatch(user2.address, 2), "SBT: not owner or minter");
+        });
+
+        it("Should allow MINTER_ROLE to mint and mintBatch", async function () {
+            const minter = user3;
+            await soulboundCore.grantRole(await soulboundCore.MINTER_ROLE(), minter.address);
+            await soulboundCore.connect(minter).mintSoul(user1.address);
+            expect(await soulboundCore.ownerOf(1)).to.equal(user1.address);
+            const tx = await soulboundCore.connect(minter).mintSoulBatch(user2.address, 2);
+            await tx.wait();
+            expect(await soulboundCore.ownerOf(2)).to.equal(user2.address);
+            expect(await soulboundCore.ownerOf(3)).to.equal(user2.address);
         });
 
         it("Should revert batch minting with invalid amount", async function () {

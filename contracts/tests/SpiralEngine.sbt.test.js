@@ -148,13 +148,11 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
         });
 
         it("Should support IERC5192 interface", async function () {
-            // P0: Критическая проверка - SpiralEngine делегирует SBT функциональность в SoulIdentity
-            // Проверяем поддержку ERC721 интерфейса
-            const IERC721_INTERFACE_ID = "0x80ac58cd"; // IERC721 interface ID
-            const supportsInterface = await spiralEngine.connect(deployer).supportsInterface(IERC721_INTERFACE_ID);
-            expect(supportsInterface).to.be.true;
-            
-            // SBT функциональность доступна через SoulIdentity
+            // P0: инвайты как лог (SBT-INV-1.2) — SpiralEngine поддерживает IERC5192 (locked), не ERC721
+            const IERC5192_INTERFACE_ID = "0xb45a3c0e"; // EIP-5192 interface ID
+            const supportsIERC5192 = await spiralEngine.connect(deployer).supportsInterface(IERC5192_INTERFACE_ID);
+            expect(supportsIERC5192).to.be.true;
+            // SoulIdentity по-прежнему используется для души
             expect(await spiralEngine.soulIdentity()).to.not.equal("0x0000000000000000000000000000000000000000");
         });
 
