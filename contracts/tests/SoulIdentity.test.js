@@ -268,6 +268,71 @@ describe("SoulIdentity Bridge Contract", function () {
         });
     });
 
+    describe("SBT-PAS-1: displayName and handle (Passport MVP)", function () {
+        beforeEach(async function () {
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+        });
+
+        it("Should set and get displayName and handle as soul owner", async function () {
+            await soulIdentity.connect(user1).setDisplayName("Moss Architect");
+            await soulIdentity.connect(user1).setHandle("@spiral:moss-architect");
+            expect(await soulIdentity.getDisplayName(user1.address)).to.equal("Moss Architect");
+            expect(await soulIdentity.getHandle(user1.address)).to.equal("@spiral:moss-architect");
+        });
+
+        it("Should return displayName and handle in getSoulProfile", async function () {
+            await soulIdentity.connect(user1).setDisplayName("Alice");
+            await soulIdentity.connect(user1).setHandle("@spiral:alice");
+            const profile = await soulIdentity.getSoulProfile(user1.address);
+            expect(profile.displayName).to.equal("Alice");
+            expect(profile.handle).to.equal("@spiral:alice");
+        });
+
+        it("Should revert setDisplayName when not soul owner", async function () {
+            await expectRevertWithMessage(
+                soulIdentity.connect(user2).setDisplayName("Fake"),
+                "SoulIdentity: no SBT"
+            );
+        });
+
+        it("Should revert setHandle when not soul owner", async function () {
+            await expectRevertWithMessage(
+                soulIdentity.connect(user2).setHandle("@spiral:other"),
+                "SoulIdentity: no SBT"
+            );
+        });
+
+        it("Should revert setDisplayName when displayName too long", async function () {
+            const long = "a".repeat(65);
+            await expectRevertWithMessage(
+                soulIdentity.connect(user1).setDisplayName(long),
+                "SoulIdentity: displayName too long"
+            );
+        });
+
+        it("Should revert setHandle when handle too long", async function () {
+            const long = "@spiral:" + "x".repeat(25); // 8 + 25 = 33
+            await expectRevertWithMessage(
+                soulIdentity.connect(user1).setHandle(long),
+                "SoulIdentity: handle too long"
+            );
+        });
+
+        it("Should revert setHandle when invalid format (no @)", async function () {
+            await expectRevertWithMessage(
+                soulIdentity.connect(user1).setHandle("spiral:user"),
+                "SoulIdentity: handle must be @communityId:localHandle"
+            );
+        });
+
+        it("Should revert setHandle when invalid format (no colon)", async function () {
+            await expectRevertWithMessage(
+                soulIdentity.connect(user1).setHandle("@spiraluser"),
+                "SoulIdentity: handle must be @communityId:localHandle"
+            );
+        });
+    });
+
     describe("P1: Access Control", function () {
         beforeEach(async function () {
             await soulboundCore.connect(deployer).mintSoul(user1.address);
