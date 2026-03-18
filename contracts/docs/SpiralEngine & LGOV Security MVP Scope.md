@@ -99,10 +99,11 @@
 **MVP‑инвариант:**  
 каждый пользователь, для которого `SpiralEngineLogic.activateUser` успешно завершён и `usedInviteByUser[user] != 0`, имеет **ровно одну SBT‑душу** в `SoulboundCore`, которая далее служит технической основой Amanita Passport.
 
-**Реализация:**
+**Реализация (SBT-INV-1, выполнено):**
 
-- ончейн‑подход (`task-implement-invites-log-soul-on-activation`): при `activateUser` вызывается `mintSoul(user)` (прямо или через minter‑прокси/орchestrator);  
-- до выполнения таска связь может обеспечиваться оркестратором (событие UserActivated → скрипт минтит душу), но MVP‑релиз предполагает завершённый и задокументированный процесс.
+- ончейн: при `activateUser` контракт **SpiralEngine** (Logic) вызывает `SoulboundCore.mintSoul(user)` при условии `soulboundCore != address(0)` и `soulboundCore.balanceOf(user) == 0`;  
+- **MINTER_ROLE** в SoulboundCore выдаётся **только адресу контракта SpiralEngine** (proxy); активированным пользователям MINTER_ROLE не выдаётся;  
+- при деплое: выдать SoulboundCore.MINTER_ROLE адресу SpiralEngine proxy и вызвать SpiralEngine.setSoulboundCore(soulboundCore).
 
 ### 2.3. Профиль души и Amanita Passport (один community, одна сеть)
 

@@ -1,8 +1,10 @@
 # Аудит: идентичность, DID, инвайт vs SBT, SoulboundCore, метаданные, избыточность и дыры
 
-**Версия:** 1.0  
+**Версия:** 1.1  
 **Дата:** 2026-03-14  
 **Методика:** run-analysis — только факты из кода; выводы по адекватности, ролям, избыточности и рискам.
+
+**Актуализация (SBT-INV-1, 2026):** Инвайты в SpiralEngine — **только лог** (записи по inviteId), без ERC721. При успешном `activateUser` контракт SpiralEngine вызывает **SoulboundCore.mintSoul(user)** (если soulboundCore задан и у user ещё нет души). **MINTER_ROLE** в SoulboundCore имеет только контракт SpiralEngine (proxy); активированным пользователям не выдаётся. Итог: один источник душ — SoulboundCore; связка «активация → душа» ончейн. Ниже §1–§2 частично описывают предыдущее состояние; разделение «инвайт vs душа» по смыслу сохранено (инвайт = запись доступа, душа = SBT в SoulboundCore).
 
 ---
 
@@ -12,8 +14,7 @@
 
 **Создание «души» (SBT):**
 
-- `contracts/SoulboundCore.sol`: минтинг только владельцем контракта: `mintSoul(address to)`, `mintSoulBatch(address to, uint256 amount)` (строки 202, 222). SpiralEngine и SoulIdentity **не вызывают** mintSoul; в коде нет автоматического минта души при активации пользователя.
-- Вывод: идентичность в смысле «наличие SBT» создаётся **вне** SpiralEngine — тем, у кого есть право owner на SoulboundCore (скрипт, бэкенд, отдельный контракт). Нет ончейн-связки «активация в SpiralEngine → минтинг души».
+- `contracts/SoulboundCore.sol`: минтинг — owner или держатель **MINTER_ROLE** (строки 208–209). После SBT-INV-1: при `activateUser` контракт **SpiralEngine** вызывает `SoulboundCore.mintSoul(user)` (MINTER_ROLE только у SpiralEngine proxy). Идентичность «наличие SBT» создаётся ончейн при активации (один активированный → одна душа).
 
 **Условие для DID:**
 
@@ -29,7 +30,7 @@
 ### 1.2 Адекватность
 
 - **Плюсы:** Чёткое условие «сначала SBT — потом DID»; разделение self-service (linkSoulIdentity) и доверенного ввода (linkExternalIdentity); несколько типов идентичностей и основная идентичность.
-- **Дыра:** Нет ончейн-правила «когда минтить душу». Связь «активация в SpiralEngine → появление SBT» не зашита в контракты; возможна рассинхронизация (активированный пользователь без души или душа без активации). Для интеграций с DID важно явно зафиксировать процесс (например, оркестратор после activateUser вызывает mintSoul и при необходимости linkExternalIdentity) и/или рассмотреть автоматизацию (например, SoulIntegration или отдельный контракт по событию UserActivated).
+- **После SBT-INV-1:** ончейн-связка «активация → душа» реализована: при `activateUser` SpiralEngine вызывает `SoulboundCore.mintSoul(user)` (при заданном soulboundCore и balanceOf(user)==0). Оркестратор не обязателен для минта души при активации.
 
 ---
 
@@ -37,17 +38,15 @@
 
 ### 2.1 Факты из кода
 
-**SpiralEngine (инвайт-NFT):**
+**SpiralEngine (инвайты после SBT-INV-1):**
 
-- `contracts/SpiralEngineLogic.sol`: собственный ERC721 — свой `_mint`, `_tokenIdCounter`, маппинги инвайтов (`inviteCodeToTokenId`, `tokenIdToInviteCode`, `inviteExpiry`, `isInviteUsed`, `usedInviteByUser`, `userActivator`, `activatedBy` и т.д.). Токены инвайтов **soulbound**: `transferFrom`, `approve`, `setApprovalForAll` — revert с кастомными ошибками `TransfersNotAllowed`, `ApprovalsNotAllowed` (стр. 114–117, 802–817); `locked(uint256)` всегда true (стр. 792).
-- Контракт **не** реализует EIP-5192 явно через один интерфейс «SBT», но поведение совпадает: нет передачи, нет approve.
+- Инвайты — **только лог** (записи по inviteId): счётчик `_inviteIdCounter`, маппинги `inviteCodeToTokenId`, `tokenIdToInviteCode`, `inviteMinter`, `inviteFirstOwner`, `usedInviteByUser` и т.д. **Нет ERC721** для инвайтов (нет `_mint`). View `ownerOf(inviteId)`, `balanceOf(owner)` — совместимость API (inviteFirstOwner, userInviteCount). Заглушки transfer/approve — revert.
 
 **SoulboundCore (душа-SBT):**
 
-- Отдельный контракт; ERC721 + EIP-5192; свои `_owners`, `_balances`, `mintSoul`/`burnSoul`; transfer/approve — revert с сообщениями `"SBT: transfer not allowed"` / `"SBT: approval not allowed"`.
-- SpiralEngine **не минтит** в SoulboundCore и **не держит** токены SoulboundCore; только читает SoulIdentity (getSoulLevel, getSoulReputation, getSoulIdentity, getSoulProfile).
+- Единственный контракт душ; ERC721 + EIP-5192; `mintSoul`/`mintSoulBatch` — owner или **MINTER_ROLE**. MINTER_ROLE только у контракта SpiralEngine (proxy); при `activateUser` вызывается `mintSoul(user)` при `balanceOf(user)==0`.
 
-**Итог по коду:** инвайт и душа — **два отдельных контракта и два типа токенов**. Инвайт выполняет **поведенческую** роль SBT (soulbound), но не является токеном из SoulboundCore и не участвует в DID/level/reputation.
+**Итог:** инвайт — **запись доступа** (логический inviteId); душа — **SBT в SoulboundCore**, минтится при активации контрактом SpiralEngine. Один источник душ — SoulboundCore.
 
 ### 2.2 Оценка разделения
 

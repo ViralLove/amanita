@@ -2,7 +2,7 @@
 
 ## Обзор
 
-`SpiralEngine` - это авторский смарт-контракт спиральной иерархии через 12-гранные круги в экосистеме Amanita, созданный **Zeya888** (https://zeya888.me). Контракт реализует систему инвайтов как **Soulbound NFT** для управления доступом пользователей в спиральной структуре с каскадной ответственностью и системой санкций.
+`SpiralEngine` - это авторский смарт-контракт спиральной иерархии через 12-гранные круги в экосистеме Amanita, созданный **Zeya888** (https://zeya888.me). Контракт реализует систему **инвайтов как лог** (записи по `inviteId`, без ERC721) и при успешной активации пользователя вызывает **SoulboundCore.mintSoul(user)** — один активированный → одна душа в единственном SBT-контракте (SoulboundCore). **MINTER_ROLE** в SoulboundCore имеет только контракт SpiralEngine (proxy); активированным пользователям эта роль не выдаётся.
 
 ## Архитектура
 
@@ -22,12 +22,12 @@ bytes32 public constant ACTIVATOR_ROLE = keccak256("ACTIVATOR_ROLE");
 - **ACTIVATOR_ROLE** - активация пользователей и назначение ролей. При успешном вызове `activateUser` **активированному пользователю автоматически выдаётся** `ACTIVATOR_ROLE` (каждый активированный = базовый Activator; см. Roles Security Policy, MVP Scope). Отзыв — через `revokeRole(ACTIVATOR_ROLE, user)`; возврат — через `grantRole` админом или пост-MVP `restoreActivatorRole` с проверкой eligibility.
 - **DEFAULT_ADMIN_ROLE** - управление ролями, санкции и система
 
-### Интеграция с SoulIdentity
-- **SBT функциональность** делегируется в контракт `SoulIdentity`
-- **Духовные аспекты** (DID, репутация, восстановление) обрабатываются через мост
-- **SpiralEngine** фокусируется на спиральной иерархии и ролях
-- **Архитектурная целостность**: Четкое разделение ответственности между контрактами
-- **100% тестовое покрытие**: Все SBT функции протестированы через SoulIdentity
+### Интеграция с SoulIdentity и SoulboundCore
+- **SBT функциональность** (DID, репутация, профиль) делегируется в контракт `SoulIdentity`
+- **Души (SBT)** минтится только в **SoulboundCore**; при успешном `activateUser` контракт SpiralEngine вызывает `SoulboundCore.mintSoul(user)` при условии `soulboundCore != address(0)` и `balanceOf(user) == 0`
+- **MINTER_ROLE** в SoulboundCore выдаётся **только адресу контракта SpiralEngine** (proxy); активированным пользователям MINTER_ROLE не выдаётся
+- Адрес SoulboundCore задаётся через `setSoulboundCore(address)` (ADMIN_ROLE); при деплое необходимо выдать SoulboundCore.MINTER_ROLE адресу SpiralEngine proxy
+- **SpiralEngine** фокусируется на спиральной иерархии, инвайтах как лог и вызове mintSoul при активации
 
 ## Основные функции
 
@@ -46,13 +46,12 @@ bytes32 public constant ACTIVATOR_ROLE = keccak256("ACTIVATOR_ROLE");
 - Код не должен быть пустым
 
 **Особенности:**
-- Создание NFT на адрес вызывающего
-- Автоматическая инициализация всех маппингов
-- Отслеживание создателя инвайта
-- Обновление счетчиков и статистики
+- Создание **записи инвайта** (логический inviteId, без ERC721 минтинга)
+- Заполнение маппингов: inviteCodeToTokenId, tokenIdToInviteCode, inviteMinter, inviteFirstOwner, userInvites, userInviteCount
+- Обновление счётчиков totalInvitesMinted
 
 **Возвращает:**
-- `uint256 tokenId` - идентификатор созданного NFT
+- `uint256` — inviteId (идентификатор записи инвайта; в API для совместимости может именоваться tokenId)
 
 #### `mintInviteBatch(string[] calldata inviteCodes, uint256[] calldata expiries)`
 Создаёт несколько инвайтов за одну транзакцию (batch). Те же гарантии, что и у `mintInvite`: валидация, события, роли, пауза, reentrancy guard на всю batch.
@@ -67,7 +66,7 @@ bytes32 public constant ACTIVATOR_ROLE = keccak256("ACTIVATOR_ROLE");
 - Все коды уникальны (в т.ч. внутри batch)
 
 **Возвращает:**
-- `uint256[] tokenIds` - массив идентификаторов созданных NFT
+- `uint256[] tokenIds` — массив inviteId созданных записей (совместимость API)
 
 **Константа:** `uint256 public constant MAX_BATCH_SIZE = 50` — максимальный размер batch (защита от переполнения газа).
 
@@ -97,10 +96,11 @@ bytes32 public constant ACTIVATOR_ROLE = keccak256("ACTIVATOR_ROLE");
 4. ✅ Проверка уникальности новых кодов
 5. ✅ Отметка инвайта как использованного
 6. ✅ Добавление пользователя в активированные
-7. ✅ Создание 12 новых инвайтов для пользователя
-8. ✅ Запись активатора и обновление статистики
-9. ✅ **Автовыдача ACTIVATOR_ROLE** активированному пользователю (`_grantRole(ACTIVATOR_ROLE, user)`)
-10. ✅ Эмиссия событий
+7. ✅ Создание 12 новых **записей инвайтов** (inviteId) для пользователя (без ERC721 минтинга)
+8. ✅ **Минтинг души:** при `soulboundCore != address(0)` и `soulboundCore.balanceOf(user) == 0` вызывается `soulboundCore.mintSoul(user)` (контракт SpiralEngine — единственный держатель MINTER_ROLE в SoulboundCore)
+9. ✅ Запись активатора и обновление статистики
+10. ✅ **Автовыдача ACTIVATOR_ROLE** активированному пользователю
+11. ✅ Эмиссия событий
 
 **События:**
 ```solidity
@@ -180,18 +180,21 @@ event UserSuspended(address indexed user, uint256 until, string reason);
 Проверяет, создан ли инвайт указанным активатором.
 
 **Параметры:**
-- `tokenId` - идентификатор токена
+- `tokenId` — inviteId записи инвайта (совместимость API)
 - `activator` - адрес активатора
 
 **Возвращает:**
 - `bool` - true если инвайт создан активатором
 
-### Интеграция с SoulIdentity
+### Интеграция с SoulIdentity и SoulboundCore
 
 #### `setSoulIdentity(address _soulIdentity)`
 Устанавливает адрес контракта SoulIdentity.
 
-**Параметры:**
+#### `setSoulboundCore(address _soulboundCore)` (SpiralEngineLogic / proxy)
+Устанавливает адрес контракта SoulboundCore для минтинга души при активации. Доступно только **ADMIN_ROLE**. При деплое необходимо выдать SoulboundCore.**MINTER_ROLE** адресу SpiralEngine (proxy); активированным пользователям MINTER_ROLE не выдаётся.
+
+**Параметры (setSoulIdentity):**
 - `_soulIdentity` - адрес контракта SoulIdentity
 
 **Требования:**
@@ -222,9 +225,9 @@ event UserSuspended(address indexed user, uint256 until, string reason);
 
 ## Структуры данных
 
-### Основные маппинги инвайтов
+### Основные маппинги инвайтов (uint256 = inviteId, id записи инвайта; не ERC721 tokenId)
 ```solidity
-// Код инвайта => ID токена
+// Код инвайта => inviteId
 mapping(string => uint256) public inviteCodeToTokenId;
 
 // Код инвайта => существует ли (для корректной проверки дублирования)
@@ -292,7 +295,7 @@ mapping(address => uint256) public nominationViolations;
 ```solidity
 uint256 public totalInvitesUsed;    // Всего использованных инвайтов
 uint256 public totalInvitesMinted;  // Всего созданных инвайтов
-uint256 private _tokenIdCounter;    // Счетчик ID токенов
+uint256 private _inviteIdCounter;   // Счётчик inviteId (записи инвайтов)
 mapping(address => uint256) public userInviteCount; // Количество инвайтов пользователя
 ```
 
@@ -301,41 +304,19 @@ mapping(address => uint256) public userInviteCount; // Количество ин
 address[] public activatedUsers;    // Все активированные пользователи
 ```
 
-### Интеграция с SoulIdentity
+### Интеграция с SoulIdentity и SoulboundCore
 ```solidity
-ISoulIdentity public soulIdentity; // Ссылка на контракт SoulIdentity
+ISoulIdentity public soulIdentity;   // Ссылка на контракт SoulIdentity
+ISoulboundCoreMinter public soulboundCore; // SoulboundCore для mintSoul при активации (MINTER_ROLE только у SpiralEngine)
 ```
 
 ## Безопасность
 
-### Soulbound NFT защита
-```solidity
-function transferFrom(address /* from */, address /* to */, uint256 /* tokenId */) public pure override {
-    revert("SpiralEngine: transfers not allowed");
-}
-
-function approve(address /* to */, uint256 /* tokenId */) public pure override {
-    revert("SpiralEngine: approvals not allowed");
-}
-
-function setApprovalForAll(address /* operator */, bool /* approved */) public pure override {
-    revert("SpiralEngine: approvals not allowed");
-}
-
-function locked(uint256 tokenId) external view override returns (bool) {
-    require(address(soulIdentity) != address(0), "SpiralEngine: soul identity not set");
-    return soulIdentity.locked(tokenId);
-}
-```
-
-**Особенности:**
-- ❌ Инвайты нельзя передавать между пользователями
-- ❌ Инвайты нельзя делегировать (approve/setApprovalForAll)
-- ✅ Можно создавать (минт) и сжигать
-- 🛡️ Защита от спекуляций и перепродажи
-- 🔒 Полная блокировка всех функций передачи
-- 🔗 Делегирование locked() функции в SoulIdentity
-- 📋 Поддержка интерфейса IERC5192
+### Инвайты как лог и совместимость API
+- **Инвайты** в SpiralEngine — только логические записи (inviteId); **не ERC721**: нет минтинга NFT для инвайтов, только маппинги (inviteCodeToTokenId, tokenIdToInviteCode, inviteFirstOwner и т.д.).
+- Для совместимости с реестрами/фронтом доступны view: `ownerOf(inviteId)` → inviteFirstOwner, `balanceOf(owner)` → userInviteCount; заглушки `approve`, `transferFrom`, `getApproved`, `isApprovedForAll` всегда revert или возвращают константы.
+- **Души (SBT)** минтится только в **SoulboundCore**; при активации контракт SpiralEngine вызывает `mintSoul(user)` (у SpiralEngine — MINTER_ROLE в SoulboundCore; активированным MINTER_ROLE не выдаётся).
+- Поддержка интерфейса IERC5192 (locked) для совместимости; передача и одобрение инвайтов запрещены (заглушки).
 
 ### Контроль доступа
 - **SELLER_ROLE** - создание инвайтов
@@ -450,25 +431,18 @@ const soulLevel = await spiralEngine.getSoulLevel(userAddress);
 ## Интеграция с экосистемой
 
 ### Зависимости
-- **OpenZeppelin ERC721** - базовая функциональность NFT
-- **OpenZeppelin AccessControl** - система ролей
-- **IERC5192** - интерфейс стандарта Soulbound Tokens
-- **ISoulIdentity** - интерфейс для интеграции с SoulIdentity
+- **OpenZeppelin AccessControl** — система ролей
+- **IERC5192** — интерфейс Soulbound (locked) для совместимости
+- **ISoulIdentity** — интеграция с SoulIdentity (DID, репутация, профиль)
+- **ISoulboundCoreMinter** — вызов mintSoul при активации (SoulboundCore)
 
-### Наследование и интерфейсы
-```solidity
-contract SpiralEngine is ERC721, AccessControl, IERC5192
-```
-
-**Реализованные интерфейсы:**
-- **ERC721** - стандарт NFT с блокировкой передачи
-- **AccessControl** - система ролей OpenZeppelin
-- **IERC5192** - стандарт Soulbound Tokens с функцией locked()
+**Инвайты:** не ERC721; только лог по inviteId. **Души (SBT):** единственный источник — SoulboundCore; минтит при активации только контракт SpiralEngine (MINTER_ROLE).
 
 ### Связь с другими контрактами
-- **SoulIdentity** - делегирование SBT функциональности, DID, репутации
-- **ProductRegistry** - использует роли и статус активации
-- **AmanitaRegistry** - регистрация адреса контракта
+- **SoulboundCore** — единственный контракт душ (SBT); SpiralEngine вызывает mintSoul(user) при activateUser; MINTER_ROLE только у SpiralEngine (proxy)
+- **SoulIdentity** — делегирование DID, репутации, getSoulProfile
+- **ProductRegistry** — использует роли и usedInviteByUser
+- **AmanitaRegistry** — регистрация адреса контракта
 
 ## Жизненный цикл в спиральной системе
 
@@ -476,21 +450,20 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192
 ```mermaid
 graph LR
     A[Продавец] --> B[mintInvite]
-    B --> C[NFT создан]
-    C --> D[Код сохранен]
-    D --> E[Отслеживание создателя]
+    B --> C[Запись inviteId]
+    C --> D[Маппинги заполнены]
+    D --> E[Нет ERC721 минтинга]
 ```
 
 ### 2. Активация пользователя
 ```mermaid
 graph LR
     A[Активатор] --> B[activateUser]
-    B --> C[Проверка принадлежности инвайта]
-    C --> D[Проверка лимита круга]
-    D --> E[Инвайт использован]
-    E --> F[Пользователь активирован]
-    F --> G[12 новых инвайтов созданы]
-    G --> H[Запись активатора]
+    B --> C[Валидация инвайта]
+    C --> D[12 записей инвайтов]
+    D --> E[SoulboundCore.mintSoul user]
+    E --> F[ACTIVATOR_ROLE user]
+    F --> G[UserActivated]
 ```
 
 ### 3. Назначение ролей
@@ -518,7 +491,7 @@ graph LR
 - 🔄 **12-гранные круги** - максимум 12 пользователей на активатора
 - 📈 **Каскадная ответственность** - активаторы отвечают за своих пользователей
 - ⚖️ **Система санкций** - нарушения влияют на всю цепочку
-- 🛡️ **Soulbound NFT** - инвайты непередаваемы, защищены от спекуляций
+- 📋 **Инвайты как лог** - записи по inviteId; душа в SoulboundCore при активации
 
 ### Ограничения активации
 - ✅ Ровно 12 новых инвайтов при активации
@@ -611,7 +584,7 @@ const isLocked = await soulIdentity.connect(user1).locked(tokenId);
 `SpiralEngine` - это авторская система спиральной иерархии, которая:
 
 - 🔄 **Уникальна** - 12-гранные круги с каскадной ответственностью
-- 🛡️ **Безопасна** - Soulbound NFT + система ролей + санкции + EIP-5192
+- 🛡️ **Безопасна** - инвайты как лог, души только в SoulboundCore + система ролей + санкции
 - ⚡ **Эффективна** - оптимизированные алгоритмы и четкие ограничения
 - 🔍 **Прозрачна** - полное логирование и аудит всех операций
 - 🔗 **Интегрирована** - тесная связь с SoulIdentity и экосистемой Amanita
