@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./IERC5192.sol";
 
 /**
@@ -36,8 +37,11 @@ interface ISoulIntegration {
  * @dev Минимальная, газоэффективная реализация Soulbound Token согласно EIP-5192
  * @notice Всегда заблокированные токены - нет дополнительных проверок для экономии газа
  */
-contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
-    
+contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable, AccessControl {
+
+    /// @dev Роль минтера: только контракт SpiralEngine (proxy) может минтить души при активации (SBT-INV-1.1).
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
     // === СОБЫТИЯ ===
     
     /**
@@ -80,6 +84,7 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
     constructor(string memory name_, string memory symbol_) Ownable(msg.sender) {
         _name = name_;
         _symbol = symbol_;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
     
     // === ERC721 VIEW FUNCTIONS ===
@@ -122,11 +127,12 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
         return _requireOwned(tokenId);
     }
     
-    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override(IERC165, AccessControl) returns (bool) {
         return interfaceId == type(IERC165).interfaceId ||
                interfaceId == type(IERC721).interfaceId ||
                interfaceId == type(IERC721Metadata).interfaceId ||
-               interfaceId == type(IERC5192).interfaceId;
+               interfaceId == type(IERC5192).interfaceId ||
+               super.supportsInterface(interfaceId);
     }
     
     // === SBT CORE FUNCTIONS ===
@@ -195,11 +201,12 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
     // === MINTING FUNCTIONS ===
     
     /**
-     * @dev Минтинг SBT токена (только владелец контракта)
+     * @dev Минтинг SBT токена (владелец контракта или держатель MINTER_ROLE, например SpiralEngine)
      * @param to получатель токена
      * @return tokenId идентификатор созданного токена
      */
-    function mintSoul(address to) external onlyOwner returns (uint256) {
+    function mintSoul(address to) external returns (uint256) {
+        require(owner() == msg.sender || hasRole(MINTER_ROLE, msg.sender), "SBT: not owner or minter");
         uint256 tokenId = _nextTokenId++;
         
         _safeMint(to, tokenId);
@@ -214,12 +221,13 @@ contract SoulboundCore is IERC165, IERC721, IERC721Metadata, IERC5192, Ownable {
     }
     
     /**
-     * @dev Массовый минтинг SBT токенов (только владелец контракта)
+     * @dev Массовый минтинг SBT токенов (владелец контракта или держатель MINTER_ROLE)
      * @param to получатель токенов
      * @param amount количество токенов для минтинга
      * @return tokenIds массив идентификаторов созданных токенов
      */
-    function mintSoulBatch(address to, uint256 amount) external onlyOwner returns (uint256[] memory) {
+    function mintSoulBatch(address to, uint256 amount) external returns (uint256[] memory) {
+        require(owner() == msg.sender || hasRole(MINTER_ROLE, msg.sender), "SBT: not owner or minter");
         require(amount > 0 && amount <= 100, "SBT: invalid amount");
         
         uint256[] memory tokenIds = new uint256[](amount);

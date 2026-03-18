@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -10,6 +9,14 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "./interfaces/ISoulIdentity.sol";
 import "./interfaces/ISpiralEngine.sol";
 import "./IERC5192.sol";
+
+/**
+ * @dev Минимальный интерфейс SoulboundCore для вызова mintSoul из SpiralEngine (SBT-INV-1.3)
+ */
+interface ISoulboundCoreMinter {
+    function mintSoul(address to) external returns (uint256);
+    function balanceOf(address owner) external view returns (uint256);
+}
 
 /**
  * @title SpiralEngineLogic
@@ -35,14 +42,12 @@ import "./IERC5192.sol";
  * 
  * @custom:security-contact security@amanita.com
  */
-contract SpiralEngineLogic is 
+contract SpiralEngineLogic is
     Initializable,
     UUPSUpgradeable,
-    ERC721Upgradeable,
     AccessControlUpgradeable,
     PausableUpgradeable,
     ReentrancyGuardUpgradeable,
-    IERC5192,
     ISpiralEngine
 {
     // === КОНСТАНТЫ ===
@@ -141,8 +146,8 @@ contract SpiralEngineLogic is
     // При delegatecall данные физически хранятся в Proxy
     // Прямой доступ к переменным (без StorageSlot)
     
-    /// @notice Счётчик tokenId для ERC721
-    uint256 private _tokenIdCounter;
+    /// @notice Счётчик inviteId (логические записи инвайтов, без ERC721 минтинга — SBT-INV-1.2)
+    uint256 private _inviteIdCounter;
     
     // === ОСНОВНЫЕ ДАННЫЕ ИНВАЙТОВ ===
     
@@ -224,10 +229,13 @@ contract SpiralEngineLogic is
     /// @notice Адрес контракта SoulIdentity для делегирования SBT функций
     ISoulIdentity public soulIdentity;
     
+    /// @notice Адрес SoulboundCore для минтинга души при активации (SBT-INV-1.3; MINTER_ROLE у SpiralEngine)
+    ISoulboundCoreMinter public soulboundCore;
+    
     // === STORAGE GAP ===
     // Резерв для будущих переменных в апгрейдах
     // При добавлении новых переменных уменьшайте размер gap
-    uint256[50] private __gap;
+    uint256[49] private __gap;
     
     // === СОБЫТИЯ ===
     // События определены в ISpiralEngine интерфейсе и наследуются
@@ -243,8 +251,7 @@ contract SpiralEngineLogic is
     function initialize(address admin) public initializer {
         if (admin == address(0)) revert ZeroAddress();
         
-        // Инициализация всех модулей OpenZeppelin в правильном порядке
-        __ERC721_init("SpiralInvite", "SPIRAL");
+        // Инициализация всех модулей OpenZeppelin в правильном порядке (инвайты — только лог, без ERC721)
         __AccessControl_init();
         __UUPSUpgradeable_init();
         __Pausable_init();
@@ -300,10 +307,9 @@ contract SpiralEngineLogic is
      * @dev Минт нового инвайта
      * @param inviteCode уникальный код инвайта
      * @param expiry срок действия (0 = бессрочный)
-     * @return tokenId идентификатор созданного NFT
-     * 
+     * @return inviteId идентификатор созданной записи инвайта (логический)
      * @notice Доступно только пользователям с SELLER_ROLE
-     * @notice Создаёт новый NFT инвайт с уникальным кодом
+     * @notice Создаёт новую запись инвайта с уникальным кодом (без ERC721 минтинга)
      */
     function mintInvite(
         string calldata inviteCode,
@@ -320,46 +326,44 @@ contract SpiralEngineLogic is
     }
     
     /**
-     * @dev Внутренняя логика минта одного инвайта (без модификаторов). Вызывается из mintInvite и mintInviteBatch.
+     * @dev Внутренняя логика создания одной записи инвайта (без модификаторов). Вызывается из mintInvite и mintInviteBatch.
      * @param inviteCode уникальный код инвайта
      * @param expiry срок действия (0 = бессрочный)
-     * @return tokenId идентификатор созданного NFT
+     * @return inviteId идентификатор созданной записи инвайта
      */
-    function _mintInviteSingle(string calldata inviteCode, uint256 expiry) internal returns (uint256 tokenId) {
+    function _mintInviteSingle(string calldata inviteCode, uint256 expiry) internal returns (uint256 inviteId) {
         if (bytes(inviteCode).length == 0) revert EmptyInviteCode();
         if (inviteCodeExists[inviteCode]) revert InviteCodeAlreadyExists();
         
         unchecked {
-            tokenId = _tokenIdCounter++;
+            inviteId = _inviteIdCounter++;
         }
         
-        _mint(msg.sender, tokenId);
-        
-        inviteCodeToTokenId[inviteCode] = tokenId;
+        inviteCodeToTokenId[inviteCode] = inviteId;
         inviteCodeExists[inviteCode] = true;
-        tokenIdToInviteCode[tokenId] = inviteCode;
-        inviteExpiry[tokenId] = expiry;
-        inviteCreatedAt[tokenId] = block.timestamp;
-        inviteMinter[tokenId] = msg.sender;
-        inviteFirstOwner[tokenId] = msg.sender;
+        tokenIdToInviteCode[inviteId] = inviteCode;
+        inviteExpiry[inviteId] = expiry;
+        inviteCreatedAt[inviteId] = block.timestamp;
+        inviteMinter[inviteId] = msg.sender;
+        inviteFirstOwner[inviteId] = msg.sender;
         
-        userInvites[msg.sender].push(tokenId);
+        userInvites[msg.sender].push(inviteId);
         
         unchecked {
             userInviteCount[msg.sender]++;
             totalInvitesMinted++;
         }
         
-        emit InviteMinted(msg.sender, tokenId, inviteCode, expiry);
+        emit InviteMinted(msg.sender, inviteId, inviteCode, expiry);
         
-        return tokenId;
+        return inviteId;
     }
     
     /**
      * @dev Минт нескольких инвайтов в одной транзакции (batch)
      * @param inviteCodes массив уникальных кодов инвайтов
      * @param expiries массив сроков действия (0 = бессрочный) для каждого инвайта
-     * @return tokenIds массив идентификаторов созданных NFT
+     * @return tokenIds массив идентификаторов созданных записей инвайтов (inviteId)
      * @notice Доступно только пользователям с SELLER_ROLE; размер batch не более MAX_BATCH_SIZE
      */
     function mintInviteBatch(
@@ -449,33 +453,35 @@ contract SpiralEngineLogic is
             if (bytes(code).length == 0) revert EmptyInviteCode();
             if (inviteCodeExists[code]) revert InviteCodeAlreadyExists();
             
-            // Минтим новый инвайт
-            uint256 newTokenId;
+            // Новая запись инвайта (логический inviteId, без _mint)
+            uint256 newInviteId;
             unchecked {
-                newTokenId = _tokenIdCounter++;
+                newInviteId = _inviteIdCounter++;
             }
             
-            _mint(user, newTokenId);
-            
-            // Сохраняем данные нового инвайта
-            inviteCodeToTokenId[code] = newTokenId;
+            inviteCodeToTokenId[code] = newInviteId;
             inviteCodeExists[code] = true;
-            tokenIdToInviteCode[newTokenId] = code;
-            inviteExpiry[newTokenId] = expiry;
-            inviteCreatedAt[newTokenId] = block.timestamp;
-            inviteMinter[newTokenId] = user;
-            inviteFirstOwner[newTokenId] = user;
+            tokenIdToInviteCode[newInviteId] = code;
+            inviteExpiry[newInviteId] = expiry;
+            inviteCreatedAt[newInviteId] = block.timestamp;
+            inviteMinter[newInviteId] = user;
+            inviteFirstOwner[newInviteId] = user;
             
-            userInvites[user].push(newTokenId);
+            userInvites[user].push(newInviteId);
             
             unchecked {
                 userInviteCount[user]++;
                 totalInvitesMinted++;
             }
             
-            emit InviteMinted(user, newTokenId, code, expiry);
+            emit InviteMinted(user, newInviteId, code, expiry);
             
             unchecked { ++i; }
+        }
+
+        // SBT-INV-1.3: минтим душу при активации, если SoulboundCore задан и у user ещё нет души
+        if (address(soulboundCore) != address(0) && soulboundCore.balanceOf(user) == 0) {
+            soulboundCore.mintSoul(user);
         }
 
         // Auto-grant ACTIVATOR_ROLE: каждый активированный пользователь становится Activator (Roles Policy, MVP Scope)
@@ -488,7 +494,7 @@ contract SpiralEngineLogic is
      * @dev Валидация инвайт кода (internal)
      * @param inviteCode код инвайта
      * @param activator адрес активатора
-     * @return tokenId идентификатор токена
+     * @return inviteId идентификатор записи инвайта
      */
     function _validateInviteCode(
         string calldata inviteCode,
@@ -640,6 +646,15 @@ contract SpiralEngineLogic is
         soulIdentity = ISoulIdentity(_soulIdentity);
         
         emit SoulIdentityUpdated(oldSoulIdentity, _soulIdentity);
+    }
+    
+    /**
+     * @dev Установить адрес SoulboundCore для минтинга души при активации (SBT-INV-1.3)
+     * @param _soulboundCore адрес контракта SoulboundCore (0 = отключить минтинг души при активации)
+     * @notice Доступно только ADMIN_ROLE. SpiralEngine (proxy) должен иметь MINTER_ROLE в SoulboundCore.
+     */
+    function setSoulboundCore(address _soulboundCore) external onlyRole(ADMIN_ROLE) {
+        soulboundCore = ISoulboundCoreMinter(_soulboundCore);
     }
     
     /**
@@ -797,57 +812,86 @@ contract SpiralEngineLogic is
         userTotalInvites = userInviteCount[seller];
     }
     
-    // === ERC5192 (SOULBOUND) IMPLEMENTATION ===
+    // === СОВМЕСТИМОСТЬ API (inviteId = uint256, без ERC721 минтинга) ===
+    
+    /// @notice Имя для совместимости с реестрами (инвайты — лог, не NFT)
+    function name() external pure returns (string memory) {
+        return "SpiralInvite";
+    }
+    
+    /// @notice Символ для совместимости с реестрами
+    function symbol() external pure returns (string memory) {
+        return "SPIRAL";
+    }
     
     /**
-     * @dev Проверка заблокированности токена (EIP-5192)
-     * @return всегда true (SBT токены всегда заблокированы)
+     * @dev Владелец записи инвайта по inviteId (для совместимости с реестрами/фронтом)
+     * @param inviteId идентификатор инвайта (логический)
+     * @return адрес первого владельца (inviteFirstOwner)
      */
-    function locked(uint256 /* tokenId */) external pure override returns (bool) {
-        // Все SpiralEngine токены - Soulbound (не передаваемые)
+    function ownerOf(uint256 inviteId) external view returns (address) {
+        address o = inviteFirstOwner[inviteId];
+        require(o != address(0), "SpiralEngine: invite not found");
+        return o;
+    }
+    
+    /**
+     * @dev Количество инвайтов пользователя (для совместимости с реестрами/фронтом)
+     * @param owner адрес пользователя
+     * @return количество записей инвайтов
+     */
+    function balanceOf(address owner) external view returns (uint256) {
+        return userInviteCount[owner];
+    }
+    
+    /// @dev EIP-5192: инвайты логически заблокированы (не передаваемы)
+    function locked(uint256 /* inviteId */) external pure returns (bool) {
         return true;
     }
     
-    // === ERC721 OVERRIDES ===
-    
-    /**
-     * @dev Блокировка approve - SBT токены не могут быть approved
-     */
-    function approve(address, uint256) public pure override {
+    /// @dev Заглушка: одобрения запрещены (инвайты не передаваемы)
+    function approve(address, uint256) external pure {
         revert ApprovalsNotAllowed();
     }
     
-    /**
-     * @dev Блокировка setApprovalForAll - SBT токены не могут быть approved
-     */
-    function setApprovalForAll(address, bool) public pure override {
+    /// @dev Заглушка: глобальное одобрение запрещено
+    function setApprovalForAll(address, bool) external pure {
         revert ApprovalsNotAllowed();
     }
     
-    /**
-     * @dev Переопределение transferFrom для предотвращения передачи
-     */
-    function transferFrom(address, address, uint256) public pure override {
+    /// @dev Заглушка: передача запрещена
+    function transferFrom(address, address, uint256) external pure {
         revert TransfersNotAllowed();
     }
     
-    /**
-     * @dev Базовый URI для токенов
-     */
-    function _baseURI() internal pure override returns (string memory) {
-        return "https://api.amanita.com/spiral/";
+    /// @dev Заглушка: безопасная передача запрещена
+    function safeTransferFrom(address /* from */, address /* to */, uint256 /* tokenId */) external pure {
+        revert TransfersNotAllowed();
+    }
+    
+    /// @dev Заглушка: безопасная передача с data запрещена
+    function safeTransferFrom(address /* from */, address /* to */, uint256 /* tokenId */, bytes calldata) external pure {
+        revert TransfersNotAllowed();
+    }
+    
+    /// @dev Заглушка: одобренный адрес всегда нулевой
+    function getApproved(uint256) external pure returns (address) {
+        return address(0);
+    }
+    
+    /// @dev Заглушка: глобальное одобрение всегда false
+    function isApprovedForAll(address, address) external pure returns (bool) {
+        return false;
     }
     
     /**
-     * @dev Поддержка интерфейсов
-     * @param interfaceId идентификатор интерфейса
-     * @return поддерживается ли интерфейс
+     * @dev Поддержка интерфейсов (AccessControl, IERC5192 для совместимости; инвайты не ERC721)
      */
-    function supportsInterface(bytes4 interfaceId) 
-        public 
-        view 
-        override(ERC721Upgradeable, AccessControlUpgradeable) 
-        returns (bool) 
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(AccessControlUpgradeable)
+        returns (bool)
     {
         return interfaceId == type(IERC5192).interfaceId || super.supportsInterface(interfaceId);
     }

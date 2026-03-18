@@ -5,29 +5,27 @@ pragma solidity ^0.8.22;
  * @title ISpiralEngine
  * @author Zeya888 (https://zeya888.me)
  * @dev Интерфейс контракта управления спиральной иерархией
- * @notice Определяет публичный API для SpiralEngine контракта
+ * @notice Инвайты — только лог (inviteId); uint256 в API = inviteId (id записи инвайта). Сигнатуры сохранены для обратной совместимости.
  */
 interface ISpiralEngine {
     // === СТРУКТУРЫ ДАННЫХ ===
     
     /**
      * @dev Структура информации об инвайте
+     * @notice tokenId в структуре = inviteId (id записи инвайта)
      */
     struct InviteInfo {
-        string inviteCode;           // Код инвайта
-        uint256 tokenId;            // ID токена инвайта
-        bool isUsed;                // Статус использования
-        address activatedBy;        // Адрес активатора (если инвайт использован)
-        uint256 activationTime;     // Время активации
-        uint256 expiry;             // Срок действия
+        string inviteCode;
+        uint256 tokenId;            // inviteId, совместимость API
+        bool isUsed;
+        address activatedBy;
+        uint256 activationTime;
+        uint256 expiry;
     }
     
-    /**
-     * @dev Структура полной диагностики состояния селлера
-     */
     struct SellerDiagnostics {
-        bool isActivated;           // Статус активации пользователя
-        uint256 usedInviteTokenId;  // ID использованного инвайта
+        bool isActivated;
+        uint256 usedInviteTokenId;  // inviteId использованного инвайта
         bool hasSellerRole;         // Наличие роли SELLER_ROLE
         bool hasActivatorRole;      // Наличие роли ACTIVATOR_ROLE
         InviteInfo[] userInvites;   // Массив инвайтов пользователя
@@ -60,24 +58,18 @@ interface ISpiralEngine {
     // === СОБЫТИЯ ===
     
     /**
-     * @dev Событие минтинга нового инвайта
-     * @param minter адрес создателя инвайта
-     * @param tokenId ID созданного NFT токена
-     * @param inviteCode уникальный код инвайта
-     * @param expiry срок действия (0 = бессрочный)
+     * @dev Событие создания новой записи инвайта (inviteId = id записи, не NFT)
      */
     event InviteMinted(
         address indexed minter,
-        uint256 indexed tokenId,
+        uint256 indexed tokenId,    // inviteId
         string inviteCode,
         uint256 expiry
     );
     
     /**
      * @dev Событие использования инвайта
-     * @param user адрес пользователя, использовавшего инвайт
-     * @param tokenId ID использованного инвайта
-     * @param inviteCode код инвайта
+     * @param tokenId inviteId использованного инвайта
      */
     event InviteUsed(
         address indexed user,
@@ -134,10 +126,8 @@ interface ISpiralEngine {
     // === ОСНОВНЫЕ ФУНКЦИИ УПРАВЛЕНИЯ ИНВАЙТАМИ ===
     
     /**
-     * @dev Минт нового инвайта
-     * @param inviteCode уникальный код инвайта
-     * @param expiry срок действия (0 = бессрочный)
-     * @return tokenId идентификатор созданного NFT
+     * @dev Создание новой записи инвайта (inviteId, без ERC721)
+     * @return tokenId inviteId созданной записи (совместимость API)
      */
     function mintInvite(
         string memory inviteCode,
@@ -145,10 +135,8 @@ interface ISpiralEngine {
     ) external returns (uint256 tokenId);
     
     /**
-     * @dev Минт нескольких инвайтов в одной транзакции (batch)
-     * @param inviteCodes массив уникальных кодов инвайтов
-     * @param expiries массив сроков действия (0 = бессрочный) для каждого инвайта
-     * @return tokenIds массив идентификаторов созданных NFT
+     * @dev Создание нескольких записей инвайтов (batch)
+     * @return tokenIds массив inviteId (совместимость API)
      */
     function mintInviteBatch(
         string[] calldata inviteCodes,
@@ -190,66 +178,37 @@ interface ISpiralEngine {
     // === VIEW ФУНКЦИИ - ДАННЫЕ ИНВАЙТОВ ===
     
     /**
-     * @dev Получить tokenId по коду инвайта
-     * @param inviteCode код инвайта
-     * @return tokenId идентификатор токена
+     * @dev Получить inviteId по коду инвайта (совместимость: возвращаемый тип uint256 = inviteId)
      */
     function inviteCodeToTokenId(string memory inviteCode) external view returns (uint256);
     
-    /**
-     * @dev Проверить существование инвайт кода
-     * @param inviteCode код инвайта
-     * @return exists существует ли код
-     */
     function inviteCodeExists(string memory inviteCode) external view returns (bool);
     
     /**
-     * @dev Получить код инвайта по tokenId
-     * @param tokenId идентификатор токена
-     * @return inviteCode код инвайта
+     * @dev Получить код инвайта по inviteId (параметр tokenId = inviteId для совместимости API)
      */
     function tokenIdToInviteCode(uint256 tokenId) external view returns (string memory);
     
     /**
-     * @dev Проверить использован ли инвайт
-     * @param tokenId идентификатор токена
-     * @return isUsed использован ли инвайт
+     * @dev Проверить использован ли инвайт (tokenId = inviteId)
      */
     function isInviteUsed(uint256 tokenId) external view returns (bool);
     
     /**
-     * @dev Получить использованный инвайт пользователя
-     * @param user адрес пользователя
-     * @return tokenId идентификатор использованного инвайта (+1 offset)
+     * @dev Получить использованный инвайт пользователя (возврат: inviteId + 1 offset)
      */
     function usedInviteByUser(address user) external view returns (uint256);
     
-    /**
-     * @dev Получить срок действия инвайта
-     * @param tokenId идентификатор токена
-     * @return expiry timestamp срока действия (0 = бессрочный)
-     */
+    /** @dev Срок действия инвайта (tokenId = inviteId) */
     function inviteExpiry(uint256 tokenId) external view returns (uint256);
     
-    /**
-     * @dev Получить дату создания инвайта
-     * @param tokenId идентификатор токена
-     * @return createdAt timestamp создания
-     */
+    /** @dev Дата создания инвайта (tokenId = inviteId) */
     function inviteCreatedAt(uint256 tokenId) external view returns (uint256);
     
-    /**
-     * @dev Получить создателя инвайта
-     * @param tokenId идентификатор токена
-     * @return minter адрес создателя
-     */
+    /** @dev Создатель записи инвайта (tokenId = inviteId) */
     function inviteMinter(uint256 tokenId) external view returns (address);
     
-    /**
-     * @dev Получить первого владельца инвайта
-     * @param tokenId идентификатор токена
-     * @return firstOwner адрес первого владельца
-     */
+    /** @dev Первый владелец записи инвайта (tokenId = inviteId) */
     function inviteFirstOwner(uint256 tokenId) external view returns (address);
     
     /**
@@ -339,10 +298,7 @@ interface ISpiralEngine {
     function getCircleMembers(address activator) external view returns (address[] memory);
     
     /**
-     * @dev Проверить, является ли инвайт от активатора
-     * @param tokenId идентификатор токена
-     * @param activator адрес активатора
-     * @return isFrom true если инвайт от активатора
+     * @dev Проверить, является ли инвайт от активатора (tokenId = inviteId)
      */
     function isInviteFromActivator(uint256 tokenId, address activator) external view returns (bool);
     
@@ -413,9 +369,7 @@ interface ISpiralEngine {
     function getSellerDiagnostics(address seller) external view returns (SellerDiagnostics memory);
     
     /**
-     * @dev Получить инвайты пользователя (только владелец или админ)
-     * @param user адрес пользователя
-     * @return invites массив ID токенов инвайтов пользователя
+     * @dev Получить инвайты пользователя (только владелец или админ). Возвращает массив inviteId.
      */
     function getUserInvites(address user) external view returns (uint256[] memory);
     

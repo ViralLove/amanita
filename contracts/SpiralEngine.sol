@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/ISoulIdentity.sol";
 import "./IERC5192.sol";
@@ -9,12 +8,12 @@ import "./IERC5192.sol";
 /**
  * @title SpiralEngine
  * @author Zeya888 (https://zeya888.me)
- * @dev Основной контракт спиральной иерархии через 12-гранные круги
- * @notice Управляет инвайтами, активацией пользователей и назначением ролей в спиральной системе
+ * @dev Фасад спиральной иерархии; инвайты — только лог (inviteId), без ERC721 (SBT-INV-1.4)
  * @notice SBT функциональность делегируется в SoulIdentity контракт
  */
-contract SpiralEngine is ERC721, AccessControl, IERC5192 {
-    uint256 private _tokenIdCounter;
+contract SpiralEngine is AccessControl, IERC5192 {
+    /// @notice Счётчик inviteId (логические записи инвайтов, без ERC721 минтинга)
+    uint256 private _inviteIdCounter;
 
     // Роль продавца для доступа к минтингу инвайтов
     bytes32 public constant SELLER_ROLE = keccak256("SELLER_ROLE");
@@ -24,34 +23,25 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
 
     // === ОСНОВНЫЕ ДАННЫЕ ИНВАЙТОВ ===
     
-    // Маппинг: inviteCode (уникальный строковый код) => tokenId (NFT инвайта)
+    // Маппинг: inviteCode → inviteId (id записи инвайта)
     mapping(string => uint256) public inviteCodeToTokenId;
     
-    // Маппинг: inviteCode => существует ли код (для корректной проверки дублирования)
     mapping(string => bool) public inviteCodeExists;
 
-    // Маппинг: tokenId (NFT инвайта) => inviteCode (уникальный строковый код)
+    // Маппинг: inviteId → inviteCode (совместимость имён с API)
     mapping(uint256 => string) public tokenIdToInviteCode;
 
-    // Маппинг: tokenId => использован ли инвайт
     mapping(uint256 => bool) public isInviteUsed;
 
-    // Маппинг: user (адрес) => использованный инвайт (tokenId)
+    // Маппинг: user → использованный инвайт (inviteId + 1)
     mapping(address => uint256) public usedInviteByUser;
 
-    // Маппинг: tokenId => срок действия инвайта (timestamp, 0 если бессрочный)
     mapping(uint256 => uint256) public inviteExpiry;
-
-    // Маппинг: tokenId => дата создания инвайта (timestamp)
     mapping(uint256 => uint256) public inviteCreatedAt;
-
-    // Маппинг: tokenId => адрес создателя (minter)
     mapping(uint256 => address) public inviteMinter;
-
-    // Маппинг: tokenId => адрес первого владельца инвайта
     mapping(uint256 => address) public inviteFirstOwner;
 
-    // Маппинг: user (адрес) => список всех его инвайтов (tokenId)
+    // Маппинг: user → список inviteId (совместимость API)
     mapping(address => uint256[]) private userInvites;
 
     // Счётчик общего количества использованных инвайтов
@@ -60,7 +50,6 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
     // Счётчик общего количества выданных инвайтов
     uint256 public totalInvitesMinted;
 
-    // Маппинг: tokenId => история всех владельцев (адреса)
     mapping(uint256 => address[]) public inviteTransferHistory;
 
     // Массив всех активированных пользователей
@@ -105,23 +94,20 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
     // === СТРУКТУРЫ ДЛЯ ДИАГНОСТИКИ ===
     
     /**
-     * @dev Структура для хранения информации об инвайте
+     * @dev Структура для хранения информации об инвайте (inviteId = id записи)
      */
     struct InviteInfo {
-        string inviteCode;           // Код инвайта
-        uint256 tokenId;            // ID токена инвайта
-        bool isUsed;                // Статус использования
-        address activatedBy;        // Адрес активатора (если инвайт использован)
-        uint256 activationTime;     // Время активации
-        uint256 expiry;             // Срок действия
+        string inviteCode;
+        uint256 tokenId;            // inviteId, совместимость API
+        bool isUsed;
+        address activatedBy;
+        uint256 activationTime;
+        uint256 expiry;
     }
     
-    /**
-     * @dev Структура для полной диагностики состояния селлера
-     */
     struct SellerDiagnostics {
-        bool isActivated;           // Статус активации пользователя
-        uint256 usedInviteTokenId;  // ID использованного инвайта
+        bool isActivated;
+        uint256 usedInviteTokenId;  // inviteId использованного инвайта
         bool hasSellerRole;         // Наличие роли SELLER_ROLE
         bool hasActivatorRole;      // Наличие роли ACTIVATOR_ROLE
         InviteInfo[] userInvites;   // Массив инвайтов пользователя
@@ -139,7 +125,7 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
 
     // === КОНСТРУКТОР ===
     
-    constructor() ERC721("SpiralInvite", "SPIRAL") {
+    constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SELLER_ROLE, msg.sender);
         _grantRole(ACTIVATOR_ROLE, msg.sender);
@@ -148,32 +134,31 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
     // === ОСНОВНЫЕ ФУНКЦИИ ИНВАЙТОВ ===
     
     /**
-     * @dev Минт нового инвайта
+     * @dev Создание новой записи инвайта (логический inviteId, без ERC721)
      * @param inviteCode уникальный код инвайта
      * @param expiry срок действия (0 = бессрочный)
-     * @return tokenId идентификатор созданного NFT
+     * @return inviteId идентификатор созданной записи
      */
     function mintInvite(string memory inviteCode, uint256 expiry) public onlyRole(SELLER_ROLE) returns (uint256) {
         require(bytes(inviteCode).length > 0, "SpiralEngine: empty invite code");
         require(!inviteCodeExists[inviteCode], "SpiralEngine: invite code already exists");
         
-        uint256 tokenId = _tokenIdCounter++;
-        _mint(msg.sender, tokenId);
+        uint256 inviteId = _inviteIdCounter++;
         
-        inviteCodeToTokenId[inviteCode] = tokenId;
+        inviteCodeToTokenId[inviteCode] = inviteId;
         inviteCodeExists[inviteCode] = true;
-        tokenIdToInviteCode[tokenId] = inviteCode;
-        inviteExpiry[tokenId] = expiry;
-        inviteCreatedAt[tokenId] = block.timestamp;
-        inviteMinter[tokenId] = msg.sender;
-        inviteFirstOwner[tokenId] = msg.sender;
+        tokenIdToInviteCode[inviteId] = inviteCode;
+        inviteExpiry[inviteId] = expiry;
+        inviteCreatedAt[inviteId] = block.timestamp;
+        inviteMinter[inviteId] = msg.sender;
+        inviteFirstOwner[inviteId] = msg.sender;
         
-        userInvites[msg.sender].push(tokenId);
+        userInvites[msg.sender].push(inviteId);
         userInviteCount[msg.sender]++;
         totalInvitesMinted++;
         
-        emit InviteMinted(msg.sender, tokenId, inviteCode, expiry);
-        return tokenId;
+        emit InviteMinted(msg.sender, inviteId, inviteCode, expiry);
+        return inviteId;
     }
 
     /**
@@ -208,27 +193,26 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
         activatedBy[msg.sender].push(user);
         activatedUsers.push(user);
         
-        // Создаем новые инвайты для пользователя
+        // Создаем новые записи инвайтов (без _mint)
         for (uint256 i = 0; i < newInviteCodes.length; i++) {
             require(bytes(newInviteCodes[i]).length > 0, "SpiralEngine: empty invite code");
             require(!inviteCodeExists[newInviteCodes[i]], "SpiralEngine: invite code already exists");
             
-            uint256 newTokenId = _tokenIdCounter++;
-            _mint(user, newTokenId);
+            uint256 newInviteId = _inviteIdCounter++;
             
-            inviteCodeToTokenId[newInviteCodes[i]] = newTokenId;
+            inviteCodeToTokenId[newInviteCodes[i]] = newInviteId;
             inviteCodeExists[newInviteCodes[i]] = true;
-            tokenIdToInviteCode[newTokenId] = newInviteCodes[i];
-            inviteExpiry[newTokenId] = expiry;
-            inviteCreatedAt[newTokenId] = block.timestamp;
-            inviteMinter[newTokenId] = user;
-            inviteFirstOwner[newTokenId] = user;
+            tokenIdToInviteCode[newInviteId] = newInviteCodes[i];
+            inviteExpiry[newInviteId] = expiry;
+            inviteCreatedAt[newInviteId] = block.timestamp;
+            inviteMinter[newInviteId] = user;
+            inviteFirstOwner[newInviteId] = user;
             
-            userInvites[user].push(newTokenId);
+            userInvites[user].push(newInviteId);
             userInviteCount[user]++;
             totalInvitesMinted++;
             
-            emit InviteMinted(user, newTokenId, newInviteCodes[i], expiry);
+            emit InviteMinted(user, newInviteId, newInviteCodes[i], expiry);
         }
         
         emit UserActivated(user, msg.sender, block.timestamp);
@@ -280,15 +264,13 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
     
     /**
      * @dev Валидация инвайт кода
-     * @param inviteCode код инвайта
-     * @param activator адрес активатора
-     * @return tokenId идентификатор токена
+     * @return inviteId идентификатор записи инвайта
      */
     function _validateInviteCode(string memory inviteCode, address activator) internal view returns (uint256) {
         require(inviteCodeExists[inviteCode], "SpiralEngine: invite code not found");
-        uint256 tokenId = inviteCodeToTokenId[inviteCode];
-        require(inviteMinter[tokenId] == activator, "SpiralEngine: invite not from activator");
-        return tokenId;
+        uint256 inviteId = inviteCodeToTokenId[inviteCode];
+        require(inviteMinter[inviteId] == activator, "SpiralEngine: invite not from activator");
+        return inviteId;
     }
 
     /**
@@ -311,12 +293,10 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
 
     /**
      * @dev Проверить, является ли инвайт от активатора
-     * @param tokenId идентификатор токена
-     * @param activator адрес активатора
-     * @return true если инвайт от активатора
+     * @param inviteId id записи инвайта
      */
-    function isInviteFromActivator(uint256 tokenId, address activator) public view returns (bool) {
-        return inviteMinter[tokenId] == activator;
+    function isInviteFromActivator(uint256 inviteId, address activator) public view returns (bool) {
+        return inviteMinter[inviteId] == activator;
     }
 
     // === УПРАВЛЕНИЕ SOUL IDENTITY ===
@@ -394,52 +374,35 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
         return soulIdentity.getSoulProfile(user);
     }
 
-    // === ПЕРЕОПРЕДЕЛЕНИЕ ФУНКЦИЙ ERC721 ===
-    
-    // === SBT (SOULBOUND TOKEN) МИНИМАЛЬНАЯ ПОДДЕРЖКА ===
-    
-    /**
-     * @dev Блокировка approve - SBT токены не могут быть approved
-     */
-    function approve(address /* to */, uint256 /* tokenId */) public pure override {
-        revert("SpiralEngine: approvals not allowed");
-    }
-    
-    /**
-     * @dev Блокировка setApprovalForAll - SBT токены не могут быть approved
-     */
-    function setApprovalForAll(address /* operator */, bool /* approved */) public pure override {
-        revert("SpiralEngine: approvals not allowed");
-    }
-    
-    /**
-     * @dev Проверка заблокированности токена (EIP-5192)
-     * Делегируется в SoulIdentity контракт
-     */
-    function locked(uint256 tokenId) external view override returns (bool) {
-        require(address(soulIdentity) != address(0), "SpiralEngine: soul identity not set");
-        return soulIdentity.locked(tokenId);
+    // === СОВМЕСТИМОСТЬ API (inviteId, без ERC721) ===
+
+    function name() public pure returns (string memory) { return "SpiralInvite"; }
+    function symbol() public pure returns (string memory) { return "SPIRAL"; }
+
+    function ownerOf(uint256 inviteId) public view returns (address) {
+        address o = inviteFirstOwner[inviteId];
+        require(o != address(0), "SpiralEngine: invite not found");
+        return o;
     }
 
-    /**
-     * @dev Поддержка интерфейсов
-     */
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721, AccessControl) returns (bool) {
+    function balanceOf(address owner) public view returns (uint256) {
+        return userInviteCount[owner];
+    }
+
+    function locked(uint256 /* inviteId */) external pure override returns (bool) {
+        return true;
+    }
+
+    function approve(address, uint256) public pure { revert("SpiralEngine: approvals not allowed"); }
+    function setApprovalForAll(address, bool) public pure { revert("SpiralEngine: approvals not allowed"); }
+    function transferFrom(address, address, uint256) public pure { revert("SpiralEngine: transfers not allowed"); }
+    function safeTransferFrom(address, address, uint256) public pure { revert("SpiralEngine: transfers not allowed"); }
+    function safeTransferFrom(address, address, uint256, bytes calldata) public pure { revert("SpiralEngine: transfers not allowed"); }
+    function getApproved(uint256) public pure returns (address) { return address(0); }
+    function isApprovedForAll(address, address) public pure returns (bool) { return false; }
+
+    function supportsInterface(bytes4 interfaceId) public view override(AccessControl) returns (bool) {
         return interfaceId == type(IERC5192).interfaceId || super.supportsInterface(interfaceId);
-    }
-
-    /**
-     * @dev Переопределение transferFrom для предотвращения передачи
-     */
-    function transferFrom(address /* from */, address /* to */, uint256 /* tokenId */) public pure override {
-        revert("SpiralEngine: transfers not allowed");
-    }
-
-    /**
-     * @dev Базовый URI для токенов
-     */
-    function _baseURI() internal pure override returns (string memory) {
-        return "https://api.amanita.com/spiral/";
     }
 
     // === ДИАГНОСТИЧЕСКИЕ ФУНКЦИИ ===
