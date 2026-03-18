@@ -66,8 +66,9 @@
 
 **Seller (SELLER_ROLE) — MVP:**
 
-- выдаётся **ручным решением админа** (через `ADMIN_ROLE` / owner), без on‑chain recommendation‑индексов и stake‑кампаний;  
+- выдаётся **только адресам с ролью админа** (через `ADMIN_ROLE` / owner), без on‑chain recommendation‑индексов и stake‑кампаний;  
 - инвариант: без `usedInviteByUser[user] != 0` и без `ACTIVATOR_ROLE` пользователь SELLER не получает;  
+- **каждая выдача SELLER фиксируется событием** `SellerRoleGranted(address indexed user, address indexed nominator, uint256 timestamp)` — оффчейн‑системы могут подписываться на него для аудита и мониторинга назначений;  
 - правовые/рисковые проверки, контент‑проверка и т.д. остаются в оффчейн‑процессах и `Contracts Security Architecture`.
 
 **Target‑состояние для Seller (Roles Policy):**  
@@ -286,9 +287,10 @@
 ### 1.2. Seller
 
 **MVP:**
-- `SELLER_ROLE` **выдаётся админом вручную**:
+- `SELLER_ROLE` **выдаётся только админом** (адреса с `ADMIN_ROLE` / деплоящий аккаунт):
   - только через `ADMIN_ROLE` / деплоящий аккаунт;
   - без on-chain индекса рекомендаций и stake‑кампаний.
+- **Каждая выдача фиксируется событием** `SellerRoleGranted(address indexed user, address indexed nominator, uint256 timestamp)` — оффчейн может подписываться на него для аудита и мониторинга.
 - Базовые инварианты:
   - без `usedInviteByUser[user] != 0` и без `ACTIVATOR_ROLE` пользователь **не может** стать SELLER.
 

@@ -514,27 +514,28 @@ contract SpiralEngineLogic is
     }
     
     /**
-     * @dev Назначение роли продавца
+     * @dev Назначение роли продавца (MVP: только ADMIN)
      * @param user адрес пользователя
-     * 
-     * @notice Доступно только пользователям с ACTIVATOR_ROLE
-     * @notice Пользователь должен быть активирован
+     *
+     * @notice Доступно только ADMIN_ROLE (MVP Scope: выдача SELLER только админом)
+     * @notice Пользователь должен быть активирован (usedInviteByUser != 0)
+     * @notice При успешной выдаче эмитится SellerRoleGranted(user, msg.sender, block.timestamp) для оффчейн-аудита и мониторинга
      */
-    function grantSellerRole(address user) 
-        external 
-        whenNotPaused 
-        nonReentrant 
-        onlyRole(ACTIVATOR_ROLE) 
-        override 
+    function grantSellerRole(address user)
+        external
+        whenNotPaused
+        nonReentrant
+        onlyRole(ADMIN_ROLE)
+        override
     {
         if (user == address(0)) revert InvalidUserAddress();
         if (usedInviteByUser[user] == 0) revert UserNotActivated();
         if (hasRole(SELLER_ROLE, user)) revert UserAlreadyHasSellerRole();
-        
+
         _grantRole(SELLER_ROLE, user);
         sellerNominator[user] = msg.sender;
         nominatedSellers[msg.sender].push(user);
-        
+
         emit SellerRoleGranted(user, msg.sender, block.timestamp);
     }
     

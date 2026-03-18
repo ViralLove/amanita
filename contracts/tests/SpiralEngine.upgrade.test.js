@@ -151,7 +151,7 @@ describe("SpiralEngine UUPS Upgrade Tests", function () {
             );
             
             // Даем пользователю роль SELLER_ROLE
-            await spiralEngine.connect(activator).grantSellerRole(user.address);
+            await spiralEngine.connect(deployer).grantSellerRole(user.address);
             
             // Проверяем состояние до upgrade
             const totalInvitesMintedBefore = await spiralEngine.totalInvitesMinted();

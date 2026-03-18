@@ -216,9 +216,9 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             await spiralEngine.connect(admin).pause();
             console.log("   ⏸️  Contract paused");
             
-            // Попытка назначить роль должна провалиться
+            // Попытка назначить роль (от админа) должна провалиться из-за паузы
             await expectCustomError(
-                spiralEngine.connect(activator).grantSellerRole(user1.address),
+                spiralEngine.connect(admin).grantSellerRole(user1.address),
                 spiralEngine,
                 "EnforcedPause"
             );
@@ -228,8 +228,8 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             await spiralEngine.connect(admin).unpause();
             console.log("   ▶️  Contract unpaused");
             
-            // Теперь должно работать
-            await spiralEngine.connect(activator).grantSellerRole(user1.address);
+            // Теперь должно работать (только ADMIN может вызывать grantSellerRole в MVP)
+            await spiralEngine.connect(admin).grantSellerRole(user1.address);
             expect(await spiralEngine.hasRole(
                 await spiralEngine.SELLER_ROLE(),
                 user1.address
@@ -478,8 +478,8 @@ describe("🔥 SpiralEngine UUPS - Comprehensive Tests", function () {
             );
             console.log("   ✅ activateUser - sequential call works");
             
-            // ===== PHASE 3: grantSellerRole (проверяет nonReentrant) =====
-            await spiralEngine.connect(activator).grantSellerRole(user1.address);
+            // ===== PHASE 3: grantSellerRole (проверяет nonReentrant; MVP: только ADMIN) =====
+            await spiralEngine.connect(admin).grantSellerRole(user1.address);
             console.log("   ✅ grantSellerRole - sequential call works");
             
             // ===== PHASE 4: suspendUser (проверяет nonReentrant) =====

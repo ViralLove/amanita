@@ -515,13 +515,13 @@ describe("SpiralEngine - Basic Functionality", function () {
             );
         });
 
-        it("Should grant seller role successfully", async function () {
+        it("Should grant seller role successfully (only ADMIN in MVP)", async function () {
             console.log("Testing seller role granting...");
             
-            const tx = await spiralEngine.connect(activator).grantSellerRole(user.address);
+            const tx = await spiralEngine.connect(deployer).grantSellerRole(user.address);
             const receipt = await tx.wait();
             
-            // Проверяем событие
+            // Проверяем событие (оффчейн может подписаться на SellerRoleGranted)
             const event = receipt.logs.find(log => {
                 try {
                     const parsed = spiralEngine.interface.parseLog(log);
@@ -534,7 +534,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             
             // Проверяем состояние
             expect(await spiralEngine.hasRole(SELLER_ROLE, user.address)).to.be.true;
-            expect(await spiralEngine.sellerNominator(user.address)).to.equal(activator.address);
+            expect(await spiralEngine.sellerNominator(user.address)).to.equal(deployer.address);
             
             console.log("✅ Seller role granted successfully");
         });
@@ -549,7 +549,7 @@ describe("SpiralEngine - Basic Functionality", function () {
             });
             
             await expectCustomError(
-                spiralEngine.connect(activator).grantSellerRole(newUser.address),
+                spiralEngine.connect(deployer).grantSellerRole(newUser.address),
                 spiralEngine,
                 "UserNotActivated"
             );
@@ -557,9 +557,15 @@ describe("SpiralEngine - Basic Functionality", function () {
             console.log("✅ Non-activated user correctly rejected");
         });
 
-        it("Should only allow ACTIVATOR_ROLE to grant seller role", async function () {
-            console.log("Testing ACTIVATOR_ROLE requirement for granting seller role...");
-            // user is activated so now has ACTIVATOR_ROLE (SEC-AC-1); use a non-role account to test restriction
+        it("Should only allow ADMIN_ROLE to grant seller role (MVP SEC-SE-1)", async function () {
+            console.log("Testing ADMIN_ROLE requirement for granting seller role...");
+            // Активатор без ADMIN не может вызвать grantSellerRole
+            await expectCustomError(
+                spiralEngine.connect(activator).grantSellerRole(user.address),
+                spiralEngine,
+                "AccessControlUnauthorizedAccount"
+            );
+            // Обычный пользователь без ролей тоже не может
             const noRoleUser = ethers.Wallet.createRandom().connect(ethers.provider);
             await deployer.sendTransaction({ to: noRoleUser.address, value: ethers.parseEther("0.1") });
             await expectCustomError(
@@ -567,7 +573,7 @@ describe("SpiralEngine - Basic Functionality", function () {
                 spiralEngine,
                 "AccessControlUnauthorizedAccount"
             );
-            console.log("✅ Non-ACTIVATOR_ROLE correctly prevented from granting seller role");
+            console.log("✅ Only ADMIN can grant seller role (MVP)");
         });
     });
 
@@ -843,8 +849,8 @@ describe("SpiralEngine - Basic Functionality", function () {
             await tx.wait();
             console.log(`   Activation transaction completed`);
             
-            // Даем пользователю роль SELLER_ROLE
-            await spiralEngine.connect(activator).grantSellerRole(user.address);
+            // Даем пользователю роль SELLER_ROLE (MVP: только ADMIN)
+            await spiralEngine.connect(deployer).grantSellerRole(user.address);
             
             // Получаем диагностику
             const diagnostics = await spiralEngine.getSellerDiagnostics(user.address);

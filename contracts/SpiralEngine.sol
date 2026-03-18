@@ -235,10 +235,11 @@ contract SpiralEngine is ERC721, AccessControl, IERC5192 {
     }
 
     /**
-     * @dev Назначение роли продавца
+     * @dev Назначение роли продавца (MVP: только админ)
      * @param user адрес пользователя
+     * @notice Доступно только DEFAULT_ADMIN_ROLE (деплоер); при выдаче эмитится SellerRoleGranted для оффчейн
      */
-    function grantSellerRole(address user) public onlyRole(ACTIVATOR_ROLE) {
+    function grantSellerRole(address user) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(user != address(0), "SpiralEngine: invalid user address");
         require(usedInviteByUser[user] > 0, "SpiralEngine: user not activated");
         require(!hasRole(SELLER_ROLE, user), "SpiralEngine: user already has seller role");
