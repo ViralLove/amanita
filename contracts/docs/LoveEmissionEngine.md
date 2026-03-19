@@ -47,7 +47,7 @@
 
 **Событие:**
 ```solidity
-event Emission(address indexed seller, uint256 amanitaAmount, uint256 agovAccrued);
+event Emission(address indexed seller, uint256 lovecoinAmount, uint256 lgovAccrued);
 ```
 
 ### Клейм утилити токенов
