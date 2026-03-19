@@ -111,7 +111,7 @@ SELLER можно получить **только одним из двух пу�
 
 | Функция | Кто может | Проверка |
 |---------|-----------|----------|
-| createActivity(activity_type, metadataCID) | Активированный ACTIVITY_CREATOR | ACTIVITY_CREATOR_ROLE + usedInviteByUser != 0. |
+| createActivity(activity_type, metadataCID) | Активированный Activator | ACTIVATOR_ROLE + usedInviteByUser != 0. |
 | activateActivity(activityId) / deactivateActivity(activityId) | Creator этой активности | onlyOwnActivity. |
 | getActivity, getActivitiesByCreator, getPublishedActivityIds | View | По контракту. |
 | pause, unpause, setSpiralEngine | ADMIN_ROLE | onlyRole(ADMIN_ROLE). |
@@ -156,5 +156,7 @@ API / UI
 
 ---
 
-**Версия:** 1.1  
+**Примечание (история решений):** Отдельная роль `ACTIVITY_CREATOR_ROLE` рассматривалась в ранних decision-документах (task-Activities-1); актуальная модель использует только **ACTIVATOR_ROLE** для создателей активностей (см. task-implement-spiralengine-activity-creator-role).
+
+**Версия:** 1.2  
 **Статус:** Архитектурный референс по ролям; документ будет дополняться.

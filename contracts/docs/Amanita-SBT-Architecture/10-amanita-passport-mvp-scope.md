@@ -5,7 +5,7 @@
 **Методика:** run-analysis; целостное понимание архитектуры SBT (документы 01–09) и планируемых интеграций.  
 **Назначение:** зафиксировать минимальный объём функциональности, достаточный для объявления «Amanita Passport MVP» и для согласования границ с тасками и интеграциями.
 
-Связанные документы: [00-INDEX.md](./00-INDEX.md), [08-personhood-driven-federated-identity-model.md](./08-personhood-driven-federated-identity-model.md), [06-identity-did-invite-sbt-metadata-audit.md](./06-identity-did-invite-sbt-metadata-audit.md), [04-critical-audit-goals.md](./04-critical-audit-goals.md), [09-x-love-do-feasibility-analysis.md](./09-x-love-do-feasibility-analysis.md).
+Связанные документы: [00-INDEX.md](./00-INDEX.md), [08-personhood-driven-federated-identity-model.md](./08-personhood-driven-federated-identity-model.md), [06-identity-did-invite-sbt-metadata-audit.md](./06-identity-did-invite-sbt-metadata-audit.md), [04-critical-audit-goals.md](./04-critical-audit-goals.md), [09-x-love-do-feasibility-analysis.md](./09-x-love-do-feasibility-analysis.md). Интеграция Passport с X (опциональная привязка, discovery, превью, границы): [X-Integration-Schema.md](../../../docs/tech/X-Integration-Schema.md).
 
 ---
 
@@ -53,7 +53,7 @@
 |------------|----------------|-------------|
 | **SpiralEngine** | Активация, инвайты, роли (SELLER, ACTIVATOR), usedInviteByUser. После активации — процесс минта души. | Level/reputation души не используются в правилах движка (активация, санкции, grantSellerRole). |
 | **LoveDo / LoveEmission** | После выполнения таска [task-fix-lovedo-emission-interface](../analysis/tasks/task-fix-lovedo-emission-interface/task-fix-lovedo-emission-interface.md): автор LoveDo, superlikes и эмиссия согласованы с контрактами. Passport может отображать «автор отзывов / superlikes» как часть активности. | X likes не являются ончейн superlikes; только доверительный superlike внутри invite-circle (док. 09). |
-| **X** | Опциональная привязка X-аккаунта к Passport (external identity); Passport URL + preview cards для discovery; при необходимости Sign in with X. | X не source of truth для репутации; X post → LoveDo token и X likes → superlikes не входят в MVP как автоматический ончейн-поток. |
+| **X** | Опциональная привязка X-аккаунта к Passport (external identity); Passport URL + preview cards для discovery; при необходимости Sign in with X. См. [X-Integration-Schema.md](../../../docs/tech/X-Integration-Schema.md). | X не source of truth для репутации; X post → LoveDo token и X likes → superlikes не входят в MVP как автоматический ончейн-поток. |
 
 ---
 
@@ -72,7 +72,7 @@
 - [ ] Passport-профиль (один community) читаем: displayName, handle, soul (tokenId, level, reputation), основная DID; при необходимости — external identity (X).
 - [ ] Восстановление доступа к душе возможно через SoulRecovery (guardian → newOwner) и документировано; при необходимости — единая точка входа через SoulIdentity (Phase 2).
 - [ ] LoveDo/LoveEmission: интерфейс выровнен (таск task-fix-lovedo-emission-interface выполнен); superlike и эмиссия работают без расхождений с LoveDoPostNFT.
-- [ ] X: опциональная привязка к Passport и использование X как discovery/превью — документированы; нет зависимости Passport от X как от источника репутации.
+- [ ] X: опциональная привязка к Passport и использование X как discovery/превью — документированы; нет зависимости Passport от X как от источника репутации. Документ: [docs/tech/X-Integration-Schema.md](../../../docs/tech/X-Integration-Schema.md).
 - [ ] Документация: границы MVP (один community, одна сеть), точки решений и список «вне MVP» актуальны и доступны команде.
 
 ---
