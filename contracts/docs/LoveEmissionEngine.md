@@ -117,13 +117,13 @@ console.log(`LoveDo постов: ${loveDoCount}`);
 ### Основные маппинги
 ```solidity
 // Продавец => накопленные $LOVECOIN
-mapping(address => uint256) public amanitaAccrued;
+mapping(address => uint256) public loveAccrued;
 
 // Продавец => накопленные $LGOV
-mapping(address => uint256) public agovAccrued;
+mapping(address => uint256) public lgovAccrued;
 
 // Продавец => активировал ли $LGOV
-mapping(address => bool) public agovClaimed;
+mapping(address => bool) public lgovClaimed;
 ```
 
 ### Константы
@@ -135,7 +135,7 @@ uint8 public constant LOVE_DO_THRESHOLD = 8;            // Порог для $LG
 ### Внешние контракты
 ```solidity
 IERC20 public immutable lovecoin;                   // $LOVECOIN токен
-IAGovToken public immutable lgovToken;                  // $LGOV токен
+ILGovToken public immutable lgovToken;              // $LGOV токен
 ILoveDoPostNFT public immutable loveDo;                 // LoveDoPostNFT
 IInviteGraph public inviteGraph;                        // Граф инвайтов
 ```
@@ -166,7 +166,7 @@ lgovClaimed[msg.sender] = true;
 
 ### Основные события
 ```solidity
-event Emission(address indexed seller, uint256 amanitaAmount, uint256 agovAccrued);
+event Emission(address indexed seller, uint256 lovecoinAmount, uint256 lgovAccrued);
 event ClaimedLOVECOIN(address indexed seller, uint256 amount);
 event ClaimedLGOV(address indexed seller, uint256 amount);
 ```
@@ -293,9 +293,9 @@ graph LR
 ## Мониторинг и аналитика
 
 ### Счетчики
-- `amanitaAccrued[seller]` - накопленные $LOVECOIN
-- `agovAccrued[seller]` - накопленные $LGOV
-- `agovClaimed[seller]` - статус активации $LGOV
+- `loveAccrued[seller]` - накопленные $LOVECOIN
+- `lgovAccrued[seller]` - накопленные $LGOV
+- `lgovClaimed[seller]` - статус активации $LGOV
 
 ### Прогресс репутации
 - Количество LoveDo постов

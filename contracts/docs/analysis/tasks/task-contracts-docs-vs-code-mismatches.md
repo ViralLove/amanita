@@ -1,137 +1,84 @@
 # task: Несоответствия docs ↔ code ↔ tests в `contracts/`
 
-**Статус:** TODO (не исправлялось)  
-**Цель:** зафиксировать найденные несоответствия, чтобы позже синхронизировать документацию/контракты/тесты.  
-**Правило:** никаких предположений — только то, что подтверждено кодом/тестами в репозитории.
+**Статус:** Implemented (Waiting Acceptance)  
+**Цель:** держать актуальный реестр реальных mismatch-пунктов после SM-1 / SM-1.1 / SM-1.2 / SM-2.  
+**Правило:** только подтвержденные факты из текущего кода и тестов.
 
 ---
 
-## 1) `contracts/docs/LoveEmissionEngine.md` не соответствует `contracts/LoveEmissionEngine.sol`
+## 1) LoveDo ↔ LoveEmission ↔ tests: статус после последних задач
 
-### 1.1 Нейминг storage/ивентов
-- **В docs**: используются `amanitaAccrued` / `agovAccrued`, и `Emission(... amanitaAmount, agovAccrued)`
-  - файл: `contracts/docs/LoveEmissionEngine.md`
-- **В коде**: используются `loveAccrued` / `lgovAccrued`, и `Emission(... lovecoinAmount, lgovAccrued)`
-  - файл: `contracts/LoveEmissionEngine.sol`
-  - примеры:
-    - `mapping(address => uint256) public loveAccrued;`
-    - `mapping(address => uint256) public lgovAccrued;`
-    - `event Emission(address indexed seller, uint256 lovecoinAmount, uint256 lgovAccrued);`
+### 1.1 Ранее критичный mismatch интерфейсов — **закрыт**
+- Исторический конфликт (`addSuperlike`/`getPost`) из SM-1 устранен.
+- Текущая связка компилируется и тестируется:
+  - `contracts/LoveDoPostNFT.sol`
+  - `contracts/LoveEmissionEngine.sol`
+  - `contracts/tests/LoveEmissionEngine.lovecoin.test.js`
+  - `contracts/tests/LoveEmissionEngine.social-mining.mvp.test.js`
 
-### 1.2 Несовпадение API с LoveDo контрактом (см. п.2)
-`LoveEmissionEngine` описан как тесно интегрированный с LoveDo, но текущие сигнатуры **не совпадают** с текущей реализацией `LoveDoPostNFT.sol` (см. ниже).
+### 1.2 User-driven superlike и anti-double-emit — **закрыто**
+- Лайк ставится пользователем напрямую в LoveDo (`msg.sender`).
+- Engine проверяет `hasSuperliked(tokenId, liker)` и защищен `emittedForLike[tokenId][liker]`.
 
----
+### 1.3 Depth-circle модель в LoveDo и удаление дублирования в Engine — **закрыто**
+- В `LoveDoPostNFT` проверка сообщества теперь depth-based (`K/L`, anchor, max hops).
+- В `LoveEmissionEngine` удален дублирующий circle-check.
 
-## 2) `contracts/LoveEmissionEngine.sol` ↔ `contracts/LoveDoPostNFT.sol`: несовместимые сигнатуры
-
-### 2.1 `addSuperlike`
-- **В `LoveEmissionEngine.sol`** (ожидается):
-  - `function addSuperlike(uint256 tokenId) external returns (bool);`
-  - `bool success = loveDo.addSuperlike(tokenId);`
-- **В `LoveDoPostNFT.sol`** (реально есть):
-  - `function addSuperlike(uint256 tokenId, uint256 expectedNonce) external`
-  - return value отсутствует (не `bool`)
-
-### 2.2 `getPost`
-- **В `LoveEmissionEngine.sol`** (ожидается tuple):
-  - `function getPost(uint256 tokenId) external view returns (address author, address sellerTo, address linkedSeller, uint8 superlikes);`
-- **В `LoveDoPostNFT.sol`** (реально есть):
-  - `function getPost(uint256 tokenId) external view returns (LoveDo memory)`
-
-### 2.3 Вывод
-Текущая пара `LoveEmissionEngine.sol` и `LoveDoPostNFT.sol` **не компилируется/не линкуется как единая связка** без правок интерфейса/адаптера. Это видно по несовпадающим сигнатурам вызовов (`addSuperlike`, `getPost`).
+### 1.4 Social-mining MVP suite — **закрыто**
+- Добавлен отдельный suite:
+  - `contracts/tests/LoveEmissionEngine.social-mining.mvp.test.js`
+- Покрыты accrual инварианты, depth-circle gating, monthly limits, threshold + one-shot.
 
 ---
 
-## 3) `contracts/LoveDoPostNFT.sol` ↔ `contracts/AmanitaRegistry.sol`: несовместимый контрактный API
+## 2) Оставшиеся актуальные mismatch-пункты
 
-### 3.1 `hasSellerRole`
-- **В `LoveDoPostNFT.sol`** контракт ожидает:
-  - `IAmanitaRegistry public amanitaRegistry;`
-  - `require(amanitaRegistry.hasSellerRole(...), "...");`
-  - интерфейс определён внизу файла:
-    - `interface IAmanitaRegistry { function hasSellerRole(address user) external view returns (bool); }`
-- **В `AmanitaRegistry.sol`** (реально есть):
-  - только `setAddress/getAddress/getAllContractNames/transferOwnership`
-  - **нет** `hasSellerRole(address)`
+## 2.1 `LoveDoPostNFT.sol` ↔ `AmanitaRegistry.sol`: API still mismatched
+- **В `LoveDoPostNFT.sol`** ожидается `hasSellerRole(address)`.
+- **В `AmanitaRegistry.sol`** (по текущему состоянию задачи и прошлому аудиту) такого метода нет.
+- В тестах используется `LoveAmanitaRegistryMock`, что обходило это место, но для production source-of-truth вопрос остаётся.
 
-### 3.2 Вывод
-Текущий `LoveDoPostNFT.sol` нельзя корректно связать с текущим `AmanitaRegistry.sol` как с “реестром sellers” — отсутствует требуемый метод.
+**Статус:** Open.
 
 ---
 
-## 4) Тесты по LoveEmission/LoveDo выглядят написанными под другой `LoveDoPostNFT` (или старую версию)
+## 2.2 Терминология LGOV vs on-chain symbol AGOV
+- Экономические docs используют `$LGOV`.
+- Контракт governance токена использует symbol `AGOV`.
+- В персистентной зоне social mining (`LoveEmissionEngine.md`, `LovecoinTokens.md`, `SpiralEngine & LGOV Security MVP Scope.md`) добавлена/сохранена явная связка: *LGOV в экономической модели ↔ AGOV как on-chain symbol*.
 
-### 4.1 `contracts/tests/LoveEmissionEngine.lovecoin.test.js`
-В тесте используются сущности/сигнатуры, которых нет в текущих контрактах:
-
-- **Деплой `LoveDoPostNFT`**:
-  - в тесте: `LoveDoPostNFT.deploy(deployer.address, deployer.address, deployer.address)`
-  - в текущем контракте: `constructor(address _admin, address _inviteGraph, address _amanitaRegistry)`
-- **Минт поста**:
-  - в тесте вызывается `loveDoPostNFT.mintLoveDo(...)`
-  - в текущем контракте есть `mintLoveDoPost(address sellerTo, string calldata uri)`
-- **Получение tokenId**:
-  - в тесте: `getCurrentTokenId()`
-  - в текущем контракте: публичная переменная `nextTokenId` (и нет `getCurrentTokenId`)
-- **Суперлайк**:
-  - в тесте суперлайк идёт через `LoveEmissionEngine.emitForSuperlike(tokenId, liker)`
-  - но внутри `LoveEmissionEngine` вызов `loveDo.addSuperlike(tokenId)` не совпадает с текущей сигнатурой `LoveDoPostNFT.addSuperlike(tokenId, expectedNonce)`
-
-### 4.2 Вывод
-С высокой вероятностью в репозитории одновременно присутствуют:
-- новая версия `LoveDoPostNFT.sol` (nonce-based, registry-check),
-- и тесты/движок эмиссии, написанные под другую (старую) версию LoveDo.
-
-Это нужно разрулить: либо обновить тесты и `LoveEmissionEngine` под текущий `LoveDoPostNFT`, либо вернуть/хранить “старый” LoveDo как отдельный контракт (и явно назвать).
+**Статус:** Partially closed (остаётся проверить оставшиеся docs вне social-mining пакета).
 
 ---
 
-## 5) Несоответствие “какой реестр адресов используется” (`AmanitaRegistry` vs `MagicRegistry`) и качество текущей реализации
+## 2.3 Реестры адресов и дубликаты имен (`AmanitaRegistry` / `MagicRegistry`)
+- По-прежнему актуально наблюдение о потенциальных дубликатах в списках имен при повторных `set`.
 
-### 5.1 `AmanitaRegistry.sol` дублирует имена
-- В `AmanitaRegistry.sol`:
-  - при каждом `setAddress(name, addr)` имя **всегда** пушится в `contractNames` (возможны дубликаты)
-
-### 5.2 `MagicRegistry.sol` аналогично хранит список имён без дедупликации
-- `MagicRegistry.sol` делает `names.push(key)` на каждый `set()`
-
-### 5.3 Вывод
-Документация может описывать “чистый список уникальных имён”, но по факту оба реестра сейчас позволяют дубликаты в массиве имён.
+**Статус:** Open (качество API/документации).
 
 ---
 
-## 6) Нейминг governance-токена: docs часто пишут LGOV, но в коде символ AGOV
+## 2.4 Варианты SpiralEngine (UUPS vs non-UUPS)
+- В репозитории присутствуют обе линии.
+- В docs/integration notes важно явно указывать, о каком адресе/ABI идет речь.
 
-### 6.1 `AmanitaGovToken.sol`
-- контракт разворачивается как:
-  - `ERC20("Amanita Governance", "AGOV")`
-
-### 6.2 Вывод
-Если в docs/внешних интерфейсах используется термин `$LGOV`, нужно явно описать связь “LGOV (в терминах экономики) = AGOV (on-chain symbol)” либо синхронизировать нейминг.
+**Статус:** Open (архитектурная дисциплина документации).
 
 ---
 
-## 7) SpiralEngine: две реализации (UUPS и non-UUPS) — важно не смешивать в docs
+## 3) Что закрыто относительно старой версии этого файла
 
-В репозитории присутствуют:
-- `contracts/SpiralEngineLogic.sol` + `contracts/SpiralEngineProxy.sol` (UUPS)
-- `contracts/SpiralEngine.sol` (не UUPS)
-
-Если docs/интеграции/деплой-скрипты ссылаются на “SpiralEngine”, нужно фиксировать, **какой адрес ожидается** (proxy или не-proxy), иначе легко получить несовпадение ABI/поведения.
+- ❎ Пункт про «несовместимые сигнатуры LoveEmission ↔ LoveDo» — закрыт.
+- ❎ Пункт про «тесты написаны под старый LoveDo» — закрыт.
+- ❎ Пункт про «LoveEmissionEngine.md критично не соответствует коду» — существенно закрыт по ключевым API/flow после SM-1.1/SM-1.2.
 
 ---
 
-## Мини-чеклист для будущего исправления (когда будет время)
-- [ ] Принять решение: какая версия LoveDo является канонической (nonce-based vs “старый” интерфейс).
-- [ ] Привести `LoveEmissionEngine.sol` и `LoveDoPostNFT.sol` к единому интерфейсу (или сделать адаптер).
-- [ ] Привести `LoveEmissionEngine.lovecoin.test.js` в соответствие с канонической версией LoveDo.
-- [ ] Решить, кто является “source of truth” по `hasSellerRole`:
-  - [ ] добавить метод в реестр, или
-  - [ ] заменить проверку в LoveDo на SpiralEngine (если это канон), или
-  - [ ] ввести отдельный контракт “SellerRegistry” и документировать его.
-- [ ] Синхронизировать `contracts/docs/LoveEmissionEngine.md` с реальным `LoveEmissionEngine.sol` (нейминг + события).
-- [ ] Синхронизировать документацию по токенам: LGOV термин ↔ AGOV символ.
+## 4) Мини-чеклист на следующий цикл (реально открытое)
+
+- [ ] Зафиксировать production source-of-truth для `hasSellerRole` в LoveDo (и документировать контракт-источник).
+- [ ] Дозакрыть нормализацию LGOV/AGOV терминологии во всех оставшихся docs вне social-mining зоны.
+- [ ] Уточнить и при необходимости задокументировать поведение реестров при повторных `set`.
+- [ ] Добавить в канонические docs явную пометку про UUPS/non-UUPS адреса SpiralEngine.
 
 

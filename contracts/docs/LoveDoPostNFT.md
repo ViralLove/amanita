@@ -256,24 +256,25 @@ LoveDoPostNFT тесно интегрирован с **LoveEmissionEngine** дл
 - **Социальные связи** - проверка depth-circle в LoveDoPostNFT (SSOT)
 - **Репутация** - количество постов влияет на активацию governance токенов
 
-#### Интерфейс для эмиссии
+#### Интерфейс для эмиссии (актуальный)
 ```solidity
 // LoveEmissionEngine использует эти методы:
-function addSuperlike(uint256 tokenId) external returns (bool);
+function hasSuperliked(uint256 tokenId, address liker) external view returns (bool);
 function getPost(uint256 tokenId) external view returns (
     address author,
-    address sellerTo, 
+    address sellerTo,
     address linkedSeller,
-    uint8 superlikes
+    uint8 superlikes,
+    uint256 timestamp
 );
 function getLoveDoCount(address seller) external view returns (uint8);
 ```
 
 #### Экономическая модель
-- **1 суперлайк** = 1 ether $LOVECOIN + 1 ether $LGOV
+- **1 суперлайк** = 1 ether $LOVECOIN + 1 ether $LGOV (после валидации Engine)
 - **$LOVECOIN** - клеймятся сразу после накопления
 - **$LGOV** - активируются при достижении 8+ постов
-- **Социальная проверка** - эмиссия только от участников одного круга
+- **Социальная проверка** - depth-circle проверяется в `addSuperlike` (SSOT в LoveDo)
 
 ## Использование
 
@@ -292,8 +293,8 @@ await loveDoNFT.mintLoveDoPost(sellerTo, ipfsURI);
 ```javascript
 const loveDoNFT = new ethers.Contract(address, abi, signer);
 
-// Получение текущего nonce
-const nonce = await loveDoNFT.superlikeNonces(sellerAddress);
+// Получение текущего nonce (для текущего signer/liker)
+const nonce = await loveDoNFT.superlikeNonces(await signer.getAddress());
 
 // Постановка суперлайка
 const tokenId = 123;
