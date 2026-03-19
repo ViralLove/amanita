@@ -41,8 +41,11 @@
 **Процесс эмиссии:**
 1. ✅ Получение данных о посте из LoveDoPostNFT
 2. ✅ Проверка социальных связей через граф инвайтов
-3. ✅ Постановка суперлайка в LoveDoPostNFT
-4. ✅ Накопление $LOVECOIN для продавца-получателя
+3. ✅ Проверка, что суперлайк уже поставлен пользователем (`hasSuperliked(tokenId, liker)`)
+4. ✅ Проверка anti-double-emit для пары `(tokenId, liker)`
+5. ✅ Накопление $LOVECOIN для продавца-получателя
+6. ✅ Накопление $LGOV для продавца-получателя
+7. ✅ Эмиссия события Emission
 5. ✅ Накопление $LGOV для продавца-получателя
 6. ✅ Эмиссия события Emission
 
@@ -187,14 +190,14 @@ event ClaimedLGOV(address indexed seller, uint256 amount);
 ## Интеграция с LoveDoPostNFT
 
 ### Тесная связь
-LoveEmissionEngine тесно интегрирован с LoveDoPostNFT:
+LoveEmissionEngine интегрирован с LoveDoPostNFT в модели user-driven superlike:
 
 ```solidity
 // Получение данных о посте
 (address author, address sellerTo, address linkedSeller, uint8 superlikes) = loveDo.getPost(tokenId);
 
-// Постановка суперлайка
-bool success = loveDo.addSuperlike(tokenId);
+// Проверка факта суперлайка от конкретного пользователя
+require(loveDo.hasSuperliked(tokenId, liker), "LoveEmission: superlike not found for liker");
 
 // Проверка количества постов
 uint8 count = loveDo.getLoveDoCount(msg.sender);
@@ -204,12 +207,13 @@ uint8 count = loveDo.getLoveDoCount(msg.sender);
 ```solidity
 interface ILoveDoPostNFT {
     function mentionsOf(address seller) external view returns (uint8);
-    function addSuperlike(uint256 tokenId) external returns (bool);
+    function hasSuperliked(uint256 tokenId, address liker) external view returns (bool);
     function getPost(uint256 tokenId) external view returns (
         address author,
         address sellerTo,
         address linkedSeller,
-        uint8 superlikes
+        uint8 superlikes,
+        uint256 timestamp
     );
     function getLoveDoCount(address seller) external view returns (uint8);
 }
