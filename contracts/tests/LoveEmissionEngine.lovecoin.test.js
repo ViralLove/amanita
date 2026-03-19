@@ -31,7 +31,7 @@ describe("LoveEmissionEngine with Lovecoin", function () {
     let loveDoPostNFT;
     let inviteGraph;
     let loveEmissionEngine;
-    let deployer, user1, user2, seller, liker, emitter;
+    let deployer, user1, user2, seller, liker, emitter, likerFar, likerOther;
 
     beforeEach(async function () {
         // Получаем деплоера
@@ -47,7 +47,10 @@ describe("LoveEmissionEngine with Lovecoin", function () {
 
         // Финансируем кошельки
         const fundingAmount = ethers.parseEther("1.0");
-        for (const user of [user1, user2, seller, liker, emitter]) {
+        likerFar = ethers.Wallet.createRandom().connect(ethers.provider);
+        likerOther = ethers.Wallet.createRandom().connect(ethers.provider);
+
+        for (const user of [user1, user2, seller, liker, emitter, likerFar, likerOther]) {
             await deployer.sendTransaction({
                 to: user.address,
                 value: fundingAmount
@@ -81,9 +84,25 @@ describe("LoveEmissionEngine with Lovecoin", function () {
         );
         await loveDoPostNFT.waitForDeployment();
 
-        // Круг для author (user1) и liker
+        // Root-граф (L=1 по умолчанию):
+        // deployer(root) -> seller(depth1, anchor=seller) -> user1(depth2) -> liker(depth3)
+        await inviteGraph.setInviter(seller.address, deployer.address);
         await inviteGraph.setInviter(user1.address, seller.address);
-        await inviteGraph.setInviter(liker.address, seller.address);
+        await inviteGraph.setInviter(liker.address, user1.address);
+
+        // far-цепочка с тем же anchor(seller), но depth слишком далек:
+        // seller -> far1 -> far2 -> far3 -> likerFar (depth=5, diff с seller=4 > K=3)
+        const far1 = ethers.Wallet.createRandom().address;
+        const far2 = ethers.Wallet.createRandom().address;
+        const far3 = ethers.Wallet.createRandom().address;
+        await inviteGraph.setInviter(far1, seller.address);
+        await inviteGraph.setInviter(far2, far1);
+        await inviteGraph.setInviter(far3, far2);
+        await inviteGraph.setInviter(likerFar.address, far3);
+
+        // Другая ветка anchor на L=1:
+        await inviteGraph.setInviter(user2.address, deployer.address); // другой anchor
+        await inviteGraph.setInviter(likerOther.address, user2.address);
 
         // Деплоим LoveEmissionEngine
         const LoveEmissionEngine = await ethers.getContractFactory("LoveEmissionEngine");
@@ -230,6 +249,39 @@ describe("LoveEmissionEngine with Lovecoin", function () {
             await expectRevertWithMessage(
                 loveEmissionEngine.connect(emitter).emitForSuperlike(tokenId, liker.address),
                 "LoveEmission: emission already processed for like"
+            );
+        });
+
+        it("Should revert when liker depth distance exceeds K", async function () {
+            await loveDoPostNFT.connect(user1).mintLoveDoPost(seller.address, "ipfs://test");
+            const tokenId = (await loveDoPostNFT.nextTokenId()) - 1n;
+            const farNonce = await loveDoPostNFT.superlikeNonces(likerFar.address);
+
+            await expectRevertWithMessage(
+                loveDoPostNFT.connect(likerFar).addSuperlike(tokenId, farNonce),
+                "LoveDo: liker outside seller community"
+            );
+        });
+
+        it("Should revert when liker has different anchor community", async function () {
+            await loveDoPostNFT.connect(user1).mintLoveDoPost(seller.address, "ipfs://test");
+            const tokenId = (await loveDoPostNFT.nextTokenId()) - 1n;
+            const otherNonce = await loveDoPostNFT.superlikeNonces(likerOther.address);
+
+            await expectRevertWithMessage(
+                loveDoPostNFT.connect(likerOther).addSuperlike(tokenId, otherNonce),
+                "LoveDo: liker outside seller community"
+            );
+        });
+
+        it("Should revert when user depth is below anchor L", async function () {
+            await loveDoPostNFT.connect(user1).mintLoveDoPost(seller.address, "ipfs://test");
+            const tokenId = (await loveDoPostNFT.nextTokenId()) - 1n;
+            const rootNonce = await loveDoPostNFT.superlikeNonces(deployer.address);
+
+            await expectRevertWithMessage(
+                loveDoPostNFT.connect(deployer).addSuperlike(tokenId, rootNonce),
+                "LoveDo: user depth below anchor"
             );
         });
     });

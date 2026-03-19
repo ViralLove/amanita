@@ -60,12 +60,6 @@ contract LoveEmissionEngine is AccessControl {
 
     function emitForSuperlike(uint256 tokenId, address liker) external onlyRole(EMITTER_ROLE) {
         (address author, address sellerTo, , , ) = loveDo.getPost(tokenId);
-
-        address inviterOfAuthor = inviteGraph.invitedBy(author);
-        address inviterOfLiker = inviteGraph.invitedBy(liker);
-
-        require(inviterOfAuthor != address(0), "Post author not invited");
-        require(inviterOfAuthor == inviterOfLiker, "Liker must be from same inviter group");
         require(liker != author, "Author can't like their own post");
         require(loveDo.hasSuperliked(tokenId, liker), "LoveEmission: superlike not found for liker");
         require(!emittedForLike[tokenId][liker], "LoveEmission: emission already processed for like");

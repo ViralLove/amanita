@@ -77,6 +77,9 @@ contract LoveDoPostNFT is ERC721URIStorage, AccessControl {
 
     /// @notice Лимит суперлайков, которые пользователь может поставить за месяц
     uint8 public constant MAX_SUPERLIKES_PER_MONTH = 8;
+    uint8 public likeDepthDistanceK = 3;
+    uint8 public commonAnchorDepthL = 1;
+    uint16 public constant MAX_DEPTH_HOPS = 64;
 
     constructor(address _admin, address _inviteGraph, address _amanitaRegistry)
         ERC721("LoveDoPost", "LDP")
@@ -168,16 +171,8 @@ contract LoveDoPostNFT is ERC721URIStorage, AccessControl {
         require(msg.sender != loveDos[tokenId].author, "LoveDo: cannot superlike own post");
         // Безопасность: предотвращает self-like и инфляцию
 
-        // --- [4] Получаем адрес селлера, который пригласил автора поста
-        address inviterOfAuthor = inviteGraph.invitedBy(loveDos[tokenId].author);
-        require(inviterOfAuthor != address(0), "LoveDo: author not invited");
-        // Защита: автор должен быть реально кем-то приглашён
-
-        // --- [5] Получаем адрес инвайтера для лайкера и сравниваем с автором
-        address inviterOfLiker = inviteGraph.invitedBy(msg.sender);
-        require(inviterOfLiker == inviterOfAuthor, "LoveDo: liker not in same circle");
-        // Социальная модель: суперлайк могут ставить только участники,
-        // приглашённые тем же селлером — "горизонтальные связи доверия"
+        // --- [4] Проверяем общность по depth-модели: liker относительно sellerTo
+        require(_isWithinCommunityDistance(msg.sender, loveDos[tokenId].sellerTo), "LoveDo: liker outside seller community");
 
         // --- [6] Проверяем, что получатель (селлер) официально зарегистрирован
         require(amanitaRegistry.hasSellerRole(loveDos[tokenId].sellerTo), "LoveDo: target seller not registered");
@@ -216,6 +211,70 @@ contract LoveDoPostNFT is ERC721URIStorage, AccessControl {
 
     function setAmanitaRegistry(address newRegistry) external onlyRole(ADMIN_ROLE) {
         amanitaRegistry = IAmanitaRegistry(newRegistry);
+    }
+
+    function setLikeDepthDistanceK(uint8 newK) external onlyRole(ADMIN_ROLE) {
+        require(newK <= MAX_DEPTH_HOPS, "LoveDo: invalid K");
+        likeDepthDistanceK = newK;
+    }
+
+    function setCommonAnchorDepthL(uint8 newL) external onlyRole(ADMIN_ROLE) {
+        require(newL <= MAX_DEPTH_HOPS, "LoveDo: invalid L");
+        commonAnchorDepthL = newL;
+    }
+
+    function _isWithinCommunityDistance(address liker, address sellerTo) internal view returns (bool) {
+        (uint256 likerDepth, address likerRoot) = _getDepthAndRoot(liker);
+        (uint256 sellerDepth, address sellerRoot) = _getDepthAndRoot(sellerTo);
+
+        if (likerRoot != sellerRoot) {
+            return false;
+        }
+
+        address likerAnchor = _getAnchorAtDepth(liker, likerDepth, commonAnchorDepthL);
+        address sellerAnchor = _getAnchorAtDepth(sellerTo, sellerDepth, commonAnchorDepthL);
+        if (likerAnchor != sellerAnchor) {
+            return false;
+        }
+
+        uint256 diff = likerDepth > sellerDepth ? likerDepth - sellerDepth : sellerDepth - likerDepth;
+        return diff <= likeDepthDistanceK;
+    }
+
+    function _getDepthAndRoot(address user) internal view returns (uint256 depth, address root) {
+        require(user != address(0), "LoveDo: invalid user");
+
+        address current = user;
+        uint256 hops = 0;
+
+        while (true) {
+            address parent = inviteGraph.invitedBy(current);
+            if (parent == address(0)) {
+                root = current;
+                break;
+            }
+
+            current = parent;
+            hops++;
+            require(hops <= MAX_DEPTH_HOPS, "LoveDo: invite chain too deep");
+        }
+
+        depth = hops;
+        require(depth >= commonAnchorDepthL, "LoveDo: user depth below anchor");
+    }
+
+    function _getAnchorAtDepth(address user, uint256 userDepth, uint256 anchorDepth) internal view returns (address) {
+        require(userDepth >= anchorDepth, "LoveDo: user depth below anchor");
+
+        address current = user;
+        uint256 upSteps = userDepth - anchorDepth;
+
+        for (uint256 i = 0; i < upSteps; i++) {
+            current = inviteGraph.invitedBy(current);
+            require(current != address(0), "LoveDo: broken invite chain");
+        }
+
+        return current;
     }
 
     function postExists(uint256 tokenId) public view returns (bool) {
