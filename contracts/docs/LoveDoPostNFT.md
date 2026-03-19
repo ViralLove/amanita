@@ -13,10 +13,11 @@
 - ✅ **Неделимость** - отзыв нельзя разделить или передать частично
 - ✅ **Владелец** - автор отзыва является владельцем NFT
 
-### Социальная модель доверия
+### Социальная модель доверия (depth-circle)
 Система основана на **графе инвайтов**:
-- 🔗 **Горизонтальные связи** - суперлайки только от участников одного круга
-- 🛡️ **Защита от манипуляций** - проверка социальных связей
+- 🔗 **Якорный круг общности** - сравнение по `anchor(L, addr)` от root
+- 📏 **Порог глубины** - `abs(depth(liker)-depth(sellerTo)) <= K`
+- 🛡️ **Защита от манипуляций** - проверка близости к поставщику услуги (`sellerTo`)
 - 📊 **Аналитика поведения** - отслеживание активности аудитории
 
 ### Система лимитов
@@ -68,7 +69,7 @@ event LoveDoMinted(uint256 indexed tokenId, address indexed author, address inde
 - Не превышен месячный лимит суперлайков (8 в месяц)
 - Пост должен существовать
 - Нельзя лайкать собственные посты
-- Автор и лайкер должны быть из одного круга доверия
+- Лайкер и `sellerTo` должны быть в допустимой близости по depth-circle
 - Продавец-получатель должен быть зарегистрирован
 
 **Процесс суперлайка:**
@@ -77,7 +78,7 @@ event LoveDoMinted(uint256 indexed tokenId, address indexed author, address inde
 3. ✅ Проверка существования поста
 4. ✅ Проверка, что лайк еще не поставлен
 5. ✅ Запрет на лайки собственных постов
-6. ✅ Проверка социальных связей через граф инвайтов
+6. ✅ Проверка общности `anchor(L, liker)==anchor(L, sellerTo)` и `|depth diff| <= K`
 7. ✅ Проверка регистрации продавца-получателя
 8. ✅ Обновление счетчика суперлайков
 9. ✅ Эмиссия события Superliked
@@ -180,12 +181,15 @@ superlikeNonces[msg.sender]++;
 require(msg.sender != loveDos[tokenId].author, "LoveDo: cannot superlike own post");
 ```
 
-#### Проверка социальных связей
+#### Проверка социальных связей (depth-circle)
 ```solidity
-address inviterOfAuthor = inviteGraph.invitedBy(loveDos[tokenId].author);
-address inviterOfLiker = inviteGraph.invitedBy(msg.sender);
-require(inviterOfLiker == inviterOfAuthor, "LoveDo: liker not in same circle");
+require(_isWithinCommunityDistance(msg.sender, loveDos[tokenId].sellerTo), "LoveDo: liker outside seller community");
 ```
+
+Параметры политики:
+- `likeDepthDistanceK` (дефолт: 3, admin-set)
+- `commonAnchorDepthL` (дефолт: 1, admin-set)
+- `MAX_DEPTH_HOPS` guard для безопасного обхода графа
 
 ### Лимиты и ограничения
 
@@ -249,7 +253,7 @@ LoveDoPostNFT тесно интегрирован с **LoveEmissionEngine** дл
 
 #### Эмиссия токенов
 - **Суперлайки** - основа для эмиссии $LOVECOIN и $LGOV токенов
-- **Социальные связи** - проверка через граф инвайтов
+- **Социальные связи** - проверка depth-circle в LoveDoPostNFT (SSOT)
 - **Репутация** - количество постов влияет на активацию governance токенов
 
 #### Интерфейс для эмиссии

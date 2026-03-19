@@ -34,18 +34,14 @@
 
 **Требования:**
 - Вызывающий должен иметь `EMITTER_ROLE`
-- Автор поста должен быть приглашен
-- Лайкер и автор должны быть из одного круга доверия
 - Лайкер не может быть автором поста
+- В LoveDo уже должен существовать валидный суперлайк от `liker`
 
 **Процесс эмиссии:**
 1. ✅ Получение данных о посте из LoveDoPostNFT
-2. ✅ Проверка социальных связей через граф инвайтов
-3. ✅ Проверка, что суперлайк уже поставлен пользователем (`hasSuperliked(tokenId, liker)`)
-4. ✅ Проверка anti-double-emit для пары `(tokenId, liker)`
-5. ✅ Накопление $LOVECOIN для продавца-получателя
-6. ✅ Накопление $LGOV для продавца-получателя
-7. ✅ Эмиссия события Emission
+2. ✅ Проверка, что суперлайк уже поставлен пользователем (`hasSuperliked(tokenId, liker)`)
+3. ✅ Проверка anti-double-emit для пары `(tokenId, liker)`
+4. ✅ Накопление $LOVECOIN для продавца-получателя
 5. ✅ Накопление $LGOV для продавца-получателя
 6. ✅ Эмиссия события Emission
 
@@ -154,11 +150,7 @@ bool success = lovecoin.transfer(msg.sender, amount);
 ```
 
 ### Проверка социальных связей
-```solidity
-address inviterOfAuthor = inviteGraph.invitedBy(author);
-address inviterOfLiker = inviteGraph.invitedBy(liker);
-require(inviterOfAuthor == inviterOfLiker, "Liker must be from same inviter group");
-```
+Проверка круга выполняется в `LoveDoPostNFT` (depth-circle модель), чтобы избежать дублирования логики.
 
 ### Одноразовая активация (текущее поведение на 2026-03-12)
 ```solidity
@@ -194,7 +186,7 @@ LoveEmissionEngine интегрирован с LoveDoPostNFT в модели use
 
 ```solidity
 // Получение данных о посте
-(address author, address sellerTo, address linkedSeller, uint8 superlikes) = loveDo.getPost(tokenId);
+(address author, address sellerTo, , , ) = loveDo.getPost(tokenId);
 
 // Проверка факта суперлайка от конкретного пользователя
 require(loveDo.hasSuperliked(tokenId, liker), "LoveEmission: superlike not found for liker");
