@@ -179,7 +179,13 @@ describe("SpiralEngine - SBT Deep Layer", function () {
             const soulboundCore = await ethers.getContractAt("SoulboundCore", soulboundCoreAddress);
             await soulboundCore.connect(deployer).mintSoul(user1.address);
 
-            // TODO: полный recovery — SoulRecovery integration (отдельный таск). Сейчас SoulIdentity — заглушка.
+            const SoulRecovery = await ethers.getContractFactory("SoulRecovery");
+            const soulRecovery = await SoulRecovery.connect(deployer).deploy(await soulboundCore.getAddress());
+            await soulRecovery.waitForDeployment();
+            await soulboundCore.connect(deployer).setRecoveryContract(await soulRecovery.getAddress());
+            await soulRecovery.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
+            await soulIdentity.connect(deployer).setSoulRecovery(await soulRecovery.getAddress());
+
             const tx = await soulIdentity.connect(user1).addTrustedGuardian(guardian1.address);
             await tx.wait();
         });
@@ -194,6 +200,13 @@ describe("SpiralEngine - SBT Deep Layer", function () {
             const soulboundCoreAddress = await soulIdentity.soulboundCore();
             const soulboundCore = await ethers.getContractAt("SoulboundCore", soulboundCoreAddress);
             await soulboundCore.connect(deployer).mintSoul(user1.address);
+
+            const SoulRecovery = await ethers.getContractFactory("SoulRecovery");
+            const soulRecovery = await SoulRecovery.connect(deployer).deploy(await soulboundCore.getAddress());
+            await soulRecovery.waitForDeployment();
+            await soulboundCore.connect(deployer).setRecoveryContract(await soulRecovery.getAddress());
+            await soulRecovery.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
+            await soulIdentity.connect(deployer).setSoulRecovery(await soulRecovery.getAddress());
             await soulIdentity.connect(user1).addTrustedGuardian(guardian1.address);
 
             const profile = await spiralEngine.getSoulProfile(user1.address);
@@ -201,7 +214,8 @@ describe("SpiralEngine - SBT Deep Layer", function () {
             expect(profile.reputation).to.be.a("bigint");
             expect(profile.identity).to.be.a("string");
             expect(profile.guardians).to.be.an("array");
-            // Заглушка: guardians может быть пустым
+            expect(profile.guardians.length).to.equal(1);
+            expect(profile.guardians[0]).to.equal(guardian1.address);
         });
     });
 

@@ -268,6 +268,188 @@ describe("SoulIdentity Bridge Contract", function () {
         });
     });
 
+    describe("SBT-REC-1: SoulRecovery delegation and hybrid (soulRecovery not set)", function () {
+        beforeEach(async function () {
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+        });
+
+        it("Should revert addTrustedGuardian when SoulRecovery not set", async function () {
+            await expectRevertWithMessage(
+                soulIdentity.connect(user1).addTrustedGuardian(user2.address),
+                "SoulIdentity: SoulRecovery not set"
+            );
+        });
+
+        it("Should revert removeTrustedGuardian when SoulRecovery not set", async function () {
+            await expectRevertWithMessage(
+                soulIdentity.connect(user1).removeTrustedGuardian(user2.address),
+                "SoulIdentity: SoulRecovery not set"
+            );
+        });
+
+        it("Should return empty guardians and false when SoulRecovery not set (read path)", async function () {
+            const guardians = await soulIdentity.getTrustedGuardians(user1.address);
+            expect(guardians).to.deep.equal([]);
+            expect(await soulIdentity.isTrustedGuardian(user1.address, user2.address)).to.be.false;
+            expect(await soulIdentity.isRecoveryInProgress(user1.address)).to.be.false;
+        });
+
+        it("Should delegate guardians and return them in getSoulProfile when SoulRecovery set", async function () {
+            const SoulRecovery = await ethers.getContractFactory("SoulRecovery");
+            const soulRecovery = await SoulRecovery.connect(deployer).deploy(await soulboundCore.getAddress());
+            await soulRecovery.waitForDeployment();
+            await soulboundCore.connect(deployer).setRecoveryContract(await soulRecovery.getAddress());
+            await soulRecovery.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
+            await soulIdentity.connect(deployer).setSoulRecovery(await soulRecovery.getAddress());
+
+            await soulIdentity.connect(user1).addTrustedGuardian(user2.address);
+            const guardians = await soulIdentity.getTrustedGuardians(user1.address);
+            expect(guardians.length).to.equal(1);
+            expect(guardians[0]).to.equal(user2.address);
+            expect(await soulIdentity.isTrustedGuardian(user1.address, user2.address)).to.be.true;
+
+            const profile = await soulIdentity.getSoulProfile(user1.address);
+            expect(profile.guardians.length).to.equal(1);
+            expect(profile.guardians[0]).to.equal(user2.address);
+        });
+    });
+
+    describe("SBT-IDX-1: owner → tokenId index", function () {
+        it("Should find soul via index when SoulboundCore notifies SoulIdentity (integration set)", async function () {
+            await soulboundCore.connect(deployer).setIntegrationContract(await soulIdentity.getAddress());
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+            const level = await soulIdentity.getSoulLevel(user1.address);
+            expect(level > 0n).to.be.true;
+            const profile = await soulIdentity.getSoulProfile(user1.address);
+            expect(profile.level > 0n).to.be.true;
+        });
+
+        it("Should find soul via fallback when integration not set (no index entry)", async function () {
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+            const level = await soulIdentity.getSoulLevel(user1.address);
+            expect(level > 0n).to.be.true;
+        });
+
+        it("Should allow ADMIN to registerSoulTokenId and then find soul via index", async function () {
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+            const tokenId = 1n;
+            await soulIdentity.connect(deployer).registerSoulTokenId(user1.address, tokenId);
+            const level = await soulIdentity.getSoulLevel(user1.address);
+            expect(level > 0n).to.be.true;
+        });
+
+        it("Should revert registerSoulTokenId when not DEFAULT_ADMIN_ROLE", async function () {
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+            await expectRevertWithMessage(
+                soulIdentity.connect(user1).registerSoulTokenId(user1.address, 1),
+                "AccessControl"
+            );
+        });
+
+        it("Should revert registerSoulTokenId when token does not exist or not owner", async function () {
+            await expectRevertWithMessage(
+                soulIdentity.connect(deployer).registerSoulTokenId(user1.address, 999),
+                "SoulIdentity: token does not exist"
+            );
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+            await expectRevertWithMessage(
+                soulIdentity.connect(deployer).registerSoulTokenId(user2.address, 1),
+                "SoulIdentity: not token owner"
+            );
+        });
+
+        it("Should revert notifySoulCreated when caller is not SoulboundCore", async function () {
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+            await expectRevertWithMessage(
+                soulIdentity.connect(deployer).notifySoulCreated(1, user1.address),
+                "SoulIdentity: only SoulboundCore"
+            );
+        });
+    });
+
+    describe("SBT-B2-1: temporary key (B2)", function () {
+        const TEMP_KEY_DURATION = 86400; // 1 day in seconds
+
+        beforeEach(async function () {
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+        });
+
+        it("Should create temporary key and return it via getTemporaryKey", async function () {
+            await soulIdentity.connect(user1).createTemporaryKey(user2.address, TEMP_KEY_DURATION);
+            expect(await soulIdentity.getTemporaryKey(user1.address)).to.equal(user2.address);
+            expect(await soulIdentity.isTemporaryKeyValid(user2.address)).to.be.true;
+        });
+
+        it("Should revert createTemporaryKey when not soul owner", async function () {
+            await expectRevertWithMessage(
+                soulIdentity.connect(user2).createTemporaryKey(deployer.address, TEMP_KEY_DURATION),
+                "SoulIdentity: only soul owner"
+            );
+        });
+
+        it("Should revert createTemporaryKey when duration > MAX_TEMP_KEY_DURATION", async function () {
+            const overMax = (await soulIdentity.MAX_TEMP_KEY_DURATION()) + 1n;
+            await expectRevertWithMessage(
+                soulIdentity.connect(user1).createTemporaryKey(user2.address, overMax),
+                "SoulIdentity: invalid duration"
+            );
+        });
+
+        it("Should revert createTemporaryKey when tempKey is zero or owner", async function () {
+            await expectRevertWithMessage(
+                soulIdentity.connect(user1).createTemporaryKey(ethers.ZeroAddress, TEMP_KEY_DURATION),
+                "SoulIdentity: zero temp key"
+            );
+            await expectRevertWithMessage(
+                soulIdentity.connect(user1).createTemporaryKey(user1.address, TEMP_KEY_DURATION),
+                "SoulIdentity: temp key cannot be owner"
+            );
+        });
+
+        it("Should revoke temporary key and clear storage", async function () {
+            await soulIdentity.connect(user1).createTemporaryKey(user2.address, TEMP_KEY_DURATION);
+            await soulIdentity.connect(user1).revokeTemporaryKey();
+            expect(await soulIdentity.getTemporaryKey(user1.address)).to.equal(ethers.ZeroAddress);
+            expect(await soulIdentity.isTemporaryKeyValid(user2.address)).to.be.false;
+        });
+
+        it("Should revert revokeTemporaryKey when not soul owner", async function () {
+            await soulIdentity.connect(user1).createTemporaryKey(user2.address, TEMP_KEY_DURATION);
+            await expectRevertWithMessage(
+                soulIdentity.connect(user2).revokeTemporaryKey(),
+                "SoulIdentity: only soul owner"
+            );
+        });
+
+        it("Should allow temp key to call linkSoulIdentity for owner", async function () {
+            await soulIdentity.connect(user1).createTemporaryKey(user2.address, TEMP_KEY_DURATION);
+            await soulIdentity.connect(user2).linkSoulIdentity(`did:spiral:${user1.address.toLowerCase()}`);
+            expect(await soulIdentity.getSoulIdentity(user1.address)).to.include(user1.address.toLowerCase());
+        });
+
+        it("Should allow temp key to call unlinkSoulIdentity for owner", async function () {
+            await soulIdentity.connect(user1).createTemporaryKey(user2.address, TEMP_KEY_DURATION);
+            await soulIdentity.connect(user2).linkSoulIdentity(`did:spiral:${user1.address.toLowerCase()}`);
+            await soulIdentity.connect(user2).unlinkSoulIdentity();
+            expect(await soulIdentity.getSoulIdentity(user1.address)).to.equal("");
+        });
+
+        it("Should revert linkSoulIdentity when not owner and not valid temp key", async function () {
+            await expectRevertWithMessage(
+                soulIdentity.connect(user2).linkSoulIdentity(`did:spiral:${user2.address.toLowerCase()}`),
+                "SoulIdentity: not owner or valid temporary key"
+            );
+        });
+
+        it("Should return false for isTemporaryKeyValid after expiry", async function () {
+            await soulIdentity.connect(user1).createTemporaryKey(user2.address, 1);
+            await ethers.provider.send("evm_increaseTime", [2]);
+            await ethers.provider.send("evm_mine", []);
+            expect(await soulIdentity.isTemporaryKeyValid(user2.address)).to.be.false;
+            expect(await soulIdentity.getTemporaryKey(user1.address)).to.equal(ethers.ZeroAddress);
+        });
+    });
+
     describe("SBT-PAS-1: displayName and handle (Passport MVP)", function () {
         beforeEach(async function () {
             await soulboundCore.connect(deployer).mintSoul(user1.address);
