@@ -69,6 +69,9 @@ contract SoulRecovery {
     
     // Ссылка на основной SoulboundCore контракт
     SoulboundCore public immutable soulboundCore;
+    // Мост SoulIdentity — может вызывать *For методы от имени владельца/guardian (SBT-REC-1)
+    address public soulIdentity;
+    address private _owner;
     
     // Mapping от tokenId к информации о guardian'е
     mapping(uint256 => GuardianInfo) private _guardians;
@@ -119,6 +122,15 @@ contract SoulRecovery {
     constructor(address _soulboundCore) {
         require(_soulboundCore != address(0), "SoulRecovery: invalid address");
         soulboundCore = SoulboundCore(_soulboundCore);
+        _owner = msg.sender;
+    }
+    
+    /**
+     * @dev Установить адрес SoulIdentity для вызовов через мост (SBT-REC-1)
+     */
+    function setSoulIdentity(address _soulIdentity) external {
+        require(msg.sender == _owner, "SoulRecovery: not owner");
+        soulIdentity = _soulIdentity;
     }
     
     // === ОСНОВНЫЕ ФУНКЦИИ ===
@@ -163,6 +175,47 @@ contract SoulRecovery {
     }
     
     /**
+     * @dev Установка guardian'а при вызове через SoulIdentity (SBT-REC-1)
+     * @param tokenId идентификатор токена
+     * @param guardian адрес guardian'а
+     * @param owner владелец токена (должен совпадать с ownerOf(tokenId))
+     */
+    function setGuardianFor(uint256 tokenId, address guardian, address owner)
+        external
+        tokenExists(tokenId)
+    {
+        require(msg.sender == soulIdentity, "SoulRecovery: only SoulIdentity");
+        require(soulboundCore.ownerOf(tokenId) == owner, "SoulRecovery: not token owner");
+        require(guardian != address(0), "SoulRecovery: invalid guardian address");
+        require(guardian != owner, "SoulRecovery: cannot be self guardian");
+        require(guardian != soulboundCore.ownerOf(tokenId), "SoulRecovery: guardian cannot be owner");
+        
+        _guardians[tokenId] = GuardianInfo({
+            guardian: guardian,
+            setTimestamp: block.timestamp,
+            isActive: true
+        });
+        
+        emit GuardianSet(tokenId, owner, guardian);
+    }
+    
+    /**
+     * @dev Удаление guardian'а при вызове через SoulIdentity (SBT-REC-1)
+     */
+    function removeGuardianFor(uint256 tokenId, address owner)
+        external
+        tokenExists(tokenId)
+    {
+        require(msg.sender == soulIdentity, "SoulRecovery: only SoulIdentity");
+        require(soulboundCore.ownerOf(tokenId) == owner, "SoulRecovery: not token owner");
+        require(_guardians[tokenId].isActive, "SoulRecovery: no active guardian");
+        
+        delete _guardians[tokenId];
+        
+        emit GuardianSet(tokenId, owner, address(0));
+    }
+    
+    /**
      * @dev Инициация процесса восстановления
      * @param tokenId идентификатор токена
      * @param newOwner новый владелец токена
@@ -190,6 +243,56 @@ contract SoulRecovery {
         });
         
         emit RecoveryInitiated(tokenId, soulboundCore.ownerOf(tokenId), newOwner, msg.sender);
+    }
+    
+    /**
+     * @dev Инициация восстановления при вызове через SoulIdentity (SBT-REC-1)
+     */
+    function initiateRecoveryFor(uint256 tokenId, address newOwner, address guardian)
+        external
+        tokenExists(tokenId)
+    {
+        require(msg.sender == soulIdentity, "SoulRecovery: only SoulIdentity");
+        require(_guardians[tokenId].guardian == guardian && _guardians[tokenId].isActive, "SoulRecovery: not authorized guardian");
+        require(newOwner != address(0), "SoulRecovery: invalid new owner");
+        require(newOwner != soulboundCore.ownerOf(tokenId), "SoulRecovery: same owner");
+        require(!_recoveries[tokenId].isActive, "SoulRecovery: recovery already active");
+        require(
+            block.timestamp >= _guardians[tokenId].setTimestamp + GUARDIAN_DELAY,
+            "SoulRecovery: guardian delay not passed"
+        );
+        
+        _recoveries[tokenId] = RecoveryInfo({
+            newOwner: newOwner,
+            guardian: guardian,
+            initiatedAt: block.timestamp,
+            isActive: true
+        });
+        
+        emit RecoveryInitiated(tokenId, soulboundCore.ownerOf(tokenId), newOwner, guardian);
+    }
+    
+    /**
+     * @dev Подтверждение восстановления при вызове через SoulIdentity (SBT-REC-1)
+     */
+    function confirmRecoveryFor(uint256 tokenId, address guardian)
+        external
+        tokenExists(tokenId)
+    {
+        require(msg.sender == soulIdentity, "SoulRecovery: only SoulIdentity");
+        RecoveryInfo storage recovery = _recoveries[tokenId];
+        require(recovery.isActive, "SoulRecovery: no active recovery");
+        require(recovery.guardian == guardian, "SoulRecovery: not recovery guardian");
+        require(
+            block.timestamp >= recovery.initiatedAt + RECOVERY_DELAY,
+            "SoulRecovery: recovery delay not passed"
+        );
+        
+        address newOwner = recovery.newOwner;
+        soulboundCore.executeRecovery(tokenId, newOwner);
+        delete _recoveries[tokenId];
+        
+        emit RecoveryCompleted(tokenId, newOwner);
     }
     
     /**

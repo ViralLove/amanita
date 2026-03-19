@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/ISoulIdentity.sol";
+import "./interfaces/ISoulRecovery.sol";
 
 /**
  * @dev Интерфейс для SoulboundCore - существующий SBT контракт
@@ -48,6 +49,7 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
     // === ИНТЕГРАЦИЯ С СУЩЕСТВУЮЩИМИ КОНТРАКТАМИ ===
     ISoulboundCore public soulboundCore;
     ISoulMetadata public soulMetadata;
+    ISoulRecovery public soulRecovery;
     
     // === НОВЫЕ DID ДАННЫЕ ===
     mapping(address => ExternalIdentity[]) private userIdentities;
@@ -61,8 +63,18 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
     mapping(address => string) private _displayNameByUser;
     mapping(address => string) private _handleByUser;
     
+    // === Индекс owner → tokenId (SBT-IDX-1): O(1) поиск души по владельцу ===
+    mapping(address => uint256) private _ownerToTokenId;
+    
+    // === Временный ключ B2: один активный на пользователя ===
+    uint256 public constant MAX_TEMP_KEY_DURATION = 30 days;
+    mapping(address => address) private _tempKeyByUser;
+    mapping(address => uint256) private _tempKeyExpiryByUser;
+    mapping(address => address) private _userByTempKey; // обратный lookup для isTemporaryKeyValid
+    
     // === СОБЫТИЯ ===
     event SoulIdentityContractsUpdated(address soulboundCore, address soulMetadata);
+    event SoulRecoverySet(address soulRecovery);
     
     // === КОНСТРУКТОР ===
     
@@ -82,6 +94,41 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
         soulMetadata = ISoulMetadata(_soulMetadata);
         
         emit SoulIdentityContractsUpdated(_soulboundCore, _soulMetadata);
+    }
+    
+    /**
+     * @dev Установить адрес SoulRecovery для делегирования guardians/recovery (SBT-REC-1)
+     * @param _soulRecovery адрес контракта SoulRecovery или address(0) для сброса
+     */
+    function setSoulRecovery(address _soulRecovery) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        soulRecovery = ISoulRecovery(_soulRecovery);
+        emit SoulRecoverySet(_soulRecovery);
+    }
+    
+    /**
+     * @dev ISoulIntegration: вызов только с SoulboundCore при минте души (SBT-IDX-1)
+     */
+    function notifySoulCreated(uint256 tokenId, address owner) external {
+        require(msg.sender == address(soulboundCore), "SoulIdentity: only SoulboundCore");
+        _ownerToTokenId[owner] = tokenId;
+    }
+    
+    /**
+     * @dev ISoulIntegration: вызов только с SoulboundCore при recovery (SBT-IDX-1)
+     */
+    function notifySoulRecovered(uint256 tokenId, address oldOwner, address newOwner) external {
+        require(msg.sender == address(soulboundCore), "SoulIdentity: only SoulboundCore");
+        _ownerToTokenId[newOwner] = tokenId;
+        delete _ownerToTokenId[oldOwner];
+    }
+    
+    /**
+     * @dev Ретроспективная регистрация пары (owner, tokenId) в индекс (SBT-IDX-1). Только DEFAULT_ADMIN_ROLE.
+     */
+    function registerSoulTokenId(address owner, uint256 tokenId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(soulboundCore.exists(tokenId), "SoulIdentity: token does not exist");
+        require(soulboundCore.ownerOf(tokenId) == owner, "SoulIdentity: not token owner");
+        _ownerToTokenId[owner] = tokenId;
     }
     
     // === ДЕЛЕГИРОВАНИЕ К СУЩЕСТВУЮЩИМ SBT КОНТРАКТАМ ===
@@ -251,12 +298,11 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
      * @param did DID идентификатор
      */
     function linkSoulIdentity(string memory did) external override {
-        // Для обратной совместимости - пользователь может добавить свою DID
         require(bytes(did).length > 0, "SoulIdentity: empty DID");
-        require(_getUserTokenId(msg.sender) > 0, "SoulIdentity: user has no SBT token");
+        address owner = _getEffectiveOwner();
+        require(_getUserTokenId(owner) > 0, "SoulIdentity: user has no SBT token");
         
-        // Добавляем идентичность напрямую (без роли для совместимости)
-        userIdentities[msg.sender].push(ExternalIdentity({
+        userIdentities[owner].push(ExternalIdentity({
             identityType: "did:spiral",
             identityValue: did,
             verified: false, // legacy всегда не верифицирована
@@ -264,12 +310,11 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
             verifiedBy: address(0) // legacy не имеет верификатора
         }));
         
-        // Если это первая идентичность, делаем её основной
-        if (userIdentities[msg.sender].length == 1) {
-            primaryIdentityIndex[msg.sender] = 0;
+        if (userIdentities[owner].length == 1) {
+            primaryIdentityIndex[owner] = 0;
         }
         
-        emit ExternalIdentityLinked(msg.sender, "did:spiral", did, false, block.timestamp);
+        emit ExternalIdentityLinked(owner, "did:spiral", did, false, block.timestamp);
     }
     
     /**
@@ -287,20 +332,17 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
      * @dev Отвязать идентичность души (DEPRECATED)
      */
     function unlinkSoulIdentity() external override {
-        // Удаляем все did:spiral идентичности пользователя
-        ExternalIdentity[] storage identities = userIdentities[msg.sender];
+        address owner = _getEffectiveOwner();
+        ExternalIdentity[] storage identities = userIdentities[owner];
         for (uint256 i = 0; i < identities.length; i++) {
             if (keccak256(bytes(identities[i].identityType)) == keccak256(bytes("did:spiral"))) {
-                // Перемещаем последний элемент на место удаляемого
                 identities[i] = identities[identities.length - 1];
                 identities.pop();
                 break;
             }
         }
-        
-        // Сброс индекса если удалили основную идентичность
         if (identities.length == 0) {
-            primaryIdentityIndex[msg.sender] = 0;
+            primaryIdentityIndex[owner] = 0;
         }
     }
     
@@ -311,13 +353,17 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
      * @param user адрес пользователя
      * @return tokenId идентификатор токена (0 если не найден)
      */
+    /**
+     * @dev Поиск tokenId по владельцу: сначала индекс O(1) (SBT-IDX-1), при отсутствии — fallback перебор без лимита 1000.
+     */
     function _getUserTokenId(address user) private view returns (uint256) {
+        if (_ownerToTokenId[user] != 0) return _ownerToTokenId[user];
+        
         uint256 balance = soulboundCore.balanceOf(user);
         if (balance == 0) return 0;
         
-        // Поиск первого токена пользователя
         uint256 totalSupply = soulboundCore.getTotalSupply();
-        for (uint256 i = 1; i <= totalSupply && i <= 1000; i++) {
+        for (uint256 i = 1; i <= totalSupply; i++) {
             try soulboundCore.ownerOf(i) returns (address owner) {
                 if (owner == user) return i;
             } catch {
@@ -325,6 +371,16 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
             }
         }
         return 0;
+    }
+    
+    /**
+     * @dev Эффективный владелец для вызова: msg.sender если у него есть SBT, иначе user, для которого msg.sender — валидный временный ключ (B2).
+     */
+    function _getEffectiveOwner() private view returns (address) {
+        if (_getUserTokenId(msg.sender) > 0) return msg.sender;
+        address user = _userByTempKey[msg.sender];
+        if (user != address(0) && block.timestamp < _tempKeyExpiryByUser[user]) return user;
+        revert("SoulIdentity: not owner or valid temporary key");
     }
     
     /**
@@ -423,7 +479,7 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
         reputation = this.getSoulReputation(user);
         identity = this.getSoulIdentity(user);
         verificationLevel = 0;
-        guardians = new address[](0);
+        guardians = this.getTrustedGuardians(user);
         displayName = _displayNameByUser[user];
         handle = _handleByUser[user];
     }
@@ -501,44 +557,95 @@ contract SoulIdentity is AccessControl, ISoulIdentity {
     // === ОСТАЛЬНЫЕ ЗАГЛУШКИ ===
     
     function addTrustedGuardian(address guardian) external override {
-        // TODO: Делегировать к SoulRecovery
+        uint256 tokenId = _getUserTokenId(msg.sender);
+        require(tokenId > 0, "SoulIdentity: no SBT");
+        require(address(soulRecovery) != address(0), "SoulIdentity: SoulRecovery not set");
+        soulRecovery.setGuardianFor(tokenId, guardian, msg.sender);
     }
     
     function removeTrustedGuardian(address guardian) external override {
-        // TODO: Делегировать к SoulRecovery
+        require(address(soulRecovery) != address(0), "SoulIdentity: SoulRecovery not set");
+        uint256 tokenId = _getUserTokenId(msg.sender);
+        require(tokenId > 0, "SoulIdentity: no SBT");
+        soulRecovery.removeGuardianFor(tokenId, msg.sender);
     }
     
     function getTrustedGuardians(address user) external view override returns (address[] memory) {
-        // TODO: Делегировать к SoulRecovery
-        return new address[](0);
+        if (address(soulRecovery) == address(0)) return new address[](0);
+        uint256 tokenId = _getUserTokenId(user);
+        if (tokenId == 0) return new address[](0);
+        address g = soulRecovery.getGuardian(tokenId);
+        if (g == address(0)) return new address[](0);
+        address[] memory out = new address[](1);
+        out[0] = g;
+        return out;
     }
     
-    function isTrustedGuardian(address user, address guardian) external pure override returns (bool) {
-        return false; // Заглушка
+    function isTrustedGuardian(address user, address guardian) external view override returns (bool) {
+        if (address(soulRecovery) == address(0)) return false;
+        uint256 tokenId = _getUserTokenId(user);
+        if (tokenId == 0) return false;
+        return soulRecovery.getGuardian(tokenId) == guardian;
     }
     
-    function initiateRecovery(address user) external override {
-        // TODO: Делегировать к SoulRecovery
+    function initiateRecovery(address user, address newKey) external override {
+        require(address(soulRecovery) != address(0), "SoulIdentity: SoulRecovery not set");
+        uint256 tokenId = _getUserTokenId(user);
+        soulRecovery.initiateRecoveryFor(tokenId, newKey, msg.sender);
     }
     
     function completeRecovery(address user, address newKey) external override {
-        // TODO: Делегировать к SoulRecovery
+        require(address(soulRecovery) != address(0), "SoulIdentity: SoulRecovery not set");
+        uint256 tokenId = _getUserTokenId(user);
+        soulRecovery.confirmRecoveryFor(tokenId, msg.sender);
     }
     
-    function isRecoveryInProgress(address user) external pure override returns (bool) {
-        return false; // Заглушка
+    function isRecoveryInProgress(address user) external view override returns (bool) {
+        if (address(soulRecovery) == address(0)) return false;
+        uint256 tokenId = _getUserTokenId(user);
+        return soulRecovery.isRecoveryActive(tokenId);
     }
     
     function createTemporaryKey(address tempKey, uint256 duration) external override {
-        // TODO: Реализовать временные ключи
+        require(_getUserTokenId(msg.sender) > 0, "SoulIdentity: only soul owner");
+        require(tempKey != address(0), "SoulIdentity: zero temp key");
+        require(tempKey != msg.sender, "SoulIdentity: temp key cannot be owner");
+        require(duration > 0 && duration <= MAX_TEMP_KEY_DURATION, "SoulIdentity: invalid duration");
+        
+        address oldTempKey = _tempKeyByUser[msg.sender];
+        if (oldTempKey != address(0)) {
+            delete _userByTempKey[oldTempKey];
+        }
+        
+        uint256 expiry = block.timestamp + duration;
+        _tempKeyByUser[msg.sender] = tempKey;
+        _tempKeyExpiryByUser[msg.sender] = expiry;
+        _userByTempKey[tempKey] = msg.sender;
+        
+        emit TemporaryKeyCreated(msg.sender, tempKey, expiry, block.timestamp);
     }
     
-    function getTemporaryKey(address user) external pure override returns (address) {
-        return address(0); // Заглушка
+    function revokeTemporaryKey() external override {
+        require(_getUserTokenId(msg.sender) > 0, "SoulIdentity: only soul owner");
+        address tempKey = _tempKeyByUser[msg.sender];
+        if (tempKey == address(0)) return;
+        
+        delete _tempKeyByUser[msg.sender];
+        delete _tempKeyExpiryByUser[msg.sender];
+        delete _userByTempKey[tempKey];
+        
+        emit TemporaryKeyRevoked(msg.sender, tempKey);
     }
     
-    function isTemporaryKeyValid(address tempKey) external pure override returns (bool) {
-        return false; // Заглушка
+    function getTemporaryKey(address user) external view override returns (address) {
+        if (block.timestamp >= _tempKeyExpiryByUser[user]) return address(0);
+        return _tempKeyByUser[user];
+    }
+    
+    function isTemporaryKeyValid(address tempKey) external view override returns (bool) {
+        address user = _userByTempKey[tempKey];
+        if (user == address(0)) return false;
+        return block.timestamp < _tempKeyExpiryByUser[user];
     }
     
     function getSBTMetadata(uint256 tokenId) external view override returns (

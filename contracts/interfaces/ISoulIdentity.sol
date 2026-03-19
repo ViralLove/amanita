@@ -175,8 +175,9 @@ interface ISoulIdentity is IERC5192 {
     /**
      * @dev Инициировать процесс восстановления доступа
      * @param user адрес пользователя, для которого инициируется восстановление
+     * @param newKey новый ключ (владелец) после восстановления
      */
-    function initiateRecovery(address user) external;
+    function initiateRecovery(address user, address newKey) external;
     
     /**
      * @dev Завершить процесс восстановления доступа
@@ -212,6 +213,16 @@ interface ISoulIdentity is IERC5192 {
      * @return true если ключ действителен
      */
     function isTemporaryKeyValid(address tempKey) external view returns (bool);
+
+    /**
+     * @dev Отозвать временный ключ владельцем SBT (B2)
+     */
+    function revokeTemporaryKey() external;
+
+    /**
+     * @dev Событие при отзыве временного ключа (B2)
+     */
+    event TemporaryKeyRevoked(address indexed user, address indexed tempKey);
 
     // === SBT METADATA FUNCTIONS ===
     
