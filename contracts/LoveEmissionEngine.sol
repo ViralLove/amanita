@@ -26,6 +26,7 @@ contract LoveEmissionEngine is AccessControl {
 
     /// @notice Сколько накоплено LGOV, но не получено
     mapping(address => uint256) public lgovAccrued;
+    mapping(uint256 => mapping(address => bool)) public emittedForLike;
 
     /// @notice Коэффициент эмиссии (на 1 суперлайк)
     uint256 public constant EMISSION_RATE = 1 ether;
@@ -58,7 +59,7 @@ contract LoveEmissionEngine is AccessControl {
     }
 
     function emitForSuperlike(uint256 tokenId, address liker) external onlyRole(EMITTER_ROLE) {
-        (address author, address sellerTo, address linkedSeller, uint8 superlikes) = loveDo.getPost(tokenId);
+        (address author, address sellerTo, , , ) = loveDo.getPost(tokenId);
 
         address inviterOfAuthor = inviteGraph.invitedBy(author);
         address inviterOfLiker = inviteGraph.invitedBy(liker);
@@ -66,10 +67,10 @@ contract LoveEmissionEngine is AccessControl {
         require(inviterOfAuthor != address(0), "Post author not invited");
         require(inviterOfAuthor == inviterOfLiker, "Liker must be from same inviter group");
         require(liker != author, "Author can't like their own post");
+        require(loveDo.hasSuperliked(tokenId, liker), "LoveEmission: superlike not found for liker");
+        require(!emittedForLike[tokenId][liker], "LoveEmission: emission already processed for like");
 
-        // 1. Записать superlike
-        bool success = loveDo.addSuperlike(tokenId);
-        require(success, "Superlike failed");
+        emittedForLike[tokenId][liker] = true;
 
         // 2. Начислить накопленные токены
         loveAccrued[sellerTo] += EMISSION_RATE;
@@ -146,14 +147,14 @@ interface ILGovToken {
 
 interface ILoveDoPostNFT {
     function mentionsOf(address seller) external view returns (uint8);
+    function hasSuperliked(uint256 tokenId, address liker) external view returns (bool);
 
-    function addSuperlike(uint256 tokenId) external returns (bool);
-    
     function getPost(uint256 tokenId) external view returns (
         address author,
         address sellerTo,
         address linkedSeller,
-        uint8 superlikes
+        uint8 superlikes,
+        uint256 timestamp
     );
 
     function getLoveDoCount(address seller) external view returns (uint8);

@@ -64,16 +64,24 @@ describe("LoveEmissionEngine with Lovecoin", function () {
         lgovToken = await AmanitaGovToken.deploy(deployer.address);
         await lgovToken.waitForDeployment();
 
-        // Моки для совместимости с LoveEmissionEngine (addSuperlike(tokenId)) и LoveDoPostNFT (getInviterOf/invitedBy)
+        // Моки: граф инвайтов (getInviterOf/invitedBy) и реестр (hasSellerRole) для LoveDoPostNFT
         const LoveInviteGraphMock = await ethers.getContractFactory("LoveInviteGraphMock");
         inviteGraph = await LoveInviteGraphMock.deploy();
         await inviteGraph.waitForDeployment();
 
-        const LoveDoPostNFTMock = await ethers.getContractFactory("LoveDoPostNFTMock");
-        loveDoPostNFT = await LoveDoPostNFTMock.deploy();
+        const LoveAmanitaRegistryMock = await ethers.getContractFactory("LoveAmanitaRegistryMock");
+        const registryMock = await LoveAmanitaRegistryMock.deploy();
+        await registryMock.waitForDeployment();
+
+        const LoveDoPostNFT = await ethers.getContractFactory("LoveDoPostNFT");
+        loveDoPostNFT = await LoveDoPostNFT.deploy(
+            deployer.address,
+            await inviteGraph.getAddress(),
+            await registryMock.getAddress()
+        );
         await loveDoPostNFT.waitForDeployment();
 
-        // Чтобы emitForSuperlike и addSuperlike проходили: author и liker из одного "круга"
+        // Круг для author (user1) и liker
         await inviteGraph.setInviter(user1.address, seller.address);
         await inviteGraph.setInviter(liker.address, seller.address);
 
@@ -103,8 +111,10 @@ describe("LoveEmissionEngine with Lovecoin", function () {
 
     describe("P0: Core Emission Functions", function () {
         it("Should emit Lovecoin and LGOV for superlike", async function () {
-            await loveDoPostNFT.addPostForTest(user1.address, seller.address, seller.address);
+            await loveDoPostNFT.connect(user1).mintLoveDoPost(seller.address, "ipfs://test");
             const tokenId = (await loveDoPostNFT.nextTokenId()) - 1n;
+            const nonce = await loveDoPostNFT.superlikeNonces(liker.address);
+            await loveDoPostNFT.connect(liker).addSuperlike(tokenId, nonce);
 
             await loveEmissionEngine.connect(emitter).emitForSuperlike(tokenId, liker.address);
 
@@ -120,8 +130,10 @@ describe("LoveEmissionEngine with Lovecoin", function () {
             const amount = ethers.parseEther("100");
             await lovecoin.connect(deployer).transfer(await loveEmissionEngine.getAddress(), amount);
 
-            await loveDoPostNFT.addPostForTest(user1.address, seller.address, seller.address);
+            await loveDoPostNFT.connect(user1).mintLoveDoPost(seller.address, "ipfs://test");
             const tokenId = (await loveDoPostNFT.nextTokenId()) - 1n;
+            const nonce = await loveDoPostNFT.superlikeNonces(liker.address);
+            await loveDoPostNFT.connect(liker).addSuperlike(tokenId, nonce);
             await loveEmissionEngine.connect(emitter).emitForSuperlike(tokenId, liker.address);
 
             const balanceBefore = await lovecoin.balanceOf(seller.address);
@@ -142,11 +154,11 @@ describe("LoveEmissionEngine with Lovecoin", function () {
     describe("P1: LGOV Activation", function () {
         it("Should activate LGOV when reputation threshold is met", async function () {
             for (let i = 0; i < 8; i++) {
-                await loveDoPostNFT.addPostForTest(user1.address, seller.address, seller.address);
+                await loveDoPostNFT.connect(user1).mintLoveDoPost(seller.address, `ipfs://post-${i}`);
             }
-
-            await loveDoPostNFT.addPostForTest(user1.address, seller.address, seller.address);
-            const tokenId = (await loveDoPostNFT.nextTokenId()) - 1n;
+            const tokenId = (await loveDoPostNFT.nextTokenId()) - 1n; // 8-й пост (getLoveDoCount(seller) = 8)
+            const nonce = await loveDoPostNFT.superlikeNonces(liker.address);
+            await loveDoPostNFT.connect(liker).addSuperlike(tokenId, nonce);
             await loveEmissionEngine.connect(emitter).emitForSuperlike(tokenId, liker.address);
 
             // Проверяем накопленные LGOV
@@ -166,9 +178,11 @@ describe("LoveEmissionEngine with Lovecoin", function () {
 
         it("Should not activate LGOV when reputation threshold is not met", async function () {
             for (let i = 0; i < 7; i++) {
-                await loveDoPostNFT.addPostForTest(user1.address, seller.address, seller.address);
+                await loveDoPostNFT.connect(user1).mintLoveDoPost(seller.address, `ipfs://post-${i}`);
             }
             const tokenId = (await loveDoPostNFT.nextTokenId()) - 1n; // последний из 7 постов
+            const nonce = await loveDoPostNFT.superlikeNonces(liker.address);
+            await loveDoPostNFT.connect(liker).addSuperlike(tokenId, nonce);
             await loveEmissionEngine.connect(emitter).emitForSuperlike(tokenId, liker.address);
             // getLoveDoCount(seller) = 7 < 8, claimLGOV должен ревертиться
             await expectRevertWithMessage(loveEmissionEngine.connect(seller).claimLGOV(), "LoveEmission: not enough LoveDo posts");
@@ -187,10 +201,36 @@ describe("LoveEmissionEngine with Lovecoin", function () {
         });
 
         it("Should revert when non-emitter tries to emit", async function () {
-            await loveDoPostNFT.addPostForTest(user1.address, seller.address, seller.address);
+            await loveDoPostNFT.connect(user1).mintLoveDoPost(seller.address, "ipfs://test");
             const tokenId = (await loveDoPostNFT.nextTokenId()) - 1n;
+            const nonce = await loveDoPostNFT.superlikeNonces(liker.address);
+            await loveDoPostNFT.connect(liker).addSuperlike(tokenId, nonce);
 
             await expectRevert(loveEmissionEngine.connect(user1).emitForSuperlike(tokenId, liker.address));
+        });
+
+        it("Should revert when emit is called without liker superlike", async function () {
+            await loveDoPostNFT.connect(user1).mintLoveDoPost(seller.address, "ipfs://test");
+            const tokenId = (await loveDoPostNFT.nextTokenId()) - 1n;
+
+            await expectRevertWithMessage(
+                loveEmissionEngine.connect(emitter).emitForSuperlike(tokenId, liker.address),
+                "LoveEmission: superlike not found for liker"
+            );
+        });
+
+        it("Should revert on duplicate emission for same like", async function () {
+            await loveDoPostNFT.connect(user1).mintLoveDoPost(seller.address, "ipfs://test");
+            const tokenId = (await loveDoPostNFT.nextTokenId()) - 1n;
+            const nonce = await loveDoPostNFT.superlikeNonces(liker.address);
+            await loveDoPostNFT.connect(liker).addSuperlike(tokenId, nonce);
+
+            await loveEmissionEngine.connect(emitter).emitForSuperlike(tokenId, liker.address);
+
+            await expectRevertWithMessage(
+                loveEmissionEngine.connect(emitter).emitForSuperlike(tokenId, liker.address),
+                "LoveEmission: emission already processed for like"
+            );
         });
     });
 
