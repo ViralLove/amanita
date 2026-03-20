@@ -219,8 +219,7 @@ describe("SpiralEngine - SBT Deep Layer", function () {
         });
     });
 
-    // P2: при появлении полного API временных ключей/репутации обновить ожидания (ненулевой ключ, истечение срока, реальные лимиты)
-    describe("P2: Edge (current stub behavior)", function () {
+    describe("P2: Edge (temporary key behavior)", function () {
         it("Should handle temporary key creation and expiration", async function () {
             await spiralEngine.connect(deployer).mintInvite("DEEP-P2-TEMP-INVITE", 0);
             const newCodes = Array.from({ length: 12 }, (_, i) => `P2-TEMP-${i + 1}`);
@@ -231,12 +230,20 @@ describe("SpiralEngine - SBT Deep Layer", function () {
             const soulboundCore = await ethers.getContractAt("SoulboundCore", soulboundCoreAddress);
             await soulboundCore.connect(deployer).mintSoul(user1.address);
 
-            // Текущая реализация: заглушки. При полном API обновить: ожидать ненулевой ключ после create, valid=true до истечения срока
             await soulIdentity.connect(user1).createTemporaryKey(guardian1.address, 3600);
             const tempKey = await soulIdentity.getTemporaryKey(user1.address);
             const valid = await soulIdentity.isTemporaryKeyValid(guardian1.address);
-            expect(tempKey).to.equal(ethers.ZeroAddress);
-            expect(valid).to.be.false;
+            expect(tempKey).to.equal(guardian1.address);
+            expect(valid).to.be.true;
+
+            // После истечения срока ключ должен считаться невалидным
+            await ethers.provider.send("evm_increaseTime", [3601]);
+            await ethers.provider.send("evm_mine", []);
+
+            const expiredTempKey = await soulIdentity.getTemporaryKey(user1.address);
+            const expiredValid = await soulIdentity.isTemporaryKeyValid(guardian1.address);
+            expect(expiredTempKey).to.equal(ethers.ZeroAddress);
+            expect(expiredValid).to.be.false;
         });
 
         it("Should prevent duplicate temporary key creation", async function () {
@@ -249,11 +256,12 @@ describe("SpiralEngine - SBT Deep Layer", function () {
             const soulboundCore = await ethers.getContractAt("SoulboundCore", soulboundCoreAddress);
             await soulboundCore.connect(deployer).mintSoul(user1.address);
 
-            // Заглушка: повторный вызов не ревертит; getTemporaryKey=0. При полном API: ожидать revert или перезапись при duplicate
             await soulIdentity.connect(user1).createTemporaryKey(guardian1.address, 3600);
             await soulIdentity.connect(user1).createTemporaryKey(guardian1.address, 7200);
             const tempKey = await soulIdentity.getTemporaryKey(user1.address);
-            expect(tempKey).to.equal(ethers.ZeroAddress);
+            const valid = await soulIdentity.isTemporaryKeyValid(guardian1.address);
+            expect(tempKey).to.equal(guardian1.address);
+            expect(valid).to.be.true;
         });
 
         it("Should validate reputation requirements", async function () {
