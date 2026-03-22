@@ -16,6 +16,9 @@ contract AmanitaToken is ERC20, AccessControl {
     mapping(address => uint256) public sellerAcceptedPayments;
     mapping(address => uint256) public sellerLiquidityRefunds;
 
+    /// @notice Checkout contract allowed to apply order-scoped AMANITA redemption (burn + debt decrease).
+    address public amanitaCheckout;
+
     bool public enforceAbsoluteDebtCap = true;
     bool public enforceDebtToLiquidityRatio = true;
     uint256 public absoluteDebtCap = 50_000 ether;
@@ -31,6 +34,15 @@ contract AmanitaToken is ERC20, AccessControl {
     event SellerDebtIncreased(address indexed seller, uint256 amount, uint256 newDebt);
     event SellerAcceptedPaymentRecorded(address indexed seller, uint256 amount, uint256 newAcceptedPayments);
     event SellerLiquidityRefundRecorded(address indexed seller, uint256 amount, uint256 newLiquidityRefunds);
+    /// @param grossAmount AMANITA received and burned (full gross).
+    /// @param debtRepaid Portion applied to reduce `sellerDebt` (min(gross, prior debt)).
+    event SellerOrderDebtRepaid(
+        address indexed seller,
+        bytes32 indexed orderHash,
+        uint256 grossAmount,
+        uint256 debtRepaid,
+        uint256 newSellerDebt
+    );
 
     constructor(address owner) ERC20("Amanita", "AMANITA") {
         _mint(owner, INITIAL_SUPPLY);
@@ -49,6 +61,34 @@ contract AmanitaToken is ERC20, AccessControl {
         address oldSpiralEngine = spiralEngine;
         spiralEngine = newSpiralEngine;
         emit SpiralEngineUpdated(oldSpiralEngine, newSpiralEngine);
+    }
+
+    /**
+     * @notice Registers `AmanitaCheckout` for `applyOrderDebtRepayment`.
+     */
+    function setAmanitaCheckout(address newCheckout) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newCheckout != address(0), "AmanitaToken: checkout required");
+        amanitaCheckout = newCheckout;
+    }
+
+    /**
+     * @notice Burns `grossAmount` of AMANITA held by this contract and reduces `sellerDebt[seller]` by min(gross, debt).
+     * @dev Caller must be `amanitaCheckout`. Tokens must already be transferred to this contract (e.g. buyer → this).
+     */
+    function applyOrderDebtRepayment(address seller, bytes32 orderHash, uint256 grossAmount) external {
+        require(msg.sender == amanitaCheckout, "AmanitaToken: only checkout");
+        require(amanitaCheckout != address(0), "AmanitaToken: checkout not set");
+        require(seller != address(0), "AmanitaToken: invalid seller");
+        require(grossAmount > 0, "AmanitaToken: amount");
+        require(balanceOf(address(this)) >= grossAmount, "AmanitaToken: insufficient AMN received");
+
+        uint256 debt = sellerDebt[seller];
+        uint256 repay = grossAmount <= debt ? grossAmount : debt;
+        unchecked {
+            sellerDebt[seller] = debt - repay;
+        }
+        _burn(address(this), grossAmount);
+        emit SellerOrderDebtRepaid(seller, orderHash, grossAmount, repay, sellerDebt[seller]);
     }
 
     function mint(address to, uint256 amount) external {
