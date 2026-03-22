@@ -14,6 +14,8 @@ import "./interfaces/IAmanitaCommerceReputationHooks.sol";
  * @notice Composite commerce checkout: AmanitaCoin + LoveCoin on-chain funding; external leg is off-chain only.
  * @dev `Paid` means buyer + seller attested full payment — not automatic from token receipts alone.
  *      Protocol does not verify external (fiat/PSP) payments. Emergency `markOrderPaid` is admin-only.
+ *      AMN-2.6: `confirmOrderReceived` and `signalWeakExternalPaymentClaim` emit **optional** reputation signals;
+ *      they do not prove delivery or PSP settlement.
  */
 contract AmanitaCheckout is AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -52,6 +54,10 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
         bool sellerAcceptedFullPayment;
         uint64 fullPaymentDeclaredAt;
         uint64 fullPaymentAcceptedAt;
+        /// @dev Buyer confirmed receipt while `Paid` (AMN-2.6); read at settle for hook.
+        uint64 receivedByBuyerAt;
+        /// @dev One-time weak external-leg claim in `Created` (AMN-2.6).
+        bool weakExternalPaymentClaimed;
     }
 
     IERC20 public immutable amanitaCoin;
@@ -84,6 +90,10 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
     );
     event OrderFullPaymentDeclared(bytes32 indexed orderHash, address indexed buyer, uint64 declaredAt);
     event OrderFullPaymentAccepted(bytes32 indexed orderHash, address indexed seller, uint64 acceptedAt);
+    /// @notice Voluntary buyer signal: claims order received (does not prove delivery; AMN-2.6).
+    event OrderReceivedByBuyer(bytes32 indexed orderHash, address indexed buyer, uint64 receivedAt);
+    /// @notice Weak optional signal while `Created`; does not move status or imply `Paid` (AMN-2.6).
+    event WeakExternalPaymentClaimed(bytes32 indexed orderHash, address indexed buyer, address indexed seller, uint64 claimedAt);
     event ReputationHooksUpdated(address indexed hooks);
 
     constructor(address admin, address amanitaToken_, address loveCoin_) {
@@ -136,7 +146,9 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
             buyerDeclaredFullPayment: false,
             sellerAcceptedFullPayment: false,
             fullPaymentDeclaredAt: 0,
-            fullPaymentAcceptedAt: 0
+            fullPaymentAcceptedAt: 0,
+            receivedByBuyerAt: 0,
+            weakExternalPaymentClaimed: false
         });
 
         emit OrderCreated(orderHash, msg.sender, seller, amount, referenceId);
@@ -195,6 +207,39 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
     }
 
     /**
+     * @notice Buyer voluntarily signals that the order was received (AMN-2.6). One call per order while `Paid`.
+     * @dev Does not change `OrderStatus`; not proof of delivery. Used at settlement for reputation hook.
+     */
+    function confirmOrderReceived(bytes32 orderHash) external {
+        Order storage order = _getOrder(orderHash);
+        require(order.status == OrderStatus.Paid, "AmanitaCheckout: invalid status for received");
+        require(msg.sender == order.buyer, "AmanitaCheckout: only buyer");
+        require(order.receivedByBuyerAt == 0, "AmanitaCheckout: already confirmed received");
+
+        order.receivedByBuyerAt = uint64(block.timestamp);
+        emit OrderReceivedByBuyer(orderHash, msg.sender, order.receivedByBuyerAt);
+    }
+
+    /**
+     * @notice Weak optional signal: buyer claims external payment leg was sent (AMN-2.6). Only in `Created`, once per order.
+     * @dev Does not set `Paid` or verify PSP/fiat.
+     */
+    function signalWeakExternalPaymentClaim(bytes32 orderHash) external {
+        Order storage order = _getOrder(orderHash);
+        require(order.status == OrderStatus.Created, "AmanitaCheckout: invalid status for weak claim");
+        require(msg.sender == order.buyer, "AmanitaCheckout: only buyer");
+        require(!order.weakExternalPaymentClaimed, "AmanitaCheckout: weak claim already used");
+
+        order.weakExternalPaymentClaimed = true;
+        uint64 t = uint64(block.timestamp);
+        emit WeakExternalPaymentClaimed(orderHash, order.buyer, order.seller, t);
+
+        if (address(reputationHooks) != address(0)) {
+            reputationHooks.notifyWeakExternalPaymentClaim(order.buyer, order.seller);
+        }
+    }
+
+    /**
      * @notice Seller accepts buyer's full-payment attestation; transitions to `Paid`.
      */
     function acceptFullPayment(bytes32 orderHash) external nonReentrant {
@@ -234,7 +279,13 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
         emit OrderSettled(orderHash, msg.sender, order.settledAt);
 
         if (address(reputationHooks) != address(0)) {
-            reputationHooks.notifyOrderSettled(order.seller);
+            reputationHooks.notifyOrderSettled(
+                order.seller,
+                order.buyer,
+                order.buyerDeclaredFullPayment,
+                order.sellerAcceptedFullPayment,
+                order.receivedByBuyerAt != 0
+            );
         }
     }
 

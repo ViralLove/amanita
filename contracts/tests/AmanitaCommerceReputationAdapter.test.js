@@ -128,6 +128,8 @@ describe("AmanitaCommerceReputationAdapter live + anchor", function () {
         expect(snap.anchoredAt > 0n).to.be.true;
         expect(snap.metrics.sellerRedemptionCount).to.equal(1n);
         expect(snap.metrics.sellerSuccessfulOrdersCount).to.equal(1n);
+        expect(snap.metrics.sellerSettledWithBuyerDeclareCount).to.equal(1n);
+        expect(snap.metrics.sellerSettledWithoutSellerAcceptCount).to.equal(0n);
 
         const h2 = await createOrder(0x04);
         await checkout.connect(buyer).captureAmanitaCoin(h2, ethers.parseEther("1"));
@@ -143,9 +145,79 @@ describe("AmanitaCommerceReputationAdapter live + anchor", function () {
             "CommerceReputation: only checkout",
         );
         await expectRevertWithMessage(
-            adapter.connect(outsider).notifyOrderSettled(seller.address),
+            adapter
+                .connect(outsider)
+                .notifyOrderSettled(seller.address, buyer.address, true, true, false),
             "CommerceReputation: only checkout",
         );
+        await expectRevertWithMessage(
+            adapter.connect(outsider).notifyWeakExternalPaymentClaim(buyer.address, seller.address),
+            "CommerceReputation: only checkout",
+        );
+    });
+
+    it("AMN-2.6: buyer confirmed received updates buyer metrics; bps views", async function () {
+        const h = await createOrder(0x10);
+        await checkout.connect(deployer).markOrderPaid(h);
+        await checkout.connect(buyer).confirmOrderReceived(h);
+        await checkout.connect(deployer).markOrderSettled(h);
+
+        const b = await adapter.getLiveBuyerMetrics(buyer.address);
+        expect(b.settledReceivedCount).to.equal(1n);
+        expect(b.settledReceivedMissingDeclareCount).to.equal(1n);
+        expect(await adapter.getBuyerReceivedWithoutDeclareBps(buyer.address)).to.equal(10000n);
+
+        const m = await adapter.getLiveMetrics(seller.address);
+        expect(m.sellerSettledWithBuyerDeclareCount).to.equal(0n);
+    });
+
+    it("AMN-2.6: attestation path + confirm → buyer missing-declare bps zero", async function () {
+        const h = await createOrder(0x11);
+        await checkout.connect(buyer).declareFullPayment(h);
+        await checkout.connect(seller).acceptFullPayment(h);
+        await checkout.connect(buyer).confirmOrderReceived(h);
+        await checkout.connect(deployer).markOrderSettled(h);
+
+        const b = await adapter.getLiveBuyerMetrics(buyer.address);
+        expect(b.settledReceivedCount).to.equal(1n);
+        expect(b.settledReceivedMissingDeclareCount).to.equal(0n);
+        expect(await adapter.getBuyerReceivedWithoutDeclareBps(buyer.address)).to.equal(0n);
+
+        const m = await adapter.getLiveMetrics(seller.address);
+        expect(m.sellerSettledWithBuyerDeclareCount).to.equal(1n);
+        expect(m.sellerSettledWithoutSellerAcceptCount).to.equal(0n);
+    });
+
+    it("AMN-2.6: declare then emergency paid → seller unsettled-after-declare bps 10000", async function () {
+        const h = await createOrder(0x12);
+        await checkout.connect(buyer).declareFullPayment(h);
+        await checkout.connect(deployer).markOrderPaid(h);
+        await checkout.connect(deployer).markOrderSettled(h);
+
+        expect(await adapter.getSellerUnsettledAfterDeclareBps(seller.address)).to.equal(10000n);
+    });
+
+    it("AMN-2.6: weak external claim increments buyer counter", async function () {
+        const h = await createOrder(0x13);
+        await checkout.connect(buyer).signalWeakExternalPaymentClaim(h);
+        const b = await adapter.getLiveBuyerMetrics(buyer.address);
+        expect(b.weakExternalClaimCount).to.equal(1n);
+    });
+
+    it("anchorBuyer freezes buyer signal snapshot", async function () {
+        const h = await createOrder(0x14);
+        await checkout.connect(buyer).signalWeakExternalPaymentClaim(h);
+        await adapter.connect(deployer).anchorBuyer(buyer.address);
+        const snap = await adapter.getAnchoredBuyerSnapshot(buyer.address);
+        expect(snap.anchoredAt > 0n).to.be.true;
+        expect(snap.metrics.weakExternalClaimCount).to.equal(1n);
+
+        const h2 = await createOrder(0x15);
+        await checkout.connect(buyer).signalWeakExternalPaymentClaim(h2);
+        const live = await adapter.getLiveBuyerMetrics(buyer.address);
+        expect(live.weakExternalClaimCount).to.equal(2n);
+        const snap2 = await adapter.getAnchoredBuyerSnapshot(buyer.address);
+        expect(snap2.metrics.weakExternalClaimCount).to.equal(1n);
     });
 
     it("recordRefund and recordDispute update live counters", async function () {
