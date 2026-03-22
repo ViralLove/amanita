@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./AmanitaToken.sol";
+import "./interfaces/IAmanitaCommerceReputationHooks.sol";
 
 /**
  * @title AmanitaCheckout
@@ -57,6 +58,9 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
     IERC20 public immutable loveCoin;
     AmanitaToken public immutable amanitaToken;
 
+    /// @notice Optional AMN-2.3 reputation hooks (zero = disabled).
+    IAmanitaCommerceReputationHooks public reputationHooks;
+
     mapping(bytes32 => Order) private _orders;
 
     event OrderCreated(
@@ -80,6 +84,7 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
     );
     event OrderFullPaymentDeclared(bytes32 indexed orderHash, address indexed buyer, uint64 declaredAt);
     event OrderFullPaymentAccepted(bytes32 indexed orderHash, address indexed seller, uint64 acceptedAt);
+    event ReputationHooksUpdated(address indexed hooks);
 
     constructor(address admin, address amanitaToken_, address loveCoin_) {
         require(admin != address(0), "AmanitaCheckout: invalid admin");
@@ -92,6 +97,14 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(CHECKOUT_WRITER_ROLE, admin);
+    }
+
+    /**
+     * @notice Wire `AmanitaCommerceReputationAdapter` (or any `IAmanitaCommerceReputationHooks` impl). Pass zero to disable.
+     */
+    function setReputationHooks(address hooks) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        reputationHooks = IAmanitaCommerceReputationHooks(hooks);
+        emit ReputationHooksUpdated(hooks);
     }
 
     function createOrder(
@@ -145,6 +158,10 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
         amanitaToken.applyOrderDebtRepayment(order.seller, orderHash, amount);
 
         emit OrderOnChainFunded(orderHash, FundingRail.AmanitaCoin, amount, order.capturedAmanita);
+
+        if (address(reputationHooks) != address(0)) {
+            reputationHooks.notifyAmanitaRedemption(order.seller, amount);
+        }
     }
 
     /**
@@ -215,6 +232,10 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
         order.status = OrderStatus.Settled;
         order.settledAt = uint64(block.timestamp);
         emit OrderSettled(orderHash, msg.sender, order.settledAt);
+
+        if (address(reputationHooks) != address(0)) {
+            reputationHooks.notifyOrderSettled(order.seller);
+        }
     }
 
     function cancelOrder(bytes32 orderHash) external onlyRole(CHECKOUT_WRITER_ROLE) {
