@@ -208,6 +208,7 @@ describe("AmanitaCheckout composite funding and attestation-gated Paid", functio
     it("AMN-2.7: cancelOwnOrder auto-refunds Love escrow to buyer", async function () {
         const orderHash = await createOrder(0x40);
         const loveAmount = ethers.parseEther("7");
+        const debtBefore = await amanitaToken.sellerDebt(seller.address);
         await checkout.connect(buyer).captureLoveCoin(orderHash, loveAmount);
         const buyerLoveBefore = await loveToken.balanceOf(buyer.address);
 
@@ -215,6 +216,7 @@ describe("AmanitaCheckout composite funding and attestation-gated Paid", functio
 
         const buyerLoveAfter = await loveToken.balanceOf(buyer.address);
         expect(buyerLoveAfter - buyerLoveBefore).to.equal(loveAmount);
+        expect(await amanitaToken.sellerDebt(seller.address)).to.equal(debtBefore);
         const order = await checkout.getOrder(orderHash);
         expect(order.status).to.equal(4n);
         expect(order.capturedLove).to.equal(0n);
@@ -276,5 +278,63 @@ describe("AmanitaCheckout composite funding and attestation-gated Paid", functio
         expect(ev.args.orderHash).to.equal(orderHash);
         expect(ev.args.buyer).to.equal(buyer.address);
         expect(ev.args.amount).to.equal(part);
+    });
+
+    it("AMN-2.4 qualification: AMN cancel emits paired refund events with same amount", async function () {
+        const orderHash = await createOrder(0x44);
+        const part = orderAmount / 2n;
+        const tx1 = await checkout.connect(buyer).captureAmanitaCoin(orderHash, part);
+        await tx1.wait();
+
+        const tx2 = await checkout.connect(deployer).cancelOrder(orderHash);
+        const receipt = await tx2.wait();
+        const parsed = receipt.logs
+            .map((l) => {
+                try {
+                    return checkout.interface.parseLog(l);
+                } catch {
+                    return null;
+                }
+            })
+            .filter(Boolean);
+
+        const buyerRefund = parsed.find((e) => e.name === "BuyerOrderAmnRefunded");
+        const railRefund = parsed.find((e) => e.name === "OrderRefunded" && e.args.rail === 0n);
+
+        expect(buyerRefund).to.not.equal(undefined);
+        expect(railRefund).to.not.equal(undefined);
+        expect(buyerRefund.args.amount).to.equal(part);
+        expect(railRefund.args.amount).to.equal(part);
+    });
+
+    it("AMN-2.4 qualification: buyer refund one-shot guard blocks second token payout", async function () {
+        const orderHash = await createOrder(0x45);
+        const part = orderAmount / 2n;
+        await checkout.connect(buyer).captureAmanitaCoin(orderHash, part);
+        await checkout.connect(deployer).cancelOrder(orderHash);
+
+        await amanitaToken.connect(deployer).setAmanitaCheckout(deployer.address);
+        await expectRevertWithMessage(
+            amanitaToken.connect(deployer).refundBuyerOnOrderCancel(buyer.address, orderHash, part),
+            "AmanitaToken: buyer already refunded",
+        );
+    });
+
+    it("AMN-2.4 qualification: no cancel refund path after Settled", async function () {
+        const orderHash = await createOrder(0x46);
+        const part = orderAmount / 2n;
+        const buyerAmnBefore = await amanitaToken.balanceOf(buyer.address);
+
+        await checkout.connect(buyer).captureAmanitaCoin(orderHash, part);
+        await checkout.connect(buyer).declareFullPayment(orderHash);
+        await checkout.connect(seller).acceptFullPayment(orderHash);
+        await checkout.connect(deployer).markOrderSettled(orderHash);
+
+        await expectRevertWithMessage(
+            checkout.connect(deployer).cancelOrder(orderHash),
+            "AmanitaCheckout: invalid transition to cancelled",
+        );
+        expect(await amanitaToken.balanceOf(buyer.address)).to.equal(buyerAmnBefore - part);
+        expect(await amanitaToken.orderBuyerRefunded(orderHash)).to.equal(false);
     });
 });

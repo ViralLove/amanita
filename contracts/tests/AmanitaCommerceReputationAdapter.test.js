@@ -69,7 +69,9 @@ describe("AmanitaCommerceReputationAdapter live + anchor", function () {
         await spiralEngine.connect(deployer).grantSellerRole(seller.address);
         await amanitaToken.connect(seller).mint(seller.address, orderAmount);
         await amanitaToken.connect(deployer).transfer(buyer.address, orderAmount * 2n);
+        await loveToken.mint(buyer.address, ethers.parseEther("100"));
         await amanitaToken.connect(buyer).approve(await checkout.getAddress(), ethers.MaxUint256);
+        await loveToken.connect(buyer).approve(await checkout.getAddress(), ethers.MaxUint256);
     });
 
     async function createOrder(refByte) {
@@ -218,6 +220,26 @@ describe("AmanitaCommerceReputationAdapter live + anchor", function () {
         expect(live.weakExternalClaimCount).to.equal(2n);
         const snap2 = await adapter.getAnchoredBuyerSnapshot(buyer.address);
         expect(snap2.metrics.weakExternalClaimCount).to.equal(1n);
+    });
+
+    it("AMN-2.4 qualification: cancel/refund does not count as successful commerce settlement", async function () {
+        const h = await createOrder(0x16);
+        const amnPart = orderAmount / 2n;
+        await checkout.connect(buyer).captureAmanitaCoin(h, amnPart);
+        await checkout.connect(buyer).captureLoveCoin(h, ethers.parseEther("2"));
+        await checkout.connect(buyer).signalWeakExternalPaymentClaim(h);
+        await checkout.connect(deployer).cancelOrder(h);
+
+        const sellerMetrics = await adapter.getLiveMetrics(seller.address);
+        expect(sellerMetrics.sellerRedemptionCount).to.equal(1n);
+        expect(sellerMetrics.sellerSuccessfulOrdersCount).to.equal(0n);
+        expect(sellerMetrics.sellerSettledWithBuyerDeclareCount).to.equal(0n);
+        expect(sellerMetrics.sellerSettledWithoutSellerAcceptCount).to.equal(0n);
+
+        const buyerMetrics = await adapter.getLiveBuyerMetrics(buyer.address);
+        expect(buyerMetrics.weakExternalClaimCount).to.equal(1n);
+        expect(buyerMetrics.settledReceivedCount).to.equal(0n);
+        expect(buyerMetrics.settledReceivedMissingDeclareCount).to.equal(0n);
     });
 
     it("recordRefund and recordDispute update live counters", async function () {

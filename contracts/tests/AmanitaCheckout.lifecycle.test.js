@@ -112,6 +112,15 @@ describe("AmanitaCheckout lifecycle and roles", function () {
         );
     });
 
+    it("rejects duplicate order hash for identical buyer/seller/amount/reference", async function () {
+        const ref = ethers.zeroPadValue("0x22", 32);
+        await checkout.connect(buyer).createOrder(seller.address, ethers.parseEther("10"), ref);
+        await expectRevertWithMessage(
+            checkout.connect(buyer).createOrder(seller.address, ethers.parseEther("10"), ref),
+            "AmanitaCheckout: order exists",
+        );
+    });
+
     it("enforces valid transition Created -> Paid -> Settled (admin emergency paid)", async function () {
         const orderHash = await createOrderAsBuyer("0x12");
         await checkout.connect(deployer).markOrderPaid(orderHash);
