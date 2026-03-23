@@ -17,6 +17,8 @@ contract AmanitaToken is ERC20, AccessControl {
     mapping(address => uint256) public sellerLiquidityRefunds;
     /// @notice Cumulative debt repaid for order (used for one-time restore on cancel in AMN-2.7).
     mapping(bytes32 => uint256) public orderDebtRepaid;
+    /// @notice One-shot guard: AMN buyer refund already minted for this order.
+    mapping(bytes32 => bool) public orderBuyerRefunded;
 
     /// @notice Checkout contract allowed to apply order-scoped AMANITA redemption (burn + debt decrease).
     address public amanitaCheckout;
@@ -51,6 +53,7 @@ contract AmanitaToken is ERC20, AccessControl {
         uint256 restoredAmount,
         uint256 newSellerDebt
     );
+    event BuyerOrderAmnRefunded(address indexed buyer, bytes32 indexed orderHash, uint256 amount);
 
     constructor(address owner) ERC20("Amanita", "AMANITA") {
         _mint(owner, INITIAL_SUPPLY);
@@ -118,6 +121,22 @@ contract AmanitaToken is ERC20, AccessControl {
         orderDebtRepaid[orderHash] = 0;
         sellerDebt[seller] += restoredAmount;
         emit SellerOrderDebtRestoredOnCancel(seller, orderHash, restoredAmount, sellerDebt[seller]);
+    }
+
+    /**
+     * @notice Mints AMANITA back to buyer on cancelled order (AMN-2.8 DG-approved mint-back).
+     * @dev One-time per `orderHash`; callable only by `amanitaCheckout`.
+     */
+    function refundBuyerOnOrderCancel(address buyer, bytes32 orderHash, uint256 amount) external {
+        require(msg.sender == amanitaCheckout, "AmanitaToken: only checkout");
+        require(amanitaCheckout != address(0), "AmanitaToken: checkout not set");
+        require(buyer != address(0), "AmanitaToken: invalid buyer");
+        require(amount > 0, "AmanitaToken: amount");
+        require(!orderBuyerRefunded[orderHash], "AmanitaToken: buyer already refunded");
+
+        orderBuyerRefunded[orderHash] = true;
+        _mint(buyer, amount);
+        emit BuyerOrderAmnRefunded(buyer, orderHash, amount);
     }
 
     function mint(address to, uint256 amount) external {

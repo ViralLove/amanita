@@ -94,6 +94,8 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
      *      `rail=LoveCoin` means actual escrow transfer to buyer.
      */
     event OrderRefunded(bytes32 indexed orderHash, address indexed buyer, FundingRail indexed rail, uint256 amount);
+    /// @notice AMN-2.8: explicit buyer AMANITA payout signal on cancel.
+    event BuyerOrderAmnRefunded(bytes32 indexed orderHash, address indexed buyer, uint256 amount);
     event OrderFullPaymentDeclared(bytes32 indexed orderHash, address indexed buyer, uint64 declaredAt);
     event OrderFullPaymentAccepted(bytes32 indexed orderHash, address indexed seller, uint64 acceptedAt);
     /// @notice Voluntary buyer signal: claims order received (does not prove delivery; AMN-2.6).
@@ -333,12 +335,15 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
 
     function _refundOnCancel(bytes32 orderHash, Order storage order) internal {
         if (order.capturedAmanita > 0) {
+            uint256 buyerAmnRefund = order.capturedAmanita;
             uint256 restoredDebt = 0;
             if (amanitaToken.orderDebtRepaid(orderHash) > 0) {
                 restoredDebt = amanitaToken.restoreOrderDebtOnCancel(order.seller, orderHash);
             }
+            amanitaToken.refundBuyerOnOrderCancel(order.buyer, orderHash, buyerAmnRefund);
             order.capturedAmanita = 0;
-            emit OrderRefunded(orderHash, order.buyer, FundingRail.AmanitaCoin, restoredDebt);
+            emit BuyerOrderAmnRefunded(orderHash, order.buyer, buyerAmnRefund);
+            emit OrderRefunded(orderHash, order.buyer, FundingRail.AmanitaCoin, buyerAmnRefund);
         }
 
         if (order.capturedLove > 0) {

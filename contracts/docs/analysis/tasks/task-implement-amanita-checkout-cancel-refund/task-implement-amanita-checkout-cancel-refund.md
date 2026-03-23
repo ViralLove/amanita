@@ -208,5 +208,5 @@ npx hardhat test
 | Поле | Выбор |
 |------|--------|
 | Love refund | **Авто при cancel** (в том же tx) |
-| AMN при cancel | **Restore `sellerDebt` by `orderDebtRepaid[orderHash]`** (one-shot) |
+| AMN при cancel | **AMN-2.8 update:** restore `sellerDebt` (one-shot) **+ buyer mint-back refund** по `capturedAmanita` |
 | Cancel после `declareFullPayment` | **Только writer/admin**; buyer self-cancel блокируется |
