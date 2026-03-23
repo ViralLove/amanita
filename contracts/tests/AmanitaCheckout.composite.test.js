@@ -204,4 +204,51 @@ describe("AmanitaCheckout composite funding and attestation-gated Paid", functio
             "AmanitaCheckout: full payment not declared",
         );
     });
+
+    it("AMN-2.7: cancelOwnOrder auto-refunds Love escrow to buyer", async function () {
+        const orderHash = await createOrder(0x40);
+        const loveAmount = ethers.parseEther("7");
+        await checkout.connect(buyer).captureLoveCoin(orderHash, loveAmount);
+        const buyerLoveBefore = await loveToken.balanceOf(buyer.address);
+
+        await checkout.connect(buyer).cancelOwnOrder(orderHash);
+
+        const buyerLoveAfter = await loveToken.balanceOf(buyer.address);
+        expect(buyerLoveAfter - buyerLoveBefore).to.equal(loveAmount);
+        const order = await checkout.getOrder(orderHash);
+        expect(order.status).to.equal(4n);
+        expect(order.capturedLove).to.equal(0n);
+    });
+
+    it("AMN-2.7: cancel restores sellerDebt by order repaid AMN amount", async function () {
+        const orderHash = await createOrder(0x41);
+        const debtBefore = await amanitaToken.sellerDebt(seller.address);
+        const part = orderAmount / 2n;
+        await checkout.connect(buyer).captureAmanitaCoin(orderHash, part);
+        expect(await amanitaToken.sellerDebt(seller.address)).to.equal(debtBefore - part);
+
+        await checkout.connect(deployer).cancelOrder(orderHash);
+        expect(await amanitaToken.sellerDebt(seller.address)).to.equal(debtBefore);
+        expect(await amanitaToken.orderDebtRepaid(orderHash)).to.equal(0n);
+        const order = await checkout.getOrder(orderHash);
+        expect(order.capturedAmanita).to.equal(0n);
+    });
+
+    it("AMN-2.7: cancel after mixed AMN+Love refunds love and restores debt", async function () {
+        const orderHash = await createOrder(0x42);
+        const debtBefore = await amanitaToken.sellerDebt(seller.address);
+        const buyerLoveBefore = await loveToken.balanceOf(buyer.address);
+        const amnPart = orderAmount / 2n;
+        const lovePart = ethers.parseEther("3");
+        await checkout.connect(buyer).captureAmanitaCoin(orderHash, amnPart);
+        await checkout.connect(buyer).captureLoveCoin(orderHash, lovePart);
+        await checkout.connect(buyer).declareFullPayment(orderHash);
+        await checkout.connect(deployer).cancelOrder(orderHash);
+
+        expect(await amanitaToken.sellerDebt(seller.address)).to.equal(debtBefore);
+        expect(await loveToken.balanceOf(buyer.address)).to.equal(buyerLoveBefore);
+        const order = await checkout.getOrder(orderHash);
+        expect(order.capturedAmanita).to.equal(0n);
+        expect(order.capturedLove).to.equal(0n);
+    });
 });

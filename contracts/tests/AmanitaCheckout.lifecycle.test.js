@@ -168,6 +168,13 @@ describe("AmanitaCheckout lifecycle and roles", function () {
             checkout.connect(buyer).cancelOwnOrder(orderHash2),
             "AmanitaCheckout: invalid self-cancel status",
         );
+
+        const orderHash3 = await createOrderAsBuyer("0x21");
+        await checkout.connect(buyer).declareFullPayment(orderHash3);
+        await expectRevertWithMessage(
+            checkout.connect(buyer).cancelOwnOrder(orderHash3),
+            "AmanitaCheckout: self-cancel locked after declare",
+        );
     });
 
     it("rejects invalid status transitions", async function () {

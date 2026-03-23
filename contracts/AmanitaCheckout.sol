@@ -88,6 +88,12 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
         uint256 increment,
         uint256 cumulativeOnRail
     );
+    /**
+     * @notice AMN-2.7 cancel compensation event.
+     * @dev `rail=AmanitaCoin` means debt ledger restoration amount (no token transfer to buyer).
+     *      `rail=LoveCoin` means actual escrow transfer to buyer.
+     */
+    event OrderRefunded(bytes32 indexed orderHash, address indexed buyer, FundingRail indexed rail, uint256 amount);
     event OrderFullPaymentDeclared(bytes32 indexed orderHash, address indexed buyer, uint64 declaredAt);
     event OrderFullPaymentAccepted(bytes32 indexed orderHash, address indexed seller, uint64 acceptedAt);
     /// @notice Voluntary buyer signal: claims order received (does not prove delivery; AMN-2.6).
@@ -289,7 +295,7 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
         }
     }
 
-    function cancelOrder(bytes32 orderHash) external onlyRole(CHECKOUT_WRITER_ROLE) {
+    function cancelOrder(bytes32 orderHash) external onlyRole(CHECKOUT_WRITER_ROLE) nonReentrant {
         Order storage order = _getOrder(orderHash);
         require(
             order.status == OrderStatus.Created || order.status == OrderStatus.Paid,
@@ -298,16 +304,19 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
 
         order.status = OrderStatus.Cancelled;
         order.cancelledAt = uint64(block.timestamp);
+        _refundOnCancel(orderHash, order);
         emit OrderCancelled(orderHash, msg.sender, order.cancelledAt);
     }
 
-    function cancelOwnOrder(bytes32 orderHash) external {
+    function cancelOwnOrder(bytes32 orderHash) external nonReentrant {
         Order storage order = _getOrder(orderHash);
         require(msg.sender == order.buyer, "AmanitaCheckout: only buyer can self-cancel");
         require(order.status == OrderStatus.Created, "AmanitaCheckout: invalid self-cancel status");
+        require(!order.buyerDeclaredFullPayment, "AmanitaCheckout: self-cancel locked after declare");
 
         order.status = OrderStatus.Cancelled;
         order.cancelledAt = uint64(block.timestamp);
+        _refundOnCancel(orderHash, order);
         emit OrderCancelled(orderHash, msg.sender, order.cancelledAt);
     }
 
@@ -320,5 +329,23 @@ contract AmanitaCheckout is AccessControl, ReentrancyGuard {
     function _getOrder(bytes32 orderHash) internal view returns (Order storage order) {
         order = _orders[orderHash];
         require(order.status != OrderStatus.None, "AmanitaCheckout: order not found");
+    }
+
+    function _refundOnCancel(bytes32 orderHash, Order storage order) internal {
+        if (order.capturedAmanita > 0) {
+            uint256 restoredDebt = 0;
+            if (amanitaToken.orderDebtRepaid(orderHash) > 0) {
+                restoredDebt = amanitaToken.restoreOrderDebtOnCancel(order.seller, orderHash);
+            }
+            order.capturedAmanita = 0;
+            emit OrderRefunded(orderHash, order.buyer, FundingRail.AmanitaCoin, restoredDebt);
+        }
+
+        if (order.capturedLove > 0) {
+            uint256 refundLove = order.capturedLove;
+            order.capturedLove = 0;
+            loveCoin.safeTransfer(order.buyer, refundLove);
+            emit OrderRefunded(orderHash, order.buyer, FundingRail.LoveCoin, refundLove);
+        }
     }
 }

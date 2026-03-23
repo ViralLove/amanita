@@ -15,6 +15,8 @@ contract AmanitaToken is ERC20, AccessControl {
     mapping(address => uint256) public sellerTotalEmitted;
     mapping(address => uint256) public sellerAcceptedPayments;
     mapping(address => uint256) public sellerLiquidityRefunds;
+    /// @notice Cumulative debt repaid for order (used for one-time restore on cancel in AMN-2.7).
+    mapping(bytes32 => uint256) public orderDebtRepaid;
 
     /// @notice Checkout contract allowed to apply order-scoped AMANITA redemption (burn + debt decrease).
     address public amanitaCheckout;
@@ -41,6 +43,12 @@ contract AmanitaToken is ERC20, AccessControl {
         bytes32 indexed orderHash,
         uint256 grossAmount,
         uint256 debtRepaid,
+        uint256 newSellerDebt
+    );
+    event SellerOrderDebtRestoredOnCancel(
+        address indexed seller,
+        bytes32 indexed orderHash,
+        uint256 restoredAmount,
         uint256 newSellerDebt
     );
 
@@ -87,8 +95,29 @@ contract AmanitaToken is ERC20, AccessControl {
         unchecked {
             sellerDebt[seller] = debt - repay;
         }
+        if (repay > 0) {
+            orderDebtRepaid[orderHash] += repay;
+        }
         _burn(address(this), grossAmount);
         emit SellerOrderDebtRepaid(seller, orderHash, grossAmount, repay, sellerDebt[seller]);
+    }
+
+    /**
+     * @notice Restores previously repaid debt for `orderHash` when checkout cancels the order (AMN-2.7).
+     * @dev One-time operation per order. Does not mint AMANITA back to buyer; only restores seller debt ledger.
+     * @return restoredAmount Amount added back to `sellerDebt`.
+     */
+    function restoreOrderDebtOnCancel(address seller, bytes32 orderHash) external returns (uint256 restoredAmount) {
+        require(msg.sender == amanitaCheckout, "AmanitaToken: only checkout");
+        require(amanitaCheckout != address(0), "AmanitaToken: checkout not set");
+        require(seller != address(0), "AmanitaToken: invalid seller");
+
+        restoredAmount = orderDebtRepaid[orderHash];
+        require(restoredAmount > 0, "AmanitaToken: nothing to restore");
+
+        orderDebtRepaid[orderHash] = 0;
+        sellerDebt[seller] += restoredAmount;
+        emit SellerOrderDebtRestoredOnCancel(seller, orderHash, restoredAmount, sellerDebt[seller]);
     }
 
     function mint(address to, uint256 amount) external {
