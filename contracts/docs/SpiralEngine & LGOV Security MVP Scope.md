@@ -11,7 +11,7 @@
 - `docs/tech/SpiralEngine Roles Security Policy.md`  
 - `docs/tech/Anti Sybil Policy.md`  
 - `contracts/docs/Amanita-SBT-Architecture/*.md` (01–10)  
-- `contracts/docs/LoveEmissionEngine.md`, `contracts/docs/LovecoinTokens.md`  
+- `contracts/docs/LoveEmissionEngine.md`, `contracts/docs/Loveconomy.md`  
 
 Этот документ описывает **минимальный контрактный функционал**, который должен быть реализован и честно задокументирован в **MVP релизе экосистемы Amanita**, с учётом:
 
@@ -203,7 +203,7 @@
 
 - AmanitaToken развёрнут с корректными MINTER/BURNER‑ролями;  
 - его использование не ломает инварианты Anti‑Sybil и не смешивает свои потоки с LoveEmissionEngine;  
-- документация (`Network-Economy.md`, `LovecoinTokens.md`) чётко объясняет, что $AMANITA — отдельная система от $LOVECOIN / $LGOV.
+- документация (`Network-Economy.md`, `Loveconomy.md`) чётко объясняет, что $AMANITA — отдельная система от $LOVECOIN / $LGOV.
 
 Детальные сценарии использования ($AMANITA + WooCommerce, кросс‑sellerские акции и т.п.) — поверх этого слоя, не требуются для выполнения контрактного MVP.
 

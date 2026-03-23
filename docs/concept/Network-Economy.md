@@ -1,7 +1,7 @@
 # Network Economy - AMANITA Ecosystem
 
 ## Overview
-This document describes the network economy principles of the AMANITA ecosystem, based on social mining, financial responsibility of participants, and selective invite distribution. The ecosystem implements a multi-token system with social capital mechanisms: $LOVECOIN (social mining), $LGOV (governance), $AMANITA (decentralized seller emission), and SpiralEngine (invite system).
+This document describes the network economy principles of the AMANITA ecosystem, based on social mining, financial responsibility of participants, and selective invite distribution. The ecosystem implements a multi-token and commerce system with social capital mechanisms: $LOVECOIN (social mining), $LGOV (governance), $AMANITA (seller loyalty emission/debt ledger), SpiralEngine (invite/trust system), and `AmanitaCheckout` (order and payment attestations).
 
 **Related Documentation:**
 - **[README.md](../README.md)** — Project overview and getting started guide
@@ -59,15 +59,16 @@ This document describes the network economy principles of the AMANITA ecosystem,
 - **LoveDo Count:** Number of posts directed at seller (reputation metric)
 
 ### 3. $AMANITA - Decentralized Seller Emission Token (ERC-20)
-**Purpose:** Loyalty tokens for decentralized emission by sellers based on sold values
+**Purpose:** Loyalty token layer with seller-driven emission and order-aware debt accounting
 
 **Key Characteristics:**
 - **Contract:** `AmanitaToken.sol` (symbol: AMANITA)
 - **Initial Supply:** 888,888,888 AMANITA (INITIAL_SUPPLY)
-- **Emission Mechanism:** Decentralized emission by sellers based on their sold values
-- **Burn Mechanism:** Tokens are burned on redemption
-- **Usage:** Seller loyalty programs, rewards to audience, cross-seller cooperation
-- **Control:** MINTER_ROLE for minting, MINTER_ROLE for burning
+- **Emission Mechanism:** Decentralized seller minting with eligibility/debt policy guards
+- **Debt Model:** `sellerDebt` increases on seller emission and decreases through order-aware AMANITA captures
+- **Cancel Model (AMN-2.7/2.8):** on cancel, debt can be restored and buyer AMANITA refund can be minted back by checkout flow
+- **Usage:** Seller loyalty programs, audience rewards, order-linked repayment mechanics
+- **Control:** seller emission guarded by SpiralEngine seller eligibility + policy checks; order repayment/refund hooks restricted to checkout
 
 **Economic Model:**
 - **Decentralized Emission:** Each seller can emit tokens based on their sales
@@ -77,7 +78,7 @@ This document describes the network economy principles of the AMANITA ecosystem,
 
 **Note:** This is a separate token system from $LOVECOIN (social P2P dynamics) and $LGOV (governance). $AMANITA focuses on seller-to-audience loyalty programs.
 
-### 4. SpiralEngine - Social Capital (ERC-721, Soulbound, Invite System)
+### 4. SpiralEngine - Social Capital (Invite + Identity/Trust)
 **Purpose:** Access control, trust system, and social capital representation through spiral hierarchy
 
 **Key Characteristics:**
@@ -94,6 +95,28 @@ This document describes the network economy principles of the AMANITA ecosystem,
 - **Trust Building:** Activator responsible for activated user behavior
 - **Network Growth:** Organic expansion through trusted connections (spiral hierarchy)
 - **Reputation Tracking:** Full history of invite usage and organic trust communities
+
+### 5. Commerce Order & Reputation Layer (AMN-2.x)
+
+**Purpose:** Bind payment facts, attestations, and reputation signals into one auditable flow.
+
+**Core contracts:**
+- `AmanitaCheckout`: canonical order lifecycle and on-chain funding rails (`AmanitaCoin`, `LoveCoin`), attestation-gated `Paid`, settlement/cancel transitions.
+- `AmanitaCommerceReputationAdapter`: hybrid metrics (live + anchored snapshots) for seller/buyer commerce signals.
+
+**Order semantics (important):**
+- `Paid` is not "token receipts reached threshold".  
+  `Paid` is an explicit attestation pair: buyer `declareFullPayment` + seller `acceptFullPayment` (or emergency admin path).
+- External payment leg can exist, but protocol does not verify fiat/PSP settlement.
+
+**Cancel/refund semantics (AMN-2.7/2.8):**
+- LoveCoin captured in checkout escrow is returned to buyer on cancel.
+- AMANITA order path restores seller debt ledger and can mint buyer refund back for captured AMANITA (one-shot guards by `orderHash`).
+- Cancel/refund does not equal successful settlement in reputation metrics.
+
+**Reputation semantics (AMN-2.6):**
+- Voluntary signals (for example "received order") are operational hints, not legal/payment proof.
+- Reputation percentages are non-punitive signal discipline indicators, not fraud verdicts.
 
 ## Social Mining System
 
@@ -402,13 +425,14 @@ This model ensures **fair and sustainable development** of a decentralized ecosy
 - **LoveEmissionEngine:** Core token emission logic for $LOVECOIN and $LGOV
 - **Lovecoin:** Utility token for social mining (888,888,888 initial supply + emission)
 - **AmanitaGovToken:** Governance token with voting (ERC20Votes + ERC20Permit, used as LGOV)
-- **AmanitaToken:** Decentralized seller emission token (888,888,888 initial supply, burned on redemption)
+- **AmanitaToken:** Decentralized seller emission token with debt ledger and order hooks
+- **AmanitaCheckout:** Canonical order contract for funding rails, payment attestation, settle/cancel
+- **AmanitaCommerceReputationAdapter:** Checkout-driven commerce signal aggregation (live + anchor)
 - **SpiralEngine:** Social capital and access control (soulbound NFTs, invite system)
 - **LoveDoPostNFT:** Social proof and reputation
 - **ProductRegistry:** Decentralized product catalog
 - **AmanitaRegistry:** Central contract registry
-- **Orders:** Order management with OTP validation
-- **AmanitaPaymentRouter:** Payment processing with stablecoins
+- **Orders / PaymentRouter:** Legacy paths may still exist in repository; AMN-2.x source of truth for checkout flow is `AmanitaCheckout`
 
 ### Economic Parameters
 - **Emission Rate:** 1 LOVECOIN per superlike (EMISSION_RATE = 1 ether)
