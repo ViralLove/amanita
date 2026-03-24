@@ -752,4 +752,62 @@ describe("SoulIdentity Bridge Contract", function () {
             console.log("✅ Mixed identity types supported");
         });
     });
+
+    describe("TST-WAVE-1.4: Stub/No-op semantics pinning", function () {
+        beforeEach(async function () {
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+        });
+
+        it("Should keep verification level at zero after updateSoulVerificationLevel call (no-op)", async function () {
+            const before = await soulIdentity.getSoulVerificationLevel(user1.address);
+            expect(before).to.equal(0n);
+
+            await soulIdentity.connect(user2).updateSoulVerificationLevel(user1.address, 7);
+
+            const after = await soulIdentity.getSoulVerificationLevel(user1.address);
+            expect(after).to.equal(0n);
+            const profile = await soulIdentity.getSoulProfile(user1.address);
+            expect(profile.verificationLevel === 0n || profile.verificationLevel === 0).to.be.true;
+        });
+
+        it("Should return zero address for getAddressBySoulIdentity regardless of linked DID (stub)", async function () {
+            const did = `did:spiral:${user1.address.toLowerCase()}`;
+            await soulIdentity.connect(user1).linkSoulIdentity(did);
+
+            const resolved = await soulIdentity.getAddressBySoulIdentity(did);
+            expect(resolved).to.equal(ethers.ZeroAddress);
+        });
+
+        it("Should keep SBT metadata unchanged after updateSBTMetadata call (no-op)", async function () {
+            await soulMetadata.connect(user1).initializeMetadata(
+                1,
+                "identity",
+                '{"level": 2, "reputation": 150}',
+                "QmPinnedHash"
+            );
+
+            const before = await soulIdentity.getSBTMetadata(1);
+            await soulIdentity.connect(user2).updateSBTMetadata(1, "hacked-type", '{"level": 999}');
+            const after = await soulIdentity.getSBTMetadata(1);
+
+            expect(after.tokenSbtType).to.equal(before.tokenSbtType);
+            expect(after.attributes).to.equal(before.attributes);
+            expect(after.version).to.equal(before.version);
+        });
+
+        it("Should keep SBT version unchanged after updateSBTVersion call (no-op)", async function () {
+            await soulMetadata.connect(user1).initializeMetadata(
+                1,
+                "identity",
+                '{"level": 1, "reputation": 100}',
+                "QmPinnedVersion"
+            );
+
+            const before = await soulIdentity.getSBTVersion(1);
+            await soulIdentity.connect(user2).updateSBTVersion(1, 999);
+            const after = await soulIdentity.getSBTVersion(1);
+
+            expect(after).to.equal(before);
+        });
+    });
 });
