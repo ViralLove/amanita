@@ -20,7 +20,7 @@ function makeCodes(prefix, n = 12) {
     return Array.from({ length: n }, (_, i) => `${prefix}-${i + 1}-${Date.now()}`);
 }
 
-describe("LoveEmissionEngine real social-mining cluster integration", function () {
+describe("LoveEmissionEngine real social-mining integration", function () {
     let deployer;
     let seller;
     let author;
@@ -127,7 +127,7 @@ describe("LoveEmissionEngine real social-mining cluster integration", function (
         expect(await lovecoin.balanceOf(seller.address)).to.equal(ethers.parseEther("1"));
     });
 
-    it("Should enforce superlike nonce boundary in real cluster path", async function () {
+    it("Should enforce superlike nonce boundary in real path", async function () {
         await loveDo.connect(author).mintLoveDoPost(seller.address, "ipfs://nonce-boundary");
         const tokenId = (await loveDo.nextTokenId()) - 1n;
         const wrongNonce = 999n;

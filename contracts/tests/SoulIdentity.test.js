@@ -365,6 +365,51 @@ describe("SoulIdentity Bridge Contract", function () {
                 "SoulIdentity: only SoulboundCore"
             );
         });
+
+        it("Should keep owner-index/profile continuity after recovery via SoulIdentity bridge", async function () {
+            await soulboundCore.connect(deployer).setIntegrationContract(await soulIdentity.getAddress());
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+            await soulIdentity.connect(user1).setDisplayName("old-owner");
+            await soulIdentity.connect(user1).setHandle("@amanita:old-owner");
+
+            const SoulRecovery = await ethers.getContractFactory("SoulRecovery");
+            const soulRecovery = await SoulRecovery.connect(deployer).deploy(await soulboundCore.getAddress());
+            await soulRecovery.waitForDeployment();
+            await soulboundCore.connect(deployer).setRecoveryContract(await soulRecovery.getAddress());
+            await soulRecovery.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
+            await soulIdentity.connect(deployer).setSoulRecovery(await soulRecovery.getAddress());
+
+            await soulIdentity.connect(user1).addTrustedGuardian(user2.address);
+            const beforeRecoveryProfile = await soulIdentity.getSoulProfile(user1.address);
+            expect(beforeRecoveryProfile.guardians.length).to.equal(1);
+            expect(beforeRecoveryProfile.guardians[0]).to.equal(user2.address);
+
+            await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+            await ethers.provider.send("evm_mine");
+            await soulIdentity.connect(user2).initiateRecovery(user1.address, deployer.address);
+
+            await ethers.provider.send("evm_increaseTime", [24 * 60 * 60]);
+            await ethers.provider.send("evm_mine");
+            await soulIdentity.connect(user2).completeRecovery(user1.address, deployer.address);
+
+            expect(await soulboundCore.ownerOf(1)).to.equal(deployer.address);
+            expect(await soulIdentity.isRecoveryInProgress(user1.address)).to.be.false;
+
+            // Old owner must lose soul-owner privileges after owner-index migration.
+            await expectRevertWithMessage(
+                soulIdentity.connect(user1).setDisplayName("should-fail"),
+                "SoulIdentity: no SBT"
+            );
+
+            // New owner must resolve profile through migrated token index and keep guardian visibility.
+            const newOwnerProfile = await soulIdentity.getSoulProfile(deployer.address);
+            expect(newOwnerProfile.level > 0n).to.be.true;
+            expect(newOwnerProfile.guardians.length).to.equal(1);
+            expect(newOwnerProfile.guardians[0]).to.equal(user2.address);
+
+            await soulIdentity.connect(deployer).setDisplayName("new-owner");
+            expect(await soulIdentity.getDisplayName(deployer.address)).to.equal("new-owner");
+        });
     });
 
     describe("SBT-B2-1: temporary key (B2)", function () {

@@ -13,7 +13,8 @@
     "test:integration": "mocha scripts/tests/integration/**/*.test.js --config scripts/tests/.mocharc.json",
     "test:e2e": "mocha scripts/tests/e2e/**/*.test.js --config scripts/tests/.mocharc.json",
     "test:coverage": "nyc npm test",
-    "test:watch": "mocha scripts/tests/**/*.test.js --config scripts/tests/.mocharc.json --watch"
+    "test:watch": "mocha scripts/tests/**/*.test.js --config scripts/tests/.mocharc.json --watch",
+    "test:quality:anti-false-success": "node scripts/quality/check-test-anti-false-success.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^0.15.13",

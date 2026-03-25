@@ -3,6 +3,10 @@ const { ethers } = require("hardhat");
 
 describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function () {
     let spiralEngine;
+    let soulboundCore;
+    let soulMetadata;
+    let soulIdentity;
+    let soulRecovery;
     let deployer;
     let seller;
     let activator1;
@@ -48,13 +52,13 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
         
         // 1. SoulboundCore
         const SoulboundCore = await ethers.getContractFactory("SoulboundCore");
-        const soulboundCore = await SoulboundCore.connect(deployer).deploy("Amanita Soul", "ASOUL");
+        soulboundCore = await SoulboundCore.connect(deployer).deploy("Amanita Soul", "ASOUL");
         await soulboundCore.waitForDeployment();
         console.log(`   SoulboundCore: ${await soulboundCore.getAddress()}`);
         
         // 2. SoulMetadata
         const SoulMetadata = await ethers.getContractFactory("SoulMetadata");
-        const soulMetadata = await SoulMetadata.connect(deployer).deploy(await soulboundCore.getAddress());
+        soulMetadata = await SoulMetadata.connect(deployer).deploy(await soulboundCore.getAddress());
         await soulMetadata.waitForDeployment();
         console.log(`   SoulMetadata: ${await soulMetadata.getAddress()}`);
         
@@ -64,12 +68,20 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
         // 3. SoulIdentity (мост)
         console.log("🔷 Deploying SoulIdentity bridge...");
         const SoulIdentity = await ethers.getContractFactory("SoulIdentity");
-        const soulIdentity = await SoulIdentity.connect(deployer).deploy(
+        soulIdentity = await SoulIdentity.connect(deployer).deploy(
             await soulboundCore.getAddress(),
             await soulMetadata.getAddress()
         );
         await soulIdentity.waitForDeployment();
         console.log(`   SoulIdentity: ${await soulIdentity.getAddress()}`);
+
+        // 4. SoulRecovery + wiring for guardians/profile (identity stack)
+        const SoulRecovery = await ethers.getContractFactory("SoulRecovery");
+        soulRecovery = await SoulRecovery.connect(deployer).deploy(await soulboundCore.getAddress());
+        await soulRecovery.waitForDeployment();
+        await soulboundCore.connect(deployer).setRecoveryContract(await soulRecovery.getAddress());
+        await soulRecovery.connect(deployer).setSoulIdentity(await soulIdentity.getAddress());
+        await soulIdentity.connect(deployer).setSoulRecovery(await soulRecovery.getAddress());
 
         // Деплой контракта SpiralEngine (UUPS архитектура)
         console.log("🔷 Deploying SpiralEngine UUPS contract...");
@@ -181,13 +193,6 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
             const newCodes = Array.from({length: 12}, (_, i) => `REP-NEW-${i + 1}`);
             await spiralEngine.connect(deployer).activateUser("SBT-REP-TEST", user1.address, newCodes, 0);
             
-            // Получаем SoulIdentity контракт через мост
-            const soulIdentityAddress = await spiralEngine.soulIdentity();
-            const soulIdentity = await ethers.getContractAt("SoulIdentity", soulIdentityAddress);
-            
-            // Получаем soulboundCore и создаем SBT токен для пользователя
-            const soulboundCoreAddress = await soulIdentity.soulboundCore();
-            const soulboundCore = await ethers.getContractAt("SoulboundCore", soulboundCoreAddress);
             await soulboundCore.connect(deployer).mintSoul(user1.address);
             
             const testDID = "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK";
@@ -209,13 +214,6 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
             const newCodes = Array.from({length: 12}, (_, i) => `DUP-NEW-${i + 1}`);
             await spiralEngine.connect(deployer).activateUser("SBT-DUP-TEST", user1.address, newCodes, 0);
             
-            // Получаем SoulIdentity контракт через мост
-            const soulIdentityAddress = await spiralEngine.soulIdentity();
-            const soulIdentity = await ethers.getContractAt("SoulIdentity", soulIdentityAddress);
-            
-            // Получаем soulboundCore и создаем SBT токен для пользователя
-            const soulboundCoreAddress = await soulIdentity.soulboundCore();
-            const soulboundCore = await ethers.getContractAt("SoulboundCore", soulboundCoreAddress);
             await soulboundCore.connect(deployer).mintSoul(user1.address);
             
             const testDID = "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK";
@@ -223,49 +221,42 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
             // Связываем DID первый раз
             await soulIdentity.connect(user1).linkSoulIdentity(testDID);
             
-            // P1: Проверка - повторное связывание пока не реализовано (TODO).
-            // На текущем этапе зафиксируем только то, что повторный вызов linkSoulIdentity не приводит к аварийному завершению теста
-            // и оставим детальную контрактную семантику для отдельного таска по DID-политике.
-            const secondLinkTx = await soulIdentity.connect(user1).linkSoulIdentity(testDID);
-            // smoke-check: должна вернуться валидная транзакция, без использования hardhat-chai-matchers reverted*
-            expect(secondLinkTx.hash).to.be.a("string");
+            const identitiesAfterFirstLink = await soulIdentity.connect(user1).getAllIdentities(user1.address);
+            expect(identitiesAfterFirstLink.length).to.equal(1);
+
+            await soulIdentity.connect(user1).linkSoulIdentity(testDID);
+            const identitiesAfterSecondLink = await soulIdentity.connect(user1).getAllIdentities(user1.address);
+            // Current legacy semantics: duplicate link appends another identity record.
+            expect(identitiesAfterSecondLink.length).to.equal(2);
+            expect(identitiesAfterSecondLink[0].identityValue).to.equal(testDID);
+            expect(identitiesAfterSecondLink[1].identityValue).to.equal(testDID);
         });
 
-        it("Should allow admin to update verification level", async function () {
+        it("Should revert updateSoulLevel when SoulMetadata is not authorized for SoulIdentity writes", async function () {
             // Создаем токен
             await spiralEngine.connect(deployer).mintInvite("SBT-VERIFY-TEST", 0);
             const newCodes = Array.from({length: 12}, (_, i) => `VERIFY-NEW-${i + 1}`);
             await spiralEngine.connect(deployer).activateUser("SBT-VERIFY-TEST", user1.address, newCodes, 0);
             
-            // Получаем SoulIdentity контракт через мост
-            const soulIdentityAddress = await spiralEngine.soulIdentity();
-            const soulIdentity = await ethers.getContractAt("SoulIdentity", soulIdentityAddress);
-            
-            // Получаем soulboundCore и создаем SBT токен для пользователя
-            const soulboundCoreAddress = await soulIdentity.soulboundCore();
-            const soulboundCore = await ethers.getContractAt("SoulboundCore", soulboundCoreAddress);
             await soulboundCore.connect(deployer).mintSoul(user1.address);
             
             const testDID = "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK";
             await soulIdentity.connect(user1).linkSoulIdentity(testDID);
             
-            // P1: Проверка обновления уровня верификации через SoulIdentity
-            // Даем deployer роль SPIRAL_ENGINE_ROLE для обновления уровня
+            // P1: Проверка строгого outcome.
+            // У deployer уже есть SPIRAL_ENGINE_ROLE (constructor), повторный grant оставляем как явное действие.
             const SPIRAL_ENGINE_ROLE = await soulIdentity.SPIRAL_ENGINE_ROLE();
             await soulIdentity.connect(deployer).grantRole(SPIRAL_ENGINE_ROLE, deployer.address);
-            
-            // Пока функция updateSoulLevel требует права владельца токена и не имеет финальной политики,
-            // фиксируем, что вызов не приводит к аварийному завершению процесса тестирования.
-            await soulIdentity.connect(deployer).updateSoulLevel(user1.address, 3).catch(() => {});
-            
-            // Проверяем базовые значения через SoulIdentity (правильная архитектура)
-            const level = await soulIdentity.connect(user1).getSoulLevel(user1.address);
-            const reputation = await soulIdentity.connect(user1).getSoulReputation(user1.address);
-            // ethers v6: значения приходят как bigint; проверяем, что базовый уровень/репутация положительны
-            expect(level).to.be.a("bigint");
-            expect(reputation).to.be.a("bigint");
-            expect(level > 0n).to.be.true; // Должен быть базовый уровень
-            expect(reputation > 0n).to.be.true; // Должна быть базовая репутация
+
+            let reverted = false;
+            try {
+                await soulIdentity.connect(deployer).updateSoulLevel(user1.address, 3);
+            } catch (e) {
+                reverted = true;
+                const msg = String(e?.message || "");
+                expect(msg.includes("SoulMetadata: not authorized")).to.equal(true);
+            }
+            expect(reverted).to.equal(true);
         });
     });
 
@@ -276,13 +267,6 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
             const newCodes = Array.from({length: 12}, (_, i) => `META-NEW-${i + 1}`);
             await spiralEngine.connect(deployer).activateUser("SBT-META-TEST", user1.address, newCodes, 0);
             
-            // Получаем SoulIdentity контракт через мост
-            const soulIdentityAddress = await spiralEngine.soulIdentity();
-            const soulIdentity = await ethers.getContractAt("SoulIdentity", soulIdentityAddress);
-            
-            // Получаем soulboundCore и создаем SBT токен для пользователя
-            const soulboundCoreAddress = await soulIdentity.soulboundCore();
-            const soulboundCore = await ethers.getContractAt("SoulboundCore", soulboundCoreAddress);
             await soulboundCore.connect(deployer).mintSoul(user1.address);
             
             const tokenId = 1;
@@ -300,29 +284,20 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
             const newCodes = Array.from({length: 12}, (_, i) => `UPDATE-NEW-${i + 1}`);
             await spiralEngine.connect(deployer).activateUser("SBT-UPDATE-TEST", user1.address, newCodes, 0);
             
-            // Получаем SoulIdentity контракт через мост
-            const soulIdentityAddress = await spiralEngine.soulIdentity();
-            const soulIdentity = await ethers.getContractAt("SoulIdentity", soulIdentityAddress);
-            
-            // Получаем soulboundCore и создаем SBT токен для пользователя
-            const soulboundCoreAddress = await soulIdentity.soulboundCore();
-            const soulboundCore = await ethers.getContractAt("SoulboundCore", soulboundCoreAddress);
             await soulboundCore.connect(deployer).mintSoul(user1.address);
             
             const tokenId = 1;
             const newSbtType = "Premium Invite";
             const newAttributes = "Special Edition";
             
-            // P1: Проверка обновления метаданных (пока функция не полностью реализована).
-            // Smoke: убеждаемся, что вызов не ломает процесс тестирования.
-            const updateMetadataTx = await soulIdentity.connect(user1).updateSBTMetadata(tokenId, newSbtType, newAttributes);
-            expect(updateMetadataTx.hash).to.be.a("string");
-            
-            // Проверяем что функция не падает (архитектурная проверка)
-            const metadata = await soulIdentity.connect(user1).getSBTMetadata(tokenId);
-            expect(metadata.isLocked).to.be.true; // Базовое свойство SBT
-            expect(metadata.tokenSbtType).to.be.a('string'); // Тип должен быть строкой
-            expect(metadata.attributes).to.be.a('string'); // Атрибуты должны быть строкой
+            const before = await soulIdentity.connect(user1).getSBTMetadata(tokenId);
+            await soulIdentity.connect(user1).updateSBTMetadata(tokenId, newSbtType, newAttributes);
+            const after = await soulIdentity.connect(user1).getSBTMetadata(tokenId);
+            // Current semantics: function is TODO/no-op, state must remain unchanged.
+            expect(after.tokenSbtType).to.equal(before.tokenSbtType);
+            expect(after.attributes).to.equal(before.attributes);
+            expect(after.version).to.equal(before.version);
+            expect(after.isLocked).to.equal(true);
         });
 
         it("Should prevent non-owner from updating metadata", async function () {
@@ -331,25 +306,22 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
             const newCodes = Array.from({length: 12}, (_, i) => `NO-UPDATE-NEW-${i + 1}`);
             await spiralEngine.connect(deployer).activateUser("SBT-NO-UPDATE-TEST", user1.address, newCodes, 0);
             
-            // Получаем SoulIdentity контракт через мост
-            const soulIdentityAddress = await spiralEngine.soulIdentity();
-            const soulIdentity = await ethers.getContractAt("SoulIdentity", soulIdentityAddress);
-            
-            // Получаем soulboundCore и создаем SBT токен для пользователя
-            const soulboundCoreAddress = await soulIdentity.soulboundCore();
-            const soulboundCore = await ethers.getContractAt("SoulboundCore", soulboundCoreAddress);
             await soulboundCore.connect(deployer).mintSoul(user1.address);
             
             const tokenId = 1;
             
-            // P1: Проверка - функция updateSBTMetadata пока не реализована (TODO).
-            // Smoke: повторный вызов от другого пользователя не должен ломать тестовый ран.
-            const hackedTx = await soulIdentity.connect(user2).updateSBTMetadata(
+            const before = await soulIdentity.connect(user1).getSBTMetadata(tokenId);
+            await soulIdentity.connect(user2).updateSBTMetadata(
                 tokenId,
                 "Hacked Type",
                 "Hacked Attributes"
             );
-            expect(hackedTx.hash).to.be.a("string");
+            const after = await soulIdentity.connect(user1).getSBTMetadata(tokenId);
+            // Unauthorized call currently does not revert because implementation is TODO/no-op.
+            // We assert strict observable outcome: metadata stays unchanged.
+            expect(after.tokenSbtType).to.equal(before.tokenSbtType);
+            expect(after.attributes).to.equal(before.attributes);
+            expect(after.version).to.equal(before.version);
         });
 
         it("Should allow admin to update SBT version", async function () {
@@ -358,27 +330,35 @@ describe("SpiralEngine - SBT (Soulbound Token) Comprehensive Tests", function ()
             const newCodes = Array.from({length: 12}, (_, i) => `VERSION-NEW-${i + 1}`);
             await spiralEngine.connect(deployer).activateUser("SBT-VERSION-TEST", user1.address, newCodes, 0);
             
-            // Получаем SoulIdentity контракт через мост
-            const soulIdentityAddress = await spiralEngine.soulIdentity();
-            const soulIdentity = await ethers.getContractAt("SoulIdentity", soulIdentityAddress);
-            
-            // Получаем soulboundCore и создаем SBT токен для пользователя
-            const soulboundCoreAddress = await soulIdentity.soulboundCore();
-            const soulboundCore = await ethers.getContractAt("SoulboundCore", soulboundCoreAddress);
             await soulboundCore.connect(deployer).mintSoul(user1.address);
             
             const tokenId = 1;
-            const newVersion = 2;
-            
-            // P1: Проверка обновления версии (пока функция не полностью реализована).
-            // Smoke: обновление версии не должно приводить к аварийному завершению.
-            const versionTx = await soulIdentity.connect(deployer).updateSBTVersion(tokenId, newVersion);
-            expect(versionTx.hash).to.be.a("string");
-            
-            // Проверяем версию через SoulIdentity (правильная архитектура)
-            const version = await soulIdentity.connect(user1).getSBTVersion(tokenId);
-            expect(version).to.be.a("bigint");
-            expect(version >= 0n).to.be.true; // Версия должна быть неотрицательной
+            const before = await soulIdentity.connect(user1).getSBTVersion(tokenId);
+            await soulIdentity.connect(deployer).updateSBTVersion(tokenId, 2);
+            const after = await soulIdentity.connect(user1).getSBTVersion(tokenId);
+            // Current semantics: updateSBTVersion is TODO/no-op.
+            expect(after).to.equal(before);
+            expect(after).to.be.a("bigint");
+        });
+    });
+
+    describe("P1: Soul Profile End-to-End", function () {
+        it("Should return consistent soul profile after DID and guardian setup", async function () {
+            await spiralEngine.connect(deployer).mintInvite("SBT-PROFILE-TEST", 0);
+            const newCodes = Array.from({length: 12}, (_, i) => `PROFILE-NEW-${i + 1}`);
+            await spiralEngine.connect(deployer).activateUser("SBT-PROFILE-TEST", user1.address, newCodes, 0);
+            await soulboundCore.connect(deployer).mintSoul(user1.address);
+
+            const did = "did:key:z6MksbtProfileIdentityFlow";
+            await soulIdentity.connect(user1).linkSoulIdentity(did);
+            await soulIdentity.connect(user1).addTrustedGuardian(guardian1.address);
+
+            const profile = await soulIdentity.connect(user1).getSoulProfile(user1.address);
+            expect(profile.level).to.equal(1n);
+            expect(profile.reputation).to.equal(100n);
+            expect(profile.identity).to.equal(did);
+            expect(profile.guardians.length).to.equal(1);
+            expect(profile.guardians[0]).to.equal(guardian1.address);
         });
     });
 
