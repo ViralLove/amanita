@@ -250,6 +250,11 @@ class BlockchainService:
         raw = signed_tx_hex.strip()
         if raw.startswith("0x"):
             raw = raw[2:]
+        # localhost E2E: wallet-mock присылает заглушку 64 нулевых байта — не валидная raw tx
+        if os.environ.get("BLOCKCHAIN_PROFILE") == "localhost" and raw == "00" * 64:
+            mock_hash = "0x" + "00" * 32
+            logger.info("Broadcast skipped (localhost mock submit), returning mock tx_hash=%s", mock_hash)
+            return mock_hash
         try:
             tx_bytes = bytes.fromhex(raw)
         except ValueError as e:
