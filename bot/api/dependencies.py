@@ -146,3 +146,15 @@ def get_sign_request_store() -> "SignRequestStore":
         from services.wallet_push import SignRequestStore
         _sign_request_store = SignRequestStore()
     return _sign_request_store
+
+
+_wallet_auth_service: Optional["WalletAuthService"] = None
+
+
+def get_wallet_auth_service() -> "WalletAuthService":
+    """FastAPI dependency для wallet auth challenge/session in-memory service."""
+    global _wallet_auth_service
+    if _wallet_auth_service is None:
+        from api.services import WalletAuthService
+        _wallet_auth_service = WalletAuthService()
+    return _wallet_auth_service

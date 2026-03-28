@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from api.dependencies import get_sign_request_store
+from api.utils.wallet_auth_guard import authenticate_wallet_request
 
 logger = logging.getLogger(__name__)
 
@@ -41,15 +42,21 @@ class SubmitBody(BaseModel):
 async def get_sign_request(
     sign_request_id: str,
     x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="User ID (required)"),
+    x_wallet_address: Optional[str] = Header(None, alias="X-Wallet-Address"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     store=Depends(get_sign_request_store),
 ):
     """Параметры для подписи контракта по id. X-User-Id должен совпадать с владельцем записи."""
-    if not x_user_id:
-        raise HTTPException(status_code=401, detail="X-User-Id header required")
     rec = store.get(sign_request_id)
     if not rec:
         raise HTTPException(status_code=404, detail="Sign request not found")
-    if rec.user_id != x_user_id:
+    principal = authenticate_wallet_request(
+        expected_user_id=rec.user_id,
+        x_user_id=x_user_id,
+        x_wallet_address=x_wallet_address,
+        authorization=authorization,
+    )
+    if rec.user_id != principal["user_id"]:
         raise HTTPException(status_code=403, detail="Sign request does not belong to this user")
     chain_id = os.environ.get("CHAIN_ID", "")
     contract_address = os.environ.get("ACTIVITY_REGISTRY_ADDRESS", "")
@@ -71,16 +78,22 @@ async def submit_sign_request(
     sign_request_id: str,
     body: SubmitBody,
     x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="User ID (required)"),
+    x_wallet_address: Optional[str] = Header(None, alias="X-Wallet-Address"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     store=Depends(get_sign_request_store),
     blockchain_service=Depends(_get_blockchain_service_for_broadcast),
 ):
     """Принять подписанную транзакцию или подпись EIP-712. Сохраняем данные; при signedTransaction — broadcast (W8)."""
-    if not x_user_id:
-        raise HTTPException(status_code=401, detail="X-User-Id header required")
     rec = store.get(sign_request_id)
     if not rec:
         raise HTTPException(status_code=404, detail="Sign request not found")
-    if rec.user_id != x_user_id:
+    principal = authenticate_wallet_request(
+        expected_user_id=rec.user_id,
+        x_user_id=x_user_id,
+        x_wallet_address=x_wallet_address,
+        authorization=authorization,
+    )
+    if rec.user_id != principal["user_id"]:
         raise HTTPException(status_code=403, detail="Sign request does not belong to this user")
     try:
         store.mark_submitted(

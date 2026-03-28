@@ -189,7 +189,14 @@ class HMACMiddleware(BaseHTTPMiddleware):
             "/redoc",
             "/openapi.json"
         }
-        skip_prefixes = ("/activities", "/reference", "/v1/uploads")
+        # /v1/pending-sign-requests, /v1/sign-requests — для wallet-mock (локальный floou без HMAC)
+        skip_prefixes = (
+            "/activities",
+            "/reference",
+            "/v1/uploads",
+            "/v1/pending-sign-requests",
+            "/v1/sign-requests",
+        )
         return path in skip_paths or any(path.startswith(p) for p in skip_prefixes)
     
     def _extract_auth_headers(self, request: Request) -> Dict[str, str]:

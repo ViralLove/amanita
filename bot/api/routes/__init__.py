@@ -7,3 +7,4 @@ from .reference import router as reference_router
 from . import uploads
 from . import sign_requests
 from . import pending_sign_requests
+from . import wallet_auth

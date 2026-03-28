@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, model_validator
 
 from api.dependencies import get_payload_cache, get_push_sender, get_sign_request_store, get_upload_service
+from api.utils.wallet_auth_guard import authenticate_wallet_request
 from services.upload.upload_service import UploadConflictError, UploadNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -134,6 +135,8 @@ async def post_upload_callback(
 async def get_upload_sign_payload(
     upload_id: str,
     x_user_id: Optional[str] = Header(None, alias="X-User-Id", description="User ID (required for sign-payload)"),
+    x_wallet_address: Optional[str] = Header(None, alias="X-Wallet-Address"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     upload_svc=Depends(get_upload_service),
     payload_cache=Depends(get_payload_cache),
 ):
@@ -142,9 +145,13 @@ async def get_upload_sign_payload(
 
     Требуется X-User-Id. Проверяется совпадение с upload.user_id; данные берутся из кэша (W2).
     """
-    if not x_user_id:
-        raise HTTPException(status_code=401, detail="X-User-Id header required")
-    user_id = x_user_id
+    principal = authenticate_wallet_request(
+        expected_user_id=None,
+        x_user_id=x_user_id,
+        x_wallet_address=x_wallet_address,
+        authorization=authorization,
+    )
+    user_id = principal["user_id"]
     rec = upload_svc.get_upload(upload_id)
     if not rec:
         raise HTTPException(status_code=404, detail="Upload not found")
