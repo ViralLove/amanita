@@ -8,27 +8,41 @@
 
 ---
 
-## Принятые решения оператора (итог)
+## Принятые решения оператора (итог) — исторический слой v1
 
 | № | Точка решения | Выбор | Примечание |
 |---|----------------|-------|------------|
-| 1 | Идентичность создателя | **SpiralEngine + ACTIVITY_CREATOR_ROLE** | Новая роль в SpiralEngine, отдельно от SELLER. |
+| 1 | Идентичность создателя | **SpiralEngine + ACTIVITY_CREATOR_ROLE** | Новая роль в SpiralEngine, отдельно от SELLER. (Историческое решение v1; см. обновление ниже.) |
 | 2 | Роль модератора | **A (локально)** | Модерация on-chain снята с повестки (см. ниже). |
 | 3 | Кто переводит в Published | **Сам creator.** Валидация по гайду — в UI (GPT инструкции); без пропуска в API не шлём. **Модераторы и доп. статусы не нужны.** | |
 | 4 | State machine | **Не нужна** при отказе от модерации. «Свой UI» → авторизация приложений в API (secret key / app auth). | |
 | 5 | active vs status | **Только active.** Черновик = неактивный; публикация через авторизованный UI, проверяющий кодекс (без модераторов). | |
-| 6 | Роль создателя в SpiralEngine | **Отдельная ACTIVITY_CREATOR_ROLE.** SELLER в будущем возможно усложнить (наработки активатора), чтобы не «базар реселлеров». | |
+| 6 | Роль создателя в SpiralEngine | **Отдельная ACTIVITY_CREATOR_ROLE.** SELLER в будущем возможно усложнить (наработки активатора), чтобы не «базар реселлеров». (Историческое решение v1.) | |
 | 7 | Зависимость от SpiralEngine | **Обязательна;** без инвайта — не стать activity provider (чистота рядов). | |
 | 8 | События | **С инициатором**, как у Products и Components (indexed address = актор). | |
 
-**Полный синтез архитектуры ролей (SpiralEngine + Products + Components + Activities):** см. канонический документ **[roles-architecture-synthesis.md](../../../roles-architecture-synthesis.md)** в корне `contracts/docs/`.
+**Полный синтез архитектуры ролей (SpiralEngine + Products + Components + Activities):** см. канонический документ **[roles-architecture-synthesis.md](../../../roles-architecture-synthesis.md)** в корне `contracts/docs/` (актуальная версия отражает модель Activator‑as‑creator).
+
+---
+
+## Updated decision (2026-03-12) — Activator as Activity Creator
+
+- **Идентичность создателя Activity:**  
+  Активированный пользователь с ролью `ACTIVATOR_ROLE` в `SpiralEngineLogic` и `usedInviteByUser(user) != 0`.  
+  Отдельная `ACTIVITY_CREATOR_ROLE` **не вводится** в продовый SpiralEngine.
+
+- **Роль создателя в SpiralEngine:**  
+  `ACTIVATOR_ROLE` — единственный источник прав для создания активностей; SELLER выдаётся отдельно по своему алгоритму.
+
+- **Проверка в ActivityRegistry:**  
+  Должна быть реализована как `ACTIVATOR_ROLE + usedInviteByUser != 0` (см. связанный таск `task-fix-activityregistry-creator-role-alignment.md`).
 
 ---
 
 ## Концепт: matchmaking-платформа для activities (после решений)
 
 **Участники экосистемы:**
-- **Создатель активности (creator)** — активированный пользователь с ACTIVITY_CREATOR_ROLE; создаёт активность, сам переводит её в публикацию (active = true) через авторизованный UI; может снять с публикации (active = false).
+- **Создатель активности (creator)** — активированный пользователь с `ACTIVATOR_ROLE` (актуальная модель; исторически здесь фигурировала `ACTIVITY_CREATOR_ROLE`); создаёт активность, сам переводит её в публикацию (active = true) через авторизованный UI; может снять с публикации (active = false).
 - **Участник (participant)** — ищет и находит активности (matchmaking).
 - **Платформа (admin)** — управление контрактом (пауза, апгрейд, при необходимости force deactivate).
 
@@ -153,11 +167,11 @@
 
 ## 9. Система ролей (актуальная — после принятых решений)
 
-**Актуальная схема** без модерации on-chain и без многостатусного lifecycle:
+**Актуальная схема** без модерации on-chain и без многостатусного lifecycle. Финальный выбор — модель Activator-as-creator (см. Updated decision выше и [task-implement-spiralengine-activity-creator-role](../task-implement-spiralengine-activity-creator-role/task-implement-spiralengine-activity-creator-role.md)):
 
 | Роль | Где хранится | Действия в ActivityRegistry |
 |------|--------------|-----------------------------|
-| **Создатель активности** | SpiralEngine: **ACTIVITY_CREATOR_ROLE** + активация (usedInviteByUser != 0) | createActivity, activateActivity, deactivateActivity (свои) |
+| **Создатель активности** | SpiralEngine: **ACTIVATOR_ROLE** + активация (usedInviteByUser != 0) | createActivity, activateActivity, deactivateActivity (свои) |
 | **Админ** | ActivityRegistry: ADMIN_ROLE, DEFAULT_ADMIN_ROLE | pause/unpause, setSpiralEngine; при необходимости forceDeactivate(activityId) |
 | **Апгрейдер** | ActivityRegistry: UPGRADER_ROLE | upgradeToAndCall |
 
@@ -167,18 +181,22 @@
 
 ## 10. Сводная таблица решений (актуальная)
 
+Таблица ниже отражает исторический слой v1; по роли создателя активностей актуально **Updated decision (2026-03-12)** выше: создатель = **ACTIVATOR_ROLE** + usedInviteByUser != 0, отдельная ACTIVITY_CREATOR_ROLE не вводится.
+
 | № | Точка решения | Принятый вариант |
 |---|----------------|------------------|
-| 1 | Идентичность создателя | SpiralEngine + **ACTIVITY_CREATOR_ROLE** (новая роль в SpiralEngine) |
+| 1 | Идентичность создателя | SpiralEngine + **ACTIVATOR_ROLE** + активация (см. Updated decision) |
 | 2 | Роль модератора | Не используется — модерация on-chain отменена |
 | 3 | Переходы в публикацию | **Creator сам**; валидация по гайду в UI; API — только авторизованные приложения |
 | 4 | State machine | Не нужна; только active (черновик / опубликовано) |
 | 5 | Поле active | **Только active** (без enum status) |
-| 6 | Роль создателя в SpiralEngine | **Отдельная ACTIVITY_CREATOR_ROLE**; SELLER в будущем возможно усложнить |
+| 6 | Роль создателя в SpiralEngine | **ACTIVATOR_ROLE** (единая роль; см. Updated decision и roles-architecture-synthesis.md) |
 | 7 | Зависимость от SpiralEngine | **Обязательна**; без инвайта — не стать activity provider |
 | 8 | События | **С инициатором** (indexed address), как у Products и Components |
 
 ---
 
-**Версия:** 1.1  
+**Актуальная архитектура ролей:** [roles-architecture-synthesis.md](../../../roles-architecture-synthesis.md). Унификация создателя активностей на ACTIVATOR_ROLE: [task-implement-spiralengine-activity-creator-role](../task-implement-spiralengine-activity-creator-role/task-implement-spiralengine-activity-creator-role.md).
+
+**Версия:** 1.2  
 **Статус:** Решения приняты оператором; актуальная архитектура — roles-architecture-synthesis.md; фиксация в реализации — task-implement-activity-registry-contract-tdd.md.
