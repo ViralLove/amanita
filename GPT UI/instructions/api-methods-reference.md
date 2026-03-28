@@ -1,8 +1,8 @@
 # Amanita Activities API Reference
 
-**Version:** 1.0.0  
+**Version:** 1.0.1  
 **Base URL:** `https://api.amanita.example.com`  
-**Last Updated:** 2025-01-15
+**Last Updated:** 2026-03-28
 
 ---
 
@@ -31,8 +31,9 @@ The Amanita Activities API provides endpoints for creating, managing, and search
 - Full Activity lifecycle management (Draft → Review → Approved → Published)
 - Advanced search with filters (time, location, language, pricing, etc.)
 - Reference data endpoints (formats, taxonomy, age groups, languages)
-- JWT Bearer token authentication for write operations
-- Public access for read-only operations
+- **Current FastAPI:** `/activities` and `/reference` without HMAC; optional **`GPT_ACTIONS_BEARER_SECRET`** → middleware требует **`Authorization: Bearer`** (shared secret для Custom GPT Actions); `X-User-Id` для draft identity (see Authentication → SSOT)
+- **Target (product):** JWT Bearer via OpenAI Actions / Logto for per-user deployments — отдельно от shared-secret GPT Actions
+- Public access for read-only search/reference where applicable
 
 **API Design Principles:**
 - RESTful architecture
@@ -45,9 +46,45 @@ The Amanita Activities API provides endpoints for creating, managing, and search
 
 ## Authentication
 
+### SSOT: current Amanita Bot API (`bot/api`, `bot/docs/tech/api/api.md`) — 2026-03
+
+**Activities and reference (prefixes `/activities`, `/reference`):**
+
+- **HMAC** (used on `/products`, `/media`, …) is **not** applied to these paths — see `_should_skip_auth` / `api.md` §3.1.
+- **`POST /activities/draft`** uses header **`X-User-Id`** (optional string) for wallet/prepare identity; if omitted, backend uses **`mock_user`**.
+- **Custom GPT Actions (API Key → Bearer):** если на бекенде задан непустой **`GPT_ACTIONS_BEARER_SECRET`**, middleware **`gpt_actions_bearer`** требует **`Authorization: Bearer <тот же секрет>`** на **всех** путях с префиксами `/activities` и `/reference`. При неверном или отсутствующем заголовке — **401** с телом `gpt_actions_auth_error` (см. `api.md` §3.3). Это **shared secret канала GPT→API**, не JWT пользователя и **не** `EDGE_TO_BACKEND_SECRET` для uploads.
+- **JWT / OAuth user token** в том же заголовке `Authorization` для этих роутов **обработчиками activities не валидируется**; per-user через Logto — отдельный эпик / прокси с `X-User-Id`.
+
+**Other zones** (e.g. `/v1/uploads/...`) use Bearer secrets or wallet guards per `api.md` §2.7–§3.2 — not interchangeable with `/activities` rules.
+
+#### OpenAPI fragment (Custom GPT schema)
+
+Для Actions в редакторе GPT: **Authentication → API Key → Bearer**. В YAML схемы (или эквивалент в JSON):
+
+```yaml
+components:
+  securitySchemes:
+    GptActionsBearer:
+      type: http
+      scheme: bearer
+      description: >
+        Same value as server env GPT_ACTIONS_BEARER_SECRET (when set).
+        Do not reuse EDGE_TO_BACKEND_SECRET.
+security:
+  - GptActionsBearer: []
+```
+
+Примените **`security`** ко всем операциям, чьи `path` начинаются с `/activities` или `/reference`. Если секрет на сервере **не** задан, эти пути остаются без проверки Bearer — для публичного хоста задайте секрет.
+
+---
+
+### Target architecture: JWT Bearer via OpenAI Actions (Logto)
+
+The reference below describes the **target** pattern (OAuth + Bearer on the client). It must be read **together** with the SSOT block above when wiring Custom GPT to the **current** open-source Bot API.
+
 ### Authentication Methods
 
-The API uses **JWT Bearer token authentication** for write operations and public access for read-only operations.
+The product design uses **JWT Bearer token authentication** for many write operations and public access for read-only operations where applicable. **`/activities` on the current FastAPI instance follows the SSOT block first.**
 
 #### Public Endpoints
 
@@ -111,9 +148,18 @@ https://api.amanita.example.com
 Content-Type: application/json
 ```
 
-**For authenticated requests:**
+**For requests to `/activities` (current Bot API):**
+```http
+X-User-Id: <stable_user_reference>
+Content-Type: application/json
+X-Conversation-Ref: <conversation_uuid>
+X-Request-Id: <request_id>
+```
+
+**For target OAuth-backed Actions (other products / future binding):**
 ```http
 Authorization: Bearer <access_token>
+Content-Type: application/json
 X-Conversation-Ref: <conversation_uuid>
 X-Request-Id: <request_id>
 ```
@@ -122,7 +168,8 @@ X-Request-Id: <request_id>
 
 | Header | Required | Description |
 |--------|----------|-------------|
-| `Authorization` | Yes (for authenticated endpoints) | JWT Bearer token: `Bearer <token>` (automatically attached by ChatGPT) |
+| `X-User-Id` | Recommended for `POST /activities/draft` on current FastAPI | User id for prepare/push; default `mock_user` if omitted (see SSOT block above). |
+| `Authorization` | **Required** when `GPT_ACTIONS_BEARER_SECRET` is set | `Bearer <shared secret>` = значение env (Custom GPT API Key mode). **Not** `EDGE_TO_BACKEND_SECRET`. JWT user tokens are not validated by activity handlers. |
 | `X-Conversation-Ref` | Optional | Conversation-level correlation ID (UUID format) for telemetry |
 | `X-Request-Id` | Optional | Request-level correlation ID (8-64 alphanumeric chars) for telemetry |
 | `Content-Type` | Yes (for POST/PUT) | Must be `application/json` |
@@ -251,13 +298,15 @@ Create a new Activity in Draft status.
 
 **Endpoint:** `POST /activities/draft`
 
-**Authentication:** Required (Bearer token)
+**Authentication (current FastAPI):** HMAC **not** enforced on `/activities`. Send **`X-User-Id: <string>`** for stable user identity in prepare/push flows; if omitted, backend uses `mock_user`. If **`GPT_ACTIONS_BEARER_SECRET`** is set, send **`Authorization: Bearer <that secret>`** (Custom GPT API Key → Bearer); otherwise 401 — see **Authentication → SSOT** and `api.md` §3.3.
 
 **Request Headers:**
 ```http
-Authorization: Bearer <token>
 Content-Type: application/json
+X-User-Id: <user_or_wallet_ref>
 X-Conversation-Ref: <conversation_uuid>
+# Required when server has GPT_ACTIONS_BEARER_SECRET:
+Authorization: Bearer <GPT_ACTIONS_BEARER_SECRET>
 ```
 
 **Request Body:**
@@ -286,7 +335,10 @@ X-Conversation-Ref: <conversation_uuid>
     // ... all fields from Activity Data Model
   },
   "request_id": "req_1234567890",
-  "timestamp": 1640995200
+  "timestamp": 1640995200,
+  "upload_id": "upl_…",
+  "upload_token": "…",
+  "expires_at": "2025-01-15T11:00:00Z"
 }
 ```
 

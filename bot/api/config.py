@@ -32,6 +32,9 @@ class APIConfig:
     # Настройки безопасности
     TRUSTED_HOSTS = os.environ.get("AMANITA_API_TRUSTED_HOSTS", "*").split(",")
     
+    # Custom GPT Actions → /activities, /reference (optional; empty = disabled)
+    GPT_ACTIONS_BEARER_SECRET = os.environ.get("GPT_ACTIONS_BEARER_SECRET", "").strip()
+
     # Настройки HMAC аутентификации
     HMAC_SECRET_KEY = os.environ.get("AMANITA_API_HMAC_SECRET_KEY", "default-secret-key-change-in-production")
     HMAC_TIMESTAMP_WINDOW = int(os.environ.get("AMANITA_API_HMAC_TIMESTAMP_WINDOW", "300"))  # 5 минут

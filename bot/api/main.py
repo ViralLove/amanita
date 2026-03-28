@@ -14,6 +14,7 @@ from typing import Optional
 from logging.handlers import RotatingFileHandler
 from api.config import APIConfig
 from api.middleware.auth import HMACMiddleware
+from api.middleware.gpt_actions_bearer import GptActionsBearerMiddleware
 from fastapi.exceptions import RequestValidationError, HTTPException
 from pydantic import ValidationError
 from api import error_handlers
@@ -108,6 +109,12 @@ def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Opti
         TrustedHostMiddleware,
         allowed_hosts=APIConfig.TRUSTED_HOSTS
     )
+
+    # Optional Bearer для Custom GPT Actions (/activities, /reference); регистрировать ДО HMAC,
+    # чтобы в цепочке выполнения проверка шла после пропуска HMAC (внутренний слой ближе к app).
+    app.add_middleware(GptActionsBearerMiddleware, bearer_secret=APIConfig.GPT_ACTIONS_BEARER_SECRET)
+    if APIConfig.GPT_ACTIONS_BEARER_SECRET:
+        logger.info("GptActionsBearerMiddleware enabled for /activities and /reference")
     
     # Настройка HMAC аутентификации
     api_key_service = None

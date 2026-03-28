@@ -266,15 +266,15 @@ Before executing API call, API Orchestrator MUST:
 
 ### 5.1 Endpoints Mapping
 
-| Operation | HTTP Method | Endpoint | Auth | Input Source |
-|-----------|-------------|----------|------|--------------|
-| Create Draft | POST | `/activities/draft` | Bearer | Activity Normalizer |
-| Update Draft | PUT | `/activities/{id}` | Bearer | Activity Normalizer |
-| Submit Review | POST | `/activities/{id}/submit-review` | Bearer | Activity Normalizer |
-| Publish | POST | `/activities/{id}/publish` | Bearer (activated) | User request |
-| Unpublish | DELETE | `/activities/{id}/unpublish` | Bearer | User request |
-| Get Details | GET | `/activities/{id}` | Public/Auth | User request |
-| List Own | GET | `/activities/me` | Bearer | User request |
+| Operation | HTTP Method | Endpoint | Auth (current `bot/api`) | Input Source |
+|-----------|-------------|----------|--------------------------|--------------|
+| Create Draft | POST | `/activities/draft` | No HMAC; **`X-User-Id`** recommended (see §7.4) | Activity Normalizer |
+| Update Draft | PUT | `/activities/{id}` | No HMAC; Bearer per §7.2 (`GPT_ACTIONS_BEARER_SECRET` when set) | Activity Normalizer |
+| Submit Review | POST | `/activities/{id}/submit-review` | No HMAC | Activity Normalizer |
+| Publish | POST | `/activities/{id}/publish` | No HMAC | User request |
+| Unpublish | DELETE | `/activities/{id}/unpublish` | No HMAC | User request |
+| Get Details | GET | `/activities/{id}` | Public (mock) | User request |
+| List Own | GET | `/activities/me` | No HMAC | User request |
 | Search | GET/POST | `/activities/search` | Public | Search Dialogue |
 | Get Formats | GET | `/reference/formats` | Public | User request |
 | Get Taxonomy | GET | `/reference/taxonomy` | Public | User request |
@@ -308,11 +308,14 @@ All request/response schemas are defined in `api-methods-reference.md`.
      "request_id": "req_1234567890"
    }
    ```
-3. **Success Response** — Standard format:
+3. **Success Response** — Standard format (list/search may use `activities` + `pagination`). **After `POST /activities/draft`**, backend adds upload signing fields when prepare runs:
    ```json
    {
      "success": true,
      "activity": { /* Activity object */ },
+     "upload_id": "…",
+     "upload_token": "…",
+     "expires_at": "…",
      "request_id": "req_1234567890",
      "timestamp": 1640995200
    }
@@ -330,7 +333,7 @@ All request/response schemas are defined in `api-methods-reference.md`.
 
 ### 7.1 Access Levels
 
-**Important:** GPT does NOT manage authentication. Authentication is handled by OpenAI Actions + OAuth (Logto.io as Identity Provider). ChatGPT automatically attaches `Authorization: Bearer <access_token>` to each action call.
+**Important:** GPT does NOT mint user JWTs. For the **current** Amanita Bot API, `/activities` and `/reference` skip HMAC; identity for draft/create uses **`X-User-Id`** (see §7.2). When the server sets **`GPT_ACTIONS_BEARER_SECRET`**, Custom GPT **API Key → Bearer** must send **`Authorization: Bearer`** with that same shared secret on all `/activities` and `/reference` calls (`api.md` §3.3); activity **handlers** still do not validate OAuth/JWT in that header. **Target / product** per-user OAuth (Logto) remains a separate wiring task.
 
 GPT only needs to know:
 
@@ -339,7 +342,7 @@ GPT only needs to know:
 - `GET /activities/{id}` — Get Published Activity details (if Published)
 - `GET /reference/*` — All reference data endpoints
 
-**Authenticated Endpoints (Bearer token required, managed by OpenAI Actions):**
+**Authenticated Endpoints (see §7.2 — `X-User-Id` for identity; optional shared-secret Bearer when `GPT_ACTIONS_BEARER_SECRET` is set; target OAuth is separate):**
 - `POST /activities/draft` — Create Draft
 - `PUT /activities/{id}` — Update Draft
 - `POST /activities/{id}/submit-review` — Submit for Review
@@ -352,8 +355,11 @@ GPT only needs to know:
 
 ### 7.2 Making API Requests
 
+**SSOT — `/activities` on current FastAPI (`bot/docs/tech/api/api.md`):** No HMAC on `/activities` or `/reference`. Use **`X-User-Id`** on `POST /activities/draft` for stable identity (default `mock_user` if omitted). `Authorization: Bearer` from Actions is **not** validated by current `/activities` handlers. **`/v1/uploads/*`** uses different auth — see `api.md` §2.7–3.2.
+
 **Headers:**
-- `Authorization: Bearer <access_token>` — Automatically attached by ChatGPT for authenticated endpoints
+- `X-User-Id: <id>` — **Use for current Bot API** on draft/create when the platform allows custom headers.
+- `Authorization: Bearer <access_token>` — When Actions enforce OAuth (target architecture); not validated on current `/activities` routes unless product adds it.
 - `X-Conversation-Ref: <conversation_uuid>` — Optional, for telemetry (see Section 7.3)
 - `X-Request-Id: <request_id>` — Optional, for request-level telemetry
 - `Content-Type: application/json` — Required for POST/PUT requests
