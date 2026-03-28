@@ -54,11 +54,13 @@
 | Файл | Назначение | Количество тестов |
 |------|------------|-------------------|
 | `test_error_handling_integration.py` | Интеграция обработки ошибок | ~8 |
+| `test_activity_full_floou_mock_wallet.py` | Full floou: draft → sign_arweave → callback → sign_contract → submit (W7) | 2 (in-process + E2E) |
 
 **Общее количество интеграционных тестов: ~15**
 
 **📚 Документация:**
 - [`integration-infrastructure.md`](./integration-infrastructure.md) - Инфраструктура интеграционных тестов (деплой контрактов, переменные окружения)
+- **[`e2e-floou-manual.md`](./e2e-floou-manual.md)** — **E2E Full Floou:** мануал по запуску теста и всех элементов (bot, arweave-uploader, wallet-mock), переменные окружения, порты, ручной и автоматический запуск
 
 ### 📱 Telegram тесты (`tests/telegram/`)
 
@@ -213,7 +215,15 @@ python3 -m pytest tests/telegram/ -v
 
 # Интеграционные тесты
 python3 -m pytest tests/integration/ -v -m integration
+
+# Full floou: in-process (без Node/uploader/JWT)
+python3 -m pytest tests/integration/test_activity_full_floou_mock_wallet.py -m full_floou_mock_wallet -v
+
+# Full floou: E2E с реальными bot, arweave-uploader, wallet-mock (см. e2e-floou-manual.md)
+python3 -m pytest tests/integration/test_activity_full_floou_mock_wallet.py -m full_floou_real_services -v
 ```
+
+Подробно: [e2e-floou-manual.md](./e2e-floou-manual.md) — переменные окружения, порты, ручной запуск всех элементов.
 
 ### Запуск с покрытием
 ```bash
