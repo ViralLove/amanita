@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Amanita ID (Dynamic) — White-label Demo</title>
+    <style>
+      :root {
+        --bg: #0b0f14;
+        --card: #121824;
+        --text: #e7eefc;
+        --muted: #a9b4c7;
+        --accent: #6ee7ff;
+        --accent2: #a78bfa;
+        --danger: #ff6b6b;
+        --ok: #66ffb3;
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        background: radial-gradient(1200px 800px at 20% 10%, rgba(110,231,255,.18), transparent 55%),
+                    radial-gradient(900px 700px at 80% 30%, rgba(167,139,250,.16), transparent 60%),
+                    var(--bg);
+        color: var(--text);
+      }
+      .wrap { max-width: 980px; margin: 32px auto; padding: 0 16px; }
+      .brand {
+        display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+      }
+      .logo {
+        width: 44px; height: 44px; border-radius: 14px;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        box-shadow: 0 10px 40px rgba(110,231,255,.15);
+      }
+      .h1 { font-size: 20px; font-weight: 700; line-height: 1.1; }
+      .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+      .grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 14px; }
+      .card {
+        background: rgba(18,24,36,.92);
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 18px;
+        padding: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,.28);
+      }
+      .title { font-weight: 700; margin: 0 0 10px; }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; }
+      button {
+        cursor: pointer;
+        border: 1px solid rgba(255,255,255,.12);
+        background: rgba(255,255,255,.06);
+        color: var(--text);
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-weight: 650;
+      }
+      button.primary {
+        background: linear-gradient(135deg, rgba(110,231,255,.18), rgba(167,139,250,.18));
+        border: 1px solid rgba(110,231,255,.35);
+      }
+      button.danger {
+        border-color: rgba(255,107,107,.35);
+        background: rgba(255,107,107,.08);
+      }
+      button:disabled { opacity: .55; cursor: not-allowed; }
+      .pill {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 6px 10px; border-radius: 999px;
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.1);
+        color: var(--muted); font-size: 12px;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,.25); }
+      .dot.ok { background: var(--ok); }
+      .dot.bad { background: var(--danger); }
+      pre {
+        margin: 10px 0 0;
+        padding: 12px;
+        border-radius: 14px;
+        background: rgba(0,0,0,.25);
+        border: 1px solid rgba(255,255,255,.08);
+        overflow: auto;
+        font-size: 12px;
+      }
+      .small { color: var(--muted); font-size: 12px; margin-top: 10px; line-height: 1.35; }
+      .list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
+      .footer { margin-top: 14px; color: var(--muted); font-size: 12px; }
+      @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <div class="h1">Amanita ID</div>
+          <div class="sub">White-label auth + wallet onboarding (Dynamic JS SDK demo)</div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <p class="title">1) Вход (Social Redirect)</p>
+          <div class="row">
+            <button class="primary" id="btn-google">Continue with Google</button>
+            <button id="btn-github">Continue with GitHub</button>
+            <button id="btn-discord">Continue with Discord</button>
+            <button class="danger" id="btn-logout" disabled>Logout</button>
+          </div>
+
+          <div class="small">
+            Этот режим делает редирект на провайдера и возвращает на <code>redirectUrl</code>, где мы завершаем логин.
+            (Нужно добавить callback URL в настройках Dynamic/провайдера.)
+          </div>
+
+          <pre id="auth-state">{ "status": "booting..." }</pre>
+        </div>
+
+        <div class="card">
+          <p class="title">2) Подключить внешний кошелёк (EVM/Solana)</p>
+          <div class="row" id="wallet-buttons"></div>
+
+          <div class="small">
+            Мы строим список доступных wallet-провайдеров (MetaMask/Phantom и т.д.) и делаем connect+verify.
+          </div>
+
+          <pre id="wallet-state">{ "wallets": [] }</pre>
+        </div>
+
+        <div class="card">
+          <p class="title">3) Сессия / JWT</p>
+          <div class="row">
+            <span class="pill"><span class="dot" id="dot-user"></span><span id="lbl-user">user: unknown</span></span>
+            <span class="pill"><span class="dot" id="dot-jwt"></span><span id="lbl-jwt">jwt: unknown</span></span>
+          </div>
+          <pre id="session-state">{}</pre>
+          <div class="small">
+            В JS SDK user доступен через <code>dynamicClient.user</code>, а токен — <code>dynamicClient.token</code>.
+          </div>
+        </div>
+
+        <div class="card">
+          <p class="title">4) Примечания по embedded wallet (WaaS)</p>
+          <ul class="list">
+            <li>Если включите embedded wallet — обязательно дайте пользователю “Export key” поток.</li>
+            <li>Экспорт отображается в защищённом sandboxed iframe, который вы не контролируете.</li>
+            <li>Это удобно для вашей модели “самокастодиальность по запросу”: пользователь может мигрировать куда угодно.</li>
+          </ul>
+          <div class="footer">
+            (Экспорт/импорт ключей описан в docs Dynamic про embedded wallets / MPC.)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      /**
+       * ДЕМО-ИМПОРТЫ:
+       * Для production лучше ставить пакеты через npm:
+       *   npm i @dynamic-labs-sdk/client
+       *
+       * Здесь используем ESM CDN, чтобы это было одним HTML файлом.
+       */
+      import {
+        createDynamicClient,
+        initializeClient,
+        onEvent,
+        // social redirect flow
+        signInWithSocialRedirect,
+        detectOAuthRedirect,
+        completeSocialRedirectSignIn,
+        // wallets
+        getAvailableWalletProvidersData,
+        connectAndVerifyWithWalletProvider,
+        getWalletAccounts,
+        // auth/session
+        logout,
+      } from "https://esm.sh/@dynamic-labs-sdk/client@latest";
+
+      // =========================
+      // 0) CONFIG (заменить)
+      // =========================
+      const DYNAMIC_ENVIRONMENT_ID = "YOUR_ENVIRONMENT_ID"; // взять из Dynamic dashboard
+      const APP_URL = window.location.origin;
+      const CALLBACK_URL = `${APP_URL}${window.location.pathname}`; // для демо: тот же URL
+
+      // =========================
+      // 1) Create client
+      // =========================
+      const dynamicClient = createDynamicClient({
+        environmentId: DYNAMIC_ENVIRONMENT_ID,
+        metadata: {
+          name: "Amanita",
+          url: APP_URL,
+          iconUrl: "https://example.com/amanita-icon.png", // заменишь на свой
+        },
+        // если хочешь полностью контролировать init:
+        autoInitialize: false,
+      });
+
+      // слушаем init status (полезно для отладки)
+      onEvent({
+        event: "initStatusChanged",
+        listener: ({ initStatus }) => {
+          setAuthState({ initStatus });
+        },
+      });
+
+      // ручной init
+      await initializeClient();
+
+      // =========================
+      // 2) Handle OAuth redirect return
+      // =========================
+      async function maybeCompleteOAuthRedirect() {
+        const currentUrl = new URL(window.location.href);
+        const isReturning = await detectOAuthRedirect({ url: currentUrl });
+        if (isReturning) {
+          await completeSocialRedirectSignIn({ url: currentUrl });
+        }
+      }
+      await maybeCompleteOAuthRedirect();
+
+      // =========================
+      // 3) UI WIRING
+      // =========================
+      const $ = (id) => document.getElementById(id);
+      const authPre = $("auth-state");
+      const walletPre = $("wallet-state");
+      const sessionPre = $("session-state");
+      const walletButtons = $("wallet-buttons");
+
+      function setAuthState(obj) {
+        authPre.textContent = JSON.stringify(obj, null, 2);
+      }
+      function setWalletState(obj) {
+        walletPre.textContent = JSON.stringify(obj, null, 2);
+      }
+      function setSessionState(obj) {
+        sessionPre.textContent = JSON.stringify(obj, null, 2);
+      }
+
+      function setDot(dotEl, ok) {
+        dotEl.classList.remove("ok", "bad");
+        dotEl.classList.add(ok ? "ok" : "bad");
+      }
+
+      async function refreshState() {
+        const user = dynamicClient.user || null;
+        const jwt = dynamicClient.token || null;
+
+        $("btn-logout").disabled = !user;
+
+        $("lbl-user").textContent = user ? `user: ${user.userId || "authenticated"}` : "user: null";
+        $("lbl-jwt").textContent = jwt ? `jwt: present` : "jwt: null";
+
+        setDot($("dot-user"), Boolean(user));
+        setDot($("dot-jwt"), Boolean(jwt));
+
+        setSessionState({
+          user,
+          jwtPresent: Boolean(jwt),
+        });
+
+        // wallets
+        try {
+          const accounts = getWalletAccounts ? getWalletAccounts() : [];
+          setWalletState({ walletAccounts: accounts });
+        } catch (e) {
+          setWalletState({ walletAccounts: [], error: String(e) });
+        }
+      }
+
+      // Social buttons
+      $("btn-google").onclick = async () => {
+        await signInWithSocialRedirect({
+          provider: "google",
+          redirectUrl: CALLBACK_URL,
+        });
+      };
+      $("btn-github").onclick = async () => {
+        await signInWithSocialRedirect({
+          provider: "github",
+          redirectUrl: CALLBACK_URL,
+        });
+      };
+      $("btn-discord").onclick = async () => {
+        await signInWithSocialRedirect({
+          provider: "discord",
+          redirectUrl: CALLBACK_URL,
+        });
+      };
+
+      $("btn-logout").onclick = async () => {
+        await logout();
+        await refreshState();
+      };
+
+      // Build wallet provider buttons (MetaMask/Phantom/etc.)
+      function renderWalletButtons() {
+        walletButtons.innerHTML = "";
+        const providers = getAvailableWalletProvidersData();
+
+        if (!providers?.length) {
+          const span = document.createElement("span");
+          span.className = "small";
+          span.textContent =
+            "Нет доступных wallet providers. Проверь: включены ли chain extensions в Dynamic, и установлен ли кошелёк в браузере.";
+          walletButtons.appendChild(span);
+          return;
+        }
+
+        // простая сортировка для красоты
+        providers
+          .slice()
+          .sort((a, b) => (a.metadata?.displayName || "").localeCompare(b.metadata?.displayName || ""))
+          .forEach((p) => {
+            const btn = document.createElement("button");
+            btn.textContent = `${p.metadata?.displayName || p.key} (${p.chain})`;
+            btn.onclick = async () => {
+              setAuthState({ action: "connectAndVerifyWithWalletProvider", walletProviderKey: p.key });
+              try {
+                const walletAccount = await connectAndVerifyWithWalletProvider({
+                  walletProviderKey: p.key,
+                });
+                setAuthState({
+                  ok: true,
+                  connected: walletAccount?.accountAddress,
+                  walletProviderKey: p.key,
+                });
+              } catch (e) {
+                setAuthState({ ok: false, error: String(e), walletProviderKey: p.key });
+              } finally {
+                await refreshState();
+              }
+            };
+            walletButtons.appendChild(btn);
+          });
+      }
+
+      renderWalletButtons();
+      await refreshState();
+
+      // периодически обновляем стейт (демо-стиль)
+      setInterval(refreshState, 2000);
+      setAuthState({ initStatus: "finished", callbackUrl: CALLBACK_URL });
+    </script>
+  </body>
+</html>
