@@ -95,6 +95,7 @@
 | **BACKEND_MOCK_ALLOW_REQUEST_OVERRIDE** | `true`/`1` — разрешить переопределение симулированного ответа по заголовкам запроса (X-Backend-Mock-Put-Status, X-Backend-Mock-Callback). |
 | **BACKEND_MOCK_TEST_SECRET** | Секрет для заголовка X-Backend-Mock-Secret (учёт override только при совпадении). |
 | **UPLOAD_TOKEN_JWT_PUBLIC_KEY** | Публичный ключ (PEM или JWK) для проверки JWT RS256 в теле запроса POST /v1/crystalize. Обязателен для приёма crystalize. |
+| **UPLOAD_TOKEN_DEBUG_PEM** / **DEBUG_PEM** | `true` / `1` / `yes` (без учёта регистра) — подробные логи `[pem-diag]` при нормализации ключа. По умолчанию выключено; при ошибке декодирования PEM диагностика всё равно пишется. |
 
 ---
 

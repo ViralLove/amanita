@@ -1,0 +1,158 @@
+openapi: 3.0.3
+info:
+  title: Arweave Uploader API
+  description: |
+    HTTP-сервис для публикации подписанных Data Item (ANS-104) в Arweave.
+    Принимает подписанный item, верифицирует JWT и подпись Data Item, упаковывает в bundle и отправляет в Arweave (или возвращает mock-ответ при USE_REAL_ARWEAVE=false).
+  version: 0.2.0
+  contact:
+    name: Amanita
+
+servers:
+  - url: https://amanita-uploader-888.up.railway.app
+    description: Production (Railway)
+  - url: http://localhost:3000
+    description: Local
+
+tags:
+  - name: Health
+    description: Проверка доступности сервиса
+  - name: Publish
+    description: Публикация Data Item в Arweave
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Проверка живости сервиса. Авторизация не требуется.
+      operationId: getHealth
+      responses:
+        "200":
+          description: Сервис доступен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /v1/crystalize:
+    post:
+      tags: [Publish]
+      summary: Опубликовать Data Item в Arweave
+      description: |
+        Отправляет подписанный ANS-104 Data Item в Arweave (bundle из одного item).
+        Валидирует JWT (RS256), подпись Data Item и тег Upload-Id.
+        При успехе возвращает идентификатор bundle-транзакции и URL.
+        Опционально на деплое может требоваться `Authorization: Bearer <RELAY_AUTH_TOKEN>` (если задан).
+      operationId: postCrystalize
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrystalizeRequest"
+      responses:
+        "200":
+          description: Успешная публикация (или mock)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrystalizeSuccess"
+        "400":
+          description: Невалидное тело или подпись Data Item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                missing_field:
+                  summary: Отсутствует обязательное поле
+                  value: { "code": "missing_field", "message": "upload_id is required" }
+                invalid_body:
+                  summary: Невалидный JSON
+                  value: { "code": "invalid_body", "message": "Invalid JSON body" }
+                signature_invalid:
+                  summary: Подпись Data Item или тег Upload-Id не прошли проверку
+                  value: { "code": "signature_invalid", "message": "Data item signature or Upload-Id tag invalid" }
+        "401":
+          description: Невалидный или истёкший JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                code: token_invalid
+                message: Invalid or expired upload token
+        "502":
+          description: Ошибка публикации в Arweave
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                code: publish_failed
+                message: Bundle publish to Arweave failed
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [ok, service, version]
+      properties:
+        ok:
+          type: boolean
+          example: true
+        service:
+          type: string
+          example: arweave-uploader
+        version:
+          type: string
+          example: "0.2.0"
+
+    CrystalizeRequest:
+      type: object
+      required: [upload_id, upload_token, signed_data_item, payload_size]
+      properties:
+        upload_id:
+          type: string
+          description: Уникальный идентификатор загрузки (должен совпадать с upload_id в JWT и в теге Data Item)
+        upload_token:
+          type: string
+          description: JWT RS256 с claims upload_id, max_bytes, exp; подписан приватным ключом пары, публичный ключ которой настроен на сервере
+        signed_data_item:
+          type: string
+          description: ANS-104 Data Item в base64url (подписанный клиентом, с тегом Upload-Id = upload_id)
+        payload_size:
+          type: number
+          minimum: 0
+          description: Размер payload в байтах (должен быть ≤ max_bytes из JWT)
+
+    CrystalizeSuccess:
+      type: object
+      required: [ack, status, bundle_tx_id, arweave_url]
+      properties:
+        ack:
+          type: boolean
+          example: true
+        status:
+          type: string
+          example: queued_for_publish
+        bundle_tx_id:
+          type: string
+          description: Идентификатор bundle-транзакции в Arweave (43 символа, base64url)
+          example: U6ntSJjXeeNjNmZC27ct97K1M2k9TR6Aqs6Zx5j-lg4
+        arweave_url:
+          type: string
+          format: uri
+          description: URL вида {protocol}://{host}/{bundle_tx_id}
+          example: https://arweave.net/U6ntSJjXeeNjNmZC27ct97K1M2k9TR6Aqs6Zx5j-lg4
+
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [invalid_body, missing_field, token_invalid, signature_invalid, publish_failed]
+        message:
+          type: string
