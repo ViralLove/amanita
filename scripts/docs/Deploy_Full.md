@@ -469,28 +469,27 @@ npx hardhat run scripts/deploy_full.js --network localhost 11 <COUNT>
 **Результат:** Сохраняет инвайты в `bot/flowers/{SELLER_ADDRESS}_invites.txt`
 **Использование:** Регулярное пополнение инвайтов для приглашения аудитории
 
-#### `13` - Диагностика состояния селлера
+#### `13` - Диагностика ролей для произвольного адреса
 ```bash
-# Способ 1 - через переменную окружения (использует SELLER_ADDRESS)
-DEPLOY_ACTION=13 npx hardhat run scripts/deploy_full.js --network polygon
+# Способ 1 (рекомендуется) - через VALIDATED_ADDRESS
+DEPLOY_ACTION=13 VALIDATED_ADDRESS=0x... npx hardhat run scripts/deploy_full.js --network polygon
 
-# Способ 2 - через аргументы командной строки (указать адрес продавца)
-npx hardhat run scripts/deploy_full.js --network polygon 13 <SELLER_ADDRESS>
+# Способ 2 - через интерактивный prompt (только TTY)
+DEPLOY_ACTION=13 ASK_FOR_ADDRESS=true npx hardhat run scripts/deploy_full.js --network localhost
 ```
-**Описание:** Полная диагностика состояния селлера из .env
+**Описание:** Быстрый role-check адреса в `SpiralEngine` без привязки к hardcoded seller.
 **Параметры:**
-- `SELLER_ADDRESS`: адрес продавца (если не указан, используется SELLER_ADDRESS из .env)
+- `VALIDATED_ADDRESS`: целевой адрес для проверки (приоритетный путь)
+- `ASK_FOR_ADDRESS=true`: запросить адрес в runtime (только в интерактивной TTY-сессии)
+- fallback: если `VALIDATED_ADDRESS` не задан, используется `SELLER_ADDRESS` из `.env`
 **Функциональность:**
 - Проверка активации пользователя в SpiralEngine
 - Проверка ролей (SELLER_ROLE, ACTIVATOR_ROLE)
-- Получение и сохранение инвайтов селлера в файл
-- Проверка каталога продуктов (количество, активность)
-- Итоговая оценка готовности селлера (0-100%)
+ - Вывод компактного отчёта по выбранному адресу
 **Результат:** 
-- Подробный отчет о состоянии селлера
-- Сохранение инвайтов в `bot/flowers/{SELLER_ADDRESS}_invites.txt`
-- Оценка готовности к работе
-**Использование:** Диагностика проблем, проверка готовности селлера
+- Подтверждение, активирован ли адрес
+- Подтверждение наличия `SELLER_ROLE` / `ACTIVATOR_ROLE`
+**Использование:** Диагностика прав для seller/activity creator/любого user-адреса
 
 ### Действия с каталогом
 
@@ -674,6 +673,31 @@ DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-XXXX-YYYY npx hardhat run scripts/depl
 - ⚠️ Action 888 **объединяет** функциональность Actions 555, 4, 41 и добавляет SBT
 - ⚠️ Если компоненты не загружены → используйте сначала Action 555
 - ✅ Можно запускать многократно - пропустит активацию если seller уже активирован
+
+#### `846` - Подготовка activity creator адреса (activate + ensure ACTIVATOR_ROLE)
+```bash
+# Использует ACTIVITY_CREATOR_ADDRESS и DEPLOYER_INVITE из .env
+DEPLOY_ACTION=846 npx hardhat run scripts/deploy_full.js --network localhost
+```
+
+**Описание:** Подготавливает адрес для `ActivityRegistry.createActivity` через `SpiralEngine`.
+
+**Что делает:**
+1. Читает `ACTIVITY_CREATOR_ADDRESS` и `DEPLOYER_INVITE` из config/.env.
+2. Проверяет активацию через `usedInviteByUser(address)`.
+3. Если адрес не активирован — вызывает `activateUser(DEPLOYER_INVITE, ACTIVITY_CREATOR_ADDRESS)`.
+4. Проверяет наличие `ACTIVATOR_ROLE`.
+5. Если роль отсутствует — вызывает `grantActivatorRole(...)`.
+6. Выполняет финальную валидацию: активирован + есть роль.
+
+**Требования:**
+- `DEPLOYER_PRIVATE_KEY` (подписант транзакций деплоя/ролей)
+- `ACTIVITY_CREATOR_ADDRESS` (целевой адрес)
+- `DEPLOYER_INVITE` (валидный инвайт)
+- Задеплоенный `SpiralEngine` в выбранной сети
+
+**Результат:**
+- Адрес готов к вызову `createActivity`: `usedInviteByUser != 0` и `ACTIVATOR_ROLE = true`.
 
 ## Подробное описание действий
 

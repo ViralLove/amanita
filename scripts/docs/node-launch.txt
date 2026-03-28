@@ -196,11 +196,28 @@ DEPLOY_ACTION=6 npx hardhat run scripts/deploy_full.js --network localhost
 #   → ACTIVATOR_ROLE назначена успешно ✅
 #   → Verification passed ✅
 
-# ✓ ПРОВЕРКА РОЛЕЙ:
-DEPLOY_ACTION=13 npx hardhat run scripts/deploy_full.js --network localhost
+# ✓ ПРОВЕРКА РОЛЕЙ ДЛЯ ЛЮБОГО АДРЕСА:
+DEPLOY_ACTION=13 VALIDATED_ADDRESS=0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f npx hardhat run scripts/deploy_full.js --network localhost
 # Ожидается в выводе:
 #   SELLER_ROLE: ✅ Есть
 #   ACTIVATOR_ROLE: ✅ Есть
+
+# ========================================
+# ACTION 846: ПОДГОТОВКА ЛЮБОГО АДРЕСА КАК ACTIVATOR (через invite)
+# ========================================
+#
+# Используется для подготовки ACTIVITY_CREATOR_ADDRESS под ActivityRegistry.createActivity:
+# - activateUser через DEPLOYER_INVITE
+# - проверка/довыдача ACTIVATOR_ROLE
+#
+# Обязательные переменные:
+#   ACTIVITY_CREATOR_ADDRESS=0x...
+#   DEPLOYER_INVITE=AMANITA-XXXX-YYYY
+#
+DEPLOY_ACTION=846 npx hardhat run scripts/deploy_full.js --network localhost
+#
+# Быстрая проверка:
+# DEPLOY_ACTION=13 VALIDATED_ADDRESS=<ACTIVITY_CREATOR_ADDRESS> npx hardhat run scripts/deploy_full.js --network localhost
 
 # 5.2 Инициализация каталога
 DEPLOY_ACTION=444 npx hardhat run scripts/deploy_full.js --network localhost
@@ -366,7 +383,7 @@ jq '.validation_report.summary.quality_score' validation_report.json
 
 # 🔴 Если онбординг в боте падает с AccessControlUnauthorizedAccount:
 #   → ПРИЧИНА: Seller НЕ имеет ACTIVATOR_ROLE!
-#   → ПРОВЕРКА: DEPLOY_ACTION=13 npx hardhat run scripts/deploy_full.js --network localhost
+#   → ПРОВЕРКА: DEPLOY_ACTION=13 VALIDATED_ADDRESS=<TARGET_ADDRESS> npx hardhat run scripts/deploy_full.js --network localhost
 #   → РЕШЕНИЕ: DEPLOY_ACTION=9 npx hardhat run scripts/deploy_full.js --network localhost
 #   → ВАЖНО: Action 9 (Шаг 5.1) ОБЯЗАТЕЛЕН после каждого node restart!
 

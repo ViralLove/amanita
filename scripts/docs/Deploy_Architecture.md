@@ -11,7 +11,7 @@
 
 - **Сокращение кода**: 4760 → 217 строк в main router (95% сокращение)
 - **Модульность**: 16 классов (6 action + 4 service + 4 utility + 2 core) с четким разделением ответственности
-- **19 централизованных actions**: Вместо 32 разрозненных блоков в монолите
+- **20 централизованных actions**: Вместо 32 разрозненных блоков в монолите
 - **Слоистая архитектура**: 5-уровневая DI структура для масштабируемости
 - **Тестируемость**: Каждый модуль может быть протестирован независимо
 - **Расширяемость**: Легкое добавление новых действий через Dependency Injection
@@ -47,7 +47,7 @@ graph TB
         H1[actions/SetupActions.js<br/>Action 2<br/>Setup & Connections]
         H2[actions/AccessControlActions.js<br/>Actions 9,13<br/>Roles & Diagnostics]
         I[actions/CatalogActions.js<br/>Actions 4,6,40,41,42,43,46,444<br/>Catalog Logic]
-        I1[actions/InviteActions.js<br/>Actions 7,11,777,888<br/>Invite & Activation]
+        I1[actions/InviteActions.js<br/>Actions 7,11,777,846,888<br/>Invite & Activation]
         J[actions/ComponentActions.js<br/>Action 555<br/>Component Logic]
         K[actions/index.js<br/>ActionsManager<br/>Centralized Interface]
     end
@@ -127,11 +127,11 @@ class DeployRouter {
 }
 ```
 
-**Доступные действия** (19 total):
+**Доступные действия** (20 total):
 - **Deploy Actions**: `0` (MagicRegistry), `1` (All contracts), `5` (Single contract)
 - **Setup Actions**: `2` (Re-setup connections)
 - **Access Control**: `9` (Grant ACTIVATOR_ROLE), `13` (Diagnose seller)
-- **Invite Actions**: `7` (Create first seller), `11` (Generate invites), `777` (Root invites), `888` (Full pipeline)
+- **Invite Actions**: `7` (Create first seller), `11` (Generate invites), `777` (Root invites), `846` (Prepare activity creator), `888` (Full pipeline)
 - **Component Actions**: `555` (Upload components)
 - **Catalog Actions**: `4`/`40` (Legacy format), `6` (Clear catalog), `41` (Transform CSV), `42` (Arweave upload), `43` (Contract registration), `46` (Activate products), `444` (Automatic pipeline)
 
@@ -343,6 +343,7 @@ class AccessControlActions {
 - Action 7: Create first seller (bootstrap)
 - Action 11: Generate invites for active seller
 - Action 777: Create root invites (deployer)
+- Action 846: Prepare ACTIVITY_CREATOR_ADDRESS (activate + ensure ACTIVATOR_ROLE)
 - Action 888: Full seller initialization pipeline
 - Активация пользователей через инвайты
 
@@ -352,6 +353,7 @@ class InviteActions {
   async action7(inviteCode)  // Создание первого селлера (bootstrap)
   async action11()  // Генерация инвайтов для активного селлера
   async action777()  // Создание root инвайтов для деплоера
+  async action846(options)  // Подготовка activity creator адреса
   async action888(inviteCode, sellerAddress, options)  // Полный pipeline инициализации селлера
   async activateSeller(spiralEngine, inviteCode, sellerAddress, options)  // Активация селлера
   async activateUser(spiralEngine, inviteCode, userAddress, newInviteCodes, sbtId)  // Активация пользователя
@@ -404,7 +406,7 @@ class ComponentActions {
 
 **Ответственность**:
 - Централизованный интерфейс для всех 6 action классов
-- Маршрутизация 19 действий по номерам
+- Маршрутизация 20 действий по номерам
 - Управление зависимостями между action классами
 - Предоставление описаний действий
 
@@ -420,8 +422,8 @@ class ActionsManager {
     this.componentActions = new ComponentActions(..., inviteActions)  // Зависимость!
   }
   
-  executeAction(actionNumber)      // Выполнение действия (19 actions)
-  getAvailableActions()           // Получение списка действий [0,1,2,4,5,6,7,9,11,13,40,41,42,43,46,444,555,777,888]
+  executeAction(actionNumber)      // Выполнение действия (20 actions)
+  getAvailableActions()           // Получение списка действий [0,1,2,4,5,6,7,9,11,13,40,41,42,43,46,444,555,777,846,888]
   getActionDescription(action)    // Получение описания действия
 }
 ```
@@ -558,7 +560,7 @@ sequenceDiagram
 |---------|-------------------|-------------------|-----------|
 | **Строки кода** | 4760 | 217 (deploy_full.js) | 95% ↓ |
 | **Функции** | 67 (60 async) | 16 классов (6 action + 4 service + 4 util + 2 core) | Модульность ↑ |
-| **Action блоки** | 32 разрозненных | 19 централизованных в 6 классах | Структурированность ↑ |
+| **Action блоки** | 32 разрозненных | 20 централизованных в 6 классах | Структурированность ↑ |
 | **Console.log** | 793 | 0 (централизовано в Logger) | Контроль ↑ |
 | **Environment vars** | 44 разбросаны | 44 централизованы в config | Управляемость ↑ |
 | **Contract references** | 303 разбросаны | 303 централизованы в ContractManager | Консистентность ↑ |

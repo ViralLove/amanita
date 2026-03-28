@@ -158,6 +158,41 @@ LOG_LEVEL=debug DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network
 
 ---
 
+## Bullrun Floou (`run-bullrun-floou.sh`): strict mode и summary
+
+Оркестратор `scripts/run-bullrun-floou.sh` (bot + arweave-uploader + wallet-mock + POST `/activities/draft`) в конце печатает **structured summary** в двух форматах:
+
+- блок `=== FLOOU_SUMMARY_JSON ===` — одна строка JSON, удобно копировать в отчёт или парсить в CI;
+- блок `=== FLOOU_SUMMARY_PLAIN ===` — те же поля построчно.
+
+Поля сводки:
+
+| Поле | Смысл |
+|------|--------|
+| `draft_created` | HTTP 201 на POST `/activities/draft` |
+| `crystalize_ok` | wallet-mock получил 200 от POST `.../crystalize` (см. маркер в `FLOOU_DONE_MARKER_FILE`) |
+| `callback_ok` | подтверждение цепочки до `sign_contract` (в текущей архитектуре событие `sign_contract` возможно только после callback uploader → bot) |
+| `submit_ok` | успешный POST `.../sign-requests/{id}/submit` и маркер `ok: true` |
+| `tx_hash` | значение из ответа submit после broadcast (или mock-хэш на localhost) |
+
+**Режим по умолчанию (мягкий):** как раньше — достаточно маркера `ok: true` в таймауте ожидания; сводка печатается для наблюдаемости, без дополнительных проверок.
+
+**Strict mode:** включается флагом **`--strict`** или **`FLOOU_STRICT=true`** (также `1` / `yes`). После успешного маркера скрипт проверяет, что все этапы и `tx_hash` явно подтверждены; при несоответствии печатается `=== FLOOU_STRICT_FAIL ===` в stderr и **exit 1**. Нужен актуальный wallet-mock, который пишет расширенный JSON маркера (`crystalize_ok`, `callback_ok`, `submit_ok`, `tx_hash`).
+
+При ошибках и таймаутах сводка тоже выводится, но strict-проверка **не** применяется (чтобы не дублировать код выхода).
+
+Примеры:
+
+```bash
+./scripts/run-bullrun-floou.sh
+FLOOU_STRICT=true ./scripts/run-bullrun-floou.sh
+./scripts/run-bullrun-floou.sh --strict
+```
+
+**Полный текстовый протокол прогона** оркестратором `run-bullrun-floou.sh` (метаданные, хронология, stdout/stderr bot / uploader / wallet-mock) пишется в `scripts/logs/{S1}.{S2}.{S3}.{S4}.{S5}.{S6}-{ddMMyyyyHHmm}.txt` (локальное время). Отключить файл: `FLOOU_LOG_DISABLE=true`. Подробности — `scripts/docs/analysis/tasks/task-implement-run-full-floou-structured-log-artifact/decision-points-run-full-floou-structured-log.md`.
+
+---
+
 ## 📚 См. также
 
 - `hardhat.config.js` - конфигурация сетей
