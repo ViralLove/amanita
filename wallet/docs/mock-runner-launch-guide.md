@@ -37,6 +37,13 @@
 | `BOT_URL` | нет | `http://localhost:8000` | Базовый URL API бота. |
 | `POLL_INTERVAL_MS` | нет | `2000` | Интервал опроса pending-sign-requests (мс). |
 | `ARWEAVE_SERVICE_URL` | нет | из ответа sign-payload | URL arweave-uploader; если не задан, берётся из поля `arweave_uploader_url` ответа sign-payload. |
+| `WALLET_AUTH_MODE` | нет | `challenge_signature` | Режим wallet->bot auth. В этом режиме runner использует `POST /v1/wallet-auth/challenge` и `POST /v1/wallet-auth/verify`, затем отправляет `Authorization: Bearer ...`. |
+| `WALLET_ALLOW_LEGACY_X_USER_ID` | нет | `true` | Разрешить fallback заголовка `X-User-Id` для localhost/transition режима. |
+| `WALLET_MOCK_PRIVATE_KEY` | для strict auth | — | Приватный EVM ключ для подписи `canonical_message`. |
+| `WALLET_MOCK_ADDRESS` | нет | из ключа | Явный wallet address (если нужно). |
+| `WALLET_AUTH_SCOPE` | нет | `signing_flow` | Scope, отправляемый в challenge endpoint. |
+
+**Поведение при старте:** перед циклом опроса `pending-sign-requests` runner выполняет ожидание **`GET ${BOT_URL}/health`** (до ~30 с). Это снижает шум при параллельном запуске с `uvicorn` и оркестраторами вроде `run-bullrun-floou.sh`.
 
 Пример `.env` в `wallet/mock-runner/` (не коммитить секреты):
 
@@ -44,6 +51,9 @@
 USER_ID=test-user-123
 BOT_URL=http://localhost:8000
 POLL_INTERVAL_MS=2000
+WALLET_AUTH_MODE=challenge_signature
+WALLET_ALLOW_LEGACY_X_USER_ID=true
+# WALLET_MOCK_PRIVATE_KEY=0x...
 # ARWEAVE_SERVICE_URL=http://localhost:3000
 ```
 
@@ -100,6 +110,7 @@ node index.js
 ## 5. Ограничения и отладка
 
 - **Crystalize:** Runner отправляет в crystalize заглушку подписи Data Item. Реальный uploader вернёт 400 `signature_invalid`. Для полного прохода до ответа 200 нужен валидный подписанный Data Item (тестовый ключ + формат ANS-104) или специальный режим uploader.
+- **Auth:** В `challenge_signature` runner автоматически refresh-ит токен при auth ошибках (`401/403/409`) и повторяет запрос один раз.
 - **Submit:** Отправка submit с заглушкой `signedTransaction` принимается ботом (200); для реального вызова контракта нужна настоящая подпись (W8).
 - При ошибках сети или 4xx/5xx от бота/uploader runner логирует и продолжает цикл опроса; процесс не завершается.
 
