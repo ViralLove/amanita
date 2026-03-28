@@ -107,6 +107,7 @@ describe('ActionsManager', () => {
       expect(actions).to.include(555);
       expect(actions).to.include(777);
       expect(actions).to.include(888);
+      expect(actions).to.include(846);
     });
   });
 
@@ -122,7 +123,7 @@ describe('ActionsManager', () => {
 
     it('должен возвращать описания для всех actions', () => {
       // GIVEN: Список всех actions
-      const actions = [0, 1, 2, 41, 42, 43, 444, 555, 777, 888];
+      const actions = [0, 1, 2, 41, 42, 43, 444, 555, 777, 846, 888];
       
       // WHEN: Получаем описания
       actions.forEach(action => {

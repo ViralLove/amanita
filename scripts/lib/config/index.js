@@ -40,7 +40,8 @@ const config = {
     privateKey: validatedEnv.DEPLOYER_PRIVATE_KEY.startsWith('0x') 
       ? validatedEnv.DEPLOYER_PRIVATE_KEY 
       : `0x${validatedEnv.DEPLOYER_PRIVATE_KEY}`,
-    address: validatedEnv.DEPLOYER_ADDRESS || '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'  // ✅ FIX: Add deployer address
+    address: validatedEnv.DEPLOYER_ADDRESS || '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',  // ✅ FIX: Add deployer address
+    invite: validatedEnv.DEPLOYER_INVITE || null
   },
   
   // Seller
@@ -53,6 +54,16 @@ const config = {
       : null,
     businessId: validatedEnv.SELLER_BUSINESS_ID || 'iveta',
     id: validatedEnv.SELLER_ID || 'iveta_zeya888'
+  },
+
+  // Activity creator (wallet signer for ActivityRegistry.createActivity)
+  activityCreator: {
+    address: validatedEnv.ACTIVITY_CREATOR_ADDRESS || null
+  },
+
+  // Generic validated address for diagnostics actions (e.g. Action 13)
+  validated: {
+    address: validatedEnv.VALIDATED_ADDRESS || null
   },
   
   // Contracts

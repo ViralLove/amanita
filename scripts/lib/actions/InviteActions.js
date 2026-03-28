@@ -568,6 +568,95 @@ class InviteActions {
   }
 
   /**
+   * Action 846: Prepare Activity Creator Address
+   * Unified flow for ActivityRegistry creator readiness:
+   * - activate user with DEPLOYER_INVITE (if not activated)
+   * - ensure ACTIVATOR_ROLE (if not granted)
+   *
+   * @param {Object} options - Optional overrides
+   * @param {string} options.activityCreatorAddress - Target address (fallback: config.activityCreator.address)
+   * @param {string} options.inviteCode - Invite code (fallback: config.deployer.invite / env DEPLOYER_INVITE)
+   * @returns {Promise<Object>} - Preparation result
+   */
+  async action846(options = {}) {
+    logger.action(846, "Prepare ACTIVITY_CREATOR_ADDRESS (activate + ensure ACTIVATOR_ROLE)");
+
+    try {
+      const activityCreatorAddress =
+        options.activityCreatorAddress ||
+        this.config.get('activityCreator.address') ||
+        process.env.ACTIVITY_CREATOR_ADDRESS;
+
+      const inviteCode =
+        options.inviteCode ||
+        this.config.get('deployer.invite') ||
+        process.env.DEPLOYER_INVITE;
+
+      if (!activityCreatorAddress || !this.ethersUtils.isValidAddress(activityCreatorAddress)) {
+        throw new Error('ACTIVITY_CREATOR_ADDRESS is required and must be a valid address');
+      }
+
+      if (!inviteCode || typeof inviteCode !== 'string' || inviteCode.trim() === '') {
+        throw new Error('DEPLOYER_INVITE is required for activity creator activation');
+      }
+
+      logger.info(`Activity creator address: ${activityCreatorAddress}`);
+      logger.info(`Invite code: ${inviteCode}`);
+
+      const spiralEngine = await this.contractManager.loadUUPSContract('SpiralEngine');
+      logger.info('SpiralEngine contract loaded ✓');
+
+      const usedInvite = await spiralEngine.usedInviteByUser(activityCreatorAddress);
+      const isActivated = usedInvite > 0;
+
+      let activationResult = null;
+      if (!isActivated) {
+        logger.info('Address is not activated, running activateUser...');
+        activationResult = await this.activateUser(spiralEngine, inviteCode, activityCreatorAddress);
+      } else {
+        logger.info(`Address already activated (usedInviteByUser=${usedInvite})`);
+      }
+
+      const ACTIVATOR_ROLE = await spiralEngine.ACTIVATOR_ROLE();
+      const hasActivatorRole = await spiralEngine.hasRole(ACTIVATOR_ROLE, activityCreatorAddress);
+
+      let roleGranted = false;
+      if (!hasActivatorRole) {
+        logger.info('ACTIVATOR_ROLE missing, granting role...');
+        await this.accessControlActions.grantActivatorRole(spiralEngine, activityCreatorAddress);
+        roleGranted = true;
+      } else {
+        logger.info('ACTIVATOR_ROLE already granted');
+      }
+
+      const finalUsedInvite = await spiralEngine.usedInviteByUser(activityCreatorAddress);
+      const finalHasActivatorRole = await spiralEngine.hasRole(ACTIVATOR_ROLE, activityCreatorAddress);
+
+      if (finalUsedInvite == 0 || !finalHasActivatorRole) {
+        throw new Error(
+          `Action 846 verification failed: activated=${finalUsedInvite != 0}, activatorRole=${finalHasActivatorRole}`
+        );
+      }
+
+      logger.success(846);
+      return {
+        success: true,
+        activityCreatorAddress,
+        wasActivated: !isActivated,
+        activationResult,
+        roleGranted,
+        finalState: {
+          usedInviteByUser: finalUsedInvite.toString(),
+          hasActivatorRole: finalHasActivatorRole
+        }
+      };
+    } catch (error) {
+      logger.failure(846, error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Action 11: Generate Invites for Active Seller
    * Seller mints their own invites (requires SELLER_ROLE)
    * 

@@ -70,13 +70,14 @@ class ActionsManager {
       
       // Access Control actions
       9: () => this.accessControlActions.action9(),
-      13: () => this.accessControlActions.action13(),
+      13: () => this.accessControlActions.action13(options),
       
       // Invite actions
       7: (inviteCode) => this.inviteActions.action7(inviteCode),
       11: () => this.inviteActions.action11(),
       777: () => this.inviteActions.action777(),
       888: (inviteCode, sellerAddress, options) => this.inviteActions.action888(inviteCode, sellerAddress, options),
+      846: () => this.inviteActions.action846(options),
       
       // Component actions
       51: () => this.componentActions.action51(),
@@ -105,7 +106,7 @@ class ActionsManager {
    * @returns {Array} - List of available action numbers
    */
   getAvailableActions() {
-    return [0, 1, 2, 4, 5, 6, 7, 9, 11, 13, 40, 41, 42, 43, 46, 51, 52, 53, 444, 555, 777, 888];
+    return [0, 1, 2, 4, 5, 6, 7, 9, 11, 13, 40, 41, 42, 43, 46, 51, 52, 53, 444, 555, 777, 846, 888];
   }
 
   /**
@@ -124,7 +125,7 @@ class ActionsManager {
       7: "Create first seller (bootstrap with invite)",
       9: "Grant ACTIVATOR_ROLE to seller",
       11: "Generate invites for active seller",
-      13: "Diagnose seller state (full diagnostics)",
+      13: "Diagnose roles for validated address",
       40: "Create catalog (inactive products) - alias for action 4",
       41: "Transform CSV → Product JSONs",
       42: "Unified Arweave Upload",
@@ -136,7 +137,8 @@ class ActionsManager {
       53: "Register components in OrganicComponentRegistry",
       555: "Component Upload Pipeline (51 → 52 → 53)",
       777: "Create Root Invites",
-      888: "Full Seller Initialization Pipeline (Complete Workflow)"
+      888: "Full Seller Initialization Pipeline (Complete Workflow)",
+      846: "Prepare ACTIVITY_CREATOR_ADDRESS (activate + ensure ACTIVATOR_ROLE)"
     };
 
     return descriptions[actionNumber] || `Unknown action: ${actionNumber}`;

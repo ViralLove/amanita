@@ -331,120 +331,57 @@ class AccessControlActions {
   // ================================================================
   
   /**
-   * Action 13: Diagnose Seller State
-   * Comprehensive seller diagnostics including catalog info
+   * Action 13: Diagnose roles for validated address
+   * Priority: options.validatedAddress -> VALIDATED_ADDRESS -> SELLER_ADDRESS
    * 
-   * @returns {Promise<Object>} - Full diagnostics result
+   * @param {Object} options
+   * @returns {Promise<Object>} - Role diagnostics result
    */
-  async action13() {
-    logger.action(13, "Diagnose seller state");
+  async action13(options = {}) {
+    logger.action(13, "Diagnose roles for validated address");
     
     try {
-      // 1. Get seller address from config
-      const sellerAddress = this.config.get('seller.address');
-      if (!sellerAddress) {
-        throw new Error('SELLER_ADDRESS not configured');
+      const validatedAddress = options.validatedAddress
+        || this.config.get('validated.address')
+        || process.env.VALIDATED_ADDRESS
+        || this.config.get('seller.address');
+
+      if (!validatedAddress) {
+        throw new Error(
+          'Address for Action 13 is not configured. Pass --address/CLI option, set VALIDATED_ADDRESS, or set SELLER_ADDRESS.'
+        );
+      }
+
+      if (!ethers.isAddress(validatedAddress)) {
+        throw new Error(`Invalid address for Action 13: ${validatedAddress}`);
       }
       
-      logger.info(`Seller address: ${sellerAddress}`);
+      logger.info(`Validated address: ${validatedAddress}`);
       logger.info("=".repeat(60));
       
-      // 2. Load contracts
-      logger.info('Loading contracts...');
+      // Load only SpiralEngine: Action 13 is now focused on activation + roles
+      logger.info('Loading SpiralEngine...');
       const spiralEngine = await this.contractManager.loadUUPSContract('SpiralEngine');
-      const productRegistry = await this.contractManager.loadUUPSContract('ProductRegistry');
-      logger.info('Contracts loaded ✓');
+      logger.info('SpiralEngine loaded ✓');
       
-      // 3. Get base diagnostics (activation + roles)
-      const baseDiagnostics = await this.getUserDiagnostics(spiralEngine, sellerAddress);
-      
-      if (!baseDiagnostics.valid || !baseDiagnostics.activation.activated) {
-        logger.warn('Seller not activated - skipping catalog check');
-        return {
-          success: true,
-          diagnostics: baseDiagnostics,
-          readinessScore: 0,
-          readinessPercent: 0
-        };
+      // Base diagnostics contains activation + role flags
+      const baseDiagnostics = await this.getUserDiagnostics(spiralEngine, validatedAddress);
+      if (!baseDiagnostics.valid) {
+        throw new Error(baseDiagnostics.error || 'Failed to get diagnostics');
       }
-      
-      // 4. Get catalog info (requires seller to have SELLER_ROLE)
-      let catalogInfo = null;
-      try {
-        logger.info('\n📦 Checking product catalog...');
-        
-        const products = await productRegistry.getProductsBySeller(sellerAddress);
-        logger.info(`Total products: ${products.length}`);
-        
-        let activeCount = 0;
-        if (products.length > 0 && baseDiagnostics.roles.SELLER_ROLE) {
-          // Get active products from contract
-          const allActiveIds = await productRegistry.getAllActiveProductIds();
-          activeCount = products.filter(id => allActiveIds.includes(id)).length;
-        }
-        
-        catalogInfo = {
-          totalProducts: products.length,
-          activeProducts: activeCount,
-          inactiveProducts: products.length - activeCount,
-          hasCatalog: products.length > 0
-        };
-        
-        logger.info(`Active products: ${activeCount}`);
-        logger.info(`Inactive products: ${catalogInfo.inactiveProducts}`);
-        
-      } catch (error) {
-        logger.warn(`Could not get catalog info: ${error.message}`);
-        catalogInfo = {
-          totalProducts: 0,
-          activeProducts: 0,
-          inactiveProducts: 0,
-          hasCatalog: false,
-          error: error.message
-        };
-      }
-      
-      // 5. Calculate readiness score (0-5)
-      const readinessChecks = {
-        activated: baseDiagnostics.activation.activated,
-        hasSellerRole: baseDiagnostics.roles.SELLER_ROLE,
-        hasActivatorRole: baseDiagnostics.roles.ACTIVATOR_ROLE,
-        hasCatalog: catalogInfo.hasCatalog,
-        hasActiveProducts: catalogInfo.activeProducts > 0
-      };
-      
-      const readinessScore = Object.values(readinessChecks).filter(Boolean).length;
-      const readinessPercent = Math.round((readinessScore / 5) * 100);
-      
-      // 6. Pretty print summary
-      logger.info('\n🎯 Readiness Summary:');
-      logger.info(`   Activated: ${readinessChecks.activated ? '✅' : '❌'}`);
-      logger.info(`   SELLER_ROLE: ${readinessChecks.hasSellerRole ? '✅' : '❌'}`);
-      logger.info(`   ACTIVATOR_ROLE: ${readinessChecks.hasActivatorRole ? '✅' : '❌'}`);
-      logger.info(`   Has Catalog: ${readinessChecks.hasCatalog ? '✅' : '❌'}`);
-      logger.info(`   Has Active Products: ${readinessChecks.hasActiveProducts ? '✅' : '❌'}`);
-      logger.info(`\n📊 Readiness Score: ${readinessScore}/5 (${readinessPercent}%)`);
-      
-      if (readinessScore === 5) {
-        logger.success('🎉 Seller fully ready!');
-      } else if (readinessScore >= 3) {
-        logger.warn('⚠️ Seller partially ready');
-      } else {
-        logger.error('❌ Seller not ready');
-      }
+
+      logger.info('\n🎯 Role Summary:');
+      logger.info(`   Activated: ${baseDiagnostics.activation.activated ? '✅' : '❌'}`);
+      logger.info(`   SELLER_ROLE: ${baseDiagnostics.roles.SELLER_ROLE ? '✅' : '❌'}`);
+      logger.info(`   ACTIVATOR_ROLE: ${baseDiagnostics.roles.ACTIVATOR_ROLE ? '✅' : '❌'}`);
       
       logger.info("=".repeat(60));
       logger.success(13);
       
       return {
         success: true,
-        diagnostics: {
-          ...baseDiagnostics,
-          catalog: catalogInfo
-        },
-        readinessChecks: readinessChecks,
-        readinessScore: readinessScore,
-        readinessPercent: readinessPercent
+        targetAddress: validatedAddress,
+        diagnostics: baseDiagnostics
       };
     } catch (error) {
       logger.failure(13, error.message);

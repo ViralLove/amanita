@@ -29,6 +29,35 @@ const EthersUtils = require('./lib/utils/EthersUtils');
 const { ActionsManager } = require('./lib/actions/index');
 const { CoreManager } = require('./lib/core/index');
 const RpcProviderManager = require('./lib/utils/RpcProviderManager');
+const readline = require('readline');
+
+function parseCliAddressArg(argv) {
+  const addressFlagIndex = argv.findIndex((arg) => arg === '--address' || arg === '-a');
+  if (addressFlagIndex !== -1 && argv[addressFlagIndex + 1]) {
+    return argv[addressFlagIndex + 1];
+  }
+
+  const afterDoubleDash = argv.indexOf('--');
+  if (afterDoubleDash !== -1) {
+    const candidate = argv[afterDoubleDash + 1];
+    if (candidate && !candidate.startsWith('-')) return candidate;
+  }
+
+  return null;
+}
+
+async function askAddressFromStdin() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  const answer = await new Promise((resolve) => {
+    rl.question('Введите адрес для диагностики Action 13: ', resolve);
+  });
+  rl.close();
+  return (answer || '').trim();
+}
 
 /**
  * Main Deploy Router Class
@@ -309,6 +338,7 @@ async function main(action, options = {}) {
  * CLI interface
  */
 if (require.main === module) {
+  const runCli = async () => {
   // 🔍 DEBUG: Set log level from environment
   const logLevel = process.env.LOG_LEVEL || process.env.DEBUG ? 'debug' : 'info';
   logger.setLevel(logLevel);
@@ -321,12 +351,24 @@ if (require.main === module) {
   // Action 5: deploy/upgrade UUPS contract. Requires DEPLOY_CONTRACT (e.g. SpiralEngine).
   // Upgrade: DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network polygon
   const contractName = process.env.DEPLOY_CONTRACT;
+  const cliAddress = parseCliAddressArg(process.argv);
   if (action === 5 && !contractName) {
     logger.error('For action 5, DEPLOY_CONTRACT is required (e.g. DEPLOY_CONTRACT=SpiralEngine)');
     logger.info('Example: DEPLOY_ACTION=5 DEPLOY_CONTRACT=SpiralEngine npx hardhat run scripts/deploy_full.js --network polygon');
     process.exit(1);
   }
-  const options = action === 5 ? { contractName } : {};
+  let validatedAddress = process.env.VALIDATED_ADDRESS || cliAddress || null;
+  if (action === 13 && !validatedAddress && process.env.ASK_FOR_ADDRESS === 'true') {
+    if (!process.stdin.isTTY) {
+      logger.error('ASK_FOR_ADDRESS=true requires interactive TTY. Use VALIDATED_ADDRESS in non-interactive mode.');
+      process.exit(1);
+    }
+    validatedAddress = await askAddressFromStdin();
+  }
+
+  const options = {};
+  if (action === 5) options.contractName = contractName;
+  if (action === 13 && validatedAddress) options.validatedAddress = validatedAddress;
   if (!action) {
     logger.error('DEPLOY_ACTION environment variable is required');
     logger.info('Available actions:');
@@ -345,6 +387,12 @@ if (require.main === module) {
 
   main(action, options).catch(error => {
     logger.error('Script execution failed:', error.message);
+    process.exit(1);
+  });
+  };
+
+  runCli().catch((error) => {
+    logger.error('CLI initialization failed:', error.message);
     process.exit(1);
   });
 }
