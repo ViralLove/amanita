@@ -13,8 +13,11 @@ except ImportError:
     VaultServiceError = Exception
     logging.warning("[CONFIG] VaultService недоступен (hvac не установлен), используем только .env")
 
-# Подробное логирование
-logging.basicConfig(level=logging.INFO)
+# Уровень логов из окружения (Railway: LOG_LEVEL=DEBUG)
+_log_level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
+_log_level = getattr(logging, _log_level_name, logging.INFO)
+logging.basicConfig(level=_log_level)
+logging.info("[CONFIG] LOG_LEVEL=%s (%s)", _log_level_name, logging.getLevelName(_log_level))
 
 # Загружаем переменные окружения из .env файла (только если не установлены в системе)
 env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -176,12 +179,40 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "local")  # local | prod
 LOAD_CATALOG = os.getenv("LOAD_CATALOG", "true").lower() in ["true", "1", "yes", "on"]
 logging.info(f"[CONFIG] LOAD_CATALOG: {LOAD_CATALOG}")
 
+
+def _resolve_abi_base_dir(path: str) -> str:
+    """
+    Абсолютный путь для ABI_BASE_DIR.
+    На Railway cwd часто /app; ошибочное значение app/artifacts/contracts давало бы /app/app/artifacts/contracts.
+    """
+    if not path:
+        return path
+    if os.path.isabs(path):
+        return os.path.normpath(path)
+    cwd = os.getcwd()
+    rel = path.replace("\\", "/")
+    if rel.startswith("app/") and cwd.rstrip(os.sep) == "/app":
+        inner = rel[4:].lstrip("/")
+        fixed = os.path.normpath(os.path.join(cwd, inner))
+        if os.path.isdir(fixed):
+            logging.info(
+                "[CONFIG] ABI_BASE_DIR: нормализация %r → %r (cwd=%r, убран лишний префикс app/)",
+                path,
+                fixed,
+                cwd,
+            )
+            return fixed
+    return os.path.normpath(os.path.join(cwd, path))
+
+
 if ENVIRONMENT == "local":
     # Для локальной разработки - используем корневую папку artifacts
     # Определяем правильный путь относительно корня проекта
     current_dir = os.path.dirname(os.path.abspath(__file__))  # bot/
     project_root = os.path.dirname(current_dir)  # корень проекта
     ABI_BASE_DIR = os.getenv("ABI_BASE_DIR", os.path.join(project_root, "artifacts", "contracts"))
+    if ABI_BASE_DIR and not os.path.isabs(ABI_BASE_DIR):
+        ABI_BASE_DIR = _resolve_abi_base_dir(ABI_BASE_DIR)
     logging.info(f"[CONFIG] ENVIRONMENT: local")
     logging.info(f"[CONFIG] current_dir (bot/): {current_dir}")
     logging.info(f"[CONFIG] project_root: {project_root}")
@@ -189,5 +220,7 @@ if ENVIRONMENT == "local":
 else:
     # Для продакшена - используем папку app/artifacts
     ABI_BASE_DIR = os.getenv("ABI_BASE_DIR", f"{APP_ROOT_DIR}/artifacts/contracts")
+    if ABI_BASE_DIR and not os.path.isabs(ABI_BASE_DIR):
+        ABI_BASE_DIR = _resolve_abi_base_dir(ABI_BASE_DIR)
     logging.info(f"[CONFIG] ENVIRONMENT: prod")
-    logging.info(f"[CONFIG] ABI_BASE_DIR: {ABI_BASE_DIR}") 
+    logging.info(f"[CONFIG] ABI_BASE_DIR: {ABI_BASE_DIR}")

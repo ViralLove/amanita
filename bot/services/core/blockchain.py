@@ -50,6 +50,60 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
+def _log_abi_filesystem_debug(contract_name: str, actual_contract_name: str, hh_path: str, flat_path: str) -> None:
+    """Детальная диагностика путей ABI (только при LOG_LEVEL=DEBUG)."""
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    cwd = os.getcwd()
+    raw_base = ABI_BASE_DIR
+    abs_base = os.path.abspath(raw_base) if raw_base else raw_base
+    try:
+        real_base = os.path.realpath(abs_base) if os.path.exists(abs_base) else abs_base
+    except OSError:
+        real_base = abs_base
+    logger.debug(
+        "[ABI] DEBUG contract=%s logic_name=%s cwd=%r ABI_BASE_DIR(raw)=%r abspath=%r realpath=%r isdir=%s",
+        contract_name,
+        actual_contract_name,
+        cwd,
+        raw_base,
+        abs_base,
+        real_base,
+        os.path.isdir(abs_base) if abs_base else False,
+    )
+    logger.debug(
+        "[ABI] DEBUG paths hh=%r exists=%s flat=%r exists=%s",
+        hh_path,
+        os.path.exists(hh_path),
+        flat_path,
+        os.path.exists(flat_path),
+    )
+    probes = [
+        "/app/artifacts/contracts",
+        os.path.join(cwd, "artifacts", "contracts"),
+        os.path.join("/app", "app", "artifacts", "contracts"),
+    ]
+    for p in probes:
+        exists = os.path.isdir(p)
+        n = 0
+        names_sample = []
+        if exists:
+            try:
+                names = sorted(os.listdir(p))
+                n = len(names)
+                names_sample = names[:25]
+            except OSError as e:
+                names_sample = [f"<listdir error: {e}>"]
+        logger.debug("[ABI] DEBUG probe dir=%r exists=%s entries=%s sample=%s", p, exists, n, names_sample)
+    magic = os.path.join("/app", "artifacts", "contracts", "MagicRegistry.sol", "MagicRegistry.json")
+    logger.debug(
+        "[ABI] DEBUG MagicRegistry fixed path %r exists=%s",
+        magic,
+        os.path.isfile(magic),
+    )
+
+
 def load_abi(contract_name):
     """
     Универсальная загрузка ABI с подробным логированием:
@@ -70,6 +124,7 @@ def load_abi(contract_name):
     
     hh_path = os.path.join(ABI_BASE_DIR, f"{actual_contract_name}.sol", f"{actual_contract_name}.json")
     flat_path = os.path.join(ABI_BASE_DIR, f"{actual_contract_name}.json")
+    _log_abi_filesystem_debug(contract_name, actual_contract_name, hh_path, flat_path)
 
     # Логируем если используется Logic ABI для UUPS
     if actual_contract_name != contract_name:
