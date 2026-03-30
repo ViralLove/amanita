@@ -1,0 +1,76 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "AmanitaInternationalProxy",
+  "sourceName": "contracts/AmanitaInternationalProxy.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "implementation",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "initData",
+          "type": "bytes"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "target",
+          "type": "address"
+        }
+      ],
+      "name": "AddressEmptyCode",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "implementation",
+          "type": "address"
+        }
+      ],
+      "name": "ERC1967InvalidImplementation",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ERC1967NonPayable",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FailedCall",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "implementation",
+          "type": "address"
+        }
+      ],
+      "name": "Upgraded",
+      "type": "event"
+    },
+    {
+      "stateMutability": "payable",
+      "type": "fallback"
+    }
+  ],
+  "bytecode": "0x608060405234610179576102bd803803806100198161017e565b9283398101906040818303126101795780516001600160a01b0381168082036101795760208381015190936001600160401b038211610179570184601f820112156101795780519061007261006d836101b9565b61017e565b9582875285838301011161017957849060005b83811061016557505060009186010152813b1561014d577f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc80546001600160a01b031916821790557fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b600080a28251801561014457600080918461012b9601845af4903d1561013b573d61011b61006d826101b9565b908152600081943d92013e6101d4565b505b604051608590816102388239f35b606092506101d4565b5050505061012d565b60249060405190634c9c8ce360e01b82526004820152fd5b818101830151888201840152869201610085565b600080fd5b6040519190601f01601f191682016001600160401b038111838210176101a357604052565b634e487b7160e01b600052604160045260246000fd5b6001600160401b0381116101a357601f01601f191660200190565b906101fb57508051156101e957805190602001fd5b60405163d6bda27560e01b8152600490fd5b8151158061022e575b61020c575090565b604051639996b31560e01b81526001600160a01b039091166004820152602490fd5b50803b1561020456fe60806040527f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc54600090819081906001600160a01b0316368280378136915af43d82803e15604b573d90f35b3d90fdfea2646970667358221220d3a3cbdeb2732c89dfbac9b802e3e7d51c0c0491e86c57c26629a05f286ce42a64736f6c63430008160033",
+  "deployedBytecode": "0x60806040527f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc54600090819081906001600160a01b0316368280378136915af43d82803e15604b573d90f35b3d90fdfea2646970667358221220d3a3cbdeb2732c89dfbac9b802e3e7d51c0c0491e86c57c26629a05f286ce42a64736f6c63430008160033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

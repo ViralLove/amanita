@@ -1,0 +1,30 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "LoveAmanitaRegistryMock",
+  "sourceName": "contracts/mocks/LoveAmanitaRegistryMock.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "hasSellerRole",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60808060405234601457608b908161001a8239f35b600080fdfe6080806040526004361015601257600080fd5b600090813560e01c6339296cfe14602857600080fd5b3460515760203660031901126051576004356001600160a01b0381160360515780600160209252f35b5080fdfea26469706673582212209c75d33478ac02464bf02dfed20962ccc3e4f9d2656ee120702de76d34b437ea64736f6c63430008160033",
+  "deployedBytecode": "0x6080806040526004361015601257600080fd5b600090813560e01c6339296cfe14602857600080fd5b3460515760203660031901126051576004356001600160a01b0381160360515780600160209252f35b5080fdfea26469706673582212209c75d33478ac02464bf02dfed20962ccc3e4f9d2656ee120702de76d34b437ea64736f6c63430008160033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

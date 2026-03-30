@@ -66,12 +66,20 @@ Bridge.md
 # Note: bot/docs/bridge.md is permanent documentation, not temporary
 
 # Analysis docs (task/working docs; permanent docs live in */docs/* outside analysis)
+/docs/analysis/
+/bot/docs/analysis/
+/scripts/docs/analysis/
+/contracts/docs/analysis/
+/arweave-uploader/docs/analysis/
+/wallet/docs/analysis/
+/wp_plugin/docs/analysis/
+/supabase/docs/analysis/
 **/docs/analysis/
 **/docs/tasks
 
 # Data и каталоги (не в Git)
 /data
-/bot/artifacts/contracts
+# bot/artifacts/contracts — в Git (копия Hardhat artifacts для деплоя без корневого /artifacts)
 /bot/catalog
 /bot/catalog_data
 /bot/*/__pycache__/*
@@ -115,9 +123,14 @@ deploy.json
 
 # Scripts archive (legacy code for reference)
 scripts/archive/
-/bot/artifacts
+# Bullrun floou orchestrator text artifacts (run-bullrun-floou.sh)
+scripts/logs/*.txt
+# bot/artifacts: в репозитории только contracts/ (ABI для Railway); build-info, @openzeppelin — не коммитим
+/bot/artifacts/*
+!/bot/artifacts/contracts/
+!/bot/artifacts/contracts/**
 /supabase/.temp
 /bot/utility
-/bot/artifacts/contracts
 /bot/handlers/__pycache__
 /bot/handlers/catalog/__pycache__
+/bot/services/common/__pycache__

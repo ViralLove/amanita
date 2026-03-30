@@ -359,6 +359,25 @@
       "type": "event"
     },
     {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "tempKey",
+          "type": "address"
+        }
+      ],
+      "name": "TemporaryKeyRevoked",
+      "type": "event"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -504,6 +523,44 @@
           "internalType": "address",
           "name": "",
           "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getDisplayName",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getHandle",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
         }
       ],
       "stateMutability": "view",
@@ -718,6 +775,16 @@
           "internalType": "address[]",
           "name": "guardians",
           "type": "address[]"
+        },
+        {
+          "internalType": "string",
+          "name": "displayName",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "handle",
+          "type": "string"
         }
       ],
       "stateMutability": "view",
@@ -847,6 +914,11 @@
         {
           "internalType": "address",
           "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "newKey",
           "type": "address"
         }
       ],
@@ -1034,6 +1106,13 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "revokeTemporaryKey",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -1047,6 +1126,32 @@
         }
       ],
       "name": "setApprovalForAll",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "displayName",
+          "type": "string"
+        }
+      ],
+      "name": "setDisplayName",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "handle",
+          "type": "string"
+        }
+      ],
+      "name": "setHandle",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

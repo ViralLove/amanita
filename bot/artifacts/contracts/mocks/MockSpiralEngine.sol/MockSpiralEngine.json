@@ -1,0 +1,116 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MockSpiralEngine",
+  "sourceName": "contracts/mocks/MockSpiralEngine.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "ACTIVATOR_ROLE",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "SELLER_ROLE",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "grantRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "hasRole",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "activated",
+          "type": "bool"
+        }
+      ],
+      "name": "setUserActivated",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "usedInviteByUser",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080806040523461001657610259908161001c8239f35b600080fdfe60806040818152600436101561001457600080fd5b600091823560e01c90816308740a3b146101b8575080632f2ff15d14610174578063434a11941461013e57806345edf705146100e757806391d14854146100a15763dbe4613d1461006457600080fd5b3461009d578160031936011261009d57602090517f43f25613eb2f15fb17222a5d424ca2655743e71265d98e4b93c05e5fb589ecde8152f35b5080fd5b503461009d578060031936011261009d5760ff816020936100c06101f2565b6004358252600186528282206001600160a01b039091168252855220549151911615158152f35b503461009d578060031936011261009d5761010061020d565b60243590811515820361013a5760ff9115610133576001905b6001600160a01b0316845260208490529183209116905580f35b8390610119565b8380fd5b503461009d57602036600319011261009d5760209181906001600160a01b0361016561020d565b16815280845220549051908152f35b503461009d578060031936011261009d5761018d6101f2565b600435835260016020528183209060018060a01b031683526020528120600160ff1982541617905580f35b83903461009d578160031936011261009d57807fec5aad7bdface20c35bc02d6d2d5760df981277427368525d634f4e2603ea19260209252f35b602435906001600160a01b038216820361020857565b600080fd5b600435906001600160a01b03821682036102085756fea26469706673582212204da17444eef0f41ab9bf17ce52659c521296ff7132c35757111e8d44c100e77764736f6c63430008160033",
+  "deployedBytecode": "0x60806040818152600436101561001457600080fd5b600091823560e01c90816308740a3b146101b8575080632f2ff15d14610174578063434a11941461013e57806345edf705146100e757806391d14854146100a15763dbe4613d1461006457600080fd5b3461009d578160031936011261009d57602090517f43f25613eb2f15fb17222a5d424ca2655743e71265d98e4b93c05e5fb589ecde8152f35b5080fd5b503461009d578060031936011261009d5760ff816020936100c06101f2565b6004358252600186528282206001600160a01b039091168252855220549151911615158152f35b503461009d578060031936011261009d5761010061020d565b60243590811515820361013a5760ff9115610133576001905b6001600160a01b0316845260208490529183209116905580f35b8390610119565b8380fd5b503461009d57602036600319011261009d5760209181906001600160a01b0361016561020d565b16815280845220549051908152f35b503461009d578060031936011261009d5761018d6101f2565b600435835260016020528183209060018060a01b031683526020528120600160ff1982541617905580f35b83903461009d578160031936011261009d57807fec5aad7bdface20c35bc02d6d2d5760df981277427368525d634f4e2603ea19260209252f35b602435906001600160a01b038216820361020857565b600080fd5b600435906001600160a01b03821682036102085756fea26469706673582212204da17444eef0f41ab9bf17ce52659c521296ff7132c35757111e8d44c100e77764736f6c63430008160033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

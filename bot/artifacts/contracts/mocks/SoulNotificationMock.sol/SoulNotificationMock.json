@@ -1,0 +1,239 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "SoulNotificationMock",
+  "sourceName": "contracts/mocks/SoulNotificationMock.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "SoulCreatedNotification",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "oldOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "SoulRecoveredNotification",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "getLastNotifiedTokenId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getLastRecoveryTokenId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getNotificationCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getRecoveryNotificationCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lastNotifiedOwner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lastNotifiedTokenId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lastRecoveryNewOwner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lastRecoveryOldOwner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lastRecoveryTokenId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "notificationCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "notifySoulCreated",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "oldOwner",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "notifySoulRecovered",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "recoveryNotificationCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608080604052346100165761034e908161001c8239f35b600080fdfe6040608081526004908136101561001557600080fd5b600091823560e01c90816329ebf10114610240578163472785d01461016957816351040d54146101b15781635c808de9146102175781636064fc19146101ef57816371342f0c146101d0578163880f8a11146101b15781638d2fa9d51461014c578163d376a8c914610188578163ddc788b014610169578163e03755571461014c578163eca0395e146100d3575063ecaff8e3146100b257600080fd5b346100cf57816003193601126100cf576020906002549051908152f35b5080fd5b91905034610148573660031901126100cf57356100ee6102d8565b81835560018060a01b031690816bffffffffffffffffffffffff60a01b600154161760015561011e6002546102f3565b6002557fd3108b665488ffbde211597172496d133f049fd9c88842288a173413f78585aa8380a380f35b8280fd5b5050346100cf57816003193601126100cf57602091549051908152f35b5050346100cf57816003193601126100cf576020906006549051908152f35b5050346100cf57816003193601126100cf5760015490516001600160a01b039091168152602090f35b5050346100cf57816003193601126100cf576020906003549051908152f35b5050346100cf57816003193601126100cf576020906002549051908152f35b9050346101485782600319360112610148575490516001600160a01b03909116815260209150f35b5050346100cf57816003193601126100cf5760055490516001600160a01b039091168152602090f35b8390346100cf5760603660031901126100cf5780359061025e6102d8565b6044356001600160a01b038181169492918590036102d45784918360035516926bffffffffffffffffffffffff60a01b90848282541617905560055416176005556102aa6006546102f3565b6006557ff624a2885d4e8595c7e1ffdb115f11c32f88da45474be7f61194029ee6ed51248480a480f35b8580fd5b602435906001600160a01b03821682036102ee57565b600080fd5b60001981146103025760010190565b634e487b7160e01b600052601160045260246000fdfea264697066735822122082c714619cdfd5544d820004b6af6942b7aa5bca3e3174fa255d2e50bf506dbf64736f6c63430008160033",
+  "deployedBytecode": "0x6040608081526004908136101561001557600080fd5b600091823560e01c90816329ebf10114610240578163472785d01461016957816351040d54146101b15781635c808de9146102175781636064fc19146101ef57816371342f0c146101d0578163880f8a11146101b15781638d2fa9d51461014c578163d376a8c914610188578163ddc788b014610169578163e03755571461014c578163eca0395e146100d3575063ecaff8e3146100b257600080fd5b346100cf57816003193601126100cf576020906002549051908152f35b5080fd5b91905034610148573660031901126100cf57356100ee6102d8565b81835560018060a01b031690816bffffffffffffffffffffffff60a01b600154161760015561011e6002546102f3565b6002557fd3108b665488ffbde211597172496d133f049fd9c88842288a173413f78585aa8380a380f35b8280fd5b5050346100cf57816003193601126100cf57602091549051908152f35b5050346100cf57816003193601126100cf576020906006549051908152f35b5050346100cf57816003193601126100cf5760015490516001600160a01b039091168152602090f35b5050346100cf57816003193601126100cf576020906003549051908152f35b5050346100cf57816003193601126100cf576020906002549051908152f35b9050346101485782600319360112610148575490516001600160a01b03909116815260209150f35b5050346100cf57816003193601126100cf5760055490516001600160a01b039091168152602090f35b8390346100cf5760603660031901126100cf5780359061025e6102d8565b6044356001600160a01b038181169492918590036102d45784918360035516926bffffffffffffffffffffffff60a01b90848282541617905560055416176005556102aa6006546102f3565b6006557ff624a2885d4e8595c7e1ffdb115f11c32f88da45474be7f61194029ee6ed51248480a480f35b8580fd5b602435906001600160a01b03821682036102ee57565b600080fd5b60001981146103025760010190565b634e487b7160e01b600052601160045260246000fdfea264697066735822122082c714619cdfd5544d820004b6af6942b7aa5bca3e3174fa255d2e50bf506dbf64736f6c63430008160033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
