@@ -27,7 +27,7 @@ npm start
 
 - `ARWEAVE_PRIVATE_KEY_FILE` или `ARWEAVE_PRIVATE_KEY` — нужны для старта (можно тестовый JWK).
 - `USE_REAL_ARWEAVE=false` — мок публикации (сервер не ходит в Arweave, возвращает 200 с mock `bundle_tx_id`).
-- Backend (PUT status, callback) при отсутствии только логирует предупреждение.
+- Backend (PUT status, callback): если нет `BACKEND_URL` и секрета — в лог пишется пропуск (`publish.backend.skip`). Для реального вызова bot задайте `BACKEND_URL` и `UPLOADER_TO_BACKEND_SECRET` (или `EDGE_TO_BACKEND_SECRET`); секрет должен совпадать с `EDGE_TO_BACKEND_SECRET` или `OWN_AUTH_TOKEN` на боте — **[backend-integration.md](./backend-integration.md)**.
 
 ## 2. Smoke crystalize против локального сервера
 

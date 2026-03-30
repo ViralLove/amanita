@@ -68,7 +68,8 @@
 
 ### 2.4 Исходящие вызовы
 
-- Один внешний вызов — Arweave gateway (протокол/хост/порт из конфига). Риск: подмена gateway через env; митигация — контроль env в деплое.
+- **Arweave gateway** (протокол/хост/порт из конфига). Риск: подмена gateway через env; митигация — контроль env в деплое.
+- **Опционально — HTTP к backend (bot):** `PUT`/`POST` на `BACKEND_URL` с `Authorization: Bearer` и общим секретом (`UPLOADER_TO_BACKEND_SECRET` / `EDGE_TO_BACKEND_SECRET`). Риск: утечка секрета или неверный URL; см. **[backend-integration.md](./backend-integration.md)**.
 
 ---
 

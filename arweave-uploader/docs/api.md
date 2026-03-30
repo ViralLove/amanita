@@ -69,6 +69,8 @@
 | 401 | `token_invalid` | JWT отсутствует, истёк, неверная подпись, несовпадение `upload_id` или `payload_size` > `max_bytes`. |
 | 502 | `publish_failed` | Ошибка при отправке в Arweave (сеть, gateway). |
 
+После обработки запроса сервис при настроенном backend выполняет **исходящие** вызовы к вашему API (статус загрузки и callback после публикации) с заголовком `Authorization: Bearer`. Переменные и согласование секрета с репозиторием **bot**: см. **[backend-integration.md](./backend-integration.md)**.
+
 Тело ошибки всегда в формате:
 ```json
 {
@@ -88,5 +90,6 @@
 ## См. также
 
 - [api.openapi.yaml](./api.openapi.yaml) — полная спецификация OpenAPI 3.0.
+- [backend-integration.md](./backend-integration.md) — исходящие PUT/POST к bot и общий секрет.
 - [architecture.md](./architecture.md) — внутренняя архитектура и конфиг сервиса.
 - [local-run-and-smoke.md](./local-run-and-smoke.md) — локальный запуск и smoke-тест.
