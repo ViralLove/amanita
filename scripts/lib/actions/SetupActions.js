@@ -189,14 +189,23 @@ class SetupActions {
       'SoulIntegration',
       'SoulIdentity',
       'ProductRegistry',
+      'ActivityRegistry',
       'OrganicComponentRegistry',
       'AmanitaInternational'
     ];
-    
+
+    const uupsNames = [
+      'SpiralEngine',
+      'ProductRegistry',
+      'ActivityRegistry',
+      'OrganicComponentRegistry',
+      'AmanitaInternational'
+    ];
+
     for (const name of contractNames) {
       try {
         // UUPS контракты
-        if (['SpiralEngine', 'ProductRegistry', 'OrganicComponentRegistry', 'AmanitaInternational'].includes(name)) {
+        if (uupsNames.includes(name)) {
           contracts[name.charAt(0).toLowerCase() + name.slice(1)] = await this.contractManager.loadUUPSContract(name);
         } else {
           // Обычные контракты

@@ -10,6 +10,9 @@
 const logger = require('../utils/Logger');
 const SetupActions = require('./SetupActions');
 const { CONTRACT_ENV_MAPPING } = require('../config/constants');
+const fs = require('fs');
+const path = require('path');
+const { ethers } = require('hardhat');
 
 class DeployActions {
   constructor(contractManager, ethersUtils, config) {
@@ -19,6 +22,120 @@ class DeployActions {
     
     // Делегируем setup operations в SetupActions
     this.setupActions = new SetupActions(contractManager, ethersUtils, config);
+  }
+
+  /**
+   * Action 12: Export contract addresses from MagicRegistry in .env format
+   * Uses MAGIC_REGISTRY_CONTRACT_ADDRESS as source of truth.
+   * Optional write-back: ACTION12_WRITE_ENV=true
+   */
+  async action12() {
+    logger.action(12, 'Export contract addresses from MagicRegistry');
+
+    const rawRegistryAddress = process.env.MAGIC_REGISTRY_CONTRACT_ADDRESS || this.config.getContractAddress?.('MagicRegistry');
+    const registryAddress = this.normalizeAddress(rawRegistryAddress);
+    if (!registryAddress) {
+      throw new Error('MAGIC_REGISTRY_CONTRACT_ADDRESS is required for Action 12');
+    }
+    if (!ethers.isAddress(registryAddress)) {
+      throw new Error(`MAGIC_REGISTRY_CONTRACT_ADDRESS is invalid: ${rawRegistryAddress}`);
+    }
+
+    const code = await this.ethersUtils.provider.getCode(registryAddress);
+    if (!code || code === '0x' || code === '0x0') {
+      throw new Error(`No contract code at MAGIC_REGISTRY_CONTRACT_ADDRESS=${registryAddress}`);
+    }
+
+    const magicRegistry = await this.contractManager.loadContract('MagicRegistry', registryAddress);
+    const writeEnv = String(process.env.ACTION12_WRITE_ENV || '').toLowerCase() === 'true';
+
+    const registryKeyToEnvNames = {
+      SpiralEngine: ['SPIRAL_ENGINE_CONTRACT_ADDRESS', 'SPIRAL_ENGINE_PROXY_ADDRESS'],
+      ProductRegistry: ['PRODUCT_REGISTRY_CONTRACT_ADDRESS', 'PRODUCT_REGISTRY_PROXY_ADDRESS'],
+      ActivityRegistry: ['ACTIVITY_REGISTRY_CONTRACT_ADDRESS', 'ACTIVITY_REGISTRY_PROXY_ADDRESS'],
+      OrganicComponentRegistry: ['ORGANIC_COMPONENT_REGISTRY_CONTRACT_ADDRESS', 'ORGANIC_COMPONENT_REGISTRY_PROXY_ADDRESS'],
+      AmanitaInternational: ['AMANITA_INTERNATIONAL_CONTRACT_ADDRESS', 'AMANITA_INTERNATIONAL_PROXY_ADDRESS'],
+      SoulboundCore: ['SOULBOUND_CORE_CONTRACT_ADDRESS'],
+      SoulMetadata: ['SOUL_METADATA_CONTRACT_ADDRESS'],
+      SoulRecovery: ['SOUL_RECOVERY_CONTRACT_ADDRESS'],
+      SoulIntegration: ['SOUL_INTEGRATION_CONTRACT_ADDRESS'],
+      SoulIdentity: ['SOUL_IDENTITY_CONTRACT_ADDRESS']
+    };
+
+    const lines = [`MAGIC_REGISTRY_CONTRACT_ADDRESS=${registryAddress}`];
+    const entries = [];
+
+    for (const [registryKey, envNames] of Object.entries(registryKeyToEnvNames)) {
+      let address = null;
+      try {
+        address = await magicRegistry.get(registryKey);
+      } catch (error) {
+        logger.warn(`[Action12] MagicRegistry.get('${registryKey}') failed: ${error.message}`);
+      }
+
+      const isUnset = !address || /^0x0{40}$/i.test(address);
+      if (isUnset) {
+        for (const envName of envNames) {
+          lines.push(`${envName}=NOT_SET`);
+        }
+        entries.push({ registryKey, address: 'NOT_SET' });
+      } else {
+        for (const envName of envNames) {
+          lines.push(`${envName}=${address}`);
+        }
+        entries.push({ registryKey, address });
+      }
+    }
+
+    console.log('');
+    console.log('='.repeat(70));
+    console.log('📋 ACTION 12 — MAGIC REGISTRY EXPORT (.env format)');
+    console.log('='.repeat(70));
+    console.log(lines.join('\n'));
+    console.log('='.repeat(70));
+    console.log('');
+
+    if (writeEnv) {
+      await this.updateEnvFile(lines.filter((line) => !line.endsWith('=NOT_SET')));
+      logger.info('[Action12] .env updated (ACTION12_WRITE_ENV=true)');
+    }
+
+    logger.success(12);
+    return {
+      success: true,
+      registryAddress,
+      writeEnv,
+      entries
+    };
+  }
+
+  async updateEnvFile(envLines) {
+    const envPath = path.join(process.cwd(), '.env');
+    let content = '';
+    if (fs.existsSync(envPath)) {
+      content = fs.readFileSync(envPath, 'utf8');
+    }
+
+    for (const line of envLines) {
+      const idx = line.indexOf('=');
+      if (idx === -1) continue;
+      const key = line.slice(0, idx);
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`^${escapedKey}=.*$`, 'm');
+      if (regex.test(content)) {
+        content = content.replace(regex, line);
+      } else {
+        content = `${content.trimEnd()}${content.trim() ? '\n' : ''}${line}\n`;
+      }
+    }
+
+    fs.writeFileSync(envPath, content, 'utf8');
+  }
+
+  normalizeAddress(value) {
+    if (!value || typeof value !== 'string') return null;
+    const trimmed = value.trim().replace(/^['"]|['"]$/g, '');
+    return trimmed || null;
   }
 
   /**
@@ -127,6 +244,17 @@ class DeployActions {
     logger.action(1, "Deploy all contracts");
     
     try {
+      if (String(process.env.ACTION1_SETUP_ONLY || '').toLowerCase() === 'true') {
+        logger.info(
+          '[RESUME] ACTION1_SETUP_ONLY=true: деплой пропущен — loadSystemContracts → setupSystemConnections → вывод адресов'
+        );
+        const contracts = await this.setupActions.loadSystemContracts();
+        await this.setupActions.setupSystemConnections(contracts);
+        await this.printContractAddresses(contracts);
+        logger.success(1);
+        return { success: true, contracts, resumeSetupOnly: true };
+      }
+
       const contracts = {};
       
       // Get network info to determine delay (mainnet needs longer delays for rate limits)

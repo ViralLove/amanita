@@ -58,6 +58,7 @@ class ActionsManager {
       // Deploy actions
       0: () => this.deployActions.action0(),
       1: () => this.deployActions.action1(),
+      12: () => this.deployActions.action12(),
       5: () => this.deployActions.action5(options.contractName),
 
       // Setup actions (re-setup connections without re-deploy)
@@ -106,7 +107,7 @@ class ActionsManager {
    * @returns {Array} - List of available action numbers
    */
   getAvailableActions() {
-    return [0, 1, 2, 4, 5, 6, 7, 9, 11, 13, 40, 41, 42, 43, 46, 51, 52, 53, 444, 555, 777, 846, 888];
+    return [0, 1, 2, 4, 5, 6, 7, 9, 11, 12, 13, 40, 41, 42, 43, 46, 51, 52, 53, 444, 555, 777, 846, 888];
   }
 
   /**
@@ -119,6 +120,7 @@ class ActionsManager {
       0: "Deploy MagicRegistry",
       1: "Deploy all contracts + Setup connections",
       2: "Re-setup system connections (без редеплоя)",
+      12: "Export contract addresses from MagicRegistry in .env format",
       4: "Create catalog (inactive products) from legacy format",
       5: "Deploy single contract by name",
       6: "Clear seller catalog",

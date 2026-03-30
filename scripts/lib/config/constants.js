@@ -5,15 +5,35 @@
  * the deploy_full.js script, centralizing magic numbers and string constants.
  */
 
-// Contract environment variable mapping
+// Canonical env key per contract (совпадает с printContractAddresses / Action 12).
+// Старые имена переменных читаются через CONTRACT_ENV_ALIASES в getContractAddress().
 const CONTRACT_ENV_MAPPING = {
-  'MagicRegistry': 'MAGIC_REGISTRY_CONTRACT_ADDRESS',
-  'SpiralEngine': 'SPIRAL_ENGINE_CONTRACT_ADDRESS', 
-  'ProductRegistry': 'PRODUCT_REGISTRY_CONTRACT_ADDRESS',
-  'ActivityRegistry': 'ACTIVITY_REGISTRY_CONTRACT_ADDRESS',
-  'SoulIdentity': 'SOUL_IDENTITY_CONTRACT_ADDRESS',
-  'OrganicComponentRegistry': 'ORGANIC_COMPONENT_REGISTRY_PROXY',
-  'AmanitaInternational': 'AMANITA_INTERNATIONAL_PROXY'
+  MagicRegistry: 'MAGIC_REGISTRY_CONTRACT_ADDRESS',
+  SpiralEngine: 'SPIRAL_ENGINE_CONTRACT_ADDRESS',
+  ProductRegistry: 'PRODUCT_REGISTRY_CONTRACT_ADDRESS',
+  ActivityRegistry: 'ACTIVITY_REGISTRY_CONTRACT_ADDRESS',
+  SoulIdentity: 'SOUL_IDENTITY_CONTRACT_ADDRESS',
+  OrganicComponentRegistry: 'ORGANIC_COMPONENT_REGISTRY_CONTRACT_ADDRESS',
+  AmanitaInternational: 'AMANITA_INTERNATIONAL_CONTRACT_ADDRESS',
+  SoulboundCore: 'SOULBOUND_CORE_CONTRACT_ADDRESS',
+  SoulMetadata: 'SOUL_METADATA_CONTRACT_ADDRESS',
+  SoulRecovery: 'SOUL_RECOVERY_CONTRACT_ADDRESS',
+  SoulIntegration: 'SOUL_INTEGRATION_CONTRACT_ADDRESS'
+};
+
+/** Дополнительные ключи process.env для resume (обратная совместимость). */
+const CONTRACT_ENV_ALIASES = {
+  SpiralEngine: ['SPIRAL_ENGINE_PROXY_ADDRESS'],
+  ProductRegistry: ['PRODUCT_REGISTRY_PROXY_ADDRESS'],
+  ActivityRegistry: ['ACTIVITY_REGISTRY_PROXY_ADDRESS'],
+  OrganicComponentRegistry: [
+    'ORGANIC_COMPONENT_REGISTRY_PROXY_ADDRESS',
+    'ORGANIC_COMPONENT_REGISTRY_PROXY'
+  ],
+  AmanitaInternational: [
+    'AMANITA_INTERNATIONAL_PROXY_ADDRESS',
+    'AMANITA_INTERNATIONAL_PROXY'
+  ]
 };
 
 // Supported contract types
@@ -134,6 +154,7 @@ const SUCCESS_MESSAGES = {
 
 module.exports = {
   CONTRACT_ENV_MAPPING,
+  CONTRACT_ENV_ALIASES,
   SUPPORTED_CONTRACTS,
   ROLES,
   PROCESSING,

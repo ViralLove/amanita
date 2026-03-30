@@ -8,9 +8,18 @@
  * Based on analysis of 44 process.env usages in deploy_full.js
  */
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../../.env') });
 
-const { ARWEAVE, CONTRACT_ENV_MAPPING } = require('./constants');
+const { ARWEAVE, CONTRACT_ENV_MAPPING, CONTRACT_ENV_ALIASES } = require('./constants');
+
+function firstEnvValue(env, keys) {
+  for (const k of keys) {
+    const v = env[k];
+    if (v && v !== 'undefined') return v;
+  }
+  return undefined;
+}
 
 // Simple validation function
 const validateEnv = () => {
@@ -66,15 +75,36 @@ const config = {
     address: validatedEnv.VALIDATED_ADDRESS || null
   },
   
-  // Contracts
+  // Contracts (canonical + aliases для resume после Action 12 / старых .env)
   contracts: {
     magicRegistry: validatedEnv.MAGIC_REGISTRY_CONTRACT_ADDRESS,
-    spiralEngine: validatedEnv.SPIRAL_ENGINE_CONTRACT_ADDRESS,
-    productRegistry: validatedEnv.PRODUCT_REGISTRY_CONTRACT_ADDRESS,
-    activityRegistry: validatedEnv.ACTIVITY_REGISTRY_CONTRACT_ADDRESS,
+    spiralEngine: firstEnvValue(validatedEnv, [
+      'SPIRAL_ENGINE_CONTRACT_ADDRESS',
+      'SPIRAL_ENGINE_PROXY_ADDRESS'
+    ]),
+    productRegistry: firstEnvValue(validatedEnv, [
+      'PRODUCT_REGISTRY_CONTRACT_ADDRESS',
+      'PRODUCT_REGISTRY_PROXY_ADDRESS'
+    ]),
+    activityRegistry: firstEnvValue(validatedEnv, [
+      'ACTIVITY_REGISTRY_CONTRACT_ADDRESS',
+      'ACTIVITY_REGISTRY_PROXY_ADDRESS'
+    ]),
     soulIdentity: validatedEnv.SOUL_IDENTITY_CONTRACT_ADDRESS,
-    organicComponentRegistry: validatedEnv.ORGANIC_COMPONENT_REGISTRY_PROXY,
-    amanitaInternational: validatedEnv.AMANITA_INTERNATIONAL_PROXY
+    organicComponentRegistry: firstEnvValue(validatedEnv, [
+      'ORGANIC_COMPONENT_REGISTRY_CONTRACT_ADDRESS',
+      'ORGANIC_COMPONENT_REGISTRY_PROXY_ADDRESS',
+      'ORGANIC_COMPONENT_REGISTRY_PROXY'
+    ]),
+    amanitaInternational: firstEnvValue(validatedEnv, [
+      'AMANITA_INTERNATIONAL_CONTRACT_ADDRESS',
+      'AMANITA_INTERNATIONAL_PROXY_ADDRESS',
+      'AMANITA_INTERNATIONAL_PROXY'
+    ]),
+    soulboundCore: validatedEnv.SOULBOUND_CORE_CONTRACT_ADDRESS,
+    soulMetadata: validatedEnv.SOUL_METADATA_CONTRACT_ADDRESS,
+    soulRecovery: validatedEnv.SOUL_RECOVERY_CONTRACT_ADDRESS,
+    soulIntegration: validatedEnv.SOUL_INTEGRATION_CONTRACT_ADDRESS
   },
   
   // Paths
@@ -169,13 +199,20 @@ module.exports = {
   isSet,
   validateRequired,
   
-  // Backward compatibility: config.contracts uses camelCase; fallback to env via CONTRACT_ENV_MAPPING
+  // camelCase ключ как в config.contracts.* (magicRegistry, spiralEngine, ...)
   getContractAddress: (contractName) => {
-    const contractKey = contractName.toLowerCase().replace(/_/g, '');
-    const fromConfig = get(`contracts.${contractKey}`);
-    if (fromConfig) return fromConfig;
-    const envVar = CONTRACT_ENV_MAPPING[contractName];
-    return (envVar && process.env[envVar]) || undefined;
+    const contractConfigKey = contractName.charAt(0).toLowerCase() + contractName.slice(1);
+    const fromConfig = get(`contracts.${contractConfigKey}`);
+    if (fromConfig && fromConfig !== 'undefined') return fromConfig;
+
+    const primary = CONTRACT_ENV_MAPPING[contractName];
+    const aliases = CONTRACT_ENV_ALIASES[contractName] || [];
+    for (const key of [primary, ...aliases]) {
+      if (!key) continue;
+      const v = process.env[key];
+      if (v && v !== 'undefined') return v;
+    }
+    return undefined;
   },
   
   getSellerConfig: () => config.seller,

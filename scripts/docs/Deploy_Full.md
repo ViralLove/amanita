@@ -310,6 +310,14 @@ ProductRegistry:
   4. Register Proxy → MagicRegistry
 ```
 
+**Resume / частичный деплой (Polygon и др.):**
+
+1. Убедитесь, что `MAGIC_REGISTRY_CONTRACT_ADDRESS` корректен (валидный 0x + 40 hex). При опечатке Action 12 и загрузка контрактов дадут ошибку.
+2. `DEPLOY_ACTION=12` (опционально `ACTION12_WRITE_ENV=true`) — выгрузить адреса из реестра в `.env`.
+3. Повторный `DEPLOY_ACTION=1`: контракты с адресом в `.env` / в реестре и с **кодом по адресу** не редеплоятся (в логах строки `[RESUME]`).
+4. Если деплой уже завершён, а упал только **setup** (связи): `DEPLOY_ACTION=2` **или**  
+   `ACTION1_SETUP_ONLY=true DEPLOY_ACTION=1 ...` — пропуск деплоя, только `loadSystemConnections` + печать адресов.
+
 #### `2` - Деплой контрактов с обновлением реестра
 ```bash
 # Способ 1 - через переменную окружения
@@ -490,6 +498,23 @@ DEPLOY_ACTION=13 ASK_FOR_ADDRESS=true npx hardhat run scripts/deploy_full.js --n
 - Подтверждение, активирован ли адрес
 - Подтверждение наличия `SELLER_ROLE` / `ACTIVATOR_ROLE`
 **Использование:** Диагностика прав для seller/activity creator/любого user-адреса
+
+#### `12` - Экспорт адресов из MagicRegistry в `.env`-формате
+```bash
+# Показать текущие адреса (без записи в .env)
+DEPLOY_ACTION=12 npx hardhat run scripts/deploy_full.js --network polygon
+
+# Показать и обновить корневой .env значениями из реестра
+DEPLOY_ACTION=12 ACTION12_WRITE_ENV=true npx hardhat run scripts/deploy_full.js --network polygon
+```
+**Описание:** Читает `MAGIC_REGISTRY_CONTRACT_ADDRESS`, подключается к MagicRegistry и выводит список контрактных адресов в `UPPER_CASE` формате для `.env`.
+**Параметры:**
+- `MAGIC_REGISTRY_CONTRACT_ADDRESS`: адрес реестра (обязательный)
+- `ACTION12_WRITE_ENV=true`: опционально обновляет значения в корневом `.env` (только найденные адреса)
+**Результат:**
+- Печатает блок `KEY=VALUE` для копирования в `.env`
+- Для отсутствующих ключей выводит `NOT_SET` (без падения всего action)
+**Использование:** Recovery после частичного деплоя, синхронизация `.env` по данным реестра без ручного парсинга терминальных логов.
 
 ### Действия с каталогом
 

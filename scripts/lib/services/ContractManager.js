@@ -755,14 +755,20 @@ class ContractManager {
    */
   async checkExistingContract(contractName) {
     try {
-      const address = this.config.getContractAddress(contractName);
+      let address = this.config.getContractAddress(contractName);
+      if (!address && contractName !== 'MagicRegistry') {
+        address = await this._resolveAddressFromMagicRegistry(contractName);
+        if (address) {
+          logger.info(`[RESUME] ${contractName} address from MagicRegistry: ${address}`);
+        }
+      }
       if (address) {
         // Если по адресу из .env нет кода (нода перезапущена), не считать контракт существующим — иначе
         // регистрация set() уйдёт в пустоту, а при 777 get() упадёт с "не найден в MagicRegistry"
         const code = await this.provider.getCode(address);
         const hasCode = code && code !== '0x' && code !== '0x0';
         if (!hasCode) {
-          logger.info(`Contract ${contractName} address from .env has no code on chain (e.g. node restarted), will deploy new`);
+          logger.info(`Contract ${contractName} address has no code on chain (e.g. wrong network or node reset), will deploy new`);
           return null;
         }
         return await this.loadContract(contractName, address);
@@ -770,6 +776,29 @@ class ContractManager {
       return null;
     } catch (error) {
       logger.debug(`Contract ${contractName} not found in environment`);
+      return null;
+    }
+  }
+
+  /**
+   * Fallback адреса из MagicRegistry, если в .env нет строки (после Action 12 можно не дублировать все ключи).
+   * @param {string} contractName
+   * @returns {Promise<string|null>}
+   */
+  async _resolveAddressFromMagicRegistry(contractName) {
+    const regAddr =
+      this.config.getContractAddress?.('MagicRegistry') || process.env.MAGIC_REGISTRY_CONTRACT_ADDRESS;
+    if (!regAddr || regAddr === 'undefined') return null;
+    try {
+      let magicRegistry = this.contracts.get('MagicRegistry');
+      if (!magicRegistry) {
+        magicRegistry = await this.loadContract('MagicRegistry', regAddr);
+      }
+      const addr = await magicRegistry.get(contractName);
+      if (!addr || addr === ethers.ZeroAddress) return null;
+      return addr;
+    } catch (e) {
+      logger.debug(`MagicRegistry.get('${contractName}') unavailable: ${e.message}`);
       return null;
     }
   }
@@ -809,7 +838,7 @@ class ContractManager {
       const existing = await this.checkExistingContract(contractName);
       if (existing) {
         const existingAddress = await existing.getAddress();
-        logger.info(`Contract ${contractName} already exists at ${existingAddress}`);
+        logger.info(`[RESUME] Contract ${contractName} reused at ${existingAddress} (no new deployment)`);
         return existing;
       }
 
