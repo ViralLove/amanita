@@ -1,6 +1,8 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@openzeppelin/hardhat-upgrades");
-require("dotenv").config();
+const path = require("path");
+// .env рядом с hardhat.config.js (корень репо), не process.cwd() — иначе перенос/запуск из подпапки ломает DEPLOYER_PRIVATE_KEY
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 // Используем те же имена переменных, что и в deploy.js для единообразия
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
@@ -17,6 +19,32 @@ console.log("[hardhat.config.js] MAGIC_REGISTRY_CONTRACT_ADDRESS:", MAGIC_REGIST
 
 const POLYGON_MAINNET_RPC = process.env.POLYGON_MAINNET_RPC;
 const POLYGON_MUMBAI_RPC = process.env.POLYGON_MUMBAI_RPC;
+const DOGEOS_TESTNET_RPC = process.env.DOGEOS_TESTNET_RPC;
+
+const POLYGON_RPC_URL = POLYGON_MAINNET_RPC || "https://polygon-rpc.com";
+try {
+  const u = new URL(POLYGON_RPC_URL);
+  const host = u.hostname;
+  console.log(
+    "[hardhat.config.js] polygon RPC:",
+    host,
+    POLYGON_MAINNET_RPC ? "(POLYGON_MAINNET_RPC from .env)" : "(default, no POLYGON_MAINNET_RPC)"
+  );
+  // Alchemy без ключа в пути отвечает «Must be authenticated!» — подсказка без утечки секрета
+  if (host.includes("alchemy.com")) {
+    const parts = u.pathname.split("/").filter(Boolean);
+    const v2i = parts.indexOf("v2");
+    const afterV2 = v2i >= 0 ? parts[v2i + 1] : "";
+    if (!afterV2 || afterV2.length < 16) {
+      console.warn(
+        "[hardhat.config.js] ⚠️ Похоже, в URL Alchemy нет API key после /v2/ (или он обрезан). " +
+          "В .env одна строка без пробелов вокруг = и без кавычек, без переноса строки посередине URL."
+      );
+    }
+  }
+} catch {
+  console.warn("[hardhat.config.js] polygon RPC URL is not a valid URL; check POLYGON_MAINNET_RPC");
+}
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -79,7 +107,7 @@ module.exports = {
       gas: 10000000
     },
     polygon: {
-      url: POLYGON_MAINNET_RPC || "https://polygon-rpc.com",
+      url: POLYGON_RPC_URL,
       accounts: DEPLOYER_PRIVATE_KEY ? [`0x${DEPLOYER_PRIVATE_KEY.replace(/^0x/, '')}`] : [],
       chainId: 137,
       gasPrice: "auto",
@@ -100,6 +128,13 @@ module.exports = {
           apiUrl: "https://api-testnet.polygonscan.com"
         }
       }
+    },
+    dogetestnet: {
+      url: DOGEOS_TESTNET_RPC || "https://rpc.testnet.dogeos.com/",
+      accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY.startsWith('0x') ? DEPLOYER_PRIVATE_KEY : `0x${DEPLOYER_PRIVATE_KEY}`] : [],
+      chainId: 6281971,
+      gasPrice: "auto",
+      timeout: 60000
     }
   },
   // Добавляем настройки для верификации контрактов
