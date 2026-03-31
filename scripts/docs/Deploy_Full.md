@@ -143,6 +143,7 @@ SELLER_ADDRESS=0x...
 # RPC URLs
 POLYGON_MAINNET_RPC=https://polygon-rpc.com
 POLYGON_MUMBAI_RPC=https://rpc-mumbai.maticvigil.com
+DOGEOS_TESTNET_RPC=https://rpc.testnet.dogeos.com/
 
 # === 🔷 UUPS Контракты (Upgradeable) ===
 
@@ -224,6 +225,15 @@ DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network mumbai
 
 # Через аргументы командной строки
 npx hardhat run scripts/deploy_full.js --network mumbai 1
+```
+
+#### DogeOS Chikyu Testnet (`dogetestnet`)
+```bash
+# Через переменную окружения (официальный RPC)
+DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network dogetestnet
+
+# Альтернативный RPC (dRPC) в .env:
+# DOGEOS_TESTNET_RPC=https://dogeos-testnet.drpc.org
 ```
 
 #### Другие сети

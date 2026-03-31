@@ -182,7 +182,7 @@ class DeployRouter {
       
       // Determine currency name based on chain ID
       const chainId = Number(network.chainId);
-      const currency = chainId === 137 ? 'MATIC' : chainId === 80001 ? 'MATIC' : 'ETH';
+      const currency = chainId === 137 ? 'MATIC' : chainId === 80001 ? 'MATIC' : chainId === 6281971 ? 'DOGE' : 'ETH';
       
       // Initialize RpcProviderManager for Polygon mainnet
       if (chainId === 137) {
@@ -240,6 +240,8 @@ class DeployRouter {
         this.logger.warn(`[WARNING] Expected Polygon mainnet (Chain ID 137), but connected to Chain ID ${chainId}`);
       } else if (networkName === 'mumbai' && chainId !== 80001) {
         this.logger.warn(`[WARNING] Expected Mumbai testnet (Chain ID 80001), but connected to Chain ID ${chainId}`);
+      } else if (networkName === 'dogetestnet' && chainId !== 6281971) {
+        this.logger.warn(`[WARNING] Expected DogeOS Chikyu testnet (Chain ID 6281971), but connected to Chain ID ${chainId}`);
       } else if (networkName === 'localhost' && chainId !== 31337) {
         this.logger.warn(`[WARNING] Expected localhost (Chain ID 31337), but connected to Chain ID ${chainId}`);
       }
