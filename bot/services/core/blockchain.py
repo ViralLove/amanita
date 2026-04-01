@@ -51,6 +51,24 @@ logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def _mask_rpc_uri(uri: str) -> str:
+    """Маскирует чувствительную часть RPC URL в логах."""
+    if not uri:
+        return "НЕ УСТАНОВЛЕН"
+    if "://" not in uri:
+        return "***"
+    scheme, rest = uri.split("://", 1)
+    if "/" not in rest:
+        return f"{scheme}://{rest}"
+    host, path = rest.split("/", 1)
+    parts = [p for p in path.split("/") if p]
+    if not parts:
+        return f"{scheme}://{host}/"
+    if len(parts) == 1:
+        return f"{scheme}://{host}/***"
+    return f"{scheme}://{host}/{'/'.join(parts[:-1])}/***"
+
+
 def _log_abi_filesystem_debug(contract_name: str, actual_contract_name: str, hh_path: str, flat_path: str) -> None:
     """Детальная диагностика путей ABI (только при LOG_LEVEL=DEBUG)."""
     if not logger.isEnabledFor(logging.DEBUG):
@@ -226,7 +244,7 @@ class BlockchainService:
             self.seller_key = SELLER_PRIVATE_KEY
             self.seller_account = Account.from_key(SELLER_PRIVATE_KEY)
             
-            logger.info(f"[Web3] RPC: {RPC_URL}")
+            logger.info("[Web3] RPC: %s", _mask_rpc_uri(RPC_URL))
             
             self._initialized = True
     
@@ -239,7 +257,7 @@ class BlockchainService:
         """Инициализирует подключение к Web3"""
         try:
             print(f"[Web3] === НАЧАЛО ИНИЦИАЛИЗАЦИИ WEB3 ===")
-            print(f"[Web3] Подключение к RPC: {RPC_URL}")
+            print(f"[Web3] Подключение к RPC: {_mask_rpc_uri(RPC_URL)}")
             print(f"[Web3] Текущая рабочая директория: {os.getcwd()}")
             print(f"[Web3] ABI_BASE_DIR: {ABI_BASE_DIR}")
             
@@ -292,11 +310,11 @@ class BlockchainService:
             if not is_connected:
                 raise Exception("Failed to connect to Web3")
                 
-            print(f"[Web3] Успешное подключение к {RPC_URL}")
+            print(f"[Web3] Успешное подключение к {_mask_rpc_uri(RPC_URL)}")
             return web3
             
         except Exception as e:
-            print(f"[Web3] Ошибка подключения к {RPC_URL}: {e}")
+            print(f"[Web3] Ошибка подключения к {_mask_rpc_uri(RPC_URL)}: {e}")
             print(f"[Web3] Тип ошибки: {type(e).__name__}")
             raise
 
@@ -320,6 +338,37 @@ class BlockchainService:
     def _log(self, msg, error=False):
         prefix = "[Web3][ERROR]" if error else "[Web3]"
         print(f"{prefix} {msg}")
+
+    def _debug_log_catalog_access_issue(self, source_error: Exception) -> None:
+        """Детальная диагностика причин revert в getMyCatalogVersion (для DEBUG)."""
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+        seller = getattr(getattr(self, "seller_account", None), "address", None)
+        registry_addr = getattr(getattr(self, "registry", None), "address", None)
+        product_registry_addr = getattr(self.contracts.get("ProductRegistry"), "address", None) if hasattr(self, "contracts") else None
+        spiral_addr = getattr(self.contracts.get("SpiralEngine"), "address", None) if hasattr(self, "contracts") else None
+        logger.debug(
+            "[CatalogDebug] getMyCatalogVersion revert diagnostics: seller=%s chain_id=%s registry=%s product_registry=%s spiral=%s error=%r",
+            seller,
+            getattr(self, "chain_id", None),
+            registry_addr,
+            product_registry_addr,
+            spiral_addr,
+            source_error,
+        )
+        try:
+            role = Web3.keccak(text="SELLER_ROLE")
+            logger.debug("[CatalogDebug] SELLER_ROLE keccak=%s", role.hex())
+            spiral = self.get_contract("SpiralEngine")
+            if spiral and seller:
+                has_role = spiral.functions.hasRole(role, seller).call({"from": seller})
+                logger.debug("[CatalogDebug] SpiralEngine.hasRole(SELLER_ROLE, seller)=%s", has_role)
+            pr = self.get_contract("ProductRegistry")
+            if pr and seller:
+                seller_ids = pr.functions.getProductsBySeller(seller).call({"from": seller})
+                logger.debug("[CatalogDebug] ProductRegistry.getProductsBySeller(seller) count=%s", len(seller_ids or []))
+        except Exception as diag_err:
+            logger.debug("[CatalogDebug] additional diagnostics failed: %r", diag_err)
 
     def _load_registry_contract(self) -> Any:
         """Загружает контракт реестра"""
@@ -1165,6 +1214,8 @@ class BlockchainService:
             )
         except Exception as e:
             self._log(f"Ошибка вызова {contract_name}.{function_name}: {e}", error=True)
+            if contract_name == "ProductRegistry" and function_name == "getMyCatalogVersion":
+                self._debug_log_catalog_access_issue(e)
             return default_value
 
     async def get_product_id_from_tx(self, tx_hash: str) -> Optional[int]:
