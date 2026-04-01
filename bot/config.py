@@ -75,20 +75,71 @@ BLOCKCHAIN_PROFILE = os.getenv("BLOCKCHAIN_PROFILE", "localhost")
 ACTIVE_PROFILE = BLOCKCHAIN_PROFILE
 RPC_URL = os.getenv("WEB3_PROVIDER_URI", "http://localhost:8545")
 
-# Deployment profile для управления источником секретов
-# localhost - загружает из .env (для разработки)
-# polygon - загружает из Vault (для production)
+# Deployment profile (сеть/окружение деплоя). Источник секретов задаётся отдельно —
+# см. SECRETS_PROVIDER (ниже); не смешивать с DEPLOYMENT_PROFILE.
 DEPLOYMENT_PROFILE = os.getenv("DEPLOYMENT_PROFILE", "localhost")
 logging.info(f"[CONFIG] DEPLOYMENT_PROFILE: {DEPLOYMENT_PROFILE}")
 
 # ============================================================================
-# SECRETS MANAGEMENT: Profile-based loading (Vault for polygon, .env for localhost)
+# SECRETS MANAGEMENT: SECRETS_PROVIDER (vault | env)
 # ============================================================================
+
+_ALLOWED_SECRETS_PROVIDERS = frozenset(("vault", "env"))
+
+
+def _infer_secrets_provider() -> tuple[str, bool]:
+    """
+    Если SECRETS_PROVIDER не задан — inferred: polygon → vault (как раньше), иначе env.
+    Returns: (provider, inferred)
+    """
+    if DEPLOYMENT_PROFILE == "polygon":
+        return "vault", True
+    return "env", True
+
+
+def _resolve_secrets_provider() -> tuple[str, bool]:
+    raw = os.getenv("SECRETS_PROVIDER", "").strip().lower()
+    if not raw:
+        provider, inferred = _infer_secrets_provider()
+        logging.info(
+            "[CONFIG] SECRETS_PROVIDER не задан; выбрано по умолчанию %r "
+            "(DEPLOYMENT_PROFILE=%r). Задайте SECRETS_PROVIDER явно для фиксации режима.",
+            provider,
+            DEPLOYMENT_PROFILE,
+        )
+        return provider, True
+    if raw not in _ALLOWED_SECRETS_PROVIDERS:
+        raise ValueError(
+            f"SECRETS_PROVIDER={raw!r} не поддерживается. Допустимо: vault, env."
+        )
+    logging.info(
+        "[CONFIG] SECRETS_PROVIDER=%s (явно из окружения)", raw
+    )
+    return raw, False
+
+
+SECRETS_PROVIDER, _ = _resolve_secrets_provider()
+
+
+def _load_secrets_from_env():
+    """Чтение SELLER_PRIVATE_KEY / ARWEAVE_PRIVATE_KEY из окружения."""
+    seller = os.getenv("SELLER_PRIVATE_KEY")
+    if not seller:
+        raise ValueError(
+            "SELLER_PRIVATE_KEY не установлен в окружении для SECRETS_PROVIDER=env"
+        )
+    arweave = os.getenv("ARWEAVE_PRIVATE_KEY")
+    if not arweave:
+        logging.warning(
+            "ARWEAVE_PRIVATE_KEY не установлен — операции Arweave могут быть недоступны"
+        )
+    return seller, arweave
+
 
 def _load_secrets_from_vault():
     """
-    Загрузка секретов из HashiCorp Vault для polygon profile.
-    
+    Загрузка секретов из HashiCorp Vault при SECRETS_PROVIDER=vault.
+
     Raises:
         VaultServiceError: Если Vault недоступен или секреты не найдены
     """
@@ -97,21 +148,21 @@ def _load_secrets_from_vault():
             "VaultService недоступен (hvac не установлен). "
             "Установите: pip install hvac"
         )
-    
+
     vault_addr = os.getenv("VAULT_ADDR")
     vault_token = os.getenv("VAULT_TOKEN")
     vault_path = os.getenv("VAULT_PATH", "secret/data/amanita")
-    
+
     if not vault_addr:
         raise VaultServiceError(
-            "VAULT_ADDR не установлен для polygon profile. "
-            "Укажите URL адрес Vault сервера в Railway Variables."
+            "VAULT_ADDR не установлен для SECRETS_PROVIDER=vault. "
+            "Укажите URL Vault или переключитесь на SECRETS_PROVIDER=env."
         )
-    
+
     if not vault_token:
         raise VaultServiceError(
-            "VAULT_TOKEN не установлен для polygon profile. "
-            "Укажите authentication token в Railway Variables."
+            "VAULT_TOKEN не установлен для SECRETS_PROVIDER=vault. "
+            "Укажите token или переключитесь на SECRETS_PROVIDER=env."
         )
     
     logging.info(f"[CONFIG] 🔐 Инициализация Vault: {vault_addr}")
@@ -135,19 +186,13 @@ def _load_secrets_from_vault():
         logging.error(f"[CONFIG] ❌ Ошибка загрузки секретов из Vault: {e}")
         raise
 
-# Ключ продавца - загрузка в зависимости от DEPLOYMENT_PROFILE
-if DEPLOYMENT_PROFILE == "polygon":
-    logging.info("[CONFIG] 🔐 Polygon profile: загружаем секреты из Vault")
+# Ключи продавца / Arweave — по SECRETS_PROVIDER
+if SECRETS_PROVIDER == "vault":
+    logging.info("[CONFIG] 🔐 Секреты: Vault (SECRETS_PROVIDER=vault)")
     SELLER_PRIVATE_KEY, ARWEAVE_PRIVATE_KEY = _load_secrets_from_vault()
 else:
-    logging.info("[CONFIG] 📁 Localhost profile: загружаем секреты из .env")
-    SELLER_PRIVATE_KEY = os.getenv("SELLER_PRIVATE_KEY")
-    if not SELLER_PRIVATE_KEY:
-        raise ValueError("SELLER_PRIVATE_KEY не установлен в .env для localhost profile")
-    
-    ARWEAVE_PRIVATE_KEY = os.getenv("ARWEAVE_PRIVATE_KEY")
-    if not ARWEAVE_PRIVATE_KEY:
-        logging.warning("ARWEAVE_PRIVATE_KEY не установлен в .env - ArWeave операции могут не работать")
+    logging.info("[CONFIG] 📁 Секреты: переменные окружения (SECRETS_PROVIDER=env)")
+    SELLER_PRIVATE_KEY, ARWEAVE_PRIVATE_KEY = _load_secrets_from_env()
 
 # Нормализация SELLER_PRIVATE_KEY (добавляем 0x префикс если отсутствует)
 if SELLER_PRIVATE_KEY and not SELLER_PRIVATE_KEY.startswith("0x"):
