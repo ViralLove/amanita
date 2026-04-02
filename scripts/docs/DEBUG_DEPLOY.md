@@ -160,7 +160,9 @@ LOG_LEVEL=debug DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network
 
 ## Bullrun Floou (`run-bullrun-floou.sh`): strict mode и summary
 
-Оркестратор `scripts/run-bullrun-floou.sh` (bot + arweave-uploader + wallet-mock + POST `/activities/draft`) в конце печатает **structured summary** в двух форматах:
+Запуск, режимы **local** / **remote**, файл **`scripts/floou-draft-request.json`**, переменные **`FLOOU_MODE`** и **`USER_ID`**, подхват **`wallet/mock-runner/.env`** — в **[bullrun-floou-manual.md](./bullrun-floou-manual.md)**.
+
+Оркестратор в конце прогона печатает **structured summary** в двух форматах:
 
 - блок `=== FLOOU_SUMMARY_JSON ===` — одна строка JSON, удобно копировать в отчёт или парсить в CI;
 - блок `=== FLOOU_SUMMARY_PLAIN ===` — те же поля построчно.
@@ -195,6 +197,8 @@ FLOOU_STRICT=true ./scripts/run-bullrun-floou.sh
 
 ## 📚 См. также
 
+- `scripts/docs/arweave-transaction-signing.md` — где в `deploy_full` / `upload_steps` подписывается Arweave-транзакция (JWK), пример на JS
+- `scripts/docs/bullrun-floou-manual.md` — мануал по `run-bullrun-floou.sh`
 - `hardhat.config.js` - конфигурация сетей
 - `.env` - переменные окружения
 - `scripts/lib/config/index.js` - логика загрузки конфигурации

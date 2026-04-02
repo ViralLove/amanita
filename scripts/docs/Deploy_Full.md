@@ -4,6 +4,8 @@
 
 `deploy_full.js` - это универсальный скрипт для развертывания и управления контрактами экосистемы Amanita. Скрипт поддерживает различные сценарии деплоя от полной инициализации экосистемы до обновления отдельных контрактов.
 
+**Онбординг по инвайту, только активатор (без продавца):** см. **Action 846** в разделе [Специализированные действия](#специализированные-действия) — сразу после Action 777. Краткий мануал: `scripts/docs/manual-activate-address-via-invite.md`.
+
 **Версия документации**: 3.2  
 **Дата обновления**: 31 января 2026  
 **Статус**: Актуализировано: Action 5 deploy/upgrade UUPS с DEPLOY_CONTRACT
@@ -363,6 +365,39 @@ npx hardhat run scripts/deploy_full.js --network localhost 777
 **Описание:** Создает 12 инвайтов для деплоера (для активации селлеров)
 **Результат:** Сохраняет инвайты в `bot/flowers/deployer_invites.txt`
 
+#### `846` — Онбординг активатора по инвайту (Action 846)
+
+*Ключевые слова для поиска в документе: `846`, активатор, `ACTIVATOR_ROLE`, `activateUser`, инвайт, `DEPLOYER_INVITE`, `ACTIVITY_CREATOR_ADDRESS`.*
+
+**Назначение:** по **валидному неиспользованному инвайту** и **целевому EVM-адресу** выполнить онбординг в `SpiralEngine` для сценария **активатора** (в т.ч. создателя активностей в `ActivityRegistry`): активация пользователя + гарантированная роль **`ACTIVATOR_ROLE`**.
+
+**Важно:** **`SELLER_ROLE` этим действием не назначается** — это только активатор. Полный seller (SELLER + ACTIVATOR + каталог и т.д.) — см. **Action 888** ниже.
+
+```bash
+# Из .env: ACTIVITY_CREATOR_ADDRESS, DEPLOYER_INVITE, DEPLOYER_PRIVATE_KEY
+DEPLOY_ACTION=846 npx hardhat run scripts/deploy_full.js --network localhost
+```
+
+**Переменные окружения (типично в корневом `.env`):**
+
+| Переменная | Назначение |
+|------------|------------|
+| `DEPLOYER_PRIVATE_KEY` | Подписант: `activateUser` / `grantRole` от имени админа деплоя |
+| `ACTIVITY_CREATOR_ADDRESS` | Адрес, который нужно активировать и сделать активатором |
+| `DEPLOYER_INVITE` | Неиспользованный инвайт-код (например из выдачи Action 777) |
+
+**Что делает код (`InviteActions.action846`):**
+1. Загружает `SpiralEngine`.
+2. Если `usedInviteByUser(адрес) == 0` — вызывает **`activateUser(invite, address, 12 новых кодов, 0)`**.
+3. Если нет **`ACTIVATOR_ROLE`** — вызывает **`grantActivatorRole`**.
+4. Проверяет: пользователь активирован и роль активатора есть.
+
+**Результат:** адрес может выступать активатором (в т.ч. **`createActivity`** в приложении), при этом **роль продавца отдельно не выдаётся**.
+
+**Идемпотентность:** повторный запуск для уже подготовленного адреса пропускает лишние шаги (см. логи).
+
+**См. также:** короткая пошаговая инструкция — [`manual-activate-address-via-invite.md`](./manual-activate-address-via-invite.md).
+
 #### `4` - Создание каталога (неактивные продукты)
 ```bash
 DEPLOY_ACTION=4 npx hardhat run scripts/deploy_full.js --network localhost
@@ -709,30 +744,7 @@ DEPLOY_ACTION=888 DEPLOYER_INVITE=AMANITA-XXXX-YYYY npx hardhat run scripts/depl
 - ⚠️ Если компоненты не загружены → используйте сначала Action 555
 - ✅ Можно запускать многократно - пропустит активацию если seller уже активирован
 
-#### `846` - Подготовка activity creator адреса (activate + ensure ACTIVATOR_ROLE)
-```bash
-# Использует ACTIVITY_CREATOR_ADDRESS и DEPLOYER_INVITE из .env
-DEPLOY_ACTION=846 npx hardhat run scripts/deploy_full.js --network localhost
-```
-
-**Описание:** Подготавливает адрес для `ActivityRegistry.createActivity` через `SpiralEngine`.
-
-**Что делает:**
-1. Читает `ACTIVITY_CREATOR_ADDRESS` и `DEPLOYER_INVITE` из config/.env.
-2. Проверяет активацию через `usedInviteByUser(address)`.
-3. Если адрес не активирован — вызывает `activateUser(DEPLOYER_INVITE, ACTIVITY_CREATOR_ADDRESS)`.
-4. Проверяет наличие `ACTIVATOR_ROLE`.
-5. Если роль отсутствует — вызывает `grantActivatorRole(...)`.
-6. Выполняет финальную валидацию: активирован + есть роль.
-
-**Требования:**
-- `DEPLOYER_PRIVATE_KEY` (подписант транзакций деплоя/ролей)
-- `ACTIVITY_CREATOR_ADDRESS` (целевой адрес)
-- `DEPLOYER_INVITE` (валидный инвайт)
-- Задеплоенный `SpiralEngine` в выбранной сети
-
-**Результат:**
-- Адрес готов к вызову `createActivity`: `usedInviteByUser != 0` и `ACTIVATOR_ROLE = true`.
+**Связанный сценарий (только активатор, без seller):** **Action 846** — см. [раздел выше](#846--онбординг-активатора-по-инвайту-action-846) (сразу после Action 777). Там же пояснено, что **SELLER_ROLE не выдаётся**.
 
 ## Подробное описание действий
 
