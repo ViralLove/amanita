@@ -77,6 +77,9 @@ Bridge.md
 **/docs/analysis/
 **/docs/tasks
 
+# Floou bullrun: операторский JSON тела POST /activities/draft (не коммитить)
+scripts/floou-draft-request.json
+
 # Data и каталоги (не в Git)
 /data
 # bot/artifacts/contracts — в Git (копия Hardhat artifacts для деплоя без корневого /artifacts)

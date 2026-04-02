@@ -1,26 +1,23 @@
 #!/usr/bin/env bash
 #
-# Bullrun: полный floou локально — bot + arweave-uploader + wallet-mock,
-# затем вызов точки входа (POST /activities/draft), ожидание двух подписей кошелька,
-# вывод итога загрузки, остановка процессов и выход с корректным кодом.
+# Bullrun Floou: поднять стек (local) или только mock-runner (remote), затем
+# POST /activities/draft телом из scripts/floou-draft-request.json, дождаться цикла
+# подписей в mock-runner, GET /activities/{id}. Блокчейн-нода — отдельно.
 #
-# Предполагается: блокчейн-нода уже запущена фоном с задеплоенными контрактами.
-# Остальные переменные окружения — в .env каждого проекта (bot, arweave-uploader).
+# Контракт скрипта (что имеет смысл задавать снаружи):
+#   FLOOU_MODE — local (дефолт) | remote
+#   USER_ID    — UUID для X-User-Id (дефолт ниже)
+# Остальное (BOT_URL, ARWEAVE_SERVICE_URL, ключи и т.д.) — через wallet/mock-runner/.env
+# и .env bot / arweave-uploader; при необходимости экспорт в shell до запуска.
 #
-# Две подписи кошелька: sign_arweave (GET sign-payload → POST crystalize), sign_contract (GET sign-request → POST submit).
-# См. bot/docs/tests/e2e-floou-manual.md
+# Тело draft: фиксированный файл  scripts/floou-draft-request.json  (шаблон: .example)
+#   local:  нет файла / битый JSON → встроенное тело
+#   remote: файл обязателен (валидный JSON)
 #
-# Использование:
-#   ./scripts/run-bullrun-floou.sh
-#   USER_ID=my-user ./scripts/run-bullrun-floou.sh
-#   FLOOU_SUBMIT_TIMEOUT_SEC=120 ./scripts/run-bullrun-floou.sh
-#   ./scripts/run-bullrun-floou.sh --strict
-#   FLOOU_STRICT=true ./scripts/run-bullrun-floou.sh
+# Мануал: scripts/docs/bullrun-floou-manual.md
 #
-# Артефакт лога: по умолчанию один файл в scripts/logs/ с именем
-#   {S1}.{S2}.{S3}.{S4}.{S5}.{S6}-{ddMMyyyyHHmm}.txt
-# Отключить запись файла (вывод детей в консоль как раньше):
-#   FLOOU_LOG_DISABLE=true ./scripts/run-bullrun-floou.sh
+# Лог-артефакт: scripts/logs/{S1}.{S2}.{S3}.{S4}.{S5}.{S6}-{ddMMyyyyHHmm}.txt — отключить: FLOOU_LOG_DISABLE=true
+# Доп. флаги: FLOOU_STRICT, --strict, FLOOU_SUBMIT_TIMEOUT_SEC
 #
 
 set -e
@@ -28,28 +25,41 @@ set -e
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# URL и прочие настройки mock-runner — из wallet/mock-runner/.env (если есть)
+if [ -f "$REPO_ROOT/wallet/mock-runner/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$REPO_ROOT/wallet/mock-runner/.env"
+  set +a
+fi
+
+FLOOU_DRAFT_FILE="$REPO_ROOT/scripts/floou-draft-request.json"
+
 for _floou_arg in "$@"; do
   case "$_floou_arg" in
     --strict) export FLOOU_STRICT=true ;;
   esac
 done
 
-# ---------------------------------------------------------------------------
-# Переменные окружения: только URL и порты (связь между сервисами).
-# Секреты и ключи — из .env соответствующих проектов.
-# ---------------------------------------------------------------------------
 export BOT_PORT="${BOT_PORT:-8000}"
 export UPLOADER_PORT="${UPLOADER_PORT:-3000}"
 export BOT_URL="${BOT_URL:-http://127.0.0.1:$BOT_PORT}"
 export ARWEAVE_SERVICE_URL="${ARWEAVE_SERVICE_URL:-http://127.0.0.1:$UPLOADER_PORT}"
-# Supabase uploads.user_id имеет тип UUID — задайте валидный UUID (или оставьте дефолт)
 export USER_ID="${USER_ID:-00000000-0000-0000-0000-000000000001}"
-# Секрет для вызовов uploader → Backend (PUT status, POST callback). Должен совпадать в bot и uploader.
 export EDGE_TO_BACKEND_SECRET="${EDGE_TO_BACKEND_SECRET:-mock-edge-to-backend-secret}"
 
-# Для uploader subprocess явно задаём связь с ботом (могут быть уже в arweave-uploader/.env)
 export BACKEND_URL="$BOT_URL"
 export PORT="$UPLOADER_PORT"
+
+_floou_mode_raw="${FLOOU_MODE:-local}"
+case "$_floou_mode_raw" in
+  local|LOCAL|Local) export FLOOU_MODE=local ;;
+  remote|REMOTE|Remote) export FLOOU_MODE=remote ;;
+  *)
+    echo "floou: неизвестный FLOOU_MODE='$_floou_mode_raw' (ожидается local или remote)" >&2
+    exit 1
+    ;;
+esac
 
 FLOOU_SUBMIT_TIMEOUT_SEC="${FLOOU_SUBMIT_TIMEOUT_SEC:-90}"
 # Сколько секунд ждать /health у Bot и uploader (медленный импорт + Web3)
@@ -109,6 +119,7 @@ floou_write_log_header() {
     echo "USER_ID=$USER_ID"
     echo "FLOOU_SUBMIT_TIMEOUT_SEC=$FLOOU_SUBMIT_TIMEOUT_SEC"
     echo "FLOOU_SERVICE_READY_SEC=$FLOOU_SERVICE_READY_SEC"
+    echo "FLOOU_MODE=${FLOOU_MODE:-}"
     echo "FLOOU_STRICT=${FLOOU_STRICT:-}"
     echo "FLOOU_LOG_DISABLE=${FLOOU_LOG_DISABLE:-}"
     echo ""
@@ -133,6 +144,32 @@ floou_file_append_file_section() {
   echo "" >>"$FLOOU_LOG_FILE"
   echo "=== $title ===" >>"$FLOOU_LOG_FILE"
   cat "$path" >>"$FLOOU_LOG_FILE"
+}
+
+floou_json_file_ok() {
+  python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$1" 2>/dev/null
+}
+
+# Задаёт FLOOU_DRAFT_BODY_FILE или FLOOU_DRAFT_INLINE; в remote при отсутствии/невалидности — exit 1
+floou_select_draft_body() {
+  FLOOU_DRAFT_BODY_FILE=""
+  FLOOU_DRAFT_INLINE=""
+  local p="$FLOOU_DRAFT_FILE"
+  if [ -f "$p" ] && [ -s "$p" ] && floou_json_file_ok "$p"; then
+    FLOOU_DRAFT_BODY_FILE="$p"
+    floou_msg "📎 Тело draft: файл $p"
+    return 0
+  fi
+  if [ "$FLOOU_MODE" = "remote" ]; then
+    if [ ! -f "$p" ] || [ ! -s "$p" ]; then
+      floou_msg "❌ remote: нужен непустой JSON для POST /activities/draft: $p"
+    else
+      floou_msg "❌ remote: файл не является валидным JSON: $p"
+    fi
+    exit 1
+  fi
+  floou_msg "ℹ️ local: нет валидного JSON в $p — встроенное тело draft (как в прежних версиях скрипта)."
+  FLOOU_DRAFT_INLINE='{"activity_type":"event","title":"Full Floou from script","short_summary":"E2E local run"}'
 }
 
 stop_children() {
@@ -205,13 +242,9 @@ if floou_is_log_enabled; then
   floou_write_log_header
 fi
 
-floou_msg "📌 Bullrun Floou — конфигурация"
-floou_msg "  BOT_URL=$BOT_URL"
-floou_msg "  ARWEAVE_SERVICE_URL=$ARWEAVE_SERVICE_URL"
-floou_msg "  USER_ID=$USER_ID"
-floou_msg "  EDGE_TO_BACKEND_SECRET=***"
-floou_msg "  FLOOU_SUBMIT_TIMEOUT_SEC=$FLOOU_SUBMIT_TIMEOUT_SEC"
-floou_msg "  FLOOU_SERVICE_READY_SEC=$FLOOU_SERVICE_READY_SEC"
+floou_msg "📌 Bullrun Floou — FLOOU_MODE=$FLOOU_MODE  USER_ID=$USER_ID"
+floou_msg "  draft: $FLOOU_DRAFT_FILE (см. .example)"
+floou_msg "  BOT_URL=$BOT_URL  ARWEAVE_SERVICE_URL=$ARWEAVE_SERVICE_URL"
 floou_msg "  FLOOU_STRICT=${FLOOU_STRICT:-off}"
 if [ -n "$FLOOU_LOG_FILE" ]; then
   floou_msg "  📎 Полный лог: $FLOOU_LOG_FILE"
@@ -285,57 +318,76 @@ sys.exit(0)
 PY
 }
 
-# ---------------------------------------------------------------------------
-# 1) Запуск Bot (uvicorn). .env подхватывается из bot/
-# ---------------------------------------------------------------------------
-floou_msg "⏳ [1/3] Запуск Bot на порту $BOT_PORT..."
-if [ -n "$BOT_LOG" ]; then
-  (
-    exec >>"$BOT_LOG" 2>&1
-    cd "$REPO_ROOT/bot"
-    [ -f .env ] && set -a && . ./.env && set +a
-    export EDGE_TO_BACKEND_SECRET
-    exec python3 -m uvicorn api.main:app --host 0.0.0.0 --port "$BOT_PORT"
-  ) &
-else
-  (
-    cd "$REPO_ROOT/bot"
-    [ -f .env ] && set -a && . ./.env && set +a
-    export EDGE_TO_BACKEND_SECRET
-    exec python3 -m uvicorn api.main:app --host 0.0.0.0 --port "$BOT_PORT"
-  ) &
+if [ "$FLOOU_MODE" = "remote" ]; then
+  if [ ! -f "$FLOOU_DRAFT_FILE" ] || [ ! -s "$FLOOU_DRAFT_FILE" ]; then
+    floou_msg "❌ remote: до старта mock-runner нужен непустой JSON: $FLOOU_DRAFT_FILE"
+    exit 1
+  fi
+  if ! floou_json_file_ok "$FLOOU_DRAFT_FILE"; then
+    floou_msg "❌ remote: файл не является валидным JSON: $FLOOU_DRAFT_FILE"
+    exit 1
+  fi
 fi
-BOT_PID=$!
 
-# ---------------------------------------------------------------------------
-# 2) Запуск arweave-uploader
-# ---------------------------------------------------------------------------
-floou_msg "⏳ [2/3] Запуск arweave-uploader на порту $UPLOADER_PORT..."
-if [ -n "$UP_LOG" ]; then
-  (
-    exec >>"$UP_LOG" 2>&1
-    cd "$REPO_ROOT/arweave-uploader"
-    [ -f .env ] && set -a && . ./.env && set +a
-    export PORT BACKEND_URL EDGE_TO_BACKEND_SECRET
-    exec node dist/server.js
-  ) &
+if [ "$FLOOU_MODE" = "local" ]; then
+  # ---------------------------------------------------------------------------
+  # 1) Запуск Bot (uvicorn). .env подхватывается из bot/
+  # ---------------------------------------------------------------------------
+  floou_msg "⏳ [1/3] Запуск Bot на порту $BOT_PORT..."
+  if [ -n "$BOT_LOG" ]; then
+    (
+      exec >>"$BOT_LOG" 2>&1
+      cd "$REPO_ROOT/bot"
+      [ -f .env ] && set -a && . ./.env && set +a
+      export EDGE_TO_BACKEND_SECRET
+      exec python3 -m uvicorn api.main:app --host 0.0.0.0 --port "$BOT_PORT"
+    ) &
+  else
+    (
+      cd "$REPO_ROOT/bot"
+      [ -f .env ] && set -a && . ./.env && set +a
+      export EDGE_TO_BACKEND_SECRET
+      exec python3 -m uvicorn api.main:app --host 0.0.0.0 --port "$BOT_PORT"
+    ) &
+  fi
+  BOT_PID=$!
+
+  # ---------------------------------------------------------------------------
+  # 2) Запуск arweave-uploader
+  # ---------------------------------------------------------------------------
+  floou_msg "⏳ [2/3] Запуск arweave-uploader на порту $UPLOADER_PORT..."
+  if [ -n "$UP_LOG" ]; then
+    (
+      exec >>"$UP_LOG" 2>&1
+      cd "$REPO_ROOT/arweave-uploader"
+      [ -f .env ] && set -a && . ./.env && set +a
+      export PORT BACKEND_URL EDGE_TO_BACKEND_SECRET
+      exec node dist/server.js
+    ) &
+  else
+    (
+      cd "$REPO_ROOT/arweave-uploader"
+      [ -f .env ] && set -a && . ./.env && set +a
+      export PORT BACKEND_URL EDGE_TO_BACKEND_SECRET
+      exec node dist/server.js
+    ) &
+  fi
+  UPLOADER_PID=$!
 else
-  (
-    cd "$REPO_ROOT/arweave-uploader"
-    [ -f .env ] && set -a && . ./.env && set +a
-    export PORT BACKEND_URL EDGE_TO_BACKEND_SECRET
-    exec node dist/server.js
-  ) &
+  floou_msg "⏭️  [remote] Локальные Bot и arweave-uploader не запускаются (BOT_URL=$BOT_URL)."
 fi
-UPLOADER_PID=$!
 
 FLOOU_DONE_MARKER_FILE="$(mktemp)"
 export FLOOU_DONE_MARKER_FILE
 
 # ---------------------------------------------------------------------------
-# 3) Запуск wallet-mock
+# Запуск wallet-mock (всегда локально)
 # ---------------------------------------------------------------------------
-floou_msg "⏳ [3/3] Запуск wallet-mock runner..."
+if [ "$FLOOU_MODE" = "local" ]; then
+  floou_msg "⏳ [3/3] Запуск wallet-mock runner..."
+else
+  floou_msg "⏳ [1/1] Запуск wallet-mock runner (remote)..."
+fi
 if [ -n "$WAL_LOG" ]; then
   (
     exec >>"$WAL_LOG" 2>&1
@@ -348,6 +400,8 @@ if [ -n "$WAL_LOG" ]; then
     export WALLET_ALLOW_LEGACY_X_USER_ID="${WALLET_ALLOW_LEGACY_X_USER_ID:-true}"
     export WALLET_MOCK_PRIVATE_KEY="${WALLET_MOCK_PRIVATE_KEY:-}"
     export WALLET_MOCK_ADDRESS="${WALLET_MOCK_ADDRESS:-}"
+    export WALLET_MOCK_ARWEAVE_PRIVATE_KEY="${WALLET_MOCK_ARWEAVE_PRIVATE_KEY:-}"
+    export WALLET_MOCK_ARWEAVE_PRIVATE_KEY_FILE="${WALLET_MOCK_ARWEAVE_PRIVATE_KEY_FILE:-}"
     exec node index.js
   ) &
 else
@@ -361,6 +415,8 @@ else
     export WALLET_ALLOW_LEGACY_X_USER_ID="${WALLET_ALLOW_LEGACY_X_USER_ID:-true}"
     export WALLET_MOCK_PRIVATE_KEY="${WALLET_MOCK_PRIVATE_KEY:-}"
     export WALLET_MOCK_ADDRESS="${WALLET_MOCK_ADDRESS:-}"
+    export WALLET_MOCK_ARWEAVE_PRIVATE_KEY="${WALLET_MOCK_ARWEAVE_PRIVATE_KEY:-}"
+    export WALLET_MOCK_ARWEAVE_PRIVATE_KEY_FILE="${WALLET_MOCK_ARWEAVE_PRIVATE_KEY_FILE:-}"
     exec node index.js
   ) &
 fi
@@ -407,12 +463,22 @@ done
 floou_msg ""
 floou_msg "📌 Точка входа: POST /activities/draft"
 
+floou_select_draft_body
+
 DRAFT_RESPONSE="$(mktemp)"
-HTTP_CODE="$(curl -s -w "%{http_code}" -o "$DRAFT_RESPONSE" \
-  -X POST "$BOT_URL/activities/draft" \
-  -H "Content-Type: application/json" \
-  -H "X-User-Id: $USER_ID" \
-  -d '{"activity_type":"event","title":"Full Floou from script","short_summary":"E2E local run"}')"
+if [ -n "$FLOOU_DRAFT_BODY_FILE" ]; then
+  HTTP_CODE="$(curl -s -w "%{http_code}" -o "$DRAFT_RESPONSE" \
+    -X POST "$BOT_URL/activities/draft" \
+    -H "Content-Type: application/json" \
+    -H "X-User-Id: $USER_ID" \
+    --data-binary @"$FLOOU_DRAFT_BODY_FILE")"
+else
+  HTTP_CODE="$(curl -s -w "%{http_code}" -o "$DRAFT_RESPONSE" \
+    -X POST "$BOT_URL/activities/draft" \
+    -H "Content-Type: application/json" \
+    -H "X-User-Id: $USER_ID" \
+    -d "$FLOOU_DRAFT_INLINE")"
+fi
 
 if [ "$HTTP_CODE" -ne 201 ]; then
   floou_msg "❌ Draft: HTTP $HTTP_CODE"
