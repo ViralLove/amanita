@@ -7,6 +7,10 @@ import { ArweaveClient } from "./arweave-client.js";
 import { isAuthorized } from "./auth.js";
 import { loadConfig } from "./config.js";
 import { errorToMessage, logError, logInfo, logWarn, sha256Hex } from "./logging.js";
+import {
+  getBackendStartupSummary,
+  logStartupEnvDiagnostics,
+} from "./env-startup-diagnostics.js";
 import { putStatus, postCallback, normalizeMockStatus } from "./publish/backend-calls.js";
 import { bundleAndPublish } from "./publish/bundle-publish.js";
 import { validateDataItem } from "./publish/validate-data-item.js";
@@ -58,7 +62,10 @@ export function generateMockTxId() {
 
 /** Returns a doPublish-compatible function that does not call Arweave; returns { bundleTxId, mock: true }. */
 export function createMockPublish() {
-    return async () => ({ bundleTxId: generateMockTxId(), mock: true });
+    return async (_signedDataItemBytes, _arweaveClient, _opts) => ({
+        bundleTxId: generateMockTxId(),
+        mock: true,
+    });
 }
 
 function isBackendMockEnabled() {
@@ -151,7 +158,9 @@ export function buildApp({ config, arweaveClient, bundleAndPublish: bundleAndPub
             signedDataItem.replace(/-/g, "+").replace(/_/g, "/"),
             "base64"
         );
-        const bundleResult = await doPublish(signedDataItemBytes, arweaveClient);
+        const bundleResult = await doPublish(signedDataItemBytes, arweaveClient, {
+            rsaSignatureBytes: dataItemResult.rsaSignatureBytes,
+        });
         if (bundleResult.error) {
             logWarn("publish.bundle_failed", { uploadId, error: bundleResult.error });
             await putStatus(uploadId, "failed", "publish_failed", requestMockOverride?.putStatus);
@@ -164,6 +173,11 @@ export function buildApp({ config, arweaveClient, bundleAndPublish: bundleAndPub
         logInfo("publish.bundle_success", { uploadId, bundleTxId, arweave_url: arweaveUrl, mock: bundleResult.mock ?? false });
         const publishedAt = new Date().toISOString();
         await postCallback(uploadId, itemId, bundleTxId, publishedAt, requestMockOverride?.callback);
+        logInfo("publish.crystalize.complete", {
+            uploadId,
+            bundleTxId,
+            steps: "token_ok → putStatus(queued) → bundle → postCallback → 200",
+        });
         reply.code(200).send({
             ack: true,
             status: "queued_for_publish",
@@ -176,6 +190,7 @@ export function buildApp({ config, arweaveClient, bundleAndPublish: bundleAndPub
 export async function startServer() {
     const useRealArweave = process.env.USE_REAL_ARWEAVE === "true" || process.env.USE_REAL_ARWEAVE === "1";
     const config = loadConfig();
+    logStartupEnvDiagnostics(config);
     const arweaveClient = new ArweaveClient(config);
     const doPublish = useRealArweave ? bundleAndPublish : createMockPublish();
     const app = buildApp({ config, arweaveClient, bundleAndPublish: doPublish });
@@ -186,6 +201,7 @@ export async function startServer() {
         arweaveProtocol: config.arweaveProtocol,
         arweavePort: config.arweavePort,
         useRealArweave,
+        ...getBackendStartupSummary(),
     });
 }
 const isEntrypoint = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

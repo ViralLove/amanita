@@ -1,10 +1,23 @@
 /**
  * Вызовы микросервиса → Backend: PUT status, POST callback.
- * Authorization: Bearer UPLOADER_TO_BACKEND_SECRET (или EDGE_TO_BACKEND_SECRET).
+ * Authorization: Bearer NODE_AUTH_TOKEN (тот же секрет, что на bot для uploads status/callback).
  * При BACKEND_USE_MOCK=true реальный fetch не выполняется; код ответа задаётся env или per-request override.
  */
 
 import { logInfo, logWarn } from "../logging.js";
+
+let warnedBackendUrlAmbiguous = false;
+
+/** 0.0.0.0 — адрес привязки, не надёжная цель для исходящего HTTP с uploader; лучше 127.0.0.1 / localhost. */
+function warnIfBackendUrlAmbiguous(baseUrl) {
+  if (warnedBackendUrlAmbiguous) return;
+  if (typeof baseUrl !== "string" || !baseUrl.includes("0.0.0.0")) return;
+  warnedBackendUrlAmbiguous = true;
+  logWarn("publish.backend.url_ambiguous", {
+    BACKEND_URL: baseUrl.replace(/\/$/, ""),
+    hint: "Исходящие запросы с uploader должны идти на адрес, где слушает API (часто http://127.0.0.1:PORT или публичный host). 0.0.0.0 как URL назначения часто даёт сбой или не тот интерфейс.",
+  });
+}
 
 function isBackendMockEnabled() {
   const v = process.env.BACKEND_USE_MOCK;
@@ -45,19 +58,28 @@ export async function putStatus(
     return;
   }
   const baseUrl = process.env.BACKEND_URL;
-  const secret =
-    process.env.UPLOADER_TO_BACKEND_SECRET || process.env.EDGE_TO_BACKEND_SECRET;
+  const secret = process.env.NODE_AUTH_TOKEN;
   if (!baseUrl || !secret) {
     logWarn("publish.backend.skip", {
-      reason: "BACKEND_URL or secret not set; skipping putStatus",
+      reason: "BACKEND_URL or NODE_AUTH_TOKEN not set; skipping putStatus",
     });
     return;
   }
+  warnIfBackendUrlAmbiguous(baseUrl);
   const url = `${baseUrl.replace(/\/$/, "")}/v1/uploads/${uploadId}/status`;
   const body =
     status === "failed"
       ? JSON.stringify({ status, failure_code: failureCode })
       : JSON.stringify({ status });
+  const t0 = Date.now();
+  logInfo("publish.backend.request", {
+    op: "putStatus",
+    method: "PUT",
+    url,
+    uploadId,
+    bodyStatus: status,
+    failureCode: failureCode ?? null,
+  });
   try {
     const res = await fetch(url, {
       method: "PUT",
@@ -67,14 +89,32 @@ export async function putStatus(
       },
       body,
     });
+    const durationMs = Date.now() - t0;
+    const text = await res.text();
     if (!res.ok) {
       logWarn("publish.putStatus.failed", {
-        status: res.status,
-        body: await res.text(),
+        uploadId,
+        httpStatus: res.status,
+        durationMs,
+        url,
+        body: text.slice(0, 2000),
+      });
+    } else {
+      logInfo("publish.putStatus.ok", {
+        uploadId,
+        httpStatus: res.status,
+        durationMs,
+        responseBytes: text.length,
+        responsePreview: text.length ? text.slice(0, 500) : "(empty)",
       });
     }
   } catch (e) {
-    logWarn("publish.putStatus.networkError", { error: e?.message ?? String(e) });
+    logWarn("publish.putStatus.networkError", {
+      uploadId,
+      url,
+      durationMs: Date.now() - t0,
+      error: e?.message ?? String(e),
+    });
   }
 }
 
@@ -103,20 +143,30 @@ export async function postCallback(
     return;
   }
   const baseUrl = process.env.BACKEND_URL;
-  const secret =
-    process.env.UPLOADER_TO_BACKEND_SECRET || process.env.EDGE_TO_BACKEND_SECRET;
+  const secret = process.env.NODE_AUTH_TOKEN;
   if (!baseUrl || !secret) {
     logWarn("publish.backend.skip", {
-      reason: "BACKEND_URL or secret not set; skipping postCallback",
+      reason: "BACKEND_URL or NODE_AUTH_TOKEN not set; skipping postCallback",
     });
     return;
   }
+  warnIfBackendUrlAmbiguous(baseUrl);
   const url = `${baseUrl.replace(/\/$/, "")}/v1/uploads/callback`;
   const body = JSON.stringify({
     upload_id: uploadId,
     item_id: itemId,
     bundle_tx_id: bundleTxId,
     published_at: publishedAt,
+  });
+  const t0 = Date.now();
+  logInfo("publish.backend.request", {
+    op: "postCallback",
+    method: "POST",
+    url,
+    uploadId,
+    itemId,
+    bundleTxId,
+    publishedAt,
   });
   try {
     const res = await fetch(url, {
@@ -127,14 +177,30 @@ export async function postCallback(
       },
       body,
     });
+    const durationMs = Date.now() - t0;
+    const text = await res.text();
     if (!res.ok) {
       logWarn("publish.postCallback.failed", {
-        status: res.status,
-        body: await res.text(),
+        uploadId,
+        httpStatus: res.status,
+        durationMs,
+        url,
+        body: text.slice(0, 2000),
+      });
+    } else {
+      logInfo("publish.postCallback.ok", {
+        uploadId,
+        httpStatus: res.status,
+        durationMs,
+        responseBytes: text.length,
+        responsePreview: text.length ? text.slice(0, 500) : "(empty)",
       });
     }
   } catch (e) {
     logWarn("publish.postCallback.networkError", {
+      uploadId,
+      url,
+      durationMs: Date.now() - t0,
       error: e?.message ?? String(e),
     });
   }

@@ -1,13 +1,15 @@
 /**
  * Валидация Data Item (ANS-104): парсинг, проверка подписи RSA-PSS, тег Upload-Id.
+ * RSA: длина подписи = размер модуля в байтах; owner = DER SPKI переменной длины (2048→256/294, 4096→512/550, …).
  */
 
 import crypto from "node:crypto";
 import { deepHash } from "./deep-hash.js";
 
 const SIGNATURE_TYPE_RSA = 1;
-const RSA_SIGNATURE_LENGTH = 256;
-const RSA_OWNER_LENGTH = 294;
+
+/** Кандидаты длины RSA-подписи (байт) = |n|/8 для типичных модулей. */
+const RSA_SIGNATURE_LENGTH_CANDIDATES = [512, 384, 256];
 
 function base64Decode(s) {
   const base64 = s.replace(/-/g, "+").replace(/_/g, "/");
@@ -50,6 +52,32 @@ function readVInt(buf, off) {
 
 function zigzagDecode(n) {
   return (n >>> 1) ^ -(n & 1);
+}
+
+/**
+ * Длина DER SEQUENCE начиная с offset (ожидается SPKI 0x30 …).
+ * @returns {number|null}
+ */
+function derSequenceTotalLength(buf, offset) {
+  if (offset >= buf.length || buf[offset] !== 0x30) return null;
+  const lenByte = buf[offset + 1];
+  if (lenByte === undefined) return null;
+  let contentLen;
+  let headerSize = 2;
+  if (lenByte < 0x80) {
+    contentLen = lenByte;
+  } else {
+    const n = lenByte & 0x7f;
+    if (n === 0 || offset + 2 + n > buf.length) return null;
+    contentLen = 0;
+    for (let i = 0; i < n; i++) {
+      contentLen = (contentLen << 8) | buf[offset + 2 + i];
+    }
+    headerSize = 2 + n;
+  }
+  const total = headerSize + contentLen;
+  if (offset + total > buf.length) return null;
+  return total;
 }
 
 function parseAvroTags(buf, offset, limit) {
@@ -100,6 +128,39 @@ function getTagValue(tags, tagName) {
 }
 
 /**
+ * Парсинг тела Data Item после полей signature + owner.
+ * @returns {{ target: Buffer, anchor: Buffer, numTags: number, numTagBytes: number, tagBytes: Buffer, data: Buffer, posAfter: number } | null}
+ */
+function parseAfterOwner(raw, pos) {
+  if (pos + 1 + 1 + 8 + 8 > raw.length) return null;
+  const targetPresent = raw[pos++];
+  let target = Buffer.alloc(0);
+  if (targetPresent === 1) {
+    if (pos + 32 > raw.length) return null;
+    target = raw.subarray(pos, pos + 32);
+    pos += 32;
+  } else if (targetPresent !== 0) return null;
+
+  const anchorPresent = raw[pos++];
+  let anchor = Buffer.alloc(0);
+  if (anchorPresent === 1) {
+    if (pos + 32 > raw.length) return null;
+    anchor = raw.subarray(pos, pos + 32);
+    pos += 32;
+  } else if (anchorPresent !== 0) return null;
+
+  const numTags = readUint64LE(raw, pos);
+  pos += 8;
+  const numTagBytes = readUint64LE(raw, pos);
+  pos += 8;
+  if (pos + numTagBytes > raw.length) return null;
+  const tagBytes = raw.subarray(pos, pos + numTagBytes);
+  pos += numTagBytes;
+  const data = raw.subarray(pos);
+  return { target, anchor, numTags, numTagBytes, tagBytes, data, posAfter: pos };
+}
+
+/**
  * @param {string} signedDataItemBase64
  * @param {string} uploadId
  * @returns {Promise<{ ok: true, itemId?: string } | { ok: false, code: 'signature_invalid' }>}
@@ -111,85 +172,117 @@ export async function validateDataItem(signedDataItemBase64, uploadId) {
   } catch {
     return { ok: false, code: "signature_invalid" };
   }
-  if (
-    raw.length <
-    2 + RSA_SIGNATURE_LENGTH + RSA_OWNER_LENGTH + 1 + 1 + 8 + 8
-  ) {
+  if (raw.length < 2 + 1 + 1 + 8 + 8) {
     return { ok: false, code: "signature_invalid" };
   }
-  let off = 0;
+
   const sigType = raw[0] | (raw[1] << 8);
-  if (sigType !== SIGNATURE_TYPE_RSA)
-    return { ok: false, code: "signature_invalid" };
-  off += 2;
-  const signature = raw.subarray(off, off + RSA_SIGNATURE_LENGTH);
-  off += RSA_SIGNATURE_LENGTH;
-  const owner = raw.subarray(off, off + RSA_OWNER_LENGTH);
-  off += RSA_OWNER_LENGTH;
-  const targetPresent = raw[off++];
-  let target = Buffer.alloc(0);
-  if (targetPresent === 1) {
-    if (off + 32 > raw.length) return { ok: false, code: "signature_invalid" };
-    target = raw.subarray(off, off + 32);
-    off += 32;
-  }
-  const anchorPresent = raw[off++];
-  let anchor = Buffer.alloc(0);
-  if (anchorPresent === 1) {
-    if (off + 32 > raw.length) return { ok: false, code: "signature_invalid" };
-    anchor = raw.subarray(off, off + 32);
-    off += 32;
-  }
-  const numTags = readUint64LE(raw, off);
-  off += 8;
-  const numTagBytes = readUint64LE(raw, off);
-  off += 8;
-  if (off + numTagBytes > raw.length)
-    return { ok: false, code: "signature_invalid" };
-  const tagBytes = raw.subarray(off, off + numTagBytes);
-  off += numTagBytes;
-  const data = raw.subarray(off);
-
-  const tags = parseAvroTags(tagBytes, 0, numTagBytes);
-  const uploadIdTag = getTagValue(tags, "Upload-Id");
-  if (uploadIdTag !== uploadId) return { ok: false, code: "signature_invalid" };
-
-  const tagsForDeepHash = tags.map((t) => [t.name, t.value]);
-  const deepHashInput = [
-    Buffer.from("dataitem", "utf8"),
-    Buffer.from("1", "utf8"),
-    owner,
-    target,
-    anchor,
-    tagsForDeepHash,
-    data,
-  ];
-  const message = await deepHash(deepHashInput);
-
-  let publicKey;
-  try {
-    publicKey = crypto.createPublicKey({
-      key: Buffer.from(owner),
-      format: "der",
-      type: "spki",
-    });
-  } catch {
+  if (sigType !== SIGNATURE_TYPE_RSA) {
     return { ok: false, code: "signature_invalid" };
   }
 
-  const valid = crypto.verify(
-    "RSA-SHA256",
-    message,
-    {
-      key: publicKey,
-      padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-      saltLength: 32,
-    },
-    signature
-  );
-  if (!valid) return { ok: false, code: "signature_invalid" };
+  for (const sigLen of RSA_SIGNATURE_LENGTH_CANDIDATES) {
+    const ostart = 2 + sigLen;
+    if (ostart >= raw.length) continue;
 
-  const idHash = crypto.createHash("sha256").update(signature).digest();
-  const itemId = base64UrlEncode(idHash);
-  return { ok: true, itemId };
+    const spkiLen = derSequenceTotalLength(raw, ostart);
+    if (spkiLen === null || spkiLen < 50) continue;
+
+    const signature = raw.subarray(2, 2 + sigLen);
+    const owner = raw.subarray(ostart, ostart + spkiLen);
+
+    let publicKey;
+    try {
+      publicKey = crypto.createPublicKey({
+        key: Buffer.from(owner),
+        format: "der",
+        type: "spki",
+      });
+    } catch {
+      continue;
+    }
+
+    const details = publicKey.asymmetricKeyDetails;
+    const modulusBits = details?.modulusLength;
+    if (modulusBits == null) continue;
+    const expectedSigBytes = modulusBits / 8;
+    if (expectedSigBytes !== sigLen) continue;
+
+    const rest = parseAfterOwner(raw, ostart + spkiLen);
+    if (!rest) continue;
+
+    const { target, anchor, numTagBytes, tagBytes, data } = rest;
+
+    const tags = parseAvroTags(tagBytes, 0, numTagBytes);
+    const uploadIdTag = getTagValue(tags, "Upload-Id");
+    if (uploadIdTag !== uploadId) continue;
+
+    const tagsForDeepHash = tags.map((t) => [t.name, t.value]);
+    const deepHashInput = [
+      Buffer.from("dataitem", "utf8"),
+      Buffer.from("1", "utf8"),
+      owner,
+      target,
+      anchor,
+      tagsForDeepHash,
+      data,
+    ];
+    const message = await deepHash(deepHashInput);
+
+    const valid = crypto.verify(
+      "RSA-SHA256",
+      message,
+      {
+        key: publicKey,
+        padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+        saltLength: 32,
+      },
+      signature
+    );
+    if (!valid) continue;
+
+    const idHash = crypto.createHash("sha256").update(signature).digest();
+    const itemId = base64UrlEncode(idHash);
+    return { ok: true, itemId, rsaSignatureBytes: sigLen };
+  }
+
+  return { ok: false, code: "signature_invalid" };
+}
+
+/**
+ * Синхронно: длина RSA-подписи в байтах по структуре Data Item (без проверки подписи).
+ * Нужна для сборки ANS-104 bundle с тем же смещением, что и при validateDataItem.
+ * @param {Buffer | Uint8Array} raw
+ * @returns {number | null}
+ */
+export function getRsaSignatureByteLength(raw) {
+  const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+  if (buf.length < 2 + 1 + 1 + 8 + 8) return null;
+  const sigType = buf[0] | (buf[1] << 8);
+  if (sigType !== SIGNATURE_TYPE_RSA) return null;
+  for (const sigLen of RSA_SIGNATURE_LENGTH_CANDIDATES) {
+    const ostart = 2 + sigLen;
+    if (ostart >= buf.length) continue;
+    const spkiLen = derSequenceTotalLength(buf, ostart);
+    if (spkiLen === null || spkiLen < 50) continue;
+    const owner = buf.subarray(ostart, ostart + spkiLen);
+    let publicKey;
+    try {
+      publicKey = crypto.createPublicKey({
+        key: Buffer.from(owner),
+        format: "der",
+        type: "spki",
+      });
+    } catch {
+      continue;
+    }
+    const details = publicKey.asymmetricKeyDetails;
+    const modulusBits = details?.modulusLength;
+    if (modulusBits == null) continue;
+    if (modulusBits / 8 !== sigLen) continue;
+    const rest = parseAfterOwner(buf, ostart + spkiLen);
+    if (!rest) continue;
+    return sigLen;
+  }
+  return null;
 }

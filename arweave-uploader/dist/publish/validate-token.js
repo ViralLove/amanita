@@ -14,6 +14,13 @@ function base64UrlDecode(str) {
   return Buffer.from(base64, "base64");
 }
 
+function isPemDebugEnabled() {
+  const v = (process.env.UPLOAD_TOKEN_DEBUG_PEM || process.env.DEBUG_PEM || "")
+    .trim()
+    .toLowerCase();
+  return v === "true" || v === "1" || v === "yes";
+}
+
 function normalizePem(pem) {
   if (typeof pem !== "string") return pem;
   let out = pem
@@ -31,8 +38,9 @@ function normalizePem(pem) {
  * Диагностика PEM: побайтово (коды символов), строки, тело между BEGIN/END.
  * 10=LF(\\n), 13=CR(\\r), 32=space, 92=backslash, 110='n' — для различения реальных \\n и буквальных \\n.
  */
-function logPemDiagnostics(label, raw) {
+function logPemDiagnostics(label, raw, force = false) {
   if (!raw || typeof raw !== "string") return;
+  if (!force && !isPemDebugEnabled()) return;
   const len = raw.length;
   const lines = raw.split("\n");
   const hasCR = raw.includes("\r");
@@ -75,7 +83,7 @@ function loadPublicKeyRaw() {
   let raw = process.env.UPLOAD_TOKEN_JWT_PUBLIC_KEY;
   if (raw && typeof raw === "string" && raw.trim()) {
     raw = raw.trim();
-    logPemDiagnostics("UPLOAD_TOKEN_JWT_PUBLIC_KEY (raw)", raw);
+    logPemDiagnostics("UPLOAD_TOKEN_JWT_PUBLIC_KEY (raw)", raw, false);
     return raw;
   }
   const filePath = process.env.UPLOAD_TOKEN_JWT_PUBLIC_KEY_FILE;
@@ -83,7 +91,7 @@ function loadPublicKeyRaw() {
   const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
   try {
     raw = fs.readFileSync(resolved, "utf8").trim();
-    logPemDiagnostics("UPLOAD_TOKEN_JWT_PUBLIC_KEY_FILE (raw)", raw);
+    logPemDiagnostics("UPLOAD_TOKEN_JWT_PUBLIC_KEY_FILE (raw)", raw, false);
     return raw;
   } catch (err) {
     console.error("UPLOAD_TOKEN_JWT_PUBLIC_KEY_FILE read failed:", resolved, err?.message || err);
@@ -96,11 +104,12 @@ function getPublicKey(keyFromEnv) {
   const trimmed = keyFromEnv.trim();
   if (trimmed.startsWith("-----BEGIN")) {
     const normalized = normalizePem(trimmed);
-    logPemDiagnostics("PEM after normalizePem", normalized);
+    logPemDiagnostics("PEM after normalizePem", normalized, false);
     try {
       return crypto.createPublicKey({ key: normalized, format: "pem" });
     } catch (err) {
       console.error("UPLOAD_TOKEN_JWT_PUBLIC_KEY PEM decode failed:", err?.message || err);
+      logPemDiagnostics("PEM after normalizePem (decode failure)", normalized, true);
       console.error("[pem-diag] on decode failure: normalized length:", normalized.length);
       console.error("[pem-diag] on decode failure: endsWith END?:", normalized.trimEnd().endsWith("-----END PUBLIC KEY-----"));
       console.error("[pem-diag] on decode failure: first 30 char codes:", JSON.stringify(Array.from(normalized.slice(0, 30), (c) => c.charCodeAt(0))));
@@ -118,6 +127,78 @@ function getPublicKey(keyFromEnv) {
     }
   }
   return null;
+}
+
+/**
+ * Тихое чтение ключа для старта (без console.error при ошибке чтения файла).
+ */
+function loadPublicKeyRawQuiet() {
+  let raw = process.env.UPLOAD_TOKEN_JWT_PUBLIC_KEY;
+  if (raw && typeof raw === "string" && raw.trim()) {
+    return raw.trim();
+  }
+  const filePath = process.env.UPLOAD_TOKEN_JWT_PUBLIC_KEY_FILE;
+  if (!filePath || typeof filePath !== "string" || !filePath.trim()) {
+    return null;
+  }
+  const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
+  try {
+    return fs.readFileSync(resolved, "utf8").trim();
+  } catch {
+    return null;
+  }
+}
+
+function parsePublicKeyQuiet(trimmed) {
+  if (!trimmed || typeof trimmed !== "string") {
+    return { ok: false };
+  }
+  const t = trimmed.trim();
+  if (t.startsWith("-----BEGIN")) {
+    try {
+      const normalized = normalizePem(t);
+      const key = crypto.createPublicKey({ key: normalized, format: "pem" });
+      return { ok: true, key };
+    } catch {
+      return { ok: false };
+    }
+  }
+  if (t.startsWith("{")) {
+    try {
+      const jwk = JSON.parse(t);
+      const key = crypto.createPublicKey({ key: jwk, format: "jwk" });
+      return { ok: true, key };
+    } catch {
+      return { ok: false };
+    }
+  }
+  return { ok: false };
+}
+
+/**
+ * Диагностика env для JWT crystalize (без секретов и материала ключа).
+ * @returns {{ source: 'inline'|'file'|'none', configured: boolean, rawLoaded: boolean, parseOk: boolean, asymmetricKeyType?: string }}
+ */
+export function diagnoseJwtPublicKeyEnv() {
+  const hasInline = !!(process.env.UPLOAD_TOKEN_JWT_PUBLIC_KEY?.trim());
+  const hasFile = !!(process.env.UPLOAD_TOKEN_JWT_PUBLIC_KEY_FILE?.trim());
+  const source = hasInline ? "inline" : hasFile ? "file" : "none";
+  const configured = hasInline || hasFile;
+  const raw = loadPublicKeyRawQuiet();
+  if (!raw) {
+    return { source, configured, rawLoaded: false, parseOk: false };
+  }
+  const parsed = parsePublicKeyQuiet(raw);
+  if (!parsed.ok) {
+    return { source, configured, rawLoaded: true, parseOk: false };
+  }
+  return {
+    source,
+    configured,
+    rawLoaded: true,
+    parseOk: true,
+    asymmetricKeyType: String(parsed.key.asymmetricKeyType ?? "unknown"),
+  };
 }
 
 /**
