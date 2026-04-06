@@ -190,12 +190,14 @@ class HMACMiddleware(BaseHTTPMiddleware):
             "/openapi.json"
         }
         # /v1/pending-sign-requests, /v1/sign-requests — для wallet-mock (локальный floou без HMAC)
+        # /v1/wallet-auth/challenge|verify — отдельная схема (подпись кошелька), без HMAC API-ключа
         skip_prefixes = (
             "/activities",
             "/reference",
             "/v1/uploads",
             "/v1/pending-sign-requests",
             "/v1/sign-requests",
+            "/v1/wallet-auth",
         )
         return path in skip_paths or any(path.startswith(p) for p in skip_prefixes)
     
