@@ -2,6 +2,7 @@
 
 ## 🎯 Main Entry Point
 - **`deploy_full.js`** - Production deployment router (modular architecture v2.0, 217 lines)
+- **Конфиг деплоя и Hardhat:** переменные в **`scripts/.env`** (не корень репозитория). Путь задаётся в `scripts/lib/env-path.js`; `hardhat.config.js` читает тот же файл.
 
 ## 🔧 Business Logic (root level)
 - **`transform_products_csv.js`** - CSV → JSON transformation for Action 41
@@ -26,6 +27,12 @@ See `validators/README.md` for detailed usage and examples.
 ## 🤖 Automation
 - **`clean_components_upload.bash`** - Cleanup before Action 555 re-run
 - **`quick_start_automation.sh`** + `.md` - Full ecosystem deployment automation
+
+## 🐚 Shell (`shell/`)
+- **`shell/run-bullrun-floou.sh`** — полный Floou E2E (см. `docs/bullrun-floou-manual.md`)
+- **`shell/post-floou-draft.sh`** — только `POST /activities/draft` из `floou-draft-request.json`
+- **`shell/sync_artifacts_to_bot.sh`** — ABI в `bot/artifacts/contracts`
+- Обёртки в корне **`scripts/`** (`run-bullrun-floou.sh`, `sync_artifacts_to_bot.sh`) делегируют в `shell/`. См. **`shell/README.md`**
 
 ## 🏗️ Architecture (`lib/`)
 Modular architecture with 16 classes:

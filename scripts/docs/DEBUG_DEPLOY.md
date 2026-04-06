@@ -158,9 +158,9 @@ LOG_LEVEL=debug DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network
 
 ---
 
-## Bullrun Floou (`run-bullrun-floou.sh`): strict mode и summary
+## Bullrun Floou (`scripts/shell/run-bullrun-floou.sh`): strict mode и summary
 
-Запуск, режимы **local** / **remote**, файл **`scripts/floou-draft-request.json`**, переменные **`FLOOU_MODE`** и **`USER_ID`**, подхват **`wallet/mock-runner/.env`** — в **[bullrun-floou-manual.md](./bullrun-floou-manual.md)**.
+Запуск, режимы **local** / **remote**, файл **`scripts/floou-draft-request.json`**, переменные **`FLOOU_MODE`** и **`USER_ID`**, подхват **`scripts/.env`** — в **[bullrun-floou-manual.md](./bullrun-floou-manual.md)**. Скрипты: **`scripts/shell/run-bullrun-floou.sh`**, только draft: **`scripts/shell/post-floou-draft.sh`**.
 
 Оркестратор в конце прогона печатает **structured summary** в двух форматах:
 
@@ -186,19 +186,19 @@ LOG_LEVEL=debug DEPLOY_ACTION=1 npx hardhat run scripts/deploy_full.js --network
 Примеры:
 
 ```bash
-./scripts/run-bullrun-floou.sh
-FLOOU_STRICT=true ./scripts/run-bullrun-floou.sh
-./scripts/run-bullrun-floou.sh --strict
+./scripts/shell/run-bullrun-floou.sh
+FLOOU_STRICT=true ./scripts/shell/run-bullrun-floou.sh
+./scripts/shell/run-bullrun-floou.sh --strict
 ```
 
-**Полный текстовый протокол прогона** оркестратором `run-bullrun-floou.sh` (метаданные, хронология, stdout/stderr bot / uploader / wallet-mock) пишется в `scripts/logs/{S1}.{S2}.{S3}.{S4}.{S5}.{S6}-{ddMMyyyyHHmm}.txt` (локальное время). Отключить файл: `FLOOU_LOG_DISABLE=true`. Подробности — `scripts/docs/analysis/tasks/task-implement-run-full-floou-structured-log-artifact/decision-points-run-full-floou-structured-log.md`.
+**Полный текстовый протокол прогона** оркестратором `scripts/shell/run-bullrun-floou.sh` (метаданные, хронология, stdout/stderr bot / uploader / wallet-mock) пишется в `scripts/logs/{S1}.{S2}.{S3}.{S4}.{S5}.{S6}-{ddMMyyyyHHmm}.txt` (локальное время). Отключить файл: `FLOOU_LOG_DISABLE=true`. Подробности — `scripts/docs/analysis/tasks/task-implement-run-full-floou-structured-log-artifact/decision-points-run-full-floou-structured-log.md`.
 
 ---
 
 ## 📚 См. также
 
 - `scripts/docs/arweave-transaction-signing.md` — где в `deploy_full` / `upload_steps` подписывается Arweave-транзакция (JWK), пример на JS
-- `scripts/docs/bullrun-floou-manual.md` — мануал по `run-bullrun-floou.sh`
+- `scripts/docs/bullrun-floou-manual.md` — мануал по bullrun / `post-floou-draft.sh`
 - `hardhat.config.js` - конфигурация сетей
 - `.env` - переменные окружения
 - `scripts/lib/config/index.js` - логика загрузки конфигурации
