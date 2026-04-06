@@ -1,5 +1,7 @@
 # Railway Deployment Guide для Amanita WebApp
 
+**POC (текущий репозиторий, `wallet/webapp`):** краткий runbook — [`railway-poc-webapp.md`](railway-poc-webapp.md).
+
 ## Полное руководство по развертыванию Amanita WebApp на Railway.com
 
 ### Содержание
