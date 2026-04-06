@@ -136,6 +136,28 @@ def get_payload_cache() -> "PayloadCache":
     return _payload_cache
 
 
+def get_activity_registry_service(
+    storage: "ActivityStorage" = Depends(get_activity_storage),
+    prepare_svc=Depends(get_prepare_resolve_service),
+    push_sender=Depends(get_push_sender),
+    payload_cache=Depends(get_payload_cache),
+):
+    """
+    Оркестратор Activity (ASG-3), аналог по роли ProductRegistryService для продуктов.
+    Роуты зависят от него напрямую — без отдельного «ApiService»-делегата (YAGNI).
+    Новый экземпляр на запрос — overrides в тестах подхватываются из Depends.
+    Граф зависимостей: services.application.activity.factory.build_activity_registry_service.
+    """
+    from services.application.activity.factory import build_activity_registry_service
+
+    return build_activity_registry_service(
+        storage=storage,
+        prepare_resolve=prepare_svc,
+        push_sender=push_sender,
+        payload_cache=payload_cache,
+    )
+
+
 _sign_request_store: Optional["SignRequestStore"] = None
 
 

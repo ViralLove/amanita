@@ -8,6 +8,11 @@ import logging
 import sys
 import os
 import json
+
+# Родитель каталога api/ — корень пакета бота (utils, services, …); в начало path — чтобы `utils.*` не перехватывался чужим каталогом при pytest
+_api_dir = os.path.dirname(os.path.abspath(__file__))
+_bot_root = os.path.normpath(os.path.join(_api_dir, ".."))
+sys.path.insert(0, _bot_root)
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
@@ -110,8 +115,8 @@ def create_api_app(service_factory=None, log_level: str = "INFO", log_file: Opti
         allowed_hosts=APIConfig.TRUSTED_HOSTS
     )
 
-    # Optional Bearer для Custom GPT Actions (/activities, /reference); регистрировать ДО HMAC,
-    # чтобы в цепочке выполнения проверка шла после пропуска HMAC (внутренний слой ближе к app).
+    # Optional Bearer для Custom GPT Actions (/activities, /reference). Регистрировать раньше HMAC:
+    # у Starlette последний добавленный слой идёт первым → сначала HMAC (skip /activities), затем Bearer.
     app.add_middleware(GptActionsBearerMiddleware, bearer_secret=APIConfig.GPT_ACTIONS_BEARER_SECRET)
     if APIConfig.GPT_ACTIONS_BEARER_SECRET:
         logger.info("GptActionsBearerMiddleware enabled for /activities and /reference")

@@ -24,6 +24,9 @@ class SignRequestRecord:
     cid: str
     status: str  # "pending" | "submitted"
     created_at: datetime
+    # Снимок целевой EVM-среды на момент создания (до кошелька); универсальные вертикали задают при create.
+    evm_chain_id: Optional[str] = None
+    evm_contract_address: Optional[str] = None
     signed_tx: Optional[str] = None
     signature: Optional[str] = None
     message: Optional[str] = None
@@ -50,6 +53,8 @@ class SignRequestStore:
         upload_id: str,
         cid: str,
         status: str = "pending",
+        evm_chain_id: Optional[str] = None,
+        evm_contract_address: Optional[str] = None,
     ) -> str:
         sign_request_id = str(uuid.uuid4())
         self._store[sign_request_id] = SignRequestRecord(
@@ -60,6 +65,8 @@ class SignRequestStore:
             cid=cid,
             status=status,
             created_at=datetime.now(timezone.utc),
+            evm_chain_id=evm_chain_id,
+            evm_contract_address=evm_contract_address,
         )
         return sign_request_id
 

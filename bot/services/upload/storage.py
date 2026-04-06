@@ -24,9 +24,12 @@ validate_ipfs_cid). Task 3.3, DP-3.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+_floou_draft_log = logging.getLogger("amanita_api.floou_draft")
 
 
 @dataclass
@@ -88,10 +91,20 @@ class PrepareResolveService:
         в кошельке). Логику БД/JWT не дублирует — только фасад.
         """
         payload_bytes = json.dumps(payload_descriptor, sort_keys=True).encode("utf-8")
+        _floou_draft_log.debug(
+            "prepare_upload_for_draft: draft_id=%s user_id=%s payload_bytes=%s",
+            draft_id,
+            user_id,
+            len(payload_bytes),
+        )
         result = self._upload_service.prepare(
             payload_bytes,
             user_id,
             activity_id=draft_id,
+        )
+        _floou_draft_log.debug(
+            "prepare_upload_for_draft: UploadService.prepare → upload_id=%s",
+            result.upload_id,
         )
         return PrepareForDraftResult(
             upload_id=result.upload_id,

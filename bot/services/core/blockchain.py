@@ -1,6 +1,9 @@
 # Универсальный слой для работы с web3 и блокчейном 
 import os
 from web3 import Web3
+from hexbytes import HexBytes
+from eth_account.typed_transactions import TypedTransaction
+from eth_account._utils.legacy_transactions import Transaction as LegacySignedTransaction
 from dotenv import load_dotenv
 import json
 from web3.middleware import ExtraDataToPOAMiddleware
@@ -31,7 +34,8 @@ try:
         SELLER_PRIVATE_KEY,
         RPC_URL,
         ABI_BASE_DIR,
-        MAGIC_REGISTRY_CONTRACT_ADDRESS
+        MAGIC_REGISTRY_CONTRACT_ADDRESS,
+        CHAIN_ID_INT,
     )
 except ImportError:
     # Fallback для запуска из папки bot
@@ -39,11 +43,48 @@ except ImportError:
         SELLER_PRIVATE_KEY,
         RPC_URL,
         ABI_BASE_DIR,
-        MAGIC_REGISTRY_CONTRACT_ADDRESS
+        MAGIC_REGISTRY_CONTRACT_ADDRESS,
+        CHAIN_ID_INT,
     )
 
 load_dotenv(dotenv_path="bot/.env")
 logger = logging.getLogger(__name__)
+
+
+def _parse_signed_transaction_chain_and_to(tx_bytes: bytes) -> tuple[Optional[int], Optional[str]]:
+    """
+    Достаёт chain_id и адрес `to` из подписанной raw-транзакции (typed или legacy EIP-155).
+    Для деплоя контракта `to` отсутствует — возвращаем (chain_id, None).
+    """
+    hb = HexBytes(tx_bytes)
+    if len(hb) == 0:
+        raise ValueError("empty raw transaction")
+    if hb[0] <= 0x7F:
+        tt = TypedTransaction.from_bytes(hb)
+        d = tt.as_dict()
+        cid = d.get("chainId")
+        chain_id = int(cid) if cid is not None else None
+        to_raw = d.get("to")
+    else:
+        txn = LegacySignedTransaction.from_bytes(hb)
+        d = txn.as_dict()
+        v = d.get("v")
+        if v is not None and int(v) >= 35:
+            chain_id = (int(v) - 35) // 2
+        else:
+            chain_id = None
+        to_raw = d.get("to")
+    if to_raw is None:
+        to_checksum: Optional[str] = None
+    elif isinstance(to_raw, bytes):
+        if len(to_raw) == 0:
+            to_checksum = None
+        else:
+            to_checksum = Web3.to_checksum_address("0x" + to_raw.hex())
+    else:
+        to_checksum = Web3.to_checksum_address(to_raw)
+    return (chain_id, to_checksum)
+
 
 # Удалены неиспользуемые словари PROFILES и CONTRACTS
 # RPC конфигурация теперь управляется через переменные окружения в config.py
@@ -134,7 +175,8 @@ def load_abi(contract_name):
         "OrganicComponentRegistry": "OrganicComponentRegistryLogic",
         "SpiralEngine": "SpiralEngineLogic",
         "ProductRegistry": "ProductRegistryLogic",
-        "AmanitaInternational": "AmanitaInternationalLogic"
+        "AmanitaInternational": "AmanitaInternationalLogic",
+        "ActivityRegistry": "ActivityRegistryLogic",
     }
     
     # Если это UUPS контракт, загружаем Logic ABI
@@ -227,10 +269,29 @@ class BlockchainService:
         if not hasattr(self, '_initialized'):
             # Инициализируем Web3
             self.web3 = self._init_web3()
-            
-            # Получаем chain_id
-            self.chain_id = self.web3.eth.chain_id
-            
+
+            # SSOT: chain id из config (CHAIN_ID в env); сверка с RPC — fail fast при рассинхроне
+            rpc_chain_id = int(self.web3.eth.chain_id)
+            skip_check = os.environ.get("EVM_CHAIN_ID_SKIP_RPC_CHECK", "").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            if CHAIN_ID_INT != rpc_chain_id:
+                if skip_check:
+                    logger.warning(
+                        "[Web3] CHAIN_ID=%s (env) != eth_chainId=%s (RPC); continuing (EVM_CHAIN_ID_SKIP_RPC_CHECK).",
+                        CHAIN_ID_INT,
+                        rpc_chain_id,
+                    )
+                else:
+                    raise ValueError(
+                        f"CHAIN_ID в окружении ({CHAIN_ID_INT}) не совпадает с сетью RPC "
+                        f"(eth_chainId={rpc_chain_id}). Исправьте CHAIN_ID или WEB3_PROVIDER_URI. "
+                        f"Для тестов/отладки: EVM_CHAIN_ID_SKIP_RPC_CHECK=1"
+                    )
+            self.chain_id = CHAIN_ID_INT
+
             # Загружаем реестр контрактов
             self.registry = self._load_registry_contract()
             
@@ -335,6 +396,54 @@ class BlockchainService:
         tx_hash = self.web3.eth.send_raw_transaction(tx_bytes)
         return tx_hash.hex()
 
+    def submit_sign_request_raw_transaction(
+        self,
+        signed_tx_hex: str,
+        *,
+        expected_chain_id: str,
+        expected_to_address: str,
+    ) -> str:
+        """
+        Broadcast подписанной tx с проверкой соответствия контексту sign_request (сеть и контракт `to`).
+        Разбор raw и сравнение — здесь; HTTP-слой только передаёт ожидаемые строки из записи или fallback.
+        """
+        raw = signed_tx_hex.strip()
+        if raw.startswith("0x"):
+            raw = raw[2:]
+        if os.environ.get("BLOCKCHAIN_PROFILE") == "localhost" and raw == "00" * 64:
+            mock_hash = "0x" + "00" * 32
+            logger.info(
+                "Broadcast skipped (localhost mock submit), returning mock tx_hash=%s",
+                mock_hash,
+            )
+            return mock_hash
+        try:
+            tx_bytes = bytes.fromhex(raw)
+        except ValueError as e:
+            raise ValueError(f"Invalid signed transaction hex: {e}") from e
+
+        chain_parsed, to_parsed = _parse_signed_transaction_chain_and_to(tx_bytes)
+        exp_chain = int(str(expected_chain_id).strip())
+        if chain_parsed is None:
+            raise ValueError(
+                "Signed transaction has no chain id; EIP-155 / typed tx required for sign_request broadcast"
+            )
+        if chain_parsed != exp_chain:
+            raise ValueError(
+                f"Transaction chain_id {chain_parsed} does not match sign request context {exp_chain}"
+            )
+        exp_to = Web3.to_checksum_address(expected_to_address.strip())
+        if to_parsed is None:
+            raise ValueError(
+                "Signed transaction has no `to` (contract creation); does not match sign request contract context"
+            )
+        if to_parsed != exp_to:
+            raise ValueError(
+                f"Transaction target {to_parsed} does not match expected contract {exp_to}"
+            )
+        tx_hash = self.web3.eth.send_raw_transaction(tx_bytes)
+        return tx_hash.hex()
+
     def _log(self, msg, error=False):
         prefix = "[Web3][ERROR]" if error else "[Web3]"
         print(f"{prefix} {msg}")
@@ -395,7 +504,14 @@ class BlockchainService:
             contracts = {}
             
             # Получаем список всех контрактов из реестра
-            contract_names = ["SpiralEngine", "ProductRegistry", "OrganicComponentRegistry", "SoulIdentity", "AmanitaInternational"]
+            contract_names = [
+                "SpiralEngine",
+                "ProductRegistry",
+                "OrganicComponentRegistry",
+                "SoulIdentity",
+                "AmanitaInternational",
+                "ActivityRegistry",
+            ]
             
             for name in contract_names:
                 try:
@@ -418,7 +534,7 @@ class BlockchainService:
                 except Exception as e:
                     logger.error(f"[Web3] Ошибка загрузки контракта {name}: {e}")
                     raise
-            
+
             logger.info(f"[Web3] Загружено контрактов: {len(contracts)}")
             return contracts
             
@@ -428,6 +544,22 @@ class BlockchainService:
 
     def get_contract(self, name):
         return self.contracts.get(name)
+
+    def get_sign_request_evm_params(self) -> tuple[str, str]:
+        """
+        chain_id (строка из config CHAIN_ID / CHAIN_ID_INT) и адрес proxy ActivityRegistry для GET /v1/sign-requests.
+        Адрес берётся из контракта, загруженного через MagicRegistry.get(\"ActivityRegistry\") — как и остальные UUPS.
+        Если контракт отсутствует в self.contracts, деплой/реестр нужно починить (не маскируем пустым env).
+        """
+        chain_id_str = str(self.chain_id)
+        c = self.contracts.get("ActivityRegistry")
+        if c is None:
+            raise RuntimeError(
+                "ActivityRegistry не загружен в BlockchainService; ожидается запись в MagicRegistry и успешный _load_contracts."
+            )
+        addr = c.address
+        addr_str = addr if isinstance(addr, str) else Web3.to_checksum_address(addr)
+        return chain_id_str, addr_str
 
     def call_contract_function(self, contract_name: str, function_name: str, *args, **kwargs) -> Any:
         """

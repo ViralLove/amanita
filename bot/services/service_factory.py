@@ -34,6 +34,32 @@ class ServiceFactory:
             validation_service=validation_service,
             account_service=account_service
         )
+
+    def create_activity_registry_service(self):
+        """
+        ActivityRegistryService — тот же граф, что собирает api.dependencies (мок Activities API).
+        Не использует синглтоны FastAPI: свежие ActivityStorage / StubPushSender / PayloadCache и
+        локальный PrepareResolveService — для скриптов и изоляции; HTTP-путь — get_activity_registry_service.
+        """
+        from api.services import ActivityStorage
+        from services.core.storage.ar_weave import ArWeaveUploader
+        from services.core.supabase import SupabaseService
+        from services.upload.upload_service import UploadService
+        from services.upload.storage import PrepareResolveService
+        from services.wallet_push import PayloadCache, StubPushSender
+        from services.application.activity.factory import build_activity_registry_service
+
+        storage = ActivityStorage()
+        upload_svc = UploadService(SupabaseService())
+        prepare = PrepareResolveService(upload_svc, ArWeaveUploader())
+        push = StubPushSender()
+        cache = PayloadCache()
+        return build_activity_registry_service(
+            storage=storage,
+            prepare_resolve=prepare,
+            push_sender=push,
+            payload_cache=cache,
+        )
     
     def create_localization_service(self, lang: str = 'ru') -> LocalizationService:
         """
