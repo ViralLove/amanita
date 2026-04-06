@@ -3,7 +3,7 @@ Optional Bearer guard for Custom GPT Actions → /activities and /reference.
 
 If GPT_ACTIONS_BEARER_SECRET is unset or empty, middleware is a no-op (backward compatible).
 If set, requests under protected prefixes must send Authorization: Bearer <exact secret>.
-Uses timing-safe comparison. Does not replace HMAC skip — runs inside stack after HMAC passes through.
+Uses timing-safe comparison. HMAC is registered after this middleware, so on the request path HMAC runs first (skips /activities) then this layer runs.
 """
 
 from __future__ import annotations

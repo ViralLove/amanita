@@ -75,6 +75,24 @@ BLOCKCHAIN_PROFILE = os.getenv("BLOCKCHAIN_PROFILE", "localhost")
 ACTIVE_PROFILE = BLOCKCHAIN_PROFILE
 RPC_URL = os.getenv("WEB3_PROVIDER_URI", "http://localhost:8545")
 
+# EVM chain id (десятичный): SSOT для кошелька, sign-requests, wallet-auth challenge.
+# Должен совпадать с eth_chainId узла WEB3_PROVIDER_URI; BlockchainService проверяет при старте
+# (отключение только через EVM_CHAIN_ID_SKIP_RPC_CHECK=1 — тесты/отладка).
+_chain_id_raw = os.getenv("CHAIN_ID", "137").strip()
+if not _chain_id_raw:
+    raise ValueError("CHAIN_ID is set but empty; unset or set a decimal chain id (e.g. 137, 31337).")
+try:
+    CHAIN_ID_INT = int(_chain_id_raw)
+except ValueError as e:
+    raise ValueError(
+        f"CHAIN_ID must be a decimal integer, got {_chain_id_raw!r}"
+    ) from e
+CHAIN_ID = _chain_id_raw
+logging.info(
+    "[CONFIG] CHAIN_ID=%s (must match eth_chainId of WEB3_PROVIDER_URI unless EVM_CHAIN_ID_SKIP_RPC_CHECK)",
+    CHAIN_ID,
+)
+
 # Deployment profile (сеть/окружение деплоя). Источник секретов задаётся отдельно —
 # см. SECRETS_PROVIDER (ниже); не смешивать с DEPLOYMENT_PROFILE.
 DEPLOYMENT_PROFILE = os.getenv("DEPLOYMENT_PROFILE", "localhost")

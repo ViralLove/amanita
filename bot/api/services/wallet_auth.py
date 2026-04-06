@@ -9,6 +9,8 @@ from typing import Dict, Optional
 from eth_account import Account
 from eth_account.messages import encode_defunct
 
+from config import CHAIN_ID
+
 
 def _normalize_address(address: str) -> str:
     return (address or "").strip().lower()
@@ -61,7 +63,7 @@ class WalletAuthService:
         return os.environ.get("WALLET_AUTH_DOMAIN", "localhost")
 
     def _chain_id(self) -> str:
-        return os.environ.get("CHAIN_ID", "137")
+        return CHAIN_ID
 
     def issue_challenge(self, wallet_address: str, user_id: str, auth_scope: str) -> ChallengeRecord:
         now_ts = _now()
