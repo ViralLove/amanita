@@ -577,6 +577,13 @@ class HTMLFormatAdapter:
                     f"<h3>Предупреждения</h3>\n<p>{self._escape_html(aggregated_descriptions['warnings'])}</p>"
                 )
 
+            if aggregated_descriptions.get('features'):
+                self.logger.debug("[HTMLFormatAdapter] Рендерим секцию features")
+                feats_html = "<br>".join(
+                    self._escape_html(f) for f in aggregated_descriptions["features"]
+                )
+                html_parts.append(f"<h3>Особенности</h3>\n<p>{feats_html}</p>")
+
             if aggregated_descriptions.get('dosage_instructions'):
                 self.logger.debug("[HTMLFormatAdapter] Рендерим секцию dosage_instructions")
                 html_parts.append(self._format_aggregated_dosage_html(aggregated_descriptions['dosage_instructions']))

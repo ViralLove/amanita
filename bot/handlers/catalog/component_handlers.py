@@ -51,8 +51,8 @@ async def show_component_description_section(
         # Get component service
         component_service = get_component_service()
         
-        # Fetch ComponentDescription
-        description = component_service.get_component_description(
+        # Fetch ComponentDescription (async API ComponentService)
+        description = await component_service.get_component_description(
             component_id,
             language
         )
