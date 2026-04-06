@@ -1,10 +1,12 @@
 """
-Uploads API — приём статуса и callback от Edge Function arweave-upload (task 3.2).
+Uploads API — приём статуса и callback от arweave-uploader (и совместимых клиентов).
 
-PUT /v1/uploads/{upload_id}/status — приём статуса от Edge (queued_for_publish / failed).
+PUT /v1/uploads/{upload_id}/status — приём статуса (queued_for_publish / failed).
 POST /v1/uploads/callback — приём callback после публикации в Arweave.
 GET /v1/uploads/{upload_id}/sign-payload — данные для подписи по upload_id (W3; X-User-Id).
-Авторизация: status/callback — Bearer EDGE_TO_BACKEND_SECRET; sign-payload — X-User-Id.
+Авторизация status/callback: Authorization: Bearer <секрет>.
+Секрет на боте (приоритет): NODE_AUTH_TOKEN → EDGE_TO_BACKEND_SECRET → OWN_AUTH_TOKEN — то же значение,
+что в NODE_AUTH_TOKEN на arweave-uploader.
 """
 
 from __future__ import annotations
@@ -19,11 +21,18 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, model_validator
 
-from api.dependencies import get_payload_cache, get_push_sender, get_sign_request_store, get_upload_service
+from api.dependencies import (
+    get_blockchain_service,
+    get_payload_cache,
+    get_push_sender,
+    get_sign_request_store,
+    get_upload_service,
+)
 from api.utils.wallet_auth_guard import authenticate_wallet_request
 from services.upload.upload_service import UploadConflictError, UploadNotFoundError
 
 logger = logging.getLogger(__name__)
+sign_flow_log = logging.getLogger("amanita_api.sign_flow")
 
 router = APIRouter(prefix="/v1", tags=["uploads"])
 
@@ -34,7 +43,12 @@ FAILURE_CODES = ("token_invalid", "signature_invalid", "publish_failed")
 
 
 def _get_edge_secret() -> str:
-    return os.environ.get("EDGE_TO_BACKEND_SECRET") or "mock-edge-to-backend-secret"
+    return (
+        os.environ.get("NODE_AUTH_TOKEN")
+        or os.environ.get("EDGE_TO_BACKEND_SECRET")
+        or os.environ.get("OWN_AUTH_TOKEN")
+        or "mock-edge-to-backend-secret"
+    )
 
 
 def verify_edge_bearer(request: Request) -> None:
@@ -103,6 +117,7 @@ async def post_upload_callback(
     upload_svc=Depends(get_upload_service),
     push_sender=Depends(get_push_sender),
     sign_request_store=Depends(get_sign_request_store),
+    blockchain_service=Depends(get_blockchain_service),
 ):
     """Приём callback после успешной публикации в Arweave. Обновляет upload; создаёт sign_request и пуш sign_contract (W4)."""
     try:
@@ -116,19 +131,52 @@ async def post_upload_callback(
         raise HTTPException(status_code=404, detail="Upload not found")
     except UploadConflictError:
         raise HTTPException(status_code=409, detail="Invalid status for callback")
+    # ASG-2 / Variant B: HTTP 200 сохраняем для «callback принят» (публикация учтена).
+    # sign_contract_enqueued отделяет успех цепочки sign_request + push от голого ok.
+    response_body: dict = {
+        "ok": True,
+        "sign_contract_enqueued": False,
+        "sign_request_id": None,
+        "error_code": None,
+        "error": None,
+    }
     try:
         rec = upload_svc.get_upload(body.upload_id)
-        if rec:
+        if not rec:
+            response_body["error_code"] = "upload_record_missing"
+            response_body["error"] = "Upload record not found after callback"
+            logger.warning(
+                "Callback: upload_id=%s missing in store after handle_callback",
+                body.upload_id,
+            )
+        else:
+            evm_chain_id, evm_contract_address = blockchain_service.get_sign_request_evm_params()
             sign_request_id = sign_request_store.create(
                 rec.user_id,
                 "create_activity",
                 body.upload_id,
                 body.bundle_tx_id,
+                evm_chain_id=evm_chain_id,
+                evm_contract_address=evm_contract_address,
             )
             push_sender.send_sign_request(rec.user_id, "sign_contract", sign_request_id)
+            response_body["sign_contract_enqueued"] = True
+            response_body["sign_request_id"] = sign_request_id
+            sign_flow_log.info(
+                "callback: sign_request created sign_request_id=%s upload_id=%s chain_id=%s "
+                "contract_address=%s user_id=%s — дальше кошелёк GET /v1/sign-requests/{id}; "
+                "ошибки подписи на стороне кошелька (ethers и т.п.) до POST .../submit в API не попадают",
+                sign_request_id,
+                body.upload_id,
+                evm_chain_id,
+                evm_contract_address,
+                rec.user_id,
+            )
     except Exception as e:
-        logger.warning("Callback sign_request/push failed (response unchanged): %s", e, exc_info=True)
-    return JSONResponse(status_code=200, content={"ok": True})
+        logger.warning("Callback sign_request/push failed: %s", e, exc_info=True)
+        response_body["error_code"] = "sign_request_push_failed"
+        response_body["error"] = "Sign request enqueue or push failed"
+    return JSONResponse(status_code=200, content=response_body)
 
 
 @router.get("/uploads/{upload_id}/sign-payload")
