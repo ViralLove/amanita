@@ -29,6 +29,7 @@ describe("publish/validate-data-item", () => {
       assert.strictEqual(result.ok, true);
       assert.strictEqual(typeof result.itemId, "string");
       assert.ok(result.itemId.length > 0);
+      assert.strictEqual(result.rsaSignatureBytes, 256);
     });
     it("P0: валидный Data Item с тегом Upload-Id = A, вызов с uploadId B → ok: false, code signature_invalid", async () => {
       const base64 = await createValidDataItem("real-upload-id");
@@ -44,6 +45,15 @@ describe("publish/validate-data-item", () => {
       const result = await validateDataItem(badBase64, "p1-upload-id");
       assert.strictEqual(result.ok, false);
       assert.strictEqual(result.code, "signature_invalid");
+    });
+    it("P0: RSA-4096 Data Item (фикстура) и совпадающий uploadId → ok: true", async () => {
+      const uploadId = "p0-upload-4096";
+      const base64 = await createValidDataItem(uploadId, Buffer.alloc(0), { modulusLength: 4096 });
+      const result = await validateDataItem(base64, uploadId);
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(typeof result.itemId, "string");
+      assert.ok(result.itemId.length > 0);
+      assert.strictEqual(result.rsaSignatureBytes, 512);
     });
   });
 });

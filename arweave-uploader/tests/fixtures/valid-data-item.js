@@ -2,22 +2,14 @@
  * Фикстура: минимальный валидный Data Item (ANS-104) с одной меткой Upload-Id и подписью RSA-PSS.
  * Для P0/P1 тестов validateDataItem.
  *
- * Что за контент и почему в байтах:
- * - ANS-104 Data Item — это бинарный формат (спека Arweave/Bundlr): не JSON, а последовательность
- *   полей (signature type, signature 256b, owner 294b, target, anchor, num_tags, tag_bytes, tags, data).
- * - Поле "data" — произвольный payload в байтах. По умолчанию пустой Buffer; можно передать
- *   любой контент, например Buffer.from(JSON.stringify(activity), "utf8") для реального JSON Activity.
- * - Кристаллизатор не шифрует и не расшифровывает: он проверяет подпись Data Item и тег Upload-Id,
- *   затем упаковывает item в bundle и отправляет в Arweave. Кто подписывает — владелец ключа (в фикстуре
- *   своя RSA-пара); в проде — ключ кошелька пользователя.
+ * Layout: signature type (2) + RSA signature (|n|/8) + owner SPKI DER (переменная длина) + target + anchor + tags + data.
+ * Поддерживаются типичные RSA модули 2048 / 3072 / 4096 (и др., если Node генерирует пару).
  */
 
 import crypto from "node:crypto";
 import { deepHash } from "../../dist/publish/deep-hash.js";
 
 const SIGNATURE_TYPE_RSA = 1;
-const RSA_SIGNATURE_LENGTH = 256;
-const RSA_OWNER_LENGTH = 294;
 
 function writeVInt(buf, offset, value) {
   let v = value;
@@ -48,13 +40,16 @@ function zigzagEncode(n) {
   return n >= 0 ? n * 2 : -n * 2 - 1;
 }
 
-let cachedKeyPair = null;
+const cachedKeyPairs = new Map();
 
-function getKeyPair() {
-  if (!cachedKeyPair) {
-    cachedKeyPair = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+function getKeyPair(modulusLength) {
+  if (!cachedKeyPairs.has(modulusLength)) {
+    cachedKeyPairs.set(
+      modulusLength,
+      crypto.generateKeyPairSync("rsa", { modulusLength })
+    );
   }
-  return cachedKeyPair;
+  return cachedKeyPairs.get(modulusLength);
 }
 
 /**
@@ -83,31 +78,29 @@ function buildTagBlock(name, value) {
  * Создаёт валидный подписанный Data Item с тегом Upload-Id = uploadIdValue.
  * @param {string} uploadIdValue — значение тега Upload-Id
  * @param {Buffer} [data] — тело data (по умолчанию пустой)
+ * @param {{ modulusLength?: number }} [opts] — по умолчанию 2048; для тестов 4096: `{ modulusLength: 4096 }`
  * @returns {Promise<string>} base64 строки подписанного data item
  */
-export async function createValidDataItem(uploadIdValue, data = Buffer.alloc(0)) {
-  const pair = getKeyPair();
+export async function createValidDataItem(uploadIdValue, data = Buffer.alloc(0), opts = {}) {
+  const modulusLength = opts.modulusLength ?? 2048;
+  const pair = getKeyPair(modulusLength);
   const owner = pair.publicKey.export({ type: "spki", format: "der" });
-  if (owner.length !== RSA_OWNER_LENGTH) {
-    throw new Error(`Expected SPKI 294 bytes, got ${owner.length}`);
-  }
   const target = Buffer.alloc(0);
   const anchor = Buffer.alloc(0);
   const tagBlock = buildTagBlock("Upload-Id", uploadIdValue);
   const numTags = 1;
   const numTagBytes = tagBlock.length;
 
-  const signaturePlaceholder = Buffer.alloc(RSA_SIGNATURE_LENGTH);
+  const sigPlaceholderLen = modulusLength / 8;
   const raw = Buffer.alloc(
-    2 + RSA_SIGNATURE_LENGTH + RSA_OWNER_LENGTH + 1 + 1 + 8 + 8 + numTagBytes + data.length
+    2 + sigPlaceholderLen + owner.length + 1 + 1 + 8 + 8 + numTagBytes + data.length
   );
   let off = 0;
   raw[off++] = SIGNATURE_TYPE_RSA & 0xff;
   raw[off++] = (SIGNATURE_TYPE_RSA >> 8) & 0xff;
-  raw.set(signaturePlaceholder, off);
-  off += RSA_SIGNATURE_LENGTH;
+  off += sigPlaceholderLen;
   raw.set(owner, off);
-  off += RSA_OWNER_LENGTH;
+  off += owner.length;
   raw[off++] = 0;
   raw[off++] = 0;
   off += writeUint64LE(raw, off, numTags);
@@ -135,8 +128,8 @@ export async function createValidDataItem(uploadIdValue, data = Buffer.alloc(0))
     padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
     saltLength: 32,
   });
-  if (signature.length !== RSA_SIGNATURE_LENGTH) {
-    throw new Error(`Expected signature 256 bytes, got ${signature.length}`);
+  if (signature.length !== sigPlaceholderLen) {
+    throw new Error(`Expected signature ${sigPlaceholderLen} bytes, got ${signature.length}`);
   }
   raw.set(signature, 2);
   return raw.toString("base64");

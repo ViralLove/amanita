@@ -103,7 +103,9 @@ async function main() {
   const arweaveClient = new ArweaveClient(config);
   const mockBundleAndPublish =
     !useRealArweave
-      ? async () => ({ bundleTxId: "mock-bundle-tx-id-publish-flow" })
+      ? async (_signedDataItemBytes, _arweaveClient, _opts) => ({
+          bundleTxId: "mock-bundle-tx-id-publish-flow",
+        })
       : undefined;
   const app = buildApp({
     config,
