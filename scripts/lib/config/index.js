@@ -9,7 +9,8 @@
  */
 
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../../../.env') });
+const { SCRIPTS_DOTENV_PATH } = require('../env-path');
+require('dotenv').config({ path: SCRIPTS_DOTENV_PATH });
 
 const { ARWEAVE, CONTRACT_ENV_MAPPING, CONTRACT_ENV_ALIASES } = require('./constants');
 

@@ -1,8 +1,8 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@openzeppelin/hardhat-upgrades");
-const path = require("path");
-// .env рядом с hardhat.config.js (корень репо), не process.cwd() — иначе перенос/запуск из подпапки ломает DEPLOYER_PRIVATE_KEY
-require("dotenv").config({ path: path.join(__dirname, ".env") });
+const { SCRIPTS_DOTENV_PATH } = require("./scripts/lib/env-path");
+// Секреты деплоя: scripts/.env (единый SSOT с deploy_full.js), не корень репо
+require("dotenv").config({ path: SCRIPTS_DOTENV_PATH });
 
 // Используем те же имена переменных, что и в deploy.js для единообразия
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
@@ -38,7 +38,7 @@ try {
     if (!afterV2 || afterV2.length < 16) {
       console.warn(
         "[hardhat.config.js] ⚠️ Похоже, в URL Alchemy нет API key после /v2/ (или он обрезан). " +
-          "В .env одна строка без пробелов вокруг = и без кавычек, без переноса строки посередине URL."
+          "В scripts/.env одна строка без пробелов вокруг = и без кавычек, без переноса строки посередине URL."
       );
     }
   }

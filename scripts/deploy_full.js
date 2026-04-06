@@ -16,9 +16,10 @@
  * @date 2025-10-14
  */
 
-// Load environment variables from repo root (parent of scripts/), not process.cwd()
+// Load environment variables from scripts/.env (same as hardhat.config.js)
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+const { SCRIPTS_DOTENV_PATH } = require('./lib/env-path');
+require('dotenv').config({ path: SCRIPTS_DOTENV_PATH });
 
 // Import all modules
 const config = require('./lib/config/index');

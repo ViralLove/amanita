@@ -12,6 +12,7 @@ const SetupActions = require('./SetupActions');
 const { CONTRACT_ENV_MAPPING } = require('../config/constants');
 const fs = require('fs');
 const path = require('path');
+const { SCRIPTS_DOTENV_PATH } = require('../env-path');
 const { ethers } = require('hardhat');
 
 class DeployActions {
@@ -110,7 +111,7 @@ class DeployActions {
   }
 
   async updateEnvFile(envLines) {
-    const envPath = path.join(process.cwd(), '.env');
+    const envPath = SCRIPTS_DOTENV_PATH;
     let content = '';
     if (fs.existsSync(envPath)) {
       content = fs.readFileSync(envPath, 'utf8');

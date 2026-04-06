@@ -9,6 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { SCRIPTS_DOTENV_PATH } = require('../env-path');
 const { ethers } = require('hardhat');
 const { SUPPORTED_CONTRACTS, CONTRACT_ENV_MAPPING, ROLES } = require('../config/constants');
 const logger = require('../utils/Logger');
@@ -909,7 +910,7 @@ class ContractManager {
       if (contractName === 'MagicRegistry') {
         const newAddress = await deployedContract.getAddress();
         process.env.MAGIC_REGISTRY_CONTRACT_ADDRESS = newAddress;
-        const envPath = path.join(process.cwd(), '.env');
+        const envPath = SCRIPTS_DOTENV_PATH;
         try {
           let content = '';
           if (fs.existsSync(envPath)) {
@@ -923,7 +924,7 @@ class ContractManager {
             content = content.trimEnd() + (content ? '\n' : '') + line + '\n';
           }
           fs.writeFileSync(envPath, content, 'utf8');
-          logger.info(`Updated .env: MAGIC_REGISTRY_CONTRACT_ADDRESS=${newAddress}`);
+          logger.info(`Updated scripts/.env: MAGIC_REGISTRY_CONTRACT_ADDRESS=${newAddress}`);
         } catch (envErr) {
           logger.warn(`Could not update .env with new MagicRegistry address: ${envErr.message}`);
         }
