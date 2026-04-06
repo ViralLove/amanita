@@ -633,8 +633,8 @@ class TestGenerateVariationSku:
             price_info = MockPriceInfo(
                 price=60,
                 currency=currency,
-                weight=Decimal("100"),
-                weight_unit="g"
+                quantity=Decimal("100"),
+                unit="g"
             )
             result = generate_variation_sku(product, "dried", price_info)
             assert result.endswith(f"_{currency}")

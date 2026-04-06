@@ -193,8 +193,8 @@ def test_di_with_real_api_endpoint():
     """
     Проверяет DI на реальном API endpoint.
     """
-    from bot.api.main import create_api_app
-    from bot.api.dependencies import get_product_storage_service
+    from api.main import create_api_app
+    from api.dependencies import get_product_storage_service
     from bot.dependencies import get_product_storage_service as get_storage_direct
     
     # Создаем реальное FastAPI приложение

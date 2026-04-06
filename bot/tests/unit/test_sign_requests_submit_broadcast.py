@@ -9,7 +9,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.dependencies import get_sign_request_store
+from api.dependencies import get_blockchain_service, get_sign_request_store
 from api.routes import sign_requests
 from services.wallet_push import SignRequestStore
 
@@ -36,7 +36,8 @@ def env_chain():
 
 def _mock_blockchain(tx_hash_hex="0xabc123"):
     m = MagicMock()
-    m.send_raw_transaction_hex.return_value = tx_hash_hex
+    m.get_sign_request_evm_params.return_value = ("137", "0xActivityRegistry")
+    m.submit_sign_request_raw_transaction.return_value = tx_hash_hex
     return m
 
 
@@ -46,7 +47,7 @@ def client(store, sign_request_id):
     app = FastAPI()
     app.include_router(sign_requests.router)
     app.dependency_overrides[get_sign_request_store] = lambda: store
-    app.dependency_overrides[sign_requests._get_blockchain_service_for_broadcast] = lambda: mock_bc
+    app.dependency_overrides[get_blockchain_service] = lambda: mock_bc
     return TestClient(app), mock_bc
 
 
@@ -65,17 +66,22 @@ class TestSubmitBroadcast:
         )
         assert r.status_code == 200
         assert r.json() == {"ok": True, "tx_hash": "0xtx_hash_456"}
-        mock_bc.send_raw_transaction_hex.assert_called_once_with("0xdeadbeef")
+        mock_bc.submit_sign_request_raw_transaction.assert_called_once_with(
+            "0xdeadbeef",
+            expected_chain_id="137",
+            expected_to_address="0xActivityRegistry",
+        )
         rec = store.get(sign_request_id)
         assert rec.tx_hash == "0xtx_hash_456"
 
     def test_submit_broadcast_value_error_returns_422(self, store, sign_request_id):
         mock_bc = MagicMock()
-        mock_bc.send_raw_transaction_hex.side_effect = ValueError("Invalid hex")
+        mock_bc.get_sign_request_evm_params.return_value = ("137", "0xActivityRegistry")
+        mock_bc.submit_sign_request_raw_transaction.side_effect = ValueError("Invalid hex")
         app = FastAPI()
         app.include_router(sign_requests.router)
         app.dependency_overrides[get_sign_request_store] = lambda: store
-        app.dependency_overrides[sign_requests._get_blockchain_service_for_broadcast] = lambda: mock_bc
+        app.dependency_overrides[get_blockchain_service] = lambda: mock_bc
         c = TestClient(app)
         r = c.post(
             f"/v1/sign-requests/{sign_request_id}/submit",
@@ -87,11 +93,12 @@ class TestSubmitBroadcast:
 
     def test_submit_broadcast_exception_returns_500(self, store, sign_request_id):
         mock_bc = MagicMock()
-        mock_bc.send_raw_transaction_hex.side_effect = RuntimeError("RPC error")
+        mock_bc.get_sign_request_evm_params.return_value = ("137", "0xActivityRegistry")
+        mock_bc.submit_sign_request_raw_transaction.side_effect = RuntimeError("RPC error")
         app = FastAPI()
         app.include_router(sign_requests.router)
         app.dependency_overrides[get_sign_request_store] = lambda: store
-        app.dependency_overrides[sign_requests._get_blockchain_service_for_broadcast] = lambda: mock_bc
+        app.dependency_overrides[get_blockchain_service] = lambda: mock_bc
         c = TestClient(app)
         r = c.post(
             f"/v1/sign-requests/{sign_request_id}/submit",

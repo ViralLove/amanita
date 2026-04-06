@@ -133,7 +133,8 @@ def payload_cache():
 @pytest.fixture
 def mock_blockchain():
     m = MagicMock()
-    m.send_raw_transaction_hex.return_value = "0xtx_hash_full_floou"
+    m.submit_sign_request_raw_transaction.return_value = "0xtx_hash_full_floou"
+    m.get_sign_request_evm_params.return_value = ("137", "0xActivityRegistry")
     return m
 
 
@@ -142,6 +143,7 @@ def _create_app(prepare_svc, mock_upload_svc, push_sender, sign_request_store, p
     with patch.dict(sys.modules, {"services.product.registry_singleton": mock_registry}):
         from api.dependencies import (
             get_activity_storage,
+            get_blockchain_service,
             get_payload_cache,
             get_prepare_resolve_service,
             get_push_sender,
@@ -165,7 +167,7 @@ def _create_app(prepare_svc, mock_upload_svc, push_sender, sign_request_store, p
     app.dependency_overrides[get_push_sender] = lambda: push_sender
     app.dependency_overrides[get_sign_request_store] = lambda: sign_request_store
     app.dependency_overrides[get_payload_cache] = lambda: payload_cache
-    app.dependency_overrides[sign_requests._get_blockchain_service_for_broadcast] = _get_blockchain
+    app.dependency_overrides[get_blockchain_service] = _get_blockchain
     return app
 
 
@@ -289,6 +291,10 @@ class TestFullFloouDraftToSubmitInProcessRunner:
             headers=_edge_headers(),
         )
         assert r5.status_code == 200
+        cb = r5.json()
+        assert cb.get("ok") is True
+        assert cb.get("sign_contract_enqueued") is True
+        assert cb.get("sign_request_id")
         assert upload_record.status == "published"
 
         # 6) GET pending-sign-requests (событие sign_contract)

@@ -43,15 +43,21 @@ def upload_svc(mock_db):
 
 @pytest.fixture
 def app(upload_svc):
-    """Сборка app без загрузки Web3: мокаем registry_singleton при импорте api."""
+    """Сборка app без загрузки Web3: мок registry_singleton + blockchain для callback."""
     mock_registry_module = MagicMock()
     mock_registry_module.product_registry_service = MagicMock()
+    mock_blockchain = MagicMock()
+    mock_blockchain.get_sign_request_evm_params.return_value = (
+        "31337",
+        "0x0000000000000000000000000000000000000001",
+    )
     with patch.dict(sys.modules, {"services.product.registry_singleton": mock_registry_module}):
-        from api.dependencies import get_upload_service
+        from api.dependencies import get_blockchain_service, get_upload_service
         from api.routes import uploads
     app = FastAPI()
     app.include_router(uploads.router)
     app.dependency_overrides[get_upload_service] = lambda: upload_svc
+    app.dependency_overrides[get_blockchain_service] = lambda: mock_blockchain
     return app
 
 
@@ -119,7 +125,12 @@ class TestUploadFlowAPI:
             headers=_headers(),
         )
         assert r.status_code == 200
-        assert r.json() == {"ok": True}
+        data = r.json()
+        assert data["ok"] is True
+        assert data["sign_contract_enqueued"] is True
+        assert data["sign_request_id"]
+        assert data["error_code"] is None
+        assert data["error"] is None
 
     def test_post_callback_404(self, client):
         """POST callback с неизвестным upload_id → 404."""

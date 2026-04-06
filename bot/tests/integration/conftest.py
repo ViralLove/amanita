@@ -28,10 +28,6 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 # Устанавливаем профиль localhost (паттерн из test_blockchain.py:8)
 os.environ["BLOCKCHAIN_PROFILE"] = "localhost"
 
-# Upload flow integration (Phase 1 harness: fixtures в upload_harness.py)
-pytest_plugins = ["tests.integration.upload_harness"]
-
-
 # ═══════════════════════════════════════════════════════════════
 # NETWORK GROWTH INFRASTRUCTURE (Exponential Growth Strategy)
 # ═══════════════════════════════════════════════════════════════

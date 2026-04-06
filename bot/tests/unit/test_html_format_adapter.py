@@ -965,10 +965,10 @@ class TestHTMLFormatAdapter:
         assert "Токсичен в больших дозах" in result['warnings']
         assert "шаманских практиках" in result['shamanic']
 
-        # Проверяем инструкции по дозировке
+        # Проверяем инструкции по дозировке (объекты DosageInstruction, не dict)
         assert len(result['dosage_instructions']) == 2
-        assert result['dosage_instructions'][0]['title'] == "Начальная доза"
-        assert result['dosage_instructions'][1]['title'] == "Полная доза"
+        assert result['dosage_instructions'][0].title == "Начальная доза"
+        assert result['dosage_instructions'][1].title == "Полная доза"
 
         # Проверяем особенности (без дубликатов)
         assert len(result['features']) == 2
@@ -1255,55 +1255,6 @@ class TestHTMLFormatAdapter:
         result_empty = aggregate_component_descriptions(product_empty)
 
         assert len(result_empty) == 0, f"Should return empty dict for empty descriptions, got: {result_empty}"
-
-    def test_aggregate_component_descriptions_qualification_check(self):
-        """
-        Проверка качества тестов по правилам @test-qualification.mdc
-
-        GIVEN: Тесты для метода агрегации описаний компонентов
-        WHEN: Анализируем coverage и quality gates
-        THEN: Все P0/P1/P2 требования выполнены
-        """
-        # Проверяем что тесты покрывают critical paths
-        test_methods = [
-            'test_aggregate_component_descriptions_single_component',
-            'test_aggregate_component_descriptions_multiple_components',
-            'test_aggregate_component_descriptions_empty_descriptions',
-            'test_aggregate_component_descriptions_partial_descriptions',
-            'test_aggregate_component_descriptions_standalone_logic'
-        ]
-
-        # NO_FALSE_SUCCESSES: тесты провалились бы при поломке логики
-        # VALIDATE_REAL_FUNCTIONALITY: проверяют реальные структуры данных
-        # CORRECT_LOGIC: assertions осмысленные, проверяют конкретные аспекты
-        # MINIMAL_MOCK_OVERUSE: используют реальные классы моделей
-
-        # Проверяем что все critical paths покрыты
-        covered_scenarios = [
-            "single component aggregation",
-            "multiple components aggregation",
-            "feature deduplication",
-            "empty descriptions handling",
-            "partial descriptions handling",
-            "standalone logic validation"
-        ]
-
-        assert len(test_methods) >= 4, "Should have at least 4 test methods for critical paths"
-        assert len(covered_scenarios) >= 6, "Should cover at least 6 critical scenarios"
-
-        # P0 Gate: Все critical paths должны быть протестированы
-        critical_paths = [
-            "component iteration",
-            "field aggregation",
-            "HTML formatting",
-            "deduplication logic",
-            "empty handling"
-        ]
-
-        # Проверяем что тесты покрывают все critical paths
-        for path in critical_paths:
-            covered = any(path in scenario for scenario in covered_scenarios)
-            assert covered, f"Critical path '{path}' not covered by tests"
 
     # ============================================================
     # Integration Tests: format_product_html with Description Aggregation

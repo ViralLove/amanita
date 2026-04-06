@@ -10,13 +10,24 @@ Phase 1 @integration-test-build.core: real Supabase (test DB), real UploadServic
 import os
 import sys
 from pathlib import Path
+from typing import Any, Mapping
 
 import pytest
+
 
 # bot root
 bot_dir = Path(__file__).resolve().parent.parent
 if str(bot_dir) not in sys.path:
     sys.path.insert(0, str(bot_dir))
+
+
+def assert_upload_callback_response_enqueued(body: Mapping[str, Any]) -> None:
+    """Ожидаемое тело POST /v1/uploads/callback при успешной цепочке sign_request + push (ASG-2, Variant B)."""
+    assert body.get("ok") is True
+    assert body.get("sign_contract_enqueued") is True
+    assert body.get("sign_request_id")
+    assert body.get("error_code") is None
+    assert body.get("error") is None
 
 
 def _upload_integration_available():
@@ -59,8 +70,8 @@ def upload_integration_app(upload_service):
     """
     Минимальное FastAPI приложение: только роутер uploads и реальный get_upload_service.
     Без lifespan (finalizer не запускаем в интеграционных тестах).
-    Импорт api.dependencies тянет registry_singleton → BlockchainService → Web3; мокаем
-    registry_singleton, чтобы не требовать запущенный node для Phase 2–3.
+    Импорт api.dependencies тянет registry_singleton → Web3; мокаем registry_singleton.
+    Для POST callback мокаем BlockchainService (get_sign_request_evm_params), чтобы Phase 2–3 не требовали RPC.
     """
     from unittest.mock import MagicMock, patch
     from fastapi import FastAPI
@@ -68,13 +79,19 @@ def upload_integration_app(upload_service):
     mock_registry = MagicMock()
     mock_registry_module = MagicMock()
     mock_registry_module.product_registry_service = mock_registry
+    mock_blockchain = MagicMock()
+    mock_blockchain.get_sign_request_evm_params.return_value = (
+        "31337",
+        "0x0000000000000000000000000000000000000001",
+    )
     with patch.dict(sys.modules, {"services.product.registry_singleton": mock_registry_module}):
-        from api.dependencies import get_upload_service
+        from api.dependencies import get_blockchain_service, get_upload_service
         from api.routes import uploads
 
     app = FastAPI(title="Upload Integration Test")
     app.include_router(uploads.router)
     app.dependency_overrides[get_upload_service] = lambda: upload_service
+    app.dependency_overrides[get_blockchain_service] = lambda: mock_blockchain
     return app
 
 

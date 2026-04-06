@@ -72,16 +72,29 @@ def sign_request_store():
 
 
 @pytest.fixture
-def app(mock_upload_svc, push_sender, sign_request_store):
+def mock_blockchain():
+    m = MagicMock()
+    m.get_sign_request_evm_params.return_value = ("137", "0x00000000000000000000000000000000AbCdEf")
+    return m
+
+
+@pytest.fixture
+def app(mock_upload_svc, push_sender, sign_request_store, mock_blockchain):
     mock_registry = MagicMock()
     with patch.dict(sys.modules, {"services.product.registry_singleton": mock_registry}):
-        from api.dependencies import get_push_sender, get_sign_request_store, get_upload_service
+        from api.dependencies import (
+            get_blockchain_service,
+            get_push_sender,
+            get_sign_request_store,
+            get_upload_service,
+        )
         from api.routes import uploads
     app = FastAPI()
     app.include_router(uploads.router)
     app.dependency_overrides[get_upload_service] = lambda: mock_upload_svc
     app.dependency_overrides[get_push_sender] = lambda: push_sender
     app.dependency_overrides[get_sign_request_store] = lambda: sign_request_store
+    app.dependency_overrides[get_blockchain_service] = lambda: mock_blockchain
     return app
 
 
@@ -107,7 +120,12 @@ class TestCallbackSignRequestPush:
         }
         r = client.post("/v1/uploads/callback", json=body, headers=_headers())
         assert r.status_code == 200
-        assert r.json() == {"ok": True}
+        data = r.json()
+        assert data["ok"] is True
+        assert data["sign_contract_enqueued"] is True
+        assert data["sign_request_id"]
+        assert data["error_code"] is None
+        assert data["error"] is None
 
         mock_upload_svc.handle_callback.assert_called_once()
         mock_upload_svc.get_upload.assert_called_with(upload_id)
@@ -126,3 +144,28 @@ class TestCallbackSignRequestPush:
         assert rec.upload_id == upload_id
         assert rec.cid == "bundle-tx-456"
         assert rec.status == "pending"
+        assert rec.evm_chain_id == "137"
+        assert rec.evm_contract_address == "0x00000000000000000000000000000000AbCdEf"
+
+    def test_callback_sign_request_create_failure_returns_enqueue_false(
+        self, client, mock_upload_svc, upload_id, push_sender, sign_request_store
+    ):
+        """Исключение в sign_request_store.create → sign_contract_enqueued false, без утечки деталей в error."""
+        sign_request_store.create = MagicMock(side_effect=RuntimeError("internal"))
+
+        body = {
+            "upload_id": upload_id,
+            "item_id": "item-1",
+            "bundle_tx_id": "bundle-tx-456",
+            "published_at": "2026-01-29T12:00:00Z",
+        }
+        r = client.post("/v1/uploads/callback", json=body, headers=_headers())
+        assert r.status_code == 200
+        data = r.json()
+        assert data["ok"] is True
+        assert data["sign_contract_enqueued"] is False
+        assert data["sign_request_id"] is None
+        assert data["error_code"] == "sign_request_push_failed"
+        assert data["error"] == "Sign request enqueue or push failed"
+
+        assert push_sender.get_pending_events() == []

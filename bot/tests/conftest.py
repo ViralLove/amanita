@@ -9,10 +9,28 @@ import time
 from pathlib import Path
 from unittest.mock import Mock, AsyncMock
 
-# Add bot/ to Python path for imports (fixes config import issue)
-bot_dir = Path(__file__).parent.parent
-if str(bot_dir) not in sys.path:
-    sys.path.insert(0, str(bot_dir))
+# Корень bot/ — всегда в начало path: иначе `tests/utils` перехватывает `import utils` (api.main → utils.sentry_init).
+# Pytest подмешивает rootdir (`tests/`) в начало sys.path после загрузки conftest — повторяем в pytest_configure.
+bot_dir = Path(__file__).parent.parent.resolve()
+
+
+def _ensure_bot_first_on_sys_path() -> None:
+    p = str(bot_dir)
+    try:
+        sys.path.remove(p)
+    except ValueError:
+        pass
+    sys.path.insert(0, p)
+
+
+_ensure_bot_first_on_sys_path()
+
+
+def pytest_configure(config):
+    _ensure_bot_first_on_sys_path()
+
+# SSOT chain id (ASG-4): для pytest по умолчанию Hardhat/Anvil 31337, если не задано в окружении/CI
+os.environ.setdefault("CHAIN_ID", "31337")
 
 # Lazy import: blockchain imported only when needed to avoid config import issues
 # from bot.services.core import blockchain
@@ -20,8 +38,8 @@ from bot.model.product import Product
 from bot.model.organic_component import OrganicComponent
 from bot.model.product import PriceInfo
 
-# Явная регистрация pytest-asyncio плагина
-pytest_plugins = ["pytest_asyncio"]
+# Плагины: asyncio + upload harness (раньше был только в integration/conftest — pytest 8+ требует top-level)
+pytest_plugins = ["pytest_asyncio", "tests.integration.upload_harness"]
 
 # Настройка логирования для тестов
 logging.basicConfig(
@@ -4061,7 +4079,7 @@ def real_blockchain_service():
 def test_app(mock_product_registry_service):
     """Фикстура для создания тестового FastAPI приложения с подмененными зависимостями"""
     from fastapi.testclient import TestClient
-    from bot.api.main import create_api_app
+    from api.main import create_api_app
     from unittest.mock import Mock
     
     # Создаем mock ServiceFactory

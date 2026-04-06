@@ -15,6 +15,11 @@ def app_with_guard():
     def act():
         return {"ok": True}
 
+    @app.post("/activities/draft")
+    def draft():
+        """Заглушка под тот же префикс, что и Bullrun POST /activities/draft."""
+        return {"success": True, "activity": {"activity_id": "draft-1"}}
+
     @app.get("/reference/formats")
     def ref():
         return {"formats": []}
@@ -46,6 +51,16 @@ class TestGptActionsBearerMiddleware:
         assert data.get("error") == "gpt_actions_auth_error"
         assert data.get("error_code") == "missing_bearer"
 
+    def test_401_activities_draft_post_without_bearer_same_as_bullrun_log(self, client):
+        """Совпадает с оркестратором: POST /activities/draft без Bearer при включённом секрете → 401 missing_bearer."""
+        r = client.post(
+            "/activities/draft",
+            json={"activity_type": "event", "title": "t", "short_summary": "s"},
+            headers={"X-User-Id": "111.444.555.888.555.444.111", "Content-Type": "application/json"},
+        )
+        assert r.status_code == 401
+        assert r.json().get("error_code") == "missing_bearer"
+
     def test_401_wrong_bearer(self, client):
         r = client.get(
             "/activities/me",
@@ -61,6 +76,18 @@ class TestGptActionsBearerMiddleware:
         )
         assert r.status_code == 200
         assert r.json() == {"ok": True}
+
+    def test_200_valid_bearer_activities_draft_post(self, client):
+        r = client.post(
+            "/activities/draft",
+            json={"activity_type": "event", "title": "t", "short_summary": "s"},
+            headers={
+                "Authorization": "Bearer gpt-secret-token-32chars!!",
+                "Content-Type": "application/json",
+            },
+        )
+        assert r.status_code == 200
+        assert r.json().get("success") is True
 
     def test_200_valid_bearer_reference(self, client):
         r = client.get(

@@ -27,6 +27,7 @@ except ImportError:
 _log = logging.getLogger(__name__)
 
 from model.upload import FAILED, PREPARED, QUEUED_FOR_PUBLISH, PUBLISHED
+from tests.integration.upload_harness import assert_upload_callback_response_enqueued
 
 # Путь по умолчанию к файлу с base64 подписанного Data Item для теста полного цикла
 _FULL_CYCLE_SIGNED_DATA_ITEM_B64_DEFAULT_PATH = (
@@ -242,7 +243,7 @@ class TestUploadIntegrationContracts:
     def test_api_contract_post_callback_response_format(
         self, upload_integration_client, upload_supabase, upload_service
     ):
-        """Contract: POST /v1/uploads/callback → 200 { ok: true } при валидном состоянии; запись в БД published с item_id и bundle_tx_id."""
+        """Contract: POST /v1/uploads/callback → 200, тело ASG-2; запись в БД published с item_id и bundle_tx_id."""
         import uuid
         upload_id = str(uuid.uuid4())
         user_id = "00000000-0000-0000-0000-000000000004"
@@ -262,7 +263,7 @@ class TestUploadIntegrationContracts:
             headers=_headers(),
         )
         assert r.status_code == 200
-        assert r.json() == {"ok": True}
+        assert_upload_callback_response_enqueued(r.json())
         rec = upload_service.get_upload(upload_id)
         assert rec is not None
         assert rec.status == PUBLISHED
@@ -458,6 +459,7 @@ class TestUploadIntegrationFloous:
             headers=_headers(),
         )
         assert r2.status_code == 200
+        assert_upload_callback_response_enqueued(r2.json())
         rec = upload_service.get_upload(upload_id)
         assert rec is not None
         assert rec.status == PUBLISHED
@@ -583,6 +585,7 @@ class TestUploadIntegrationFloous:
             headers=_headers(),
         )
         assert r2.status_code == 200
+        assert_upload_callback_response_enqueued(r2.json())
         rec = upload_service.get_upload(upload_id)
         assert rec.status == PUBLISHED
         assert rec.bundle_tx_id == "full-bundle"
