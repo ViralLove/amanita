@@ -122,10 +122,10 @@ python3 -m pytest tests/integration/test_activity_full_floou_mock_wallet.py -m f
 
 ## 6. Bullrun: скрипт «всё в одном» (репо)
 
-Из **корня репозитория** можно запустить все сервисы и вызов точки входа одним скриптом **`scripts/run-bullrun-floou.sh`** (bullrun floou):
+Из **корня репозитория** можно запустить все сервисы и вызов точки входа одним скриптом **`scripts/shell/run-bullrun-floou.sh`** (bullrun floou; обёртка `scripts/run-bullrun-floou.sh`):
 
 ```bash
-./scripts/run-bullrun-floou.sh
+./scripts/shell/run-bullrun-floou.sh
 ```
 
 Скрипт:
@@ -139,12 +139,12 @@ python3 -m pytest tests/integration/test_activity_full_floou_mock_wallet.py -m f
 
 **Предполагается:** блокчейн-нода уже запущена с задеплоенными контрактами. Остановка: Ctrl+C (скрипт завершит все три процесса).
 
-**Протокол прогона (артефакт):** при каждом завершении `run-bullrun-floou.sh` (успех, ошибка или код **130** при прерывании) в каталоге `scripts/logs/` создаётся **один** текстовый файл с именем по шаблону `{S1}.{S2}.{S3}.{S4}.{S5}.{S6}-{ddMMyyyyHHmm}.txt` — шесть целочисленных сегментов через точку и двенадцатизначная метка **локального** времени (день, месяц, год, час, минута). В файле: метаданные, хронология шагов оркестратора и полные stdout/stderr процессов Bot, arweave-uploader и wallet-mock. Запись в файл отключить: `FLOOU_LOG_DISABLE=true`. Подробности — `scripts/docs/analysis/tasks/task-implement-run-full-floou-structured-log-artifact/decision-points-run-full-floou-structured-log.md`.
+**Протокол прогона (артефакт):** при каждом завершении `scripts/shell/run-bullrun-floou.sh` (успех, ошибка или код **130** при прерывании) в каталоге `scripts/logs/` создаётся **один** текстовый файл с именем по шаблону `{S1}.{S2}.{S3}.{S4}.{S5}.{S6}-{ddMMyyyyHHmm}.txt` — шесть целочисленных сегментов через точку и двенадцатизначная метка **локального** времени (день, месяц, год, час, минута). В файле: метаданные, хронология шагов оркестратора и полные stdout/stderr процессов Bot, arweave-uploader и wallet-mock. Запись в файл отключить: `FLOOU_LOG_DISABLE=true`. Подробности — `scripts/docs/analysis/tasks/task-implement-run-full-floou-structured-log-artifact/decision-points-run-full-floou-structured-log.md`.
 
 Переопределение портов и пользователя:
 
 ```bash
-BOT_PORT=8000 UPLOADER_PORT=3000 USER_ID=my-user ./scripts/run-bullrun-floou.sh
+BOT_PORT=8000 UPLOADER_PORT=3000 USER_ID=my-user ./scripts/shell/run-bullrun-floou.sh
 ```
 
 ---
@@ -233,7 +233,7 @@ python3 -m pytest tests/integration/test_activity_full_floou_mock_wallet.py -m f
 
 | Документ | Описание |
 |----------|----------|
-| **`scripts/run-bullrun-floou.sh`** (bullrun, из корня репо) | Скрипт: export URL/портов, старт bot + uploader + wallet-mock, curl draft, ожидание двух подписей, итог. |
+| **`scripts/shell/run-bullrun-floou.sh`** (bullrun, из корня репо) | Скрипт: export URL/портов, старт bot + uploader + wallet-mock, curl draft, ожидание двух подписей, итог. |
 | [`bot/docs/analysis/tasks/task-tests-full-flow-signing-mock-wallet-localhost.md`](../analysis/tasks/task-tests-full-flow-signing-mock-wallet-localhost.md) | Таск и критерии приёмки. |
 | [`bot/docs/analysis/tasks/.../e2e-real-services-design.md`](../analysis/tasks/task-tests-full-flow-signing-mock-wallet-localhost/e2e-real-services-design.md) | Дизайн E2E: поток, верификация, ограничение wallet-mock. |
 | [`wallet/docs/mock-runner-launch-guide.md`](../../../wallet/docs/mock-runner-launch-guide.md) | Запуск wallet-mock, переменные, сценарий отладки. |

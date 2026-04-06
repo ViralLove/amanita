@@ -1,8 +1,13 @@
 # AMANITA Bot API — техническая документация (SSOT: код)
 
-**Последняя сверка с кодом:** 2026-03-28 (GPT Actions Bearer)  
+**Последняя сверка с кодом:** 2026-03-28  
 **Источники истины:** `bot/api/main.py`, `bot/api/middleware/auth.py`, `bot/api/config.py`, `bot/api/routes/*.py`.  
-**Канонические схемы запросов/ответов:** интерактивно — `GET /docs`, `GET /openapi.json` (генерируется FastAPI).
+**Канонические схемы запросов/ответов:** интерактивно — `GET /docs`, `GET /openapi.json` (генерируется FastAPI).  
+**Краткий вход (запуск):** `bot/api/README.md`.
+
+## 0. Остальная документация в этой папке
+
+Оглавление и роли файлов — **[`README.md`](./README.md)** (commerce-поток, HMAC/архитектура, требования WP, логирование). Этот файл (`api.md`) не дублирует пошаговые гайды — только **факты** о маршрутах и auth.
 
 ---
 
@@ -82,7 +87,7 @@ REST API на **FastAPI** (зависимость: `fastapi>=0.104.0` в кор�
 
 Во многих хендлерах поддерживается query `simulate_error=…` для матрицы ошибок (см. описания в OpenAPI).
 
-Заголовок **`X-User-Id`**: используется в `POST /activities/draft` (mock user при отсутствии); иначе auth на уровне HMAC не требуется для префикса `/activities`.
+Заголовок **`X-User-Id`**: используется в `POST /activities/draft` (mock user при отсутствии); иначе auth на уровне HMAC не требуется для префикса `/activities`. Подробно: **[`activity-x-user-id.md`](./activity-x-user-id.md)** (валидация, привязка к upload, wallet-guard).
 
 ### 2.6 `/reference` (`routes/reference.py`)
 
@@ -97,11 +102,23 @@ REST API на **FastAPI** (зависимость: `fastapi>=0.104.0` в кор�
 
 | Метод | Путь | Авторизация |
 |--------|------|-------------|
-| PUT | `/v1/uploads/{upload_id}/status` | `Authorization: Bearer <EDGE_TO_BACKEND_SECRET>` |
+| PUT | `/v1/uploads/{upload_id}/status` | `Authorization: Bearer <секрет>` — `_get_edge_secret()`: `NODE_AUTH_TOKEN` → `EDGE_TO_BACKEND_SECRET` → `OWN_AUTH_TOKEN` |
 | POST | `/v1/uploads/callback` | То же Bearer |
 | GET | `/v1/uploads/{upload_id}/sign-payload` | `authenticate_wallet_request`: `WALLET_AUTH_MODE`, `Authorization: Bearer <wallet_auth_token>` при challenge-режиме, иначе при `ALLOW_X_USER_ID_FALLBACK=true` — **обязателен `X-User-Id`** |
 
 Тела статуса/callback — см. Pydantic-модели `PutStatusBody`, `CallbackBody` в том же файле.
+
+**Ответ `POST /v1/uploads/callback` (ASG-2, Variant B):** HTTP **всегда 200**, если `handle_callback` прошёл (публикация учтена). Тело расширено полями наблюдаемости:
+
+| Поле | Тип | Смысл |
+|------|-----|--------|
+| `ok` | bool | Callback принят (как и раньше). |
+| `sign_contract_enqueued` | bool | Успешно создан `sign_request` и отправлен push `sign_contract`. |
+| `sign_request_id` | string \| null | ID sign-request при успехе; иначе `null`. |
+| `error_code` | string \| null | Например `upload_record_missing`, `sign_request_push_failed`; при успехе `null`. |
+| `error` | string \| null | Краткое сообщение для оператора **без** деталей исключения и секретов; полный traceback — только в логах сервера. |
+
+Интеграторы (arweave-uploader / Edge): проверять **`sign_contract_enqueued`**, а не только `ok`.
 
 ### 2.8 `/v1` sign requests (`routes/sign_requests.py`)
 
@@ -109,6 +126,8 @@ REST API на **FastAPI** (зависимость: `fastapi>=0.104.0` в кор�
 |--------|------|
 | GET | `/v1/sign-requests/{sign_request_id}` |
 | POST | `/v1/sign-requests/{sign_request_id}/submit` |
+
+**GET — поля `chain_id` и `contract_address` (wallet `sign_contract`):** через **`BlockchainService.get_sign_request_evm_params()`**: `chain_id` = строка **`CHAIN_ID`** из **`bot/config.py`** (переменная окружения `CHAIN_ID`, должна совпадать с `eth_chainId` узла `WEB3_PROVIDER_URI`; при рассинхроне старт сервиса падает, кроме режима **`EVM_CHAIN_ID_SKIP_RPC_CHECK=1`**); `contract_address` = proxy **ActivityRegistry** из **MagicRegistry** (загрузка по имени `ActivityRegistry` в `bot/services/core/blockchain.py`).
 
 ### 2.9 `/v1` pending (`routes/pending_sign_requests.py`)
 
@@ -158,9 +177,9 @@ REST API на **FastAPI** (зависимость: `fastapi>=0.104.0` в кор�
 - **Префиксы:** `/activities`, `/reference` (все пути, начинающиеся с них).
 - **Требование:** заголовок `Authorization: Bearer <секрет>`; сравнение через `secrets.compare_digest` (при неравной длине токена и секрета — 401 без исключения).
 - **Ответ 401:** JSON с `success: false`, `error: gpt_actions_auth_error`, `error_code`: `missing_bearer` | `invalid_bearer`, `path`, `timestamp`.
-- **Не путать с:** `EDGE_TO_BACKEND_SECRET` (Edge → upload status/callback), wallet session token из `POST /v1/wallet-auth/verify`.
+- **Не путать с:** секретом uploads status/callback (`NODE_AUTH_TOKEN` / `EDGE_TO_BACKEND_SECRET` / `OWN_AUTH_TOKEN` в `uploads.py`), wallet session token из `POST /v1/wallet-auth/verify`.
 
-Порядок в стеке: middleware регистрируется в `main.py` **до** `HMACMiddleware`, чтобы после пропуска HMAC для `/activities` запрос доходил до этой проверки.
+Порядок в стеке: `GptActionsBearerMiddleware` добавляется в `main.py` **раньше** `HMACMiddleware`. У Starlette **последний** зарегистрированный слой обрабатывает запрос **первым**, поэтому фактически: сначала **HMAC** (для `/activities` — пропуск), затем **GptActionsBearer**, затем приложение.
 
 ---
 
@@ -183,7 +202,7 @@ Upload / edge / finalizer:
 
 | Переменная | Где используется |
 |------------|------------------|
-| `EDGE_TO_BACKEND_SECRET` | `uploads.py` Bearer для status/callback |
+| `NODE_AUTH_TOKEN`, `EDGE_TO_BACKEND_SECRET`, `OWN_AUTH_TOKEN` | `uploads.py` Bearer для status/callback (приоритет см. `_get_edge_secret`) |
 | `ARWEAVE_SERVICE_URL` | Ответ `sign-payload` |
 | `UPLOAD_FINALIZER_INTERVAL_SEC` | `main.py` lifespan |
 
@@ -192,6 +211,14 @@ Wallet:
 | Переменная | Где |
 |------------|-----|
 | `WALLET_AUTH_MODE`, `ALLOW_X_USER_ID_FALLBACK` | `wallet_auth_guard.py` |
+
+Блокчейн (EVM, `bot/config.py`, `BlockchainService`, challenge wallet-auth):
+
+| Переменная | Назначение |
+|------------|------------|
+| `WEB3_PROVIDER_URI` | RPC URL узла |
+| `CHAIN_ID` | Десятичный chain id деплоя; SSOT для API sign-requests, транзакций бота и текста challenge (`WalletAuthService`); при старте сравнивается с `eth_chainId` RPC |
+| `EVM_CHAIN_ID_SKIP_RPC_CHECK` | Если `1`/`true`/`yes` — не падать при несовпадении `CHAIN_ID` и RPC (только отладка/особые тесты) |
 
 ---
 
@@ -254,4 +281,4 @@ cd bot && python3 -m pytest tests/unit/test_wallet_auth_enforcement.py -v
 
 ## 10. Заключение
 
-Документ описывает **фактическое** поведение Bot API для интеграции. Детальные JSON-схемы и примеры тел запросов — в **OpenAPI** (`/docs`). При расхождении кода и этой заметки приоритет у **кода**; этот файл следует обновлять при добавлении роутеров или изменении middleware.
+Документ описывает **фактическое** поведение Bot API для интеграции. Детальные JSON-схемы и примеры тел запросов — в **OpenAPI** (`/docs`). Поток загрузки продуктов для интеграторов — [`commerce-upload-flow.md`](./commerce-upload-flow.md). При расхождении кода и этой заметки приоритет у **кода**; обновлять при изменении роутеров или middleware.

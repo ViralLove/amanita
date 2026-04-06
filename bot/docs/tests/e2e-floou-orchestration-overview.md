@@ -12,7 +12,7 @@
 - Есть рабочий ручной мануал:
   - `bot/docs/tests/e2e-floou-manual.md`
 - Есть скрипт оркестрации из корня репо:
-  - `scripts/run-bullrun-floou.sh`
+  - `scripts/shell/run-bullrun-floou.sh`
 
 Итого: предметно сценарий уже покрыт, формальный статус task-дока просто не синхронизирован.
 
@@ -25,7 +25,7 @@
 Из корня репозитория:
 
 ```bash
-./scripts/run-bullrun-floou.sh
+./scripts/shell/run-bullrun-floou.sh
 ```
 
 Скрипт поднимает:
@@ -157,7 +157,7 @@ sequenceDiagram
 - `bot/docs/tests/e2e-floou-manual.md`
 - `bot/tests/integration/test_activity_full_floou_mock_wallet.py`
 - `bot/docs/analysis/tasks/task-tests-full-flow-signing-mock-wallet-localhost/task-tests-full-flow-signing-mock-wallet-localhost.md`
-- `scripts/run-bullrun-floou.sh`
+- `scripts/shell/run-bullrun-floou.sh`
 
 ---
 

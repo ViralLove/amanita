@@ -24,6 +24,12 @@ Activity Services Architecture описывает структуру серви�
 6. **Cache паттерн**: кэширование для производительности
 7. **Validation паттерн**: отдельный сервис для валидации
 
+### Реализация Bot API (мок GPT, in-memory)
+
+В коде `bot/api/routes/activities.py` все операции `/activities/*` делегируют в **`ActivityRegistryService`** (`bot/services/application/activity/`), сборка графа: `build_activity_registry_service` + `api.dependencies.get_activity_registry_service`. Это **мок-вертикаль** поверх `ActivityStorage` с цепочкой prepare/push для draft; полный набор зависимостей из диаграммы ниже (отдельный Validation/Assembler/chain для каждого шага) подключается по мере production-итераций, а не дублируется в роутах.
+
+Расхождение порядка floou (Arweave upload mock vs «сначала запись в chain» в учебных фрагментах документа) зафиксировано в ADR: `bot/docs/analysis/tasks/task-umbrella-activity-evm-signing-gap-closure/subtask-c-activity-vertical-alignment/ADR-activity-mock-floou-vs-target-architecture.md`.
+
 ---
 
 ## Архитектурная диаграмма
@@ -384,7 +390,9 @@ class ActivityCacheService:
 
 ### 3. ActivityApiService (Application Layer)
 
-**Назначение**: Тонкий слой для API endpoints. Координирует между routes и RegistryService.
+**Реализация в bot (актуально):** эндпоинты могут внедрять **`ActivityRegistryService`** напрямую (`Depends(get_activity_registry_service)`), по аналогии с **`ProductRegistryService`**, без отдельного класса `ActivityApiService`, пока нет HTTP-специфичной логики (версии API, маппинг DTO, feature flags) — иначе получается лишний проход без ответственности (YAGNI). Ниже описан **опциональный** тонкий слой, если он понадобится.
+
+**Назначение (целевой паттерн)**: Тонкий слой для API endpoints. Координирует между routes и RegistryService.
 
 **Зависимости**:
 - `ActivityRegistryService` - для всех операций с Activity
@@ -581,41 +589,43 @@ class ServiceFactory:
 
 ### 5. Интеграция с API Routes
 
-**Назначение**: Использование ActivityApiService в FastAPI routes через Dependency Injection.
+**Назначение**: Внедрение оркестратора через Dependency Injection (как `ProductRegistryService`).
 
-**Пример реализации** (обновление routes):
+**Пример реализации в bot** (актуально: прямой `ActivityRegistryService`, без обязательного `ActivityApiService`):
 
 ```python
-# bot/api/routes/activities.py
+# bot/api/routes/activities.py (фрагмент)
 
-from fastapi import APIRouter, Depends, HTTPException
-from api.dependencies import get_activity_api_service
-from services.application.activity.api_service import ActivityApiService
-
-router = APIRouter(prefix="/activities", tags=["activities"])
+from fastapi import Depends
+from api.dependencies import get_activity_registry_service
+from services.application.activity import ActivityRegistryService
 
 @router.post("/draft")
 async def create_draft(
     body: ActivityCreateRequest,
-    creator_address: str = Depends(get_current_user_address),  # Из authentication
+    activity_registry: ActivityRegistryService = Depends(get_activity_registry_service),
+):
+    user_id = ...
+    payload = body.model_dump(exclude_none=True)
+    result = activity_registry.create_draft(user_id, payload)
+    return JSONResponse(status_code=201, content=build_success_response(...))
+
+# Альтернатива: ActivityApiService = Depends(get_activity_api_service) — если появится
+# HTTP-специфичная логика (см. §3).
+```
+
+**Пример с отдельным ApiService** (опционально, если понадобится тонкий слой):
+
+```python
+from api.dependencies import get_activity_api_service  # гипотетический провайдер
+from services.application.activity.api_service import ActivityApiService  # при введении класса
+
+@router.post("/draft")
+async def create_draft(
+    body: ActivityCreateRequest,
     api_service: ActivityApiService = Depends(get_activity_api_service)
 ):
-    """
-    Создать Draft Activity.
-    """
-    try:
-        activity_data = body.model_dump(exclude_none=True)
-        result = await api_service.create_draft(activity_data, creator_address)
-        return JSONResponse(
-            status_code=201,
-            content=build_success_response(activity=result)
-        )
-    except ValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except AuthorizationError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    ...
 
 @router.get("/{activity_id}")
 async def get_activity(
