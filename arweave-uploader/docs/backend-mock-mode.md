@@ -19,7 +19,7 @@
 BACKEND_USE_MOCK=true node dist/server.js
 ```
 
-Чтобы **не** мокировать backend и реально дергать bot: не задавайте `BACKEND_USE_MOCK` (или `false`), укажите **`BACKEND_URL`** и **`UPLOADER_TO_BACKEND_SECRET`** или **`EDGE_TO_BACKEND_SECRET`** — см. **[backend-integration.md](./backend-integration.md)**.
+Чтобы **не** мокировать backend и реально дергать bot: не задавайте `BACKEND_USE_MOCK` (или `false`), укажите **`BACKEND_URL`** и **`NODE_AUTH_TOKEN`** — см. **[backend-integration.md](./backend-integration.md)**.
 
 ---
 

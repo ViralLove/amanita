@@ -99,7 +99,7 @@
 
 ### Реальный Backend (бот)
 
-Если **не** включён `BACKEND_USE_MOCK`, для `PUT …/v1/uploads/…/status` и `POST …/v1/uploads/callback` нужны **`BACKEND_URL`** и секрет **`UPLOADER_TO_BACKEND_SECRET`** или **`EDGE_TO_BACKEND_SECRET`** (одинаковая строка с приёмником на bot). Подробно: **[backend-integration.md](backend-integration.md)**.
+Если **не** включён `BACKEND_USE_MOCK`, для `PUT …/v1/uploads/…/status` и `POST …/v1/uploads/callback` нужны **`BACKEND_URL`** и **`NODE_AUTH_TOKEN`** (одинаковая строка с приёмником на bot). Подробно: **[backend-integration.md](backend-integration.md)**.
 
 ---
 
@@ -124,7 +124,7 @@
 
 ## 7. Связанные документы
 
-- **Интеграция с bot (реальные callback/status):** `docs/backend-integration.md` — `BACKEND_URL`, секрет, связка с `OWN_AUTH_TOKEN` / `EDGE_TO_BACKEND_SECRET` на боте.
+- **Интеграция с bot (реальные callback/status):** `docs/backend-integration.md` — `BACKEND_URL`, `NODE_AUTH_TOKEN`, связка с bot (`uploads.py`).
 - **Режим мока Backend:** `docs/backend-mock-mode.md` — переменные, заголовки, переключение на лету.
 - **Деплой и проверка:** `docs/deploy/railway-docker.md`, `docs/deploy/deploy-options.md`
 - **Тесты:** Unit: `npm run test:unit` (см. `docs/testing-unit.md`). Сводные publish: `node tests/publish-flow.test.js` (требуют ARWEAVE_PRIVATE_KEY, BACKEND_USE_MOCK=true).

@@ -21,7 +21,7 @@ node --test 'tests/unit/*.test.js'
 | `tests/helpers/env.js` | Сохранение/восстановление env для изоляции |
 | `tests/fixtures/minimal-jwk.json` | Минимальный JWK для loadConfig в тестах |
 | `tests/fixtures/jwt-upload-token.js` | RSA-ключи и подписанный JWT (RS256) для verifyUploadToken |
-| `tests/fixtures/valid-data-item.js` | Минимальный валидный ANS-104 Data Item с тегом Upload-Id |
+| `tests/fixtures/valid-data-item.js` | Минимальный валидный ANS-104 Data Item с тегом Upload-Id; опция `{ modulusLength: 4096 }` для RSA-4096 |
 | `tests/fixtures/deep-hash-vectors.json` | Эталоны deepHash (sha256, referenceSha384). Ссылки на источники в файле. |
 
 ## Модули
@@ -32,7 +32,7 @@ node --test 'tests/unit/*.test.js'
 - **arweave-client** — ArweaveClient (инициализация, arweave/jwk для bundleAndPublish)
 - **publish/backend-calls** — normalizeMockStatus, putStatus, postCallback (mock)
 - **publish/validate-token** — verifyUploadToken (token_invalid)
-- **publish/validate-data-item** — validateDataItem (signature_invalid)
+- **publish/validate-data-item** — validateDataItem (signature_invalid); RSA с динамической длиной подписи (256/384/512 B) и DER SPKI owner (типично 294/422/550 B для 2048/3072/4096)
 - **publish/deep-hash** — deepHash (blob/list). См. ниже «Зачем тестируем deepHash».
 - **publish/bundle-publish** — bundleAndPublish (error path)
 - **server** — buildApp, GET /health, POST /v1/crystalize (400/401)
