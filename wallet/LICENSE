@@ -1,0 +1,25 @@
+Amanita Reference Client License (BSL-style)
+
+This license applies ONLY to the contents of the /wallet directory.
+
+You are allowed to:
+
+* View and study the source code
+* Modify the code for personal or internal use
+* Run the application for non-production purposes
+
+You are NOT allowed to:
+
+* Use this frontend in production for a competing or independent network
+* Rebrand, reskin, or redistribute this frontend as a standalone product
+* Remove or alter protocol identity indicators
+* Use this frontend to operate a system that does not comply with Amanita protocol rules
+
+Commercial use of this frontend is restricted unless explicitly approved.
+
+Change Date:
+This code may be relicensed under a permissive open-source license at a future date defined by the Amanita maintainers.
+
+Disclaimer:
+This restriction applies only to the frontend implementation.
+The underlying protocol and smart contracts remain open under Apache 2.0.
